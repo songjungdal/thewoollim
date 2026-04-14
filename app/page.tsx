@@ -144,20 +144,20 @@ export default function SmoothOnePage() {
             </div>
 
             <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} className="mt-20 flex justify-center">
-              <button 
+              <div 
+                role="button"
+                tabIndex={0}
                 onClick={() => {
                   setIsGalleryExpanded(!isGalleryExpanded);
                   if (isGalleryExpanded) {
                     document.getElementById('gallery')?.scrollIntoView({ behavior: 'smooth' });
                   }
                 }}
-                className="group flex flex-col items-center gap-2 text-white font-bold hover:text-brand-point transition-all duration-300"
+                className="group inline-flex items-center gap-3 bg-[#008080] text-white px-8 py-3.5 rounded-xl border border-[#008080] font-semibold transition-all duration-300 hover:bg-[#006666] hover:-translate-y-[2px] hover:shadow-[0_8px_20px_rgba(0,128,128,0.3)] active:scale-95 active:translate-y-0 shadow-lg cursor-pointer"
               >
-                <span className="text-sm tracking-widest uppercase mb-1">{isGalleryExpanded ? "접기" : "더보기"}</span>
-                <div className={`w-12 h-12 rounded-full border border-white/20 flex items-center justify-center group-hover:border-brand-point transition-all duration-300 ${isGalleryExpanded ? 'rotate-180' : ''}`}>
-                  <ChevronDown className="group-hover:translate-y-1 transition-transform" />
-                </div>
-              </button>
+                <span className="text-base tracking-widest">{isGalleryExpanded ? "접기" : "더보기"}</span>
+                <ChevronDown className={`transition-transform duration-300 ${isGalleryExpanded ? 'rotate-180' : 'group-hover:translate-y-1'}`} />
+              </div>
             </motion.div>
           </div>
         </section>
