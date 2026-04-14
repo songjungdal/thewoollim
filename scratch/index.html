@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Server Monitoring Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --accent-primary: #38bdf8;
+            --accent-secondary: #818cf8;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
+                radial-gradient(at 50% 0%, hsla(225,39%,30%,1) 0, transparent 50%), 
+                radial-gradient(at 100% 0%, hsla(339,49%,30%,1) 0, transparent 50%);
+            background-attachment: fixed;
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 3rem;
+        }
+
+        header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(to right, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.2);
+            color: #4ade80;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .pulse {
+            width: 8px;
+            height: 8px;
+            background-color: #4ade80;
+            border-radius: 50%;
+            box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(74, 222, 128, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 1.5rem;
+            padding: 1.5rem;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .card-title {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .card-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .card-footer {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .progress-container {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 999px;
+            overflow: hidden;
+            margin: 1rem 0;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(to right, var(--accent-primary), var(--accent-secondary));
+            border-radius: 999px;
+            transition: width 1s ease;
+        }
+
+        .chart-container {
+            grid-column: span 2;
+            height: 300px;
+        }
+
+        @media (max-width: 900px) {
+            .chart-container {
+                grid-column: span 1;
+            }
+        }
+
+        .icon-box {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 0.5rem;
+            border-radius: 0.75rem;
+            color: var(--accent-primary);
+        }
+
+        .uptime-display {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 1rem;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 1rem;
+            border: 1px solid var(--glass-border);
+        }
+
+        .uptime-label {
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(8px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.5s ease, visibility 0.5s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-content {
+            background: var(--card-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 2rem;
+            padding: 2rem;
+            max-width: 600px;
+            width: 90%;
+            text-align: center;
+            transform: scale(0.9);
+            transition: transform 0.5s ease;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-overlay.active .modal-content {
+            transform: scale(1);
+        }
+
+        .modal-image {
+            width: 100%;
+            border-radius: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            background: linear-gradient(to right, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .modal-btn {
+            background: linear-gradient(to right, var(--accent-primary), var(--accent-secondary));
+            color: white;
+            border: none;
+            padding: 0.75rem 2rem;
+            border-radius: 9999px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            margin-top: 1rem;
+        }
+
+        .modal-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(56, 189, 248, 0.4);
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <h1>Infrastructure Monitoring</h1>
+                <p style="color: var(--text-secondary);">Real-time server performance metrics</p>
+            </div>
+            <div class="status-badge">
+                <div class="pulse"></div>
+                System Operational
+            </div>
+        </header>
+
+        <div class="grid">
+            <!-- CPU Card -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">CPU Load</span>
+                    <div class="icon-box"><i data-lucide="cpu"></i></div>
+                </div>
+                <div class="card-value" id="cpu-value">--</div>
+                <div class="card-footer">Avg load per core</div>
+            </div>
+
+            <!-- RAM Card -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Memory Usage</span>
+                    <div class="icon-box"><i data-lucide="database"></i></div>
+                </div>
+                <div class="card-value" id="mem-percent">--%</div>
+                <div class="progress-container">
+                    <div class="progress-bar" id="mem-bar" style="width: 0%"></div>
+                </div>
+                <div class="card-footer" id="mem-footer">-- / -- MB used</div>
+            </div>
+
+            <!-- Disk Card -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Disk Storage</span>
+                    <div class="icon-box"><i data-lucide="hard-drive"></i></div>
+                </div>
+                <div class="card-value" id="disk-percent">--%</div>
+                <div class="progress-container">
+                    <div class="progress-bar" id="disk-bar" style="width: 0%; background: linear-gradient(to right, #f472b6, #fb7185);"></div>
+                </div>
+                <div class="card-footer" id="disk-footer">-- / -- GB used</div>
+            </div>
+        </div>
+
+        <div class="grid">
+            <!-- Dynamic Chart -->
+            <div class="card chart-container">
+                <div class="card-header">
+                    <span class="card-title">Live Performance Tracking</span>
+                    <div class="icon-box"><i data-lucide="activity"></i></div>
+                </div>
+                <canvas id="performanceChart"></canvas>
+            </div>
+
+            <!-- Server Info -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">System Status</span>
+                    <div class="icon-box"><i data-lucide="info"></i></div>
+                </div>
+                <div class="uptime-display">
+                    <i data-lucide="clock" size="18"></i>
+                    <div>
+                        <div class="uptime-label">Uptime</div>
+                        <div id="uptime-value">Loading...</div>
+                    </div>
+                </div>
+                <div class="uptime-display" style="margin-top: 1rem;">
+                    <i data-lucide="server" size="18"></i>
+                    <div>
+                        <div class="uptime-label">IP Address</div>
+                        <div>15.164.55.147</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Splash Modal -->
+    <div class="modal-overlay" id="splash-modal">
+        <div class="modal-content">
+            <img src="splash.png" alt="Vibe Coding" class="modal-image">
+            <h2 class="modal-title">Welcome to the Dashboard</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">The Fox and the Cat are hard at work vibe-coding your infrastructure. Stay tuned for real-time updates!</p>
+            <button class="modal-btn" onclick="closeModal()">Enter Dashboard</button>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // Chart Initialization
+        const ctx = document.getElementById('performanceChart').getContext('2d');
+        const chartData = {
+            labels: Array(20).fill(''),
+            datasets: [
+                {
+                    label: 'CPU Usage',
+                    data: Array(20).fill(0),
+                    borderColor: '#38bdf8',
+                    backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    borderWidth: 3
+                },
+                {
+                    label: 'RAM Usage',
+                    data: Array(20).fill(0),
+                    borderColor: '#818cf8',
+                    backgroundColor: 'rgba(129, 140, 248, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    borderWidth: 3
+                }
+            ]
+        };
+
+        const config = {
+            type: 'line',
+            data: chartData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: { color: '#94a3b8', font: { family: 'Inter' } }
+                    }
+                },
+                scales: {
+                    x: { display: false },
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: { color: '#94a3b8' }
+                    }
+                },
+                animation: { duration: 1000 }
+            }
+        };
+
+        const performanceChart = new Chart(ctx, config);
+
+        // Modal Logic
+        function openModal() {
+            document.getElementById('splash-modal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('splash-modal').classList.remove('active');
+        }
+
+        // Show modal on load
+        window.addEventListener('load', () => {
+            setTimeout(openModal, 500);
+        });
+
+        async function updateDashboard() {
+            try {
+                const response = await fetch('stats.php');
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    const data = result.data;
+                    
+                    // Update CPU
+                    document.getElementById('cpu-value').innerText = data.cpu;
+                    
+                    // Update Memory
+                    document.getElementById('mem-percent').innerText = data.memory.percent + '%';
+                    document.getElementById('mem-bar').style.width = data.memory.percent + '%';
+                    document.getElementById('mem-footer').innerText = `${data.memory.used} / ${data.memory.total} MB used`;
+                    
+                    // Update Disk
+                    document.getElementById('disk-percent').innerText = data.disk.percent + '%';
+                    document.getElementById('disk-bar').style.width = data.disk.percent + '%';
+                    document.getElementById('disk-footer').innerText = `${data.disk.used} / ${data.disk.total} GB used`;
+                    
+                    // Update Uptime
+                    document.getElementById('uptime-value').innerText = data.uptime;
+
+                    // Update Chart (CPU value is load avg, so we normalize for demo or just show it)
+                    // Let's assume max load 4 for scale or just use percentage
+                    const cpuPercent = Math.min((data.cpu / 2) * 100, 100); // Simple normalization
+                    
+                    performanceChart.data.datasets[0].data.shift();
+                    performanceChart.data.datasets[0].data.push(cpuPercent);
+                    
+                    performanceChart.data.datasets[1].data.shift();
+                    performanceChart.data.datasets[1].data.push(data.memory.percent);
+                    
+                    performanceChart.update();
+                }
+            } catch (error) {
+                console.error('Error fetching stats:', error);
+            }
+        }
+
+        // Initial update and then every 3 seconds
+        updateDashboard();
+        setInterval(updateDashboard, 3000);
+
+    </script>
+</body>
+</html>

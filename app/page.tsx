@@ -1,65 +1,353 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState } from "react";
+import { motion, AnimatePresence, Variants } from "framer-motion";
+import { ArrowRight, ChevronDown, Users, Star, Calendar, MapPin, X } from "lucide-react";
+import FullCalendar from "@fullcalendar/react";
+import dayGridPlugin from "@fullcalendar/daygrid";
+import interactionPlugin from "@fullcalendar/interaction";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import Header from "./components/Header";
+import Footer from "./components/Footer";
+import { PARTIES, CALENDAR_EVENTS, PARTICIPANTS, FAQS } from "./lib/data";
+
+export default function SmoothOnePage() {
+  const [activeTab, setActiveTab] = useState("주제별");
+  const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(null);
+  const [selectedGalleryImage, setSelectedGalleryImage] = useState<string | null>(null);
+  const [isGalleryExpanded, setIsGalleryExpanded] = useState(false);
+  const router = useRouter();
+
+  const TABS = ["주제별", "지역별", "일정별"];
+
+  const fadeInUp: Variants = {
+    hidden: { opacity: 0, y: 40 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: "easeOut" } }
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <div className="flex flex-col min-h-screen text-brand-black pb-0">
+      <Header />
+      
+      <main className="flex-1">
+        {/* Hero Section */}
+        <section className="relative h-[90vh] min-h-[700px] flex flex-col justify-center bg-brand-black overflow-hidden pt-[120px] pb-24 md:pt-[140px] md:pb-32">
+          {/* Background Image with Parallax & Overlay */}
+          <div 
+            className="absolute inset-0 bg-cover bg-no-repeat bg-center pointer-events-none transition-all duration-700"
+            style={{ backgroundImage: "url('/images/hero-bg.jpg')" }}
+          />
+          <div className="absolute inset-0 bg-[rgba(0,0,0,0.5)]" />
+
+          {/* Content */}
+          <div className="relative z-10 max-w-7xl mx-auto px-6 w-full text-white mt-auto mb-16 md:mb-20">
+            <motion.div initial="hidden" animate="visible" variants={fadeInUp}>
+              <h1 className="text-5xl md:text-8xl font-black tracking-tighter leading-tight mb-8 md:mb-10 drop-shadow-2xl">
+                세상을 울리는<br />
+                새로운 연결, <span className="text-brand-point">어울림</span>
+              </h1>
+              <p className="text-lg md:text-2xl text-white font-semibold max-w-3xl leading-relaxed mb-12 md:mb-14 flex flex-col gap-1 md:gap-2 drop-shadow-lg">
+                <span>숫자와 스펙으로 재단되는 관계를 넘어,</span>
+                <span className="hidden sm:inline">진정으로 마음을 울리는 감성적인 오프라인 네트워킹을 경험하세요.</span>
+                <span className="sm:hidden">진심이 통하는 네트워킹을 경험하세요.</span>
+              </p>
+              <button 
+                onClick={(e) => {
+                  e.preventDefault();
+                  document.getElementById('apply')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="inline-flex items-center gap-3 bg-brand-black text-white px-10 py-5 md:py-6 rounded-full text-lg font-bold hover:bg-brand-point hover:-translate-y-1 transition-all shadow-xl hover:shadow-brand-point/30 cursor-pointer border border-white/20"
+              >
+                어울림 매칭파티 신청하기 <ArrowRight size={20} />
+              </button>
+            </motion.div>
+          </div>
+        </section>
+
+        {/* 참여하기 (Apply Cards) Section */}
+        <section id="apply" className="py-32 px-6 bg-white rounded-t-3xl md:rounded-t-[3rem] shadow-[0_-20px_40px_rgba(0,0,0,0.02)]">
+          <div className="max-w-7xl mx-auto">
+            <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="text-center mb-16">
+              <h2 className="text-4xl md:text-6xl font-bold mb-6 tracking-tight">매칭파티 신청</h2>
+              <p className="text-lg text-gray-500 max-w-2xl mx-auto">원하는 테마와 일정을 선택하여 어울림의 감성을 만나보세요.</p>
+            </motion.div>
+
+            <div className="flex justify-center gap-4 mb-16 border-b border-gray-100 pb-2 overflow-x-auto">
+              {TABS.map(tab => (
+                <button 
+                  key={tab} 
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-6 py-3 text-lg font-bold rounded-full transition-colors whitespace-nowrap ${activeTab === tab ? 'bg-brand-point text-white shadow-md' : 'text-gray-400 hover:bg-gray-100'}`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              <AnimatePresence>
+                {PARTIES.filter(card => activeTab === '일정별' || card.tag === activeTab).map(card => (
+                  <motion.div 
+                    key={card.id} layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.3 }}
+                    className="bg-brand-lightgray border border-gray-100 p-8 rounded-3xl hover:border-brand-point transition-all flex flex-col h-full group"
+                  >
+                    <h3 className="text-2xl font-bold mb-4 group-hover:text-brand-point transition-colors">{card.title}</h3>
+                    <div className="space-y-3 mb-8 text-gray-600 font-medium flex-1">
+                      <div className="flex items-center gap-3"><Calendar size={18} className="text-gray-400 group-hover:text-brand-point transition-colors" /> {card.dateString}</div>
+                      <div className="flex items-center gap-3"><MapPin size={18} className="text-gray-400 group-hover:text-brand-point transition-colors" /> {card.location}</div>
+                      <div className="flex items-center gap-3"><Users size={18} className="text-gray-400 group-hover:text-brand-point transition-colors" /> {card.target}</div>
+                    </div>
+                    {/* Independent Page Next Routing implementation */}
+                    <Link 
+                      href={`/party/${card.id}`}
+                      className="w-full text-center bg-brand-black text-white font-bold py-4 rounded-xl hover:bg-brand-point transition-colors duration-300 block"
+                    >
+                      매칭파티 참여하기
+                    </Link>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+          </div>
+        </section>
+
+        {/* Gallery Section */}
+        <section id="gallery" className="py-32 px-6 bg-brand-black text-white">
+          <div className="max-w-7xl mx-auto">
+            <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="mb-20">
+              <h2 className="text-4xl md:text-6xl font-bold mb-6 tracking-tight">후기갤러리</h2>
+              <p className="text-xl text-gray-400">어울림에서 피어난 따뜻하고 감각적인 시간들.</p>
+            </motion.div>
+            
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6 px-4 md:px-0 transition-all duration-700">
+              <AnimatePresence mode="popLayout">
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 1, 2, 3, 4, 5, 6, 7].slice(0, isGalleryExpanded ? 16 : (typeof window !== 'undefined' && window.innerWidth < 768 ? 4 : 6)).map((imgId, idx) => (
+                  <motion.div 
+                    key={`${imgId}-${idx}`} 
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    layout
+                    variants={fadeInUp}
+                    className="aspect-square bg-gray-800 rounded-2xl md:rounded-3xl relative overflow-hidden group cursor-pointer border border-white/5"
+                  >
+                    <div 
+                      onClick={() => setSelectedGalleryImage(`/images/gallery/g${imgId}.png`)}
+                      className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110 group-hover:brightness-110"
+                      style={{ backgroundImage: `url('/images/gallery/g${imgId}.png')` }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+
+            <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} className="mt-20 flex justify-center">
+              <button 
+                onClick={() => {
+                  setIsGalleryExpanded(!isGalleryExpanded);
+                  if (isGalleryExpanded) {
+                    document.getElementById('gallery')?.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }}
+                className="group flex flex-col items-center gap-2 text-white font-bold hover:text-brand-point transition-all duration-300"
+              >
+                <span className="text-sm tracking-widest uppercase mb-1">{isGalleryExpanded ? "접기" : "더보기"}</span>
+                <div className={`w-12 h-12 rounded-full border border-white/20 flex items-center justify-center group-hover:border-brand-point transition-all duration-300 ${isGalleryExpanded ? 'rotate-180' : ''}`}>
+                  <ChevronDown className="group-hover:translate-y-1 transition-transform" />
+                </div>
+              </button>
+            </motion.div>
+          </div>
+        </section>
+
+        {/* Matching Schedule Section (Calendar Implementation) */}
+        <section id="schedule" className="py-32 px-6 bg-white shadow-[0_-20px_40px_rgba(0,0,0,0.02)]">
+          <div className="max-w-7xl mx-auto">
+            <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="text-center mb-16">
+              <h2 className="text-4xl md:text-6xl font-bold mb-6 tracking-tight">매칭파티 일정</h2>
+              <p className="text-lg text-gray-500 max-w-2xl mx-auto">캘린더에서 신청가능한 매칭파티 일정을 확인하세요.</p>
+            </motion.div>
+
+            <div className="bg-white p-6 md:p-10 rounded-3xl shadow-lg border border-gray-100">
+              <div className="calendar-container w-full h-[700px] md:h-[1200px]">
+                <style dangerouslySetInnerHTML={{__html: `
+                  .fc-theme-standard .fc-scrollgrid { border-color: #f3f4f6; }
+                  .fc-theme-standard th, .fc-theme-standard td { border-color: #f3f4f6; }
+                  .fc-daygrid-day-frame { min-height: 160px !important; display: flex !important; flex-direction: column !important; }
+                  .fc-daygrid-day-top { flex-direction: row !important; justify-content: flex-start !important; padding: 10px !important; }
+                  .fc-daygrid-day-number { font-weight: 800; color: #111; padding: 0 !important; font-size: 1.1rem; }
+                  .fc-event { cursor: pointer; border-radius: 8px; padding: 6px 10px !important; font-weight: 800; font-size: 0.8rem; border: none; background-color: #40E0D0; color: #000 !important; margin-bottom: 5px !important; border-left: 4px solid rgba(0,0,0,0.1); transition: color 0.2s ease !important; }
+                  .fc-event:hover { color: #fff !important; opacity: 0.9; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(64, 224, 208, 0.3); }
+                  .fc-event-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+                  .fc-toolbar-title { font-weight: 900; font-size: 1.25rem !important; letter-spacing: -0.02em; }
+                  @media (min-width: 768px) { .fc-toolbar-title { font-size: 1.85rem !important; } }
+                  .fc-button-primary { background-color: #000 !important; border: none !important; border-radius: 12px !important; padding: 8px 16px !important; font-size: 0.9rem !important; display: flex !important; align-items: center !important; justify-content: center !important; transition: all 0.2s !important; }
+                  .fc-button-primary:hover { background-color: #40E0D0 !important; transform: translateY(-1px); }
+                  .fc-button-group { gap: 10px !important; }
+                  .fc-button-group > .fc-button { border-radius: 12px !important; margin-left: 0 !important; }
+                  .fc-toolbar-chunk { display: flex; align-items: center; }
+                  .fc-toolbar { display: flex !important; align-items: center !important; justify-content: space-between !important; margin-bottom: 2.5rem !important; }
+                  .fc-icon { font-size: 1.2em !important; font-weight: bold; }
+                  .fc-today-button { font-weight: 800 !important; text-transform: uppercase !important; letter-spacing: 0.05em !important; padding-left: 20px !important; padding-right: 20px !important; }
+                  /* Custom positioning for Today button on right */
+                  @media (max-width: 768px) {
+                    .fc-toolbar { flex-direction: row; flex-wrap: wrap; justify-content: space-between !important; }
+                    .fc-toolbar-chunk:nth-child(2) { order: 3; width: 100%; text-align: center; margin-top: 15px; }
+                    .fc-daygrid-day-frame { min-height: 120px !important; }
+                  }
+                  .fc-view-harness { background-color: #fff; }
+                  .fc-col-header-cell { padding: 12px 0 !important; background-color: #fafafa; }
+                  .fc-col-header-cell-cushion { color: #666; font-weight: 700; font-size: 0.9rem; }
+                  .fc-daygrid-more-link { font-weight: 800; color: #40E0D0 !important; font-size: 0.8rem; margin-top: 2px; padding-left: 4px; }
+                `}} />
+                <FullCalendar
+                  plugins={[dayGridPlugin, interactionPlugin]}
+                  initialView="dayGridMonth"
+                  locale="ko"
+                  buttonText={{ today: 'TODAY' }}
+                  events={CALENDAR_EVENTS}
+                  eventClick={(info) => router.push(`/party/${info.event.id}`)}
+                  height="100%"
+                  headerToolbar={{
+                    left: 'prev,next',
+                    center: 'title',
+                    right: 'today'
+                  }}
+                  titleFormat={{ year: 'numeric', month: 'long' }}
+                  dayMaxEvents={5}
+                  dayCellContent={(arg) => arg.dayNumberText.replace('일', '')}
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Participants List Section (Infinite Carousel) */}
+        <section id="participants" className="py-32 bg-brand-lightgray overflow-hidden">
+          <div className="max-w-7xl mx-auto px-6 mb-16">
+            <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="text-center">
+              <h2 className="text-4xl md:text-6xl font-bold mb-6 tracking-tight">어떤 사람들이 오나요?</h2>
+              <p className="text-lg text-gray-500">철저한 심사를 거친, 매력적인 참가자들이 기다리고 있습니다.</p>
+            </motion.div>
+          </div>
+
+          <div className="relative flex">
+            {/* Infinite Scroll Container */}
+            <motion.div 
+              className="flex gap-6 py-4"
+              animate={{ x: ["0%", "-50%"] }}
+              transition={{ repeat: Infinity, duration: 40, ease: "linear" }}
+              style={{ width: "fit-content" }}
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+              {/* Combine participants twice for seamless loop */}
+              {[...PARTICIPANTS, ...PARTICIPANTS].map((p, idx) => (
+                <motion.div 
+                  key={`${p.id}-${idx}`}
+                  whileHover={{ y: -15, scale: 1.05, boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.15)" }}
+                  className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-gray-100 min-w-[320px] transition-shadow flex flex-col items-center text-center group cursor-pointer"
+                >
+                  <div className={`w-16 h-16 rounded-full mb-5 flex items-center justify-center transition-transform group-hover:scale-110 ${p.gender === 'male' ? 'bg-[#E3F2FD]' : 'bg-[#FCE4EC]'}`}>
+                    <Users size={22} className={p.gender === 'male' ? 'text-blue-400' : 'text-pink-400'} />
+                  </div>
+                  <h3 className="text-2xl font-black mb-3 text-gray-900">{p.job}</h3>
+                  <p className="text-brand-point font-bold text-lg mb-8">{p.age}</p>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {p.keywords.map((k, kIdx) => (
+                      <span key={kIdx} className="bg-gray-50 text-gray-500 text-sm font-bold px-4 py-1.5 rounded-full border border-gray-100">#{k}</span>
+                    ))}
+                  </div>
+                </motion.div>
+              ))}
+            </motion.div>
+          </div>
+
+          <style jsx global>{`
+            #participants .relative:hover .flex {
+              animation-play-state: paused !important;
+            }
+          `}</style>
+        </section>
+
+        {/* FAQ Accordion Section */}
+        <section id="faq" className="py-32 px-6 bg-white">
+          <div className="max-w-3xl mx-auto">
+            <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="mb-16">
+              <h2 className="text-4xl md:text-5xl font-bold tracking-tight">자주 묻는 질문</h2>
+            </motion.div>
+
+            <div className="space-y-4">
+              {FAQS.map((faq, index) => {
+                const isOpen = faqOpenIndex === index;
+                return (
+                  <div key={index} className="border border-gray-200 rounded-3xl overflow-hidden shadow-sm">
+                    <button 
+                      onClick={() => setFaqOpenIndex(isOpen ? null : index)}
+                      className="w-full px-8 py-6 flex justify-between items-center text-left bg-white hover:bg-brand-lightgray transition-colors"
+                    >
+                      <span className="text-lg font-bold">{faq.q}</span>
+                      <ChevronDown className={`transform transition-transform duration-300 text-brand-point ${isOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    <AnimatePresence>
+                      {isOpen && (
+                        <motion.div 
+                          initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+                          className="bg-brand-lightgray/50 px-8"
+                        >
+                          <p className="text-gray-600 font-medium leading-relaxed py-6 border-t border-gray-200/60">
+                            {faq.a}
+                          </p>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
       </main>
+
+      <Footer />
+
+      {/* Gallery Lightbox Modal */}
+      <AnimatePresence>
+        {selectedGalleryImage && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setSelectedGalleryImage(null)}
+            className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 md:p-10 cursor-pointer"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="relative max-w-5xl w-full h-full flex items-center justify-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img 
+                src={selectedGalleryImage} 
+                alt="Gallery Preview" 
+                className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
+              />
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedGalleryImage(null);
+                }}
+                className="absolute top-4 right-4 text-white hover:text-brand-point bg-black/50 p-4 rounded-full transition-all z-[110] hover:scale-110 active:scale-95"
+                title="닫기"
+              >
+                <X size={28} />
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

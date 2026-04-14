@@ -1,0 +1,51 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  phone         String?   @unique
+  role          String    @default("USER")
+  
+  reservations  Reservation[]
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Program {
+  id            String   @id @default(cuid())
+  title         String
+  concept       String   // e.g. "직장인 독서 모임"
+  date          DateTime
+  location      String
+  price         Int
+  
+  capacity      Int
+  currentPax    Int      @default(0)
+
+  reservations  Reservation[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Reservation {
+  id          String   @id @default(cuid())
+  userId      String
+  programId   String
+  status      String   @default("PAYMENT_PENDING") // PAYMENT_PENDING, CONFIRMED, CANCELED
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  program     Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, programId])
+}
