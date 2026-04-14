@@ -19,3 +19,13 @@ section {
 .glow-point {
   box-shadow: 0 0 20px rgba(64, 224, 208, 0.4), inset 0 0 10px rgba(64, 224, 208, 0.2);
 }
+
+/* Global Button Hover Style Override */
+button:hover,
+a[class*="bg-brand-black"]:hover,
+a[class*="bg-brand-point"]:hover {
+  background-color: var(--color-brand-point, #40E0D0) !important;
+  color: #000000 !important;
+  font-weight: 600 !important;
+  transition: all 0.2s ease !important;
+}

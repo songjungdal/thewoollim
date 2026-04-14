@@ -176,11 +176,14 @@ export default function SmoothOnePage() {
                   .fc-theme-standard .fc-scrollgrid { border-color: #f3f4f6; }
                   .fc-theme-standard th, .fc-theme-standard td { border-color: #f3f4f6; }
                   .fc-daygrid-day-frame { min-height: 160px !important; display: flex !important; flex-direction: column !important; }
-                  .fc-daygrid-day-top { flex-direction: row !important; justify-content: flex-start !important; padding: 10px !important; }
-                  .fc-daygrid-day-number { font-weight: 800; color: #111; padding: 0 !important; font-size: 1.1rem; }
-                  .fc-event { cursor: pointer; border-radius: 8px; padding: 6px 10px !important; font-weight: 800; font-size: 0.8rem; border: none; background-color: #40E0D0; color: #000 !important; margin-bottom: 5px !important; border-left: 4px solid rgba(0,0,0,0.1); transition: color 0.2s ease !important; }
-                  .fc-event:hover { color: #fff !important; opacity: 0.9; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(64, 224, 208, 0.3); }
-                  .fc-event-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+                  .fc-daygrid-day-top { flex-direction: row !important; justify-content: flex-start !important; padding: 12px 14px 8px !important; }
+                  .fc-daygrid-day-number { font-weight: 800; color: #111; padding: 0 !important; font-size: 1.2rem; opacity: 0.9; margin-bottom: 4px; }
+                  .fc-daygrid-day-events { display: flex !important; flex-direction: column !important; gap: 5px !important; padding: 0 4px 8px 4px !important; }
+                  .fc-event { cursor: pointer; border-radius: 4px !important; padding: 4px 8px !important; font-weight: 800; font-size: 0.85rem; border: none; background-color: #40E0D0; margin: 0 !important; border-left: 4px solid rgba(0,0,0,0.15) !important; transition: all 0.2s ease !important; box-shadow: 0 1px 3px rgba(0,0,0,0.05); width: 100% !important; box-sizing: border-box; }
+                  .fc-event, .fc-event * { color: #000000 !important; }
+                  .fc-event:hover { background-color: #38C8BA !important; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(64, 224, 208, 0.4); opacity: 1 !important; z-index: 5; position: relative; }
+                  .fc-event:active { transform: translateY(0) scale(0.98); box-shadow: 0 1px 2px rgba(64, 224, 208, 0.2); }
+                  .fc-event-title, .fc-event-main { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; padding: 0 !important; margin: 0 !important; background: transparent !important; }
                   .fc-toolbar-title { font-weight: 900; font-size: 1.25rem !important; letter-spacing: -0.02em; }
                   @media (min-width: 768px) { .fc-toolbar-title { font-size: 1.85rem !important; } }
                   .fc-button-primary { background-color: #000 !important; border: none !important; border-radius: 12px !important; padding: 8px 16px !important; font-size: 0.9rem !important; display: flex !important; align-items: center !important; justify-content: center !important; transition: all 0.2s !important; }
@@ -209,6 +212,7 @@ export default function SmoothOnePage() {
                   buttonText={{ today: 'TODAY' }}
                   events={CALENDAR_EVENTS}
                   eventClick={(info) => router.push(`/party/${info.event.id}`)}
+                  eventTextColor="#000000"
                   height="100%"
                   headerToolbar={{
                     left: 'prev,next',
