@@ -17,13 +17,15 @@ export type Profile = {
 const CART_API    = "/api/cart.php";
 const PROFILE_API = "/api/profile.php";
 
-async function fetchServerCart(email: string): Promise<CartItem[]> {
+async function fetchServerCart(email: string): Promise<CartItem[] | null> {
   try {
-    const res = await fetch(`${CART_API}?email=${encodeURIComponent(email)}`);
-    if (!res.ok) return [];
+    const res = await fetch(`${CART_API}?email=${encodeURIComponent(email)}`, {
+      cache: "no-store", // Prevent stale data on mobile Safari/Chrome
+    });
+    if (!res.ok) return null;
     const data = await res.json();
-    return Array.isArray(data) ? data : [];
-  } catch { return []; }
+    return Array.isArray(data) ? data : null;
+  } catch { return null; }
 }
 async function saveServerCart(email: string, cart: CartItem[]): Promise<void> {
   try {
@@ -62,6 +64,7 @@ type AuthContextType = {
   cart: CartItem[];
   addToCart: (partyId: string) => void;
   removeFromCart: (partyId: string) => void;
+  refreshCart: () => Promise<void>;
   profile: Profile | null;
   updateProfile: (profile: Profile) => Promise<void>;
 };
@@ -75,6 +78,7 @@ const AuthContext = createContext<AuthContextType>({
   cart: [],
   addToCart: () => {},
   removeFromCart: () => {},
+  refreshCart: async () => {},
   profile: null,
   updateProfile: async () => {},
 });
@@ -92,6 +96,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const userEmailRef = useRef<string | null>(null);
   useEffect(() => { userEmailRef.current = userEmail; }, [userEmail]);
 
+  // cartRef mirrors cart state synchronously. Required because React's
+  // setCart(updater) runs the updater async during reconciliation, so we
+  // cannot read the new value from within the same function scope.
+  const cartRef = useRef<CartItem[]>([]);
+  const setCartSync = useCallback((next: CartItem[]) => {
+    cartRef.current = next;
+    setCart(next);
+  }, []);
+
+  // Counter of in-flight cart saves. refreshCart skips while >0 so a
+  // background refetch can't overwrite a just-made local mutation with
+  // pre-save server state.
+  const pendingSavesRef = useRef(0);
+
+  const refreshCart = useCallback(async () => {
+    if (pendingSavesRef.current > 0) return;
+    if (userEmailRef.current) {
+      const serverCart = await fetchServerCart(userEmailRef.current);
+      if (serverCart !== null) {
+        setCartSync(serverCart);
+        localStorage.setItem("woollim_cart", JSON.stringify(serverCart));
+      }
+    }
+  }, [setCartSync]);
+
   // Initial load
   useEffect(() => {
     const init = async () => {
@@ -104,17 +133,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUserEmail(parsed.email);
             userEmailRef.current = parsed.email;
 
-            // Cart sync
+            // Cart sync — server is authoritative. If server returns a valid
+            // array (even empty), trust it. Only fall back to local on network error.
+            // Skip overwrite if user already mutated cart during this init.
             const serverCart = await fetchServerCart(parsed.email);
-            if (serverCart.length > 0) {
-              setCart(serverCart);
-              localStorage.setItem("woollim_cart", JSON.stringify(serverCart));
-            } else {
-              const localRaw = localStorage.getItem("woollim_cart");
-              if (localRaw) {
-                const localCart: CartItem[] = JSON.parse(localRaw);
-                setCart(localCart);
-                if (localCart.length > 0) await saveServerCart(parsed.email, localCart);
+            if (pendingSavesRef.current === 0 && cartRef.current.length === 0) {
+              if (serverCart !== null) {
+                setCartSync(serverCart);
+                localStorage.setItem("woollim_cart", JSON.stringify(serverCart));
+              } else {
+                const localRaw = localStorage.getItem("woollim_cart");
+                if (localRaw) setCartSync(JSON.parse(localRaw));
               }
             }
 
@@ -134,13 +163,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         } else {
           const cartData = localStorage.getItem("woollim_cart");
-          if (cartData) setCart(JSON.parse(cartData));
+          if (cartData) setCartSync(JSON.parse(cartData));
         }
       } catch {}
       setMounted(true);
     };
     init();
   }, []);
+
+  // Real-time synchronization: refetch on focus / visibility / periodic
+  useEffect(() => {
+    if (isLoggedIn && mounted) {
+      const onVisibility = () => {
+        if (document.visibilityState === "visible") refreshCart();
+      };
+      window.addEventListener("focus", refreshCart);
+      document.addEventListener("visibilitychange", onVisibility);
+      window.addEventListener("pageshow", refreshCart);
+      const interval = setInterval(refreshCart, 15000); // 15s
+
+      return () => {
+        window.removeEventListener("focus", refreshCart);
+        document.removeEventListener("visibilitychange", onVisibility);
+        window.removeEventListener("pageshow", refreshCart);
+        clearInterval(interval);
+      };
+    }
+  }, [isLoggedIn, mounted, refreshCart]);
 
   const login = useCallback(async (email: string, password: string): Promise<boolean> => {
     if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
@@ -149,20 +198,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       userEmailRef.current = email;
       localStorage.setItem("woollim_auth", JSON.stringify({ loggedIn: true, email }));
 
-      // Cart sync
+      // Cart sync — server is authoritative. Trust its response fully (even empty).
       const serverCart = await fetchServerCart(email);
-      if (serverCart.length > 0) {
-        setCart(serverCart);
+      if (serverCart !== null) {
+        setCartSync(serverCart);
         localStorage.setItem("woollim_cart", JSON.stringify(serverCart));
       } else {
+        // Network error — fall back to local cache
         const localRaw = localStorage.getItem("woollim_cart");
-        if (localRaw) {
-          const localCart: CartItem[] = JSON.parse(localRaw);
-          if (localCart.length > 0) {
-            setCart(localCart);
-            await saveServerCart(email, localCart);
-          }
-        }
+        if (localRaw) setCartSync(JSON.parse(localRaw));
       }
 
       // Profile sync
@@ -186,32 +230,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     setIsLoggedIn(false);
     setUserEmail(null);
-    setCart([]);
+    setCartSync([]);
     setProfile(null);
     userEmailRef.current = null;
     localStorage.removeItem("woollim_auth");
     localStorage.removeItem("woollim_cart");
     localStorage.removeItem("woollim_profile");
-  }, []);
+  }, [setCartSync]);
 
-  const addToCart = useCallback((partyId: string) => {
-    setCart(prev => {
-      if (prev.some(i => i.partyId === partyId)) return prev;
-      const updated = [...prev, { partyId }];
-      localStorage.setItem("woollim_cart", JSON.stringify(updated));
-      if (userEmailRef.current) saveServerCart(userEmailRef.current, updated);
-      return updated;
-    });
-  }, []);
+  const addToCart = useCallback(async (partyId: string) => {
+    if (cartRef.current.some(i => i.partyId === partyId)) return;
 
-  const removeFromCart = useCallback((partyId: string) => {
-    setCart(prev => {
-      const updated = prev.filter(i => i.partyId !== partyId);
-      localStorage.setItem("woollim_cart", JSON.stringify(updated));
-      if (userEmailRef.current) saveServerCart(userEmailRef.current, updated);
-      return updated;
-    });
-  }, []);
+    const updated = [...cartRef.current, { partyId }];
+    setCartSync(updated);
+    localStorage.setItem("woollim_cart", JSON.stringify(updated));
+
+    if (userEmailRef.current) {
+      pendingSavesRef.current++;
+      try {
+        await saveServerCart(userEmailRef.current, updated);
+      } finally {
+        pendingSavesRef.current--;
+      }
+    }
+  }, [setCartSync]);
+
+  const removeFromCart = useCallback(async (partyId: string) => {
+    const updated = cartRef.current.filter(i => i.partyId !== partyId);
+    setCartSync(updated);
+    localStorage.setItem("woollim_cart", JSON.stringify(updated));
+
+    if (userEmailRef.current) {
+      pendingSavesRef.current++;
+      try {
+        await saveServerCart(userEmailRef.current, updated);
+      } finally {
+        pendingSavesRef.current--;
+      }
+    }
+  }, [setCartSync]);
 
   const updateProfile = useCallback(async (p: Profile) => {
     setProfile(p);
@@ -223,7 +280,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider value={{
       mounted, isLoggedIn, userEmail,
       login, logout,
-      cart, addToCart, removeFromCart,
+      cart, addToCart, removeFromCart, refreshCart,
       profile, updateProfile,
     }}>
       {children}

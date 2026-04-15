@@ -1,7 +1,8 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { ArrowLeft, Star, Heart, Clock, CheckCircle } from "lucide-react";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowLeft, Star, Heart, Clock, CheckCircle, ShoppingBag, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Header from "../../components/Header";
@@ -13,6 +14,7 @@ export default function PartyClientView({ id }: { id: string }) {
   const detailItem = PARTIES.find(p => p.id === id);
   const router = useRouter();
   const { isLoggedIn, addToCart } = useAuth();
+  const [showCartModal, setShowCartModal] = useState(false);
 
   if (!detailItem) {
     return (
@@ -43,7 +45,7 @@ export default function PartyClientView({ id }: { id: string }) {
       return;
     }
     addToCart(id);
-    alert("장바구니에 담겼습니다! 마이페이지에서 확인하세요.");
+    setShowCartModal(true);
   };
 
   return (
@@ -212,6 +214,65 @@ export default function PartyClientView({ id }: { id: string }) {
       </main>
 
       <Footer />
+
+      {/* Cart confirmation modal */}
+      <AnimatePresence>
+        {showCartModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowCartModal(false)}
+            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 20 }}
+              transition={{ type: "spring", stiffness: 260, damping: 22 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-sm md:max-w-md p-7 md:p-9 relative"
+            >
+              <button
+                onClick={() => setShowCartModal(false)}
+                className="absolute top-4 right-4 text-gray-300 hover:text-gray-600 transition-colors"
+                aria-label="닫기"
+              >
+                <X size={22} />
+              </button>
+
+              <div className="flex flex-col items-center text-center">
+                <div className="w-16 h-16 md:w-20 md:h-20 bg-brand-point/10 rounded-full flex items-center justify-center mb-5">
+                  <ShoppingBag size={32} className="text-brand-point md:hidden" />
+                  <ShoppingBag size={38} className="text-brand-point hidden md:block" />
+                </div>
+
+                <h3 className="text-xl md:text-2xl font-black mb-2 tracking-tight">
+                  장바구니에 담겼습니다
+                </h3>
+                <p className="text-sm md:text-base text-gray-500 font-medium mb-7 md:mb-8 leading-relaxed">
+                  {detailItem.title}
+                </p>
+
+                <div className="flex flex-col w-full gap-2.5">
+                  <button
+                    onClick={() => router.push("/mypage")}
+                    className="w-full bg-brand-black text-white py-4 rounded-xl font-black text-sm md:text-base hover:bg-brand-point transition-all shadow-lg hover:shadow-brand-point/30 flex items-center justify-center gap-2"
+                  >
+                    <ShoppingBag size={17} /> 장바구니로 가기
+                  </button>
+                  <button
+                    onClick={() => setShowCartModal(false)}
+                    className="w-full bg-white border-2 border-gray-200 text-gray-700 py-4 rounded-xl font-bold text-sm md:text-base hover:border-brand-black hover:text-brand-black transition-all"
+                  >
+                    목록 계속보기
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ShoppingBag, LogOut, User, Trash2, Calendar, MapPin } from "lucide-react";
+import { ShoppingBag, LogOut, User, Trash2, Calendar, MapPin, CheckSquare, Square, CreditCard } from "lucide-react";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useAuth } from "../context/AuthContext";
@@ -13,12 +13,21 @@ import { PARTIES } from "../lib/data";
 export default function MyPage() {
   const { mounted, isLoggedIn, userEmail, logout, cart, removeFromCart } = useAuth();
   const router = useRouter();
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const cartParties = cart
+    .map(item => PARTIES.find(p => p.id === item.partyId))
+    .filter(Boolean) as typeof PARTIES;
 
   useEffect(() => {
     if (mounted && !isLoggedIn) {
       router.push("/login?redirect=/mypage");
     }
   }, [mounted, isLoggedIn, router]);
+
+  useEffect(() => {
+    setSelectedIds(new Set(cart.map(c => c.partyId)));
+  }, [cart]);
 
   if (!mounted || !isLoggedIn) {
     return (
@@ -28,9 +37,27 @@ export default function MyPage() {
     );
   }
 
-  const cartParties = cart
-    .map(item => PARTIES.find(p => p.id === item.partyId))
-    .filter(Boolean) as typeof PARTIES;
+  const allSelected = cartParties.length > 0 && selectedIds.size === cartParties.length;
+
+  const toggleAll = () => {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(cartParties.map(p => p.id)));
+    }
+  };
+
+  const toggleOne = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectedParties = cartParties.filter(p => selectedIds.has(p.id));
+  const selectedTotal = selectedParties.reduce((sum, p) => sum + p.price, 0);
 
   const handleLogout = () => {
     logout();
@@ -88,46 +115,89 @@ export default function MyPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {cartParties.map(party => (
-                  <motion.div
-                    key={party.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-white rounded-2xl md:rounded-3xl p-5 md:p-7 border border-gray-100 flex flex-col md:flex-row md:items-center gap-4 md:gap-6"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <span className="inline-block text-xs font-bold text-brand-point bg-brand-point/10 px-2.5 py-1 rounded-full mb-2">모집중</span>
-                      <h3 className="font-black text-base md:text-xl mb-2 leading-snug">{party.title}</h3>
-                      <div className="flex flex-col gap-1 text-xs md:text-sm text-gray-500 font-medium">
-                        <span className="flex items-center gap-1.5"><Calendar size={13} /> {party.dateString}</span>
-                        <span className="flex items-center gap-1.5"><MapPin size={13} /> {party.location}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="font-black text-lg md:text-2xl text-brand-point whitespace-nowrap">₩{party.price.toLocaleString()}</span>
-                      <Link
-                        href={`/checkout/?id=${party.id}`}
-                        className="bg-brand-black text-white px-4 md:px-6 py-3 rounded-xl font-bold text-sm hover:bg-brand-point transition-all whitespace-nowrap"
-                      >
-                        결제하기
-                      </Link>
-                      <button
-                        onClick={() => removeFromCart(party.id)}
-                        className="p-2.5 rounded-xl bg-gray-50 hover:bg-red-50 text-gray-400 hover:text-red-400 transition-all flex-shrink-0"
-                        aria-label="삭제"
-                      >
-                        <Trash2 size={17} />
-                      </button>
-                    </div>
-                  </motion.div>
-                ))}
+                {/* Select All */}
+                <div className="flex items-center gap-3 px-2">
+                  <button onClick={toggleAll} className="flex items-center gap-2 text-sm font-bold text-gray-600 hover:text-brand-point transition-colors">
+                    {allSelected
+                      ? <CheckSquare size={20} className="text-brand-point" />
+                      : <Square size={20} />
+                    }
+                    전체선택 ({selectedIds.size}/{cartParties.length})
+                  </button>
+                </div>
 
-                {/* Total */}
-                <div className="bg-white rounded-2xl md:rounded-3xl p-5 md:p-7 border border-gray-100 flex justify-between items-center">
-                  <span className="font-black text-base md:text-lg">총 결제 예정금액</span>
-                  <span className="font-black text-xl md:text-3xl text-brand-point">
-                    ₩{cartParties.reduce((sum, p) => sum + p.price, 0).toLocaleString()}
-                  </span>
+                {cartParties.map(party => {
+                  const isSelected = selectedIds.has(party.id);
+                  return (
+                    <motion.div
+                      key={party.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={`bg-white rounded-2xl md:rounded-3xl p-5 md:p-7 border-2 flex flex-col md:flex-row md:items-center gap-4 md:gap-6 transition-colors ${isSelected ? "border-brand-point/30" : "border-gray-100"}`}
+                    >
+                      <button onClick={() => toggleOne(party.id)} className="flex-shrink-0 self-start md:self-center">
+                        {isSelected
+                          ? <CheckSquare size={22} className="text-brand-point" />
+                          : <Square size={22} className="text-gray-300" />
+                        }
+                      </button>
+                      <Link href={`/party/${party.id}`} className="flex-1 min-w-0 group cursor-pointer">
+                        <span className="inline-block text-xs font-bold text-brand-point bg-brand-point/10 px-2.5 py-1 rounded-full mb-2">모집중</span>
+                        <h3 className="font-black text-base md:text-xl mb-2 leading-snug group-hover:text-brand-point transition-colors">{party.title}</h3>
+                        <div className="flex flex-col gap-1 text-xs md:text-sm text-gray-500 font-medium">
+                          <span className="flex items-center gap-1.5"><Calendar size={13} /> {party.dateString}</span>
+                          <span className="flex items-center gap-1.5"><MapPin size={13} /> {party.location}</span>
+                        </div>
+                      </Link>
+                      <div className="flex items-center gap-3">
+                        <span className="font-black text-lg md:text-2xl text-brand-point whitespace-nowrap">₩{party.price.toLocaleString()}</span>
+                        <button
+                          onClick={() => removeFromCart(party.id)}
+                          className="p-2.5 rounded-xl bg-gray-50 hover:bg-red-50 text-gray-400 hover:text-red-400 transition-all flex-shrink-0"
+                          aria-label="삭제"
+                        >
+                          <Trash2 size={17} />
+                        </button>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+
+                {/* Total + Checkout for selected */}
+                <div className="bg-white rounded-2xl md:rounded-3xl p-5 md:p-7 border border-gray-100">
+                  <div className="flex justify-between items-center mb-5">
+                    <span className="font-black text-base md:text-lg">
+                      {allSelected ? "전체 결제금액" : "선택 결제금액"}{" "}
+                      <span className="text-brand-point">({selectedParties.length}건)</span>
+                    </span>
+                    <span className="font-black text-xl md:text-3xl text-brand-point">
+                      ₩{selectedTotal.toLocaleString()}
+                    </span>
+                  </div>
+
+                  {/* Primary: Pay all */}
+                  <Link
+                    href={`/checkout/?ids=${cartParties.map(p => p.id).join(",")}`}
+                    className="flex items-center justify-center gap-2 w-full bg-brand-black text-white py-4 rounded-xl font-black text-base md:text-lg hover:bg-brand-point transition-all text-center mb-3"
+                  >
+                    <CreditCard size={20} />
+                    전체 결제하기 ({cartParties.length}건) · ₩{cartParties.reduce((s, p) => s + p.price, 0).toLocaleString()}
+                  </Link>
+
+                  {/* Secondary: Pay selected (only if partial selection) */}
+                  {!allSelected && selectedParties.length > 0 && (
+                    <Link
+                      href={`/checkout/?ids=${selectedParties.map(p => p.id).join(",")}`}
+                      className="flex items-center justify-center gap-2 w-full bg-white border-2 border-brand-black text-brand-black py-3.5 rounded-xl font-black text-sm md:text-base hover:bg-brand-point hover:text-white hover:border-brand-point transition-all text-center"
+                    >
+                      선택 항목만 결제하기 ({selectedParties.length}건)
+                    </Link>
+                  )}
+                  {selectedParties.length === 0 && (
+                    <p className="text-center text-xs text-gray-400 font-medium">
+                      일부 항목만 결제하려면 체크박스로 선택해주세요.
+                    </p>
+                  )}
                 </div>
               </div>
             )}

@@ -1,9 +1,9 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, CreditCard, User, Phone, Mail, ShieldCheck } from "lucide-react";
+import { ArrowLeft, CreditCard, ShieldCheck } from "lucide-react";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useAuth } from "../context/AuthContext";
@@ -16,20 +16,24 @@ declare global {
 function CheckoutContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { mounted, isLoggedIn, userEmail } = useAuth();
+  const { mounted, isLoggedIn, userEmail, removeFromCart } = useAuth();
 
-  const partyId = searchParams.get("id");
-  const party = PARTIES.find(p => p.id === partyId);
+  const singleId = searchParams.get("id");
+  const multiIds = searchParams.get("ids");
+  const partyIds = multiIds ? multiIds.split(",") : singleId ? [singleId] : [];
+  const parties = partyIds
+    .map(id => PARTIES.find(p => p.id === id))
+    .filter(Boolean) as typeof PARTIES;
+  const totalAmount = parties.reduce((sum, p) => sum + p.price, 0);
 
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
   const [agreed, setAgreed] = useState(false);
 
   useEffect(() => {
     if (mounted && !isLoggedIn) {
-      router.push(`/login?redirect=${encodeURIComponent(`/checkout/?id=${partyId}`)}`);
+      const currentUrl = multiIds ? `/checkout/?ids=${multiIds}` : `/checkout/?id=${singleId}`;
+      router.push(`/login?redirect=${encodeURIComponent(currentUrl)}`);
     }
-  }, [mounted, isLoggedIn, router, partyId]);
+  }, [mounted, isLoggedIn, router, singleId, multiIds]);
 
   if (!mounted || !isLoggedIn) {
     return (
@@ -39,7 +43,7 @@ function CheckoutContent() {
     );
   }
 
-  if (!party) {
+  if (parties.length === 0) {
     return (
       <div className="flex flex-col min-h-screen">
         <Header />
@@ -54,11 +58,11 @@ function CheckoutContent() {
     );
   }
 
+  const orderName = parties.length === 1
+    ? parties[0].title
+    : `${parties[0].title} 외 ${parties.length - 1}건`;
+
   const handlePayment = async () => {
-    if (!name.trim() || !phone.trim()) {
-      alert("이름과 연락처를 입력해주세요.");
-      return;
-    }
     if (!agreed) {
       alert("결제 진행 동의 체크 후 결제하실 수 있습니다.");
       return;
@@ -73,19 +77,18 @@ function CheckoutContent() {
         storeId: "store-49a37ad9-6f17-4952-b8ec-fbdc3ed0a6d0",
         channelKey: "channel-key-mock",
         paymentId,
-        orderName: party.title,
-        totalAmount: party.price,
+        orderName,
+        totalAmount,
         currency: "CURRENCY_KRW",
         payMethod: "CARD",
         customer: {
-          fullName: name,
-          phoneNumber: phone,
           email: userEmail || "",
         },
       });
       if (response.code != null) {
         alert(`결제 실패: ${response.message}`);
       } else {
+        for (const p of parties) removeFromCart(p.id);
         alert("결제가 완료되었습니다!\n참여 확정 안내 문자가 순차적으로 발송됩니다.");
         router.push("/mypage");
       }
@@ -94,8 +97,6 @@ function CheckoutContent() {
     }
   };
 
-  const inputClass = "w-full pl-12 pr-4 py-4 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-brand-point focus:border-brand-point transition-all outline-none font-medium text-sm md:text-base";
-
   return (
     <div className="flex flex-col min-h-screen bg-brand-lightgray">
       <Header />
@@ -103,60 +104,38 @@ function CheckoutContent() {
         <div className="max-w-2xl mx-auto">
 
           <Link
-            href={`/party/${party.id}`}
+            href={parties.length === 1 ? `/party/${parties[0].id}` : "/mypage"}
             className="inline-flex items-center gap-2 text-gray-500 hover:text-brand-black mb-7 font-bold transition-colors text-sm md:text-base"
           >
-            <ArrowLeft size={16} /> 파티 상세로 돌아가기
+            <ArrowLeft size={16} /> {parties.length === 1 ? "파티 상세로 돌아가기" : "장바구니로 돌아가기"}
           </Link>
 
           <h1 className="text-2xl md:text-4xl font-black tracking-tight mb-8 md:mb-10">결제하기</h1>
 
           {/* Order Summary */}
           <div className="bg-white rounded-2xl md:rounded-3xl p-6 md:p-8 border border-gray-100 mb-5">
-            <h2 className="font-black text-base md:text-lg mb-5">주문 요약</h2>
+            <h2 className="font-black text-base md:text-lg mb-5">주문 요약 {parties.length > 1 && <span className="text-brand-point">({parties.length}건)</span>}</h2>
             <div className="space-y-3 text-sm md:text-base">
-              {[
-                { label: "파티명", value: party.title },
-                { label: "일시", value: party.dateString },
-                { label: "장소", value: party.location },
-                { label: "대상", value: party.target },
-              ].map(row => (
-                <div key={row.label} className="flex justify-between gap-4">
-                  <span className="text-gray-500 font-medium flex-shrink-0">{row.label}</span>
-                  <span className="font-bold text-right">{row.value}</span>
+              {parties.map((party, idx) => (
+                <div key={party.id}>
+                  {parties.length > 1 && idx > 0 && <div className="border-t border-gray-100 my-3" />}
+                  {[
+                    { label: "파티명", value: party.title },
+                    { label: "일시", value: party.dateString },
+                    { label: "장소", value: party.location },
+                    { label: "대상", value: party.target },
+                    ...(parties.length > 1 ? [{ label: "금액", value: `₩${party.price.toLocaleString()}` }] : []),
+                  ].map(row => (
+                    <div key={`${party.id}-${row.label}`} className="flex justify-between gap-4">
+                      <span className="text-gray-500 font-medium flex-shrink-0">{row.label}</span>
+                      <span className="font-bold text-right">{row.value}</span>
+                    </div>
+                  ))}
                 </div>
               ))}
               <div className="border-t border-gray-100 pt-3 mt-1 flex justify-between items-center gap-4">
                 <span className="font-black text-base md:text-lg">최종 결제금액</span>
-                <span className="font-black text-xl md:text-2xl text-brand-point">₩{party.price.toLocaleString()}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Applicant Info */}
-          <div className="bg-white rounded-2xl md:rounded-3xl p-6 md:p-8 border border-gray-100 mb-5">
-            <h2 className="font-black text-base md:text-lg mb-5 md:mb-6">신청자 정보</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2 ml-1">이름</label>
-                <div className="relative">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                  <input type="text" placeholder="실명을 입력해주세요" className={inputClass} value={name} onChange={e => setName(e.target.value)} />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2 ml-1">연락처</label>
-                <div className="relative">
-                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                  <input type="tel" placeholder="010-0000-0000" className={inputClass} value={phone} onChange={e => setPhone(e.target.value)} />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2 ml-1">이메일</label>
-                <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                  <input type="email" className={inputClass + " bg-gray-100 cursor-not-allowed"} value={userEmail || ""} readOnly />
-                </div>
+                <span className="font-black text-xl md:text-2xl text-brand-point">₩{totalAmount.toLocaleString()}</span>
               </div>
             </div>
           </div>
@@ -182,7 +161,7 @@ function CheckoutContent() {
             className="w-full bg-brand-black text-white py-5 rounded-2xl font-black text-base md:text-xl hover:bg-brand-point transition-all shadow-xl hover:shadow-brand-point/30 flex items-center justify-center gap-3"
           >
             <CreditCard size={22} />
-            ₩{party.price.toLocaleString()} 결제하기
+            ₩{totalAmount.toLocaleString()} 결제하기
           </button>
 
           <p className="text-center text-xs text-gray-400 font-medium mt-4 flex items-center justify-center gap-1.5">
