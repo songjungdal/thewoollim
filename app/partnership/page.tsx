@@ -20,7 +20,7 @@ export default function PartnershipPage() {
           <div className="max-w-4xl mx-auto">
             <div className="text-gray-600 leading-relaxed font-medium text-lg md:text-xl">
               <h2 className="text-3xl font-black text-gray-900 mb-10 tracking-tight">어울림과 함께 성장할 파트너를 찾습니다.</h2>
-              <p className="mb-16">여기에 내용을 입력하세요. 어울림은 다양한 브랜드, 공간 운영자, 콘텐츠 크리에이터와의 협업에 열려 있습니다. 우리의 감성과 결이 맞는 파트너십을 통해 더 큰 시너지를 만들어내기를 기대합니다.</p>
+              <p className="mb-16">어울림은 다양한 브랜드, 공간 운영자, 콘텐츠 크리에이터와의 협업에 항상 열려 있습니다. 우리의 감성과 결이 맞는 파트너십(Partnership)을 통해 더 큰 시너지를 만들어내기를 기대합니다.</p>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-20">
                 <div className="p-10 bg-gray-50 rounded-[2.5rem] border border-gray-100">

@@ -32,22 +32,23 @@ export default function SmoothOnePage() {
       
       <main className="flex-1">
         {/* Hero Section */}
-        <section className="relative h-[90vh] min-h-[700px] flex flex-col justify-center bg-brand-black overflow-hidden pt-[120px] pb-24 md:pt-[140px] md:pb-32">
-          {/* Background Image with Parallax & Overlay */}
+        <section className="relative h-[90vh] min-h-[600px] md:min-h-[700px] flex flex-col justify-center bg-brand-black overflow-hidden">
+          {/* Background Image */}
           <div 
             className="absolute inset-0 bg-cover bg-no-repeat bg-center pointer-events-none transition-all duration-700"
-            style={{ backgroundImage: "url('/images/hero-bg.jpg')" }}
+            style={{ backgroundImage: "url('/images/hero-bg.jpg')", backgroundPosition: "center 30%" }}
           />
-          <div className="absolute inset-0 bg-[rgba(0,0,0,0.5)]" />
+          {/* Warm gradient overlay - preserves image warmth while ensuring text readability */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/20" />
 
           {/* Content */}
-          <div className="relative z-10 max-w-7xl mx-auto px-6 w-full text-white mt-auto mb-16 md:mb-20">
+          <div className="relative z-10 max-w-7xl mx-auto px-6 md:px-10 w-full text-white mt-auto pb-16 md:pb-24 pt-[140px] md:pt-[160px]">
             <motion.div initial="hidden" animate="visible" variants={fadeInUp}>
-              <h1 className="text-5xl md:text-8xl font-black tracking-tighter leading-tight mb-8 md:mb-10 drop-shadow-2xl">
+              <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black tracking-tighter leading-[1.15] mb-6 md:mb-10 drop-shadow-2xl">
                 세상을 울리는<br />
                 새로운 연결, <span className="text-brand-point">어울림</span>
               </h1>
-              <p className="text-lg md:text-2xl text-white font-semibold max-w-3xl leading-relaxed mb-12 md:mb-14 flex flex-col gap-1 md:gap-2 drop-shadow-lg">
+              <p className="text-base sm:text-lg md:text-2xl text-white/90 font-semibold max-w-3xl leading-relaxed mb-10 md:mb-14 flex flex-col gap-1 md:gap-2 drop-shadow-lg">
                 <span>숫자와 스펙으로 재단되는 관계를 넘어,</span>
                 <span className="hidden sm:inline">진정으로 마음을 울리는 감성적인 오프라인 네트워킹을 경험하세요.</span>
                 <span className="sm:hidden">진심이 통하는 네트워킹을 경험하세요.</span>
@@ -57,7 +58,7 @@ export default function SmoothOnePage() {
                   e.preventDefault();
                   document.getElementById('apply')?.scrollIntoView({ behavior: 'smooth' });
                 }}
-                className="inline-flex items-center gap-3 bg-brand-black text-white px-10 py-5 md:py-6 rounded-full text-lg font-bold hover:bg-brand-point hover:-translate-y-1 transition-all shadow-xl hover:shadow-brand-point/30 cursor-pointer border border-white/20"
+                className="inline-flex items-center gap-3 bg-brand-black text-white px-8 py-4 md:px-10 md:py-6 rounded-full text-base md:text-lg font-bold hover:bg-brand-point hover:-translate-y-1 transition-all shadow-xl hover:shadow-brand-point/30 cursor-pointer border border-white/20"
               >
                 어울림 매칭파티 신청하기 <ArrowRight size={20} />
               </button>
