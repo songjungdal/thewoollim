@@ -11,6 +11,7 @@ export type Profile = {
   location: string;
   job: string;
   mbti: string;
+  interests: string;
   idealType: string;
 };
 

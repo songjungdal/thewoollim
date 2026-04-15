@@ -73,8 +73,13 @@ function LoginContent() {
       alert("본인인증을 먼저 완료해주세요.");
       return;
     }
-    alert("어울림의 회원이 되신 것을 환영합니다! 로그인을 진행해주세요.");
-    setActiveTab("login");
+    router.push("/profile-setup");
+  };
+
+  const handleSnsLogin = (provider: string) => {
+    // SNS 로그인 시뮬레이션: 최초 가입자로 간주하고 프로필 입력으로 이동
+    try { localStorage.setItem("woollim_sns_provider", provider); } catch {}
+    router.push("/profile-setup");
   };
 
   const socialButtons = [
@@ -155,7 +160,12 @@ function LoginContent() {
 
                     <div className="space-y-3">
                       {socialButtons.map((btn) => (
-                        <button key={btn.name} className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-3 transition-transform hover:scale-[1.02] ${btn.color}`}>
+                        <button
+                          key={btn.name}
+                          type="button"
+                          onClick={() => handleSnsLogin(btn.name)}
+                          className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-3 transition-transform hover:scale-[1.02] ${btn.color}`}
+                        >
                           <span className="w-6 h-6 rounded-full flex items-center justify-center font-black text-sm">{btn.logo}</span>
                           {btn.name} 계정으로 로그인
                         </button>

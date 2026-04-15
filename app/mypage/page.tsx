@@ -4,14 +4,14 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ShoppingBag, LogOut, User, Trash2, Calendar, MapPin, CheckSquare, Square, CreditCard } from "lucide-react";
+import { ShoppingBag, LogOut, User, Trash2, Calendar, MapPin, CheckSquare, Square, CreditCard, Pencil, Phone, Briefcase, Heart, Sparkles } from "lucide-react";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useAuth } from "../context/AuthContext";
 import { PARTIES } from "../lib/data";
 
 export default function MyPage() {
-  const { mounted, isLoggedIn, userEmail, logout, cart, removeFromCart } = useAuth();
+  const { mounted, isLoggedIn, userEmail, logout, cart, removeFromCart, profile } = useAuth();
   const router = useRouter();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -83,14 +83,88 @@ export default function MyPage() {
                 <p className="text-gray-400 text-sm mt-1">{userEmail}</p>
               </div>
             </div>
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-5 py-3 rounded-xl font-bold transition-all text-sm w-fit"
-            >
-              <LogOut size={15} /> 로그아웃
-            </button>
+            <div className="flex gap-2.5">
+              <button
+                onClick={() => router.push("/profile-setup?edit=true")}
+                className="flex items-center gap-2 bg-brand-point hover:brightness-110 text-white px-4 md:px-5 py-3 rounded-xl font-bold transition-all text-sm w-fit"
+              >
+                <Pencil size={14} /> 정보수정
+              </button>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 md:px-5 py-3 rounded-xl font-bold transition-all text-sm w-fit"
+              >
+                <LogOut size={15} /> 로그아웃
+              </button>
+            </div>
           </div>
         </section>
+
+        {/* Profile Info Section */}
+        {profile ? (
+          <section className="px-4 md:px-6 pt-8 md:pt-12">
+            <div className="max-w-4xl mx-auto">
+              <div className="flex items-center gap-3 mb-5 md:mb-6">
+                <User size={20} className="text-brand-point" />
+                <h2 className="text-xl md:text-2xl font-black tracking-tight">내 프로필</h2>
+              </div>
+              <div className="bg-white rounded-2xl md:rounded-3xl p-6 md:p-8 border border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6">
+                {[
+                  { icon: User, label: "이름",     value: profile.name },
+                  { icon: User, label: "성별",     value: profile.gender },
+                  { icon: Phone, label: "연락처",  value: profile.phone },
+                  { icon: MapPin, label: "거주 지역", value: profile.location },
+                  { icon: Briefcase, label: "직업",  value: profile.job },
+                  { icon: Sparkles, label: "MBTI",   value: profile.mbti },
+                ].map(row => {
+                  const Icon = row.icon;
+                  return (
+                    <div key={row.label} className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-brand-point/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <Icon size={16} className="text-brand-point" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs text-gray-400 font-medium mb-0.5">{row.label}</p>
+                        <p className="font-bold text-sm md:text-base truncate">{row.value || "-"}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+                <div className="md:col-span-2 border-t border-gray-100 pt-5 md:pt-6">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles size={14} className="text-brand-point" />
+                    <p className="text-xs text-gray-400 font-bold">관심사</p>
+                  </div>
+                  <p className="text-sm md:text-base font-medium text-gray-700 leading-relaxed">{profile.interests || "-"}</p>
+                </div>
+                <div className="md:col-span-2 border-t border-gray-100 pt-5 md:pt-6">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Heart size={14} className="text-brand-point" />
+                    <p className="text-xs text-gray-400 font-bold">이상형</p>
+                  </div>
+                  <p className="text-sm md:text-base font-medium text-gray-700 leading-relaxed">{profile.idealType || "-"}</p>
+                </div>
+              </div>
+            </div>
+          </section>
+        ) : (
+          <section className="px-4 md:px-6 pt-8 md:pt-12">
+            <div className="max-w-4xl mx-auto">
+              <div className="bg-brand-point/5 border-2 border-dashed border-brand-point/30 rounded-2xl md:rounded-3xl p-6 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                  <p className="font-black text-base md:text-lg mb-1">프로필을 완성해주세요</p>
+                  <p className="text-sm text-gray-500 font-medium">매칭파티 참여 전 프로필 정보 입력이 필요합니다.</p>
+                </div>
+                <button
+                  onClick={() => router.push("/profile-setup")}
+                  className="bg-brand-black text-white px-5 py-3 rounded-xl font-bold text-sm hover:bg-brand-point transition-all whitespace-nowrap w-fit"
+                >
+                  프로필 작성하기
+                </button>
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* Cart Section */}
         <section className="py-10 md:py-16 px-4 md:px-6">

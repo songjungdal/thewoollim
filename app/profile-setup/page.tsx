@@ -5,18 +5,12 @@ import { motion } from "framer-motion";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  User, Phone, MapPin, Briefcase, Heart,
+  User, Phone, MapPin, Briefcase, Heart, Sparkles,
   ChevronDown, ChevronUp, CheckCircle2, ArrowLeft,
 } from "lucide-react";
 import { useAuth, type Profile } from "../context/AuthContext";
 import Header from "../components/Header";
-
-const REGIONS = [
-  "서울특별시", "경기도", "인천광역시", "부산광역시",
-  "대구광역시", "대전광역시", "광주광역시", "울산광역시",
-  "세종특별자치시", "강원도", "충청북도", "충청남도",
-  "전라북도", "전라남도", "경상북도", "경상남도", "제주특별자치도",
-];
+import { LOCATIONS, SIDO_LIST } from "../lib/locations";
 
 const MBTI_TYPES = [
   "INTJ","INTP","ENTJ","ENTP",
@@ -47,7 +41,7 @@ const CONSENT_DETAIL = `"어울림"(이하 '서비스')은 최적의 매칭 환�
 
 const EMPTY_FORM: Profile = {
   name: "", gender: "", phone: "", location: "",
-  job: "", mbti: "", idealType: "",
+  job: "", mbti: "", interests: "", idealType: "",
 };
 
 function ProfileSetupContent() {
@@ -57,32 +51,71 @@ function ProfileSetupContent() {
   const { mounted, isLoggedIn, profile, updateProfile } = useAuth();
 
   const [form,             setForm]             = useState<Profile>(EMPTY_FORM);
+  const [sido,             setSido]             = useState("");
+  const [sigungu,          setSigungu]          = useState("");
   const [agreed,           setAgreed]           = useState(false);
   const [consentExpanded,  setConsentExpanded]  = useState(false);
   const [submitting,       setSubmitting]       = useState(false);
   const [errors,           setErrors]           = useState<Partial<Profile>>({});
 
-  /* Pre-fill on edit mode or restore pending draft */
+  /* Parse stored "시도 시군구" string into 2 dropdowns */
+  const parseLocation = (loc: string) => {
+    if (!loc) return;
+    const matched = SIDO_LIST.find(s => loc.startsWith(s));
+    if (matched) {
+      setSido(matched);
+      setSigungu(loc.slice(matched.length).trim());
+    }
+  };
+
+  /* Pre-fill on edit mode or restore pending draft.
+     Always spread EMPTY_FORM so older saved profiles missing new fields
+     (e.g. `interests`) don't render undefined into inputs / crash validate. */
   useEffect(() => {
     if (!mounted) return;
     if (isEditMode) {
       if (!isLoggedIn) { router.push("/login"); return; }
-      if (profile) { setForm(profile); setAgreed(true); }
+      if (profile) {
+        const merged = { ...EMPTY_FORM, ...profile };
+        setForm(merged);
+        parseLocation(merged.location);
+        setAgreed(true);
+      }
     } else {
       try {
         const pending = localStorage.getItem("woollim_pending_profile");
-        if (pending) setForm(JSON.parse(pending));
+        if (pending) {
+          const merged = { ...EMPTY_FORM, ...JSON.parse(pending) };
+          setForm(merged);
+          parseLocation(merged.location);
+        }
       } catch {}
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mounted, isEditMode, isLoggedIn, profile, router]);
+
+  /* Keep form.location in sync with the two dropdowns */
+  useEffect(() => {
+    const combined = sigungu ? `${sido} ${sigungu}` : sido;
+    setForm(prev => prev.location === combined ? prev : { ...prev, location: combined });
+  }, [sido, sigungu]);
 
   const set = (field: keyof Profile) => (value: string) =>
     setForm(prev => ({ ...prev, [field]: value }));
 
   const validate = (): boolean => {
     const e: Partial<Profile> = {};
-    const req: Array<keyof Profile> = ["name","gender","phone","location","job","mbti","idealType"];
-    req.forEach(f => { if (!form[f].trim()) e[f] = "필수 입력 항목입니다."; });
+    const req: Array<keyof Profile> = ["name","gender","phone","job","mbti","interests","idealType"];
+    req.forEach(f => {
+      const v = form[f];
+      if (!v || !v.trim()) e[f] = "필수 입력 항목입니다.";
+    });
+    // Location: sido required; if sido has subdivisions, sigungu also required
+    if (!sido) {
+      e.location = "거주 지역을 선택해주세요.";
+    } else if ((LOCATIONS[sido]?.length ?? 0) > 0 && !sigungu) {
+      e.location = "시/군/구까지 선택해주세요.";
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -187,7 +220,7 @@ function ProfileSetupContent() {
                   성별 <span className="text-brand-point">*</span>
                 </label>
                 <div className="flex gap-2 md:gap-3">
-                  {["남성", "여성", "선택 안함"].map(g => (
+                  {["남성", "여성"].map(g => (
                     <button key={g} type="button" onClick={() => set("gender")(g)}
                       className={`flex-1 py-3.5 rounded-xl font-bold text-sm transition-all ${
                         form.gender === g
@@ -213,19 +246,42 @@ function ProfileSetupContent() {
                 {errors.phone && <p className="text-xs text-red-500 mt-1 ml-1">{errors.phone}</p>}
               </div>
 
-              {/* Location */}
+              {/* Location — cascading 시/도 → 시/군/구 */}
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">
                   거주 지역 <span className="text-brand-point">*</span>
                 </label>
-                <div className="relative">
-                  <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={17} />
-                  <select value={form.location} onChange={e => set("location")(e.target.value)}
-                    className={inp("location") + " pl-11 appearance-none cursor-pointer"}
-                  >
-                    <option value="">지역을 선택해주세요</option>
-                    {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
-                  </select>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3">
+                  <div className="relative">
+                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={17} />
+                    <select
+                      value={sido}
+                      onChange={e => { setSido(e.target.value); setSigungu(""); }}
+                      className={inp("location") + " pl-11 appearance-none cursor-pointer"}
+                    >
+                      <option value="">시/도 선택</option>
+                      {SIDO_LIST.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div className="relative">
+                    <select
+                      value={sigungu}
+                      onChange={e => setSigungu(e.target.value)}
+                      disabled={!sido || (LOCATIONS[sido]?.length ?? 0) === 0}
+                      className={inp("location") + " appearance-none cursor-pointer disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"}
+                    >
+                      <option value="">
+                        {!sido
+                          ? "시/도를 먼저 선택"
+                          : (LOCATIONS[sido]?.length ?? 0) === 0
+                            ? "선택 불필요"
+                            : "시/군/구 선택"}
+                      </option>
+                      {sido && LOCATIONS[sido]?.map(g => (
+                        <option key={g} value={g}>{g}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 {errors.location && <p className="text-xs text-red-500 mt-1 ml-1">{errors.location}</p>}
               </div>
@@ -255,6 +311,22 @@ function ProfileSetupContent() {
                   {MBTI_TYPES.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
                 {errors.mbti && <p className="text-xs text-red-500 mt-1 ml-1">{errors.mbti}</p>}
+              </div>
+
+              {/* Interests */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  관심사 <span className="text-brand-point">*</span>
+                </label>
+                <div className="relative">
+                  <Sparkles className="absolute left-4 top-4 text-gray-400" size={17} />
+                  <textarea value={form.interests} onChange={e => set("interests")(e.target.value)}
+                    placeholder="좋아하거나 관심 있는 분야를 자유롭게 적어주세요. (예: 와인, 테니스, 전시회, 독서)"
+                    rows={2}
+                    className={`w-full pl-11 pr-4 py-4 rounded-xl border ${errors.interests ? "border-red-300 bg-red-50" : "border-gray-100 bg-gray-50"} focus:bg-white focus:ring-2 focus:ring-brand-point focus:border-brand-point transition-all outline-none font-medium text-sm resize-none`}
+                  />
+                </div>
+                {errors.interests && <p className="text-xs text-red-500 mt-1 ml-1">{errors.interests}</p>}
               </div>
 
               {/* Ideal Type */}
