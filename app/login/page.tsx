@@ -57,9 +57,9 @@ function LoginContent() {
     }
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const success = login(loginEmail, loginPassword);
+    const success = await login(loginEmail, loginPassword);
     if (success) {
       router.push(redirectTo);
     } else {
