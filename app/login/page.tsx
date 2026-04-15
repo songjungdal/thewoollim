@@ -7,18 +7,22 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import { useAuth } from "../context/AuthContext";
 
 import { Suspense } from "react";
 
 function LoginContent() {
   const [activeTab, setActiveTab] = useState<"login" | "register">("login");
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
   const [timer, setTimer] = useState(0);
   const [isAuthSent, setIsAuthSent] = useState(false);
   const [isAuthVerified, setIsAuthVerified] = useState(false);
   const [authCode, setAuthCode] = useState("");
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirect") || "/";
+  const redirectTo = searchParams.get("redirect") || "/mypage";
+  const { login } = useAuth();
 
   // Authentication Timer Logic
   useEffect(() => {
@@ -55,8 +59,12 @@ function LoginContent() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    alert("로그인 성공! 이전 페이지로 이동합니다.");
-    router.push(redirectTo);
+    const success = login(loginEmail, loginPassword);
+    if (success) {
+      router.push(redirectTo);
+    } else {
+      alert("이메일 또는 비밀번호가 올바르지 않습니다.");
+    }
   };
 
   const handleRegister = (e: React.FormEvent) => {
@@ -125,14 +133,14 @@ function LoginContent() {
                         <label className={labelClass}>이메일 주소</label>
                         <div className="relative">
                           <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                          <input type="email" placeholder="example@thewoollim.com" className={inputClass} required />
+                          <input type="email" placeholder="example@thewoollim.com" className={inputClass} required value={loginEmail} onChange={e => setLoginEmail(e.target.value)} />
                         </div>
                       </div>
                       <div>
                         <label className={labelClass}>비밀번호</label>
                         <div className="relative">
                           <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                          <input type="password" placeholder="••••••••" className={inputClass} required />
+                          <input type="password" placeholder="••••••••" className={inputClass} required value={loginPassword} onChange={e => setLoginPassword(e.target.value)} />
                         </div>
                       </div>
                       <button type="submit" className="w-full bg-brand-black text-white py-4 rounded-xl font-bold text-lg hover:bg-brand-point transition-all shadow-xl hover:shadow-brand-point/20">

@@ -21,9 +21,8 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-import Header from "./components/Header";
-import Footer from "../app/components/Footer"; // Re-fix if needed or use relative
 import LoadingSpinner from "./components/LoadingSpinner";
+import ClientProviders from "./components/ClientProviders";
 import { Suspense } from "react";
 
 export default function RootLayout({
@@ -38,10 +37,12 @@ export default function RootLayout({
         <script src="https://cdn.portone.io/v2/browser-sdk.js" async></script>
       </head>
       <body className="bg-brand-lightgray text-brand-black antialiased font-sans selection:bg-brand-point selection:text-white">
-        <Suspense fallback={null}>
-          <LoadingSpinner />
-        </Suspense>
-        {children}
+        <ClientProviders>
+          <Suspense fallback={null}>
+            <LoadingSpinner />
+          </Suspense>
+          {children}
+        </ClientProviders>
       </body>
     </html>
   );

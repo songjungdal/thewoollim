@@ -2,12 +2,15 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Menu, X } from "lucide-react";
+import Image from "next/image";
+import { Menu, X, ShoppingBag } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { useAuth } from "../context/AuthContext";
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const pathname = usePathname();
+  const { isLoggedIn, mounted, cart } = useAuth();
   
   const handleScroll = (e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
     if (pathname === "/") {
@@ -25,17 +28,29 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-50 bg-black backdrop-blur-md border-b border-gray-800">
       <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between text-white">
-        <Link href="/" className="text-2xl font-black tracking-tighter cursor-pointer">
-          어울림<span className="text-brand-point">.</span>
+        <Link href="/" className="cursor-pointer">
+          <Image src="/images/logo_white.png" alt="어울림 로고" width={130} height={42} priority />
         </Link>
         
-        <nav className="hidden md:flex gap-8 font-semibold text-sm">
+        <nav className="hidden md:flex items-center gap-8 font-semibold text-sm">
           <Link href="/#apply" onClick={(e) => handleScroll(e, 'apply')} className="hover:text-brand-point transition-colors">참여하기</Link>
           <Link href="/#gallery" onClick={(e) => handleScroll(e, 'gallery')} className="hover:text-brand-point transition-colors">후기갤러리</Link>
           <Link href="/#participants" onClick={(e) => handleScroll(e, 'participants')} className="hover:text-brand-point transition-colors">참여자 명단</Link>
           <Link href="/#schedule" onClick={(e) => handleScroll(e, 'schedule')} className="hover:text-brand-point transition-colors">매칭파티 일정</Link>
           <Link href="/#faq" onClick={(e) => handleScroll(e, 'faq')} className="hover:text-brand-point transition-colors">FAQ</Link>
-          <Link href="/login" className="text-brand-point font-bold transition-transform hover:scale-105">로그인</Link>
+          {mounted && isLoggedIn ? (
+            <div className="flex items-center gap-4">
+              <Link href="/mypage" className="relative hover:text-brand-point transition-colors">
+                <ShoppingBag size={22} />
+                {cart.length > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-brand-point text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center">{cart.length}</span>
+                )}
+              </Link>
+              <Link href="/mypage" className="text-brand-point font-bold transition-transform hover:scale-105">마이페이지</Link>
+            </div>
+          ) : (
+            <Link href="/login" className="text-brand-point font-bold transition-transform hover:scale-105">로그인</Link>
+          )}
         </nav>
 
         <button className="md:hidden" onClick={() => setIsMenuOpen(!isMenuOpen)}>
@@ -49,7 +64,13 @@ export default function Header() {
           <Link href="/#gallery" onClick={(e) => handleScroll(e, 'gallery')}>후기갤러리</Link>
           <Link href="/#schedule" onClick={(e) => handleScroll(e, 'schedule')}>매칭파티 일정</Link>
           <Link href="/#faq" onClick={(e) => handleScroll(e, 'faq')}>FAQ</Link>
-          <Link href="/login" className="text-brand-point font-bold" onClick={() => setIsMenuOpen(false)}>로그인</Link>
+          {mounted && isLoggedIn ? (
+            <Link href="/mypage" className="text-brand-point font-bold flex items-center gap-2" onClick={() => setIsMenuOpen(false)}>
+              마이페이지 {cart.length > 0 && <span className="bg-brand-point text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center">{cart.length}</span>}
+            </Link>
+          ) : (
+            <Link href="/login" className="text-brand-point font-bold" onClick={() => setIsMenuOpen(false)}>로그인</Link>
+          )}
         </div>
       )}
     </header>
