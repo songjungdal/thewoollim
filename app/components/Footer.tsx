@@ -9,7 +9,7 @@ export default function Footer() {
 
             <div className="col-span-2 lg:col-span-2">
               <div className="mb-5 md:mb-6">
-                <Image src="/images/logo_white.png" alt="어울림 로고" width={140} height={45} />
+                <Image src="/images/logo_white.png" alt="어울림 로고" width={129} height={41} />
               </div>
               <div className="text-gray-400 text-xs md:text-sm space-y-1.5 md:space-y-2 leading-relaxed">
                  <p>상호명: 어울림</p>
@@ -22,7 +22,7 @@ export default function Footer() {
             <div>
               <h4 className="font-bold text-sm md:text-lg mb-4 md:mb-6">고객센터</h4>
               <ul className="text-gray-400 space-y-2 md:space-y-3 font-medium text-sm md:text-base">
-                <li><Link href="/refund" target="_blank" className="hover:text-brand-point transition-colors">환불규정</Link></li>
+                <li><Link href="/refund" className="hover:text-brand-point transition-colors">환불규정</Link></li>
                 <li><Link href="/report" className="hover:text-brand-point transition-colors">신고센터</Link></li>
                 <li><Link href="/about" className="hover:text-brand-point transition-colors">회사소개</Link></li>
               </ul>

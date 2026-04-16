@@ -27,9 +27,9 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-50 bg-black backdrop-blur-md border-b border-gray-800">
-      <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between text-white">
+      <div className="max-w-7xl mx-auto px-6 h-[72px] md:h-24 flex items-center justify-between text-white">
         <Link href="/" className="cursor-pointer">
-          <Image src="/images/logo_white.png" alt="어울림 로고" width={130} height={42} priority />
+          <Image src="/images/logo_white.png" alt="어울림 로고" width={120} height={39} priority />
         </Link>
         
         <nav className="hidden md:flex items-center gap-8 font-semibold text-sm">
@@ -59,7 +59,7 @@ export default function Header() {
       </div>
 
       {isMenuOpen && (
-        <div className="md:hidden absolute top-20 left-0 w-full bg-black border-b border-gray-800 p-6 flex flex-col gap-6 font-semibold text-white shadow-2xl">
+        <div className="md:hidden absolute top-[72px] left-0 w-full bg-black border-b border-gray-800 p-6 flex flex-col gap-6 font-semibold text-white shadow-2xl">
           <Link href="/#apply" onClick={(e) => handleScroll(e, 'apply')}>참여하기</Link>
           <Link href="/#gallery" onClick={(e) => handleScroll(e, 'gallery')}>후기갤러리</Link>
           <Link href="/#schedule" onClick={(e) => handleScroll(e, 'schedule')}>매칭파티 일정</Link>

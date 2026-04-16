@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence, Variants } from "framer-motion";
 import { ArrowRight, ChevronDown, Users, Calendar, MapPin, X } from "lucide-react";
 import FullCalendar from "@fullcalendar/react";
@@ -14,13 +14,34 @@ import Footer from "./components/Footer";
 import { PARTIES, CALENDAR_EVENTS, PARTICIPANTS, FAQS } from "./lib/data";
 
 export default function SmoothOnePage() {
-  const [activeTab, setActiveTab] = useState("주제별");
+  const [activeTab, setActiveTab] = useState("일정별");
   const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(null);
   const [selectedGalleryImage, setSelectedGalleryImage] = useState<string | null>(null);
   const [isGalleryExpanded, setIsGalleryExpanded] = useState(false);
   const router = useRouter();
 
-  const TABS = ["주제별", "지역별", "일정별"];
+  const TABS = ["일정별", "지역별", "주제별", "연령별"];
+
+  const sortedParties = useMemo(() => {
+    const list = [...PARTIES];
+    switch (activeTab) {
+      case "일정별":
+        return list.sort((a, b) => a.calendarDate.localeCompare(b.calendarDate));
+      case "지역별":
+        return list.sort((a, b) => a.location.localeCompare(b.location, "ko"));
+      case "주제별":
+        return list.sort((a, b) => a.tag.localeCompare(b.tag, "ko") || a.title.localeCompare(b.title, "ko"));
+      case "연령별": {
+        const extractAge = (t: string) => {
+          const m = t.match(/(\d+)/);
+          return m ? parseInt(m[1], 10) : 999;
+        };
+        return list.sort((a, b) => extractAge(a.target) - extractAge(b.target));
+      }
+      default:
+        return list;
+    }
+  }, [activeTab]);
 
   const fadeInUp: Variants = {
     hidden: { opacity: 0, y: 40 },
@@ -104,12 +125,20 @@ export default function SmoothOnePage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
-              <AnimatePresence>
-                {PARTIES.filter(card => activeTab === '일정별' || card.tag === activeTab).map(card => (
+              <AnimatePresence mode="popLayout">
+                {sortedParties.map(card => (
                   <motion.div
-                    key={card.id} layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.3 }}
+                    key={card.id}
+                    layout
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -12 }}
+                    transition={{ duration: 0.35, type: "spring", stiffness: 300, damping: 28 }}
                     className="bg-brand-lightgray border border-gray-100 p-5 md:p-8 rounded-2xl md:rounded-3xl hover:border-brand-point transition-all flex flex-col h-full group"
                   >
+                    <div className="flex items-center gap-2 mb-3 md:mb-4">
+                      <span className="text-[11px] md:text-xs font-bold px-2.5 py-1 rounded-full bg-brand-point/10 text-brand-point">{card.tag}</span>
+                    </div>
                     <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-4 group-hover:text-brand-point transition-colors leading-snug">{card.title}</h3>
                     <div className="space-y-2.5 md:space-y-3 mb-5 md:mb-8 text-gray-600 font-medium flex-1 text-sm md:text-base">
                       <div className="flex items-center gap-2.5"><Calendar size={16} className="text-gray-400 group-hover:text-brand-point transition-colors flex-shrink-0" /> {card.dateString}</div>
