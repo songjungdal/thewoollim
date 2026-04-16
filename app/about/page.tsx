@@ -23,7 +23,7 @@ export default function AboutPage() {
           <div className="max-w-4xl mx-auto">
             <div className="text-gray-600 leading-relaxed font-medium text-base md:text-lg">
               <h2 className="text-3xl md:text-4xl font-black text-gray-900 mb-8 md:mb-10 tracking-tight leading-tight">세상을 울리는 새로운 연결,<br />어울림(The Woollim)입니다.</h2>
-              <p className="mb-12 md:mb-20 text-gray-700">여기에 내용을 입력하세요. 어울림의 비전과 가치에 대한 설명을 입력하는 공간입니다. 우리는 숫자와 효율이 지배하는 세상에서 잃어버린 '진짜 연결'의 가치를 회복하고자 합니다.</p>
+              <p className="mb-12 md:mb-20 text-gray-700">우리는 숫자와 효율이 지배하는 세상에서 잃어버린 '진짜 연결'의 가치를 회복하고자 합니다.</p>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12 mb-14 md:mb-24">
                 <div className="space-y-4">

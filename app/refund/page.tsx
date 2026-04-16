@@ -50,7 +50,7 @@ export default function RefundPage() {
                       <CreditCard className="text-brand-point flex-shrink-0" size={22} />
                       <h2 className="text-xl md:text-2xl font-bold">환불 방법</h2>
                     </div>
-                    <p className="text-sm md:text-base text-gray-700">여기에 내용을 입력하세요. 신용카드 결제 시 카드사에 따라 영업일 기준 3~5일이 소요될 수 있습니다. 무통장 입금의 경우 신청하신 계좌로 영업일 기준 2일 이내에 송금됩니다.</p>
+                    <p className="text-sm md:text-base text-gray-700">신용카드 결제 시 카드사에 따라 영업일 기준 3~5일이 소요될 수 있습니다. 무통장 입금의 경우 신청하신 계좌로 영업일 기준 2일 이내에 송금됩니다.</p>
                   </div>
                 </div>
 

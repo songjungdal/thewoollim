@@ -43,10 +43,10 @@ export default function PartnershipPage() {
                 <p className="text-gray-600 text-sm md:text-base mb-7 md:mb-10">제안서를 포함하여 아래 이메일이나 채널로 문의해 주시기 바랍니다.</p>
 
                 <div className="flex flex-col items-center gap-3 md:gap-6">
-                  <div className="flex items-center gap-3 bg-white w-full md:w-auto px-5 md:px-8 py-3.5 md:py-4 rounded-2xl shadow-sm border border-gray-200 justify-center">
+                  <a href="mailto:info@thewoollim.com" className="flex items-center gap-3 bg-white w-full md:w-auto px-5 md:px-8 py-3.5 md:py-4 rounded-2xl shadow-sm border border-gray-200 justify-center hover:border-brand-point transition-colors no-underline">
                     <Mail className="text-brand-point flex-shrink-0" size={18} />
-                    <span className="font-bold text-gray-900 text-sm md:text-base">partner@thewoollim.com</span>
-                  </div>
+                    <span className="font-bold text-gray-900 text-sm md:text-base">info@thewoollim.com</span>
+                  </a>
                   <div className="flex items-center gap-3 bg-white w-full md:w-auto px-5 md:px-8 py-3.5 md:py-4 rounded-2xl shadow-sm border border-gray-200 justify-center">
                     <MessageSquare className="text-brand-point flex-shrink-0" size={18} />
                     <span className="font-bold text-gray-900 text-sm md:text-base">카카오톡 @어울림비즈니스</span>

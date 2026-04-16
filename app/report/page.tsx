@@ -23,7 +23,7 @@ export default function ReportPage() {
           <div className="max-w-4xl mx-auto">
             <div className="text-gray-600 leading-relaxed font-medium text-base md:text-lg">
               <h2 className="text-2xl md:text-3xl font-black text-gray-900 mb-5 md:mb-6 tracking-tight">안전하고 정직한 네트워킹을 지향합니다.</h2>
-              <p className="mb-10 md:mb-16 text-sm md:text-base">여기에 내용을 입력하세요. 어울림은 모든 회원의 매너 있는 활동을 권장하며, 부적절한 언행이나 허위 정보 기재 등에 대해 단호하게 대응합니다. 신고 내용은 철저히 익명으로 처리됩니다.</p>
+              <p className="mb-10 md:mb-16 text-sm md:text-base">어울림은 모든 회원의 매너 있는 활동을 권장하며, 부적절한 언행이나 허위 정보 기재 등에 대해 단호하게 대응합니다. 신고 내용은 철저히 익명으로 처리됩니다.</p>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8 mb-12 md:mb-20">
                 <div className="p-6 md:p-8 bg-gray-50 rounded-2xl md:rounded-3xl border border-gray-100">
