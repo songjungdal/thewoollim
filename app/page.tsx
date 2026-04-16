@@ -221,7 +221,7 @@ export default function SmoothOnePage() {
               {CALENDAR_EVENTS.length === 0 ? (
                 <p className="text-center text-gray-400 py-12">등록된 일정이 없습니다.</p>
               ) : (
-                CALENDAR_EVENTS.map((event) => {
+                [...CALENDAR_EVENTS].sort((a, b) => a.date.localeCompare(b.date)).map((event) => {
                   const party = PARTIES.find(p => p.id === event.id);
                   const dateObj = new Date(event.date + "T00:00:00");
                   const month = dateObj.getMonth() + 1;
@@ -282,6 +282,7 @@ export default function SmoothOnePage() {
                 <FullCalendar
                   plugins={[dayGridPlugin, interactionPlugin]}
                   initialView="dayGridMonth"
+                  initialDate={PARTIES[0]?.calendarDate}
                   locale="ko"
                   buttonText={{ today: 'TODAY' }}
                   events={CALENDAR_EVENTS}
