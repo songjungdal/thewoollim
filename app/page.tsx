@@ -136,10 +136,7 @@ export default function SmoothOnePage() {
                     transition={{ duration: 0.35, type: "spring", stiffness: 300, damping: 28 }}
                     className="bg-brand-lightgray border border-gray-100 p-5 md:p-8 rounded-2xl md:rounded-3xl hover:border-brand-point transition-all flex flex-col h-full group"
                   >
-                    <div className="flex items-center gap-2 mb-3 md:mb-4">
-                      <span className="text-[11px] md:text-xs font-bold px-2.5 py-1 rounded-full bg-brand-point/10 text-brand-point">{card.tag}</span>
-                    </div>
-                    <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-4 group-hover:text-brand-point transition-colors leading-snug">{card.title}</h3>
+                    <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-5 group-hover:text-brand-point transition-colors leading-snug">{card.title}</h3>
                     <div className="space-y-2.5 md:space-y-3 mb-5 md:mb-8 text-gray-600 font-medium flex-1 text-sm md:text-base">
                       <div className="flex items-center gap-2.5"><Calendar size={16} className="text-gray-400 group-hover:text-brand-point transition-colors flex-shrink-0" /> {card.dateString}</div>
                       <div className="flex items-center gap-2.5"><MapPin size={16} className="text-gray-400 group-hover:text-brand-point transition-colors flex-shrink-0" /> {card.location}</div>
