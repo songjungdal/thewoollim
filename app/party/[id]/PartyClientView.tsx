@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Star, Heart, Clock, CheckCircle, ShoppingBag, X } from "lucide-react";
+import { ArrowLeft, Star, Heart, Clock, CheckCircle, ShoppingBag, X, ClipboardList } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Header from "../../components/Header";
@@ -66,7 +66,7 @@ export default function PartyClientView({ id }: { id: string }) {
           {/* TOP SECTION: MAIN INFO */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-7 md:gap-16 mb-10 md:mb-24">
             {/* Left: Emotional Image Placeholder */}
-            <div className="aspect-[3/2] md:aspect-[4/5] bg-neutral-900 rounded-2xl md:rounded-[2rem] flex items-center justify-center relative overflow-hidden group">
+            <div className="aspect-[5/3] md:aspect-[10/11] bg-neutral-900 rounded-2xl md:rounded-[2rem] flex items-center justify-center relative overflow-hidden group">
               <div className="absolute inset-0 bg-neutral-800 flex items-center justify-center opacity-40">
                 <Star size={48} className="text-gray-400" />
               </div>
@@ -75,44 +75,46 @@ export default function PartyClientView({ id }: { id: string }) {
             </div>
 
             {/* Right: Info & Checkout */}
-            <div className="flex flex-col justify-center">
-              <h1 className="text-3xl md:text-5xl font-black tracking-tight mb-3 md:mb-4 leading-snug">{detailItem.title}</h1>
-              <p className="text-sm md:text-xl text-gray-500 mb-7 md:mb-12 font-medium leading-relaxed">
-                단순한 만남을 넘어 감성을 향유하는 시간.<br />
-                어울림이 큐레이션한 프리미엄 네트워킹에 초대합니다.
-              </p>
+            <div className="flex flex-col justify-between min-h-0">
+              <div>
+                <h1 className="text-3xl md:text-5xl font-black tracking-tight mb-3 md:mb-4 leading-snug">{detailItem.title}</h1>
+                <p className="text-sm md:text-lg text-gray-500 mb-5 md:mb-8 font-medium leading-relaxed">
+                  단순한 만남을 넘어 감성을 향유하는 시간.<br />
+                  어울림이 큐레이션한 프리미엄 네트워킹에 초대합니다.
+                </p>
 
-              {/* Info rows */}
-              <div className="space-y-0 mb-7 md:mb-12 flex-1">
-                {[
-                  { label: "일시 (Date)", value: detailItem.dateString },
-                  { label: "장소 (Location)", value: detailItem.location },
-                  { label: "대상 (Target)", value: detailItem.target },
-                ].map((row) => (
-                  <div key={row.label} className="flex flex-col md:flex-row md:justify-between md:items-center py-3.5 md:py-4 border-b border-gray-200 gap-0.5 md:gap-0">
-                    <span className="text-xs md:text-base text-gray-400 md:text-gray-500 font-medium md:w-36">{row.label}</span>
-                    <span className="font-bold text-sm md:text-base md:text-right">{row.value}</span>
+                {/* Info rows */}
+                <div className="space-y-0 mb-5 md:mb-8">
+                  {[
+                    { label: "일시 (Date)", value: detailItem.dateString },
+                    { label: "장소 (Location)", value: detailItem.location },
+                    { label: "대상 (Target)", value: detailItem.target },
+                  ].map((row) => (
+                    <div key={row.label} className="flex flex-col md:flex-row md:justify-between md:items-center py-3 md:py-3.5 border-b border-gray-200 gap-0.5 md:gap-0">
+                      <span className="text-xs md:text-base text-gray-400 md:text-gray-500 font-medium md:w-36">{row.label}</span>
+                      <span className="font-bold text-sm md:text-base md:text-right">{row.value}</span>
+                    </div>
+                  ))}
+                  <div className="flex flex-col md:flex-row md:justify-between md:items-center py-3 md:py-3.5 border-b border-gray-200 gap-0.5 md:gap-0">
+                    <span className="text-xs md:text-base text-gray-400 md:text-gray-500 font-medium md:w-36">참가비 (Price)</span>
+                    <span className="font-black text-xl md:text-2xl text-brand-point">₩{detailItem.price.toLocaleString()}</span>
                   </div>
-                ))}
-                <div className="flex flex-col md:flex-row md:justify-between md:items-center py-3.5 md:py-4 border-b border-gray-200 gap-0.5 md:gap-0">
-                  <span className="text-xs md:text-base text-gray-400 md:text-gray-500 font-medium md:w-36">참가비 (Price)</span>
-                  <span className="font-black text-xl md:text-2xl text-brand-point">₩{detailItem.price.toLocaleString()}</span>
+                </div>
+
+                {/* Notice */}
+                <div className="bg-white p-4 md:p-5 rounded-xl md:rounded-2xl border border-gray-200 mb-5 md:mb-6">
+                  <h4 className="font-bold mb-1.5 flex items-center gap-2 text-sm md:text-base">
+                    <Heart size={15} className="text-brand-point" /> 꼭 확인해주세요.
+                  </h4>
+                  <p className="text-xs md:text-sm text-gray-500 leading-relaxed">
+                    어울림은 진정성 있는 네트워크 유지를 위해 철저한 사전 승인제로 운영됩니다.<br />
+                    결제 완료 시 참여 확정 및 안내 문자가 순차적으로 발송됩니다.
+                  </p>
                 </div>
               </div>
 
-              {/* Notice */}
-              <div className="bg-white p-4 md:p-6 rounded-xl md:rounded-2xl border border-gray-200 mb-5 md:mb-8">
-                <h4 className="font-bold mb-1.5 flex items-center gap-2 text-sm md:text-base">
-                  <Heart size={15} className="text-brand-point" /> 꼭 확인해주세요.
-                </h4>
-                <p className="text-xs md:text-sm text-gray-500 leading-relaxed">
-                  어울림은 진정성 있는 네트워크 유지를 위해 철저한 사전 승인제로 운영됩니다.<br />
-                  결제 완료 시 참여 확정 및 안내 문자가 순차적으로 발송됩니다.
-                </p>
-              </div>
-
-              {/* CTA Buttons */}
-              <div className="flex gap-3 md:gap-4">
+              {/* CTA Buttons — pinned to bottom */}
+              <div className="flex gap-3 md:gap-4 mt-auto">
                 <button
                   onClick={handleCheckout}
                   className="flex-[2] bg-brand-black text-white px-5 md:px-8 py-4 md:py-5 rounded-xl md:rounded-2xl text-base md:text-xl font-bold hover:bg-brand-point transition-all shadow-xl hover:shadow-brand-point/30"
@@ -125,6 +127,89 @@ export default function PartyClientView({ id }: { id: string }) {
                 >
                   장바구니
                 </button>
+              </div>
+            </div>
+          </div>
+
+          {/* INTRO — Party-specific OUR EXPERIENCE style */}
+          <div className="mb-10 md:mb-24">
+            <div className="max-w-4xl mx-auto">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.7 }}
+                className="space-y-6 md:space-y-10"
+              >
+                <div className="text-center space-y-3 md:space-y-5">
+                  <p className="text-xs md:text-sm font-black tracking-[0.25em] text-brand-point uppercase">Private Matching Party</p>
+                  <h2 className="text-2xl md:text-5xl font-black tracking-tighter leading-tight">
+                    프라이빗 매칭 파티<br className="md:hidden" />
+                    <span className="hidden md:inline"> : </span>
+                    <span className="md:hidden">: </span>
+                    <span className="text-brand-point">{detailItem.title}</span>
+                  </h2>
+                  <p className="text-sm md:text-lg text-gray-600 leading-relaxed max-w-2xl mx-auto">
+                    어울림<span className="text-brand-point font-bold">(THEWOOLLIM)</span>이 제안하는 엄선된 만남.<br />
+                    같은 취향과 가치관을 가진 분들과의 특별한 시간을 경험해 보세요.
+                  </p>
+                </div>
+
+                <div className="relative group overflow-hidden rounded-2xl md:rounded-3xl shadow-2xl aspect-[16/9] md:aspect-[21/9]">
+                  <img
+                    src="/images/party_vibe_1.png"
+                    alt={`${detailItem.title} — 프라이빗 매칭 파티 분위기`}
+                    className="w-full h-full object-cover transform transition-transform duration-1000 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/10 to-transparent group-hover:from-black/30 transition-colors" />
+                </div>
+              </motion.div>
+            </div>
+          </div>
+
+          {/* HOW TO JOIN — Timeline-styled Application Guide */}
+          <div className="mb-10 md:mb-24">
+            <div className="max-w-4xl mx-auto">
+              <div className="bg-white p-6 md:p-20 rounded-2xl md:rounded-[3rem] shadow-sm border border-gray-100">
+                <div className="flex items-center gap-3 md:gap-4 mb-7 md:mb-12">
+                  <ClipboardList size={26} className="text-brand-point md:hidden" />
+                  <ClipboardList size={32} className="text-brand-point hidden md:block" />
+                  <h3 className="text-xl md:text-3xl font-bold tracking-tight">참가 신청 방법</h3>
+                </div>
+
+                <div className="space-y-7 md:space-y-12 relative before:absolute before:left-3.5 md:before:left-4 before:top-2 before:bottom-2 before:w-px before:bg-gray-100">
+                  {[
+                    {
+                      title: "결제하기",
+                      desc: "매칭파티 카드의 일시, 장소, 연령대를 확인하고 결제해주세요.",
+                      note: null,
+                    },
+                    {
+                      title: "프로필카드 작성하기",
+                      desc: "매칭파티 프로필카드를 작성해주세요.",
+                      note: "프로필카드가 작성되면 확인 후 참가승인 확정문자를 보내드립니다.",
+                    },
+                    {
+                      title: "참가승인 확정 후 방문하기",
+                      desc: "참가승인 확정문자 확인 후 해당 장소로 방문하여 파티에 참여해주세요.",
+                      note: "성비가 맞지 않거나 주최측의 사정으로 파티가 취소될 경우 100% 환불이나 쿠폰 적립 후 다음 모임 선확정 중 선택하실 수 있습니다.",
+                    },
+                  ].map((item, idx) => (
+                    <div key={idx} className="relative pl-12 md:pl-14">
+                      <div className="absolute left-0 top-0 w-7 h-7 md:w-8 md:h-8 bg-brand-point text-white rounded-full border-4 border-white shadow-md flex items-center justify-center font-black text-xs md:text-sm">
+                        {idx + 1}
+                      </div>
+                      <div className="text-brand-point font-black text-xs md:text-sm tracking-[0.15em] mb-1 md:mb-1.5">STEP {idx + 1}</div>
+                      <div className="font-bold text-base md:text-xl mb-1.5 md:mb-2 text-brand-black leading-snug">{item.title}</div>
+                      <div className="text-gray-600 font-medium text-sm md:text-base leading-relaxed">{item.desc}</div>
+                      {item.note && (
+                        <div className="mt-2.5 md:mt-3 bg-brand-point/5 border-l-2 border-brand-point/40 pl-3 md:pl-4 py-2 md:py-2.5 rounded-r-lg">
+                          <p className="text-xs md:text-sm text-gray-600 leading-relaxed">{item.note}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>

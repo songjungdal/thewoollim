@@ -22,8 +22,60 @@ export default function AboutPage() {
         <section className="py-12 md:py-24 px-4 md:px-6">
           <div className="max-w-4xl mx-auto">
             <div className="text-gray-600 leading-relaxed font-medium text-base md:text-lg">
-              <h2 className="text-3xl md:text-4xl font-black text-gray-900 mb-8 md:mb-10 tracking-tight leading-tight">세상을 울리는 새로운 연결,<br />어울림(The Woollim)입니다.</h2>
-              <p className="mb-12 md:mb-20 text-gray-700">우리는 숫자와 효율이 지배하는 세상에서 잃어버린 '진짜 연결'의 가치를 회복하고자 합니다.</p>
+              <h2 className="text-3xl md:text-4xl font-black text-gray-900 mb-8 md:mb-10 tracking-tight leading-tight">세상을 울리는 새로운 <span className="text-brand-point">연결</span>,<br />어울림(The Woollim)입니다.</h2>
+              <p className="mb-12 md:mb-20 text-gray-700 leading-relaxed">
+                어울림은 서로 다른 사람들이 자연스럽게 만나 특별한 인연이 되는
+                <span className="font-bold text-gray-900"> 매칭 파티 플랫폼</span>입니다.
+                우리는 숫자와 효율이 지배하는 세상에서 잃어버린
+                <span className="font-bold text-gray-900"> '진짜 연결'</span>의 가치를 회복하고자 합니다.
+              </p>
+
+              {/* Logo Identity Section */}
+              <div className="mb-14 md:mb-24">
+                <div className="flex items-center gap-3 mb-6 md:mb-8">
+                  <div className="w-1 h-5 md:h-6 bg-brand-point rounded-full"></div>
+                  <h3 className="text-xs md:text-sm font-black tracking-[0.2em] text-brand-point uppercase">Brand Identity</h3>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-6 md:gap-10 items-stretch">
+                  {/* Logo Box */}
+                  <div className="md:col-span-2 bg-brand-lightgray border border-gray-100 rounded-3xl p-10 md:p-14 flex items-center justify-center aspect-[4/3] md:aspect-auto">
+                    <Image
+                      src="/images/logo_black.png"
+                      alt="어울림 로고"
+                      width={220}
+                      height={72}
+                      className="object-contain w-full max-w-[220px] h-auto"
+                    />
+                  </div>
+
+                  {/* Description Box */}
+                  <div className="md:col-span-3 bg-white border border-gray-100 rounded-3xl p-7 md:p-10 flex flex-col justify-center">
+                    <h4 className="text-lg md:text-2xl font-black text-gray-900 mb-4 md:mb-5 leading-snug">
+                      기분 좋은 <span className="text-brand-point">울림</span>을 시각화한 로고
+                    </h4>
+                    <p className="text-sm md:text-base text-gray-600 leading-relaxed mb-5 md:mb-6">
+                      사람과 사람 사이의 유연한
+                      <span className="font-bold text-brand-point"> 연결</span>과 만남에서 시작되는
+                      기분 좋은 <span className="font-bold text-brand-point">'울림'</span>을 시각화했습니다.
+                      포인트 요소는 연결의 시작점과
+                      <span className="font-bold text-brand-point"> 설렘</span>을 상징합니다.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { label: "연결", desc: "사람과 사람 사이" },
+                        { label: "울림", desc: "기분 좋은 여운" },
+                        { label: "설렘", desc: "새로운 시작" },
+                      ].map(k => (
+                        <div key={k.label} className="flex items-center gap-1.5 bg-brand-point/10 border border-brand-point/20 px-3 py-1.5 rounded-full">
+                          <span className="text-xs md:text-sm font-black text-brand-point">#{k.label}</span>
+                          <span className="hidden md:inline text-xs text-gray-500 font-medium">· {k.desc}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12 mb-14 md:mb-24">
                 <div className="space-y-4">
