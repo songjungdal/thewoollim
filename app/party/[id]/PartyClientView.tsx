@@ -7,13 +7,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
-import { PARTIES } from "../../lib/data";
+import { PARTIES, partyStockStatus } from "../../lib/data";
 import { useAuth } from "../../context/AuthContext";
 
 export default function PartyClientView({ id }: { id: string }) {
   const detailItem = PARTIES.find(p => p.id === id);
   const router = useRouter();
-  const { isLoggedIn, addToCart } = useAuth();
+  const { isLoggedIn, addToCart, profile } = useAuth();
   const [showCartModal, setShowCartModal] = useState(false);
 
   if (!detailItem) {
@@ -31,9 +31,26 @@ export default function PartyClientView({ id }: { id: string }) {
     );
   }
 
+  const stock = partyStockStatus(detailItem);
+
+  const checkGenderAvailability = (): string | null => {
+    if (stock.allFull) return "모집이 마감되었습니다.";
+    const g = profile?.gender;
+    if (g === "남성" && stock.maleFull)   return "남성 참가 인원이 마감되었습니다. 다른 파티를 확인해주세요.";
+    if (g === "여성" && stock.femaleFull) return "여성 참가 인원이 마감되었습니다. 다른 파티를 확인해주세요.";
+    return null;
+  };
+
   const handleCheckout = () => {
     if (!isLoggedIn) {
       router.push(`/login?redirect=${encodeURIComponent(`/checkout/?id=${id}`)}`);
+      return;
+    }
+    const blocked = checkGenderAvailability();
+    if (blocked) { alert(blocked); return; }
+    if (!profile?.gender) {
+      alert("프로필 정보(성별)가 필요합니다. 프로필을 먼저 완성해주세요.");
+      router.push("/profile-setup/?edit=true");
       return;
     }
     router.push(`/checkout/?id=${id}`);
@@ -44,6 +61,8 @@ export default function PartyClientView({ id }: { id: string }) {
       router.push("/login");
       return;
     }
+    const blocked = checkGenderAvailability();
+    if (blocked) { alert(blocked); return; }
     addToCart(id);
     setShowCartModal(true);
   };
@@ -65,8 +84,8 @@ export default function PartyClientView({ id }: { id: string }) {
 
           {/* TOP SECTION: MAIN INFO */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-7 md:gap-16 mb-10 md:mb-24">
-            {/* Left: Emotional Image Placeholder */}
-            <div className="aspect-[5/3] md:aspect-[10/11] bg-neutral-900 rounded-2xl md:rounded-[2rem] flex items-center justify-center relative overflow-hidden group">
+            {/* Left: Emotional Image Placeholder — mobile/tablet use fixed aspect, desktop (lg+) stretches to match right column height */}
+            <div className="aspect-[5/3] lg:aspect-auto lg:h-full lg:min-h-[520px] bg-neutral-900 rounded-2xl md:rounded-[2rem] flex items-center justify-center relative overflow-hidden group">
               <div className="absolute inset-0 bg-neutral-800 flex items-center justify-center opacity-40">
                 <Star size={48} className="text-gray-400" />
               </div>
@@ -101,6 +120,29 @@ export default function PartyClientView({ id }: { id: string }) {
                   </div>
                 </div>
 
+                {/* Gender stock — minimal underline typography */}
+                <div className="flex items-center border-t border-b border-gray-300 py-4 md:py-5 mb-5 md:mb-6">
+                  <div className="flex-1 flex items-baseline justify-center gap-2.5 md:gap-3">
+                    <span className="text-sm md:text-base font-bold text-gray-400 tracking-wider">남성</span>
+                    <span className={`text-xl md:text-2xl font-black tabular-nums ${stock.maleFull ? "text-gray-400" : "text-brand-black"}`}>
+                      {detailItem.maleBooked}/{detailItem.maleStock}
+                    </span>
+                    {stock.maleFull && (
+                      <span className="text-[11px] md:text-xs font-black text-gray-400 tracking-wider">마감</span>
+                    )}
+                  </div>
+                  <div className="w-px h-7 md:h-8 bg-gray-300" />
+                  <div className="flex-1 flex items-baseline justify-center gap-2.5 md:gap-3">
+                    <span className="text-sm md:text-base font-bold text-gray-400 tracking-wider">여성</span>
+                    <span className={`text-xl md:text-2xl font-black tabular-nums ${stock.femaleFull ? "text-gray-400" : "text-brand-black"}`}>
+                      {detailItem.femaleBooked}/{detailItem.femaleStock}
+                    </span>
+                    {stock.femaleFull && (
+                      <span className="text-[11px] md:text-xs font-black text-gray-400 tracking-wider">마감</span>
+                    )}
+                  </div>
+                </div>
+
                 {/* Notice */}
                 <div className="bg-white p-4 md:p-5 rounded-xl md:rounded-2xl border border-gray-200 mb-5 md:mb-6">
                   <h4 className="font-bold mb-1.5 flex items-center gap-2 text-sm md:text-base">
@@ -114,20 +156,46 @@ export default function PartyClientView({ id }: { id: string }) {
               </div>
 
               {/* CTA Buttons — pinned to bottom */}
-              <div className="flex gap-3 md:gap-4 mt-auto">
-                <button
-                  onClick={handleCheckout}
-                  className="flex-[2] bg-brand-black text-white px-5 md:px-8 py-4 md:py-5 rounded-xl md:rounded-2xl text-base md:text-xl font-bold hover:bg-brand-point transition-all shadow-xl hover:shadow-brand-point/30"
-                >
-                  참가신청
-                </button>
-                <button
-                  onClick={handleAddToCart}
-                  className="flex-1 bg-brand-black text-white px-5 md:px-8 py-4 md:py-5 rounded-xl md:rounded-2xl text-base md:text-xl font-bold hover:bg-brand-point transition-all shadow-xl"
-                >
-                  장바구니
-                </button>
-              </div>
+              {(() => {
+                const userGender = profile?.gender;
+                const userSideFull =
+                  (userGender === "남성" && stock.maleFull) ||
+                  (userGender === "여성" && stock.femaleFull);
+                const disabled = stock.allFull || userSideFull;
+                const label = stock.allFull
+                  ? "모집 마감"
+                  : userGender === "남성" && stock.maleFull
+                    ? "남성 마감"
+                    : userGender === "여성" && stock.femaleFull
+                      ? "여성 마감"
+                      : "참가신청";
+                return (
+                  <div className="flex gap-3 md:gap-4 mt-auto">
+                    <button
+                      onClick={handleCheckout}
+                      disabled={disabled}
+                      className={`flex-[2] px-5 md:px-8 py-4 md:py-5 rounded-xl md:rounded-2xl text-base md:text-xl font-bold transition-all shadow-xl ${
+                        disabled
+                          ? "bg-gray-200 text-gray-400 cursor-not-allowed shadow-none"
+                          : "bg-brand-black text-white hover:bg-brand-point hover:shadow-brand-point/30"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                    <button
+                      onClick={handleAddToCart}
+                      disabled={disabled}
+                      className={`flex-1 px-5 md:px-8 py-4 md:py-5 rounded-xl md:rounded-2xl text-base md:text-xl font-bold transition-all shadow-xl ${
+                        disabled
+                          ? "bg-gray-200 text-gray-400 cursor-not-allowed shadow-none"
+                          : "bg-brand-black text-white hover:bg-brand-point"
+                      }`}
+                    >
+                      장바구니
+                    </button>
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
@@ -180,18 +248,18 @@ export default function PartyClientView({ id }: { id: string }) {
                 <div className="space-y-7 md:space-y-12 relative before:absolute before:left-3.5 md:before:left-4 before:top-2 before:bottom-2 before:w-px before:bg-gray-100">
                   {[
                     {
-                      title: "결제하기",
+                      title: "매칭파티 카드를 확인하고 결제하기",
                       desc: "매칭파티 카드의 일시, 장소, 연령대를 확인하고 결제해주세요.",
                       note: null,
                     },
                     {
-                      title: "프로필카드 작성하기",
-                      desc: "매칭파티 프로필카드를 작성해주세요.",
-                      note: "프로필카드가 작성되면 확인 후 참가승인 확정문자를 보내드립니다.",
+                      title: "매칭 프로필 카드 작성하기",
+                      desc: "매칭파티 프로필 카드 작성을 완료해야 참가확정을 받으실 수 있습니다.",
+                      note: "마이페이지의 내 예약 현황에서 현재 참가 확정 여부를 확인하실 수 있습니다.",
                     },
                     {
-                      title: "참가승인 확정 후 방문하기",
-                      desc: "참가승인 확정문자 확인 후 해당 장소로 방문하여 파티에 참여해주세요.",
+                      title: "매칭파티 참가확정 확인 후 방문하기",
+                      desc: "참가확정이 되어야만 참석 가능하오니 알림 문자나 참가 확정 여부를 꼭 확인해주세요!",
                       note: "성비가 맞지 않거나 주최측의 사정으로 파티가 취소될 경우 100% 환불이나 쿠폰 적립 후 다음 모임 선확정 중 선택하실 수 있습니다.",
                     },
                   ].map((item, idx) => (

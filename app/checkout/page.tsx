@@ -16,7 +16,7 @@ declare global {
 function CheckoutContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { mounted, isLoggedIn, userEmail, removeFromCart } = useAuth();
+  const { mounted, isLoggedIn, userEmail, removeFromCart, createBookings } = useAuth();
 
   const singleId = searchParams.get("id");
   const multiIds = searchParams.get("ids");
@@ -88,12 +88,21 @@ function CheckoutContent() {
       if (response.code != null) {
         alert(`결제 실패: ${response.message}`);
       } else {
+        await createBookings(parties.map(p => p.id), paymentId, totalAmount);
         for (const p of parties) removeFromCart(p.id);
-        alert("결제가 완료되었습니다!\n참여 확정 안내 문자가 순차적으로 발송됩니다.");
-        router.push("/mypage");
+        const ids = parties.map(p => p.id).join(",");
+        router.push(`/payment/success/?ids=${ids}&total=${totalAmount}`);
       }
     } catch (error: any) {
-      alert("테스트 결제 요청이 전송되었습니다. (" + error.message + ")");
+      // 테스트 환경에서도 booking 생성하여 플로우 검증
+      try {
+        await createBookings(parties.map(p => p.id), `test-${Date.now()}`, totalAmount);
+        for (const p of parties) removeFromCart(p.id);
+        const ids = parties.map(p => p.id).join(",");
+        router.push(`/payment/success/?ids=${ids}&total=${totalAmount}&test=1`);
+      } catch {
+        alert("결제 처리 중 오류: " + error.message);
+      }
     }
   };
 

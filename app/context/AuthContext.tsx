@@ -11,12 +11,51 @@ export type Profile = {
   location: string;
   job: string;
   mbti: string;
+  birthDate: string;   // ISO 'YYYY-MM-DD'
   interests: string;
   idealType: string;
 };
 
-const CART_API    = "/api/cart.php";
-const PROFILE_API = "/api/profile.php";
+export type BookingStatus = "paid_pending_profile" | "pending_approval" | "confirmed" | "cancelled";
+
+export type Booking = {
+  id: string;
+  partyId: string;
+  status: BookingStatus;
+  paymentId?: string | null;
+  total?: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export function isProfileComplete(p: Profile | null): boolean {
+  if (!p) return false;
+  return !!(p.name?.trim() && p.gender?.trim() && p.job?.trim() && p.mbti?.trim());
+}
+
+const CART_API     = "/api/cart.php";
+const PROFILE_API  = "/api/profile.php";
+const BOOKINGS_API = "/api/bookings.php";
+
+async function fetchServerBookings(email: string): Promise<Booking[] | null> {
+  try {
+    const res = await fetch(`${BOOKINGS_API}?email=${encodeURIComponent(email)}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return Array.isArray(data) ? data : null;
+  } catch { return null; }
+}
+async function postBookings(email: string, payload: Record<string, unknown>): Promise<Booking[] | null> {
+  try {
+    const res = await fetch(BOOKINGS_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, ...payload }),
+    });
+    const data = await res.json();
+    return data?.bookings ?? null;
+  } catch { return null; }
+}
 
 async function fetchServerCart(email: string): Promise<CartItem[] | null> {
   try {
@@ -68,6 +107,10 @@ type AuthContextType = {
   refreshCart: () => Promise<void>;
   profile: Profile | null;
   updateProfile: (profile: Profile) => Promise<void>;
+  deleteAccount: () => Promise<boolean>;
+  bookings: Booking[];
+  createBookings: (partyIds: string[], paymentId?: string, total?: number) => Promise<void>;
+  refreshBookings: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -82,6 +125,10 @@ const AuthContext = createContext<AuthContextType>({
   refreshCart: async () => {},
   profile: null,
   updateProfile: async () => {},
+  deleteAccount: async () => false,
+  bookings: [],
+  createBookings: async () => {},
+  refreshBookings: async () => {},
 });
 
 const ADMIN_EMAIL    = "pletora@naver.com";
@@ -93,6 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [userEmail,  setUserEmail]  = useState<string | null>(null);
   const [cart,       setCart]       = useState<CartItem[]>([]);
   const [profile,    setProfile]    = useState<Profile | null>(null);
+  const [bookings,   setBookings]   = useState<Booking[]>([]);
 
   const userEmailRef = useRef<string | null>(null);
   useEffect(() => { userEmailRef.current = userEmail; }, [userEmail]);
@@ -161,6 +209,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 await saveServerProfile(parsed.email, localProfile);
               }
             }
+
+            // Bookings sync
+            const serverBookings = await fetchServerBookings(parsed.email);
+            if (serverBookings !== null) setBookings(serverBookings);
           }
         } else {
           const cartData = localStorage.getItem("woollim_cart");
@@ -274,8 +326,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateProfile = useCallback(async (p: Profile) => {
     setProfile(p);
     localStorage.setItem("woollim_profile", JSON.stringify(p));
-    if (userEmailRef.current) await saveServerProfile(userEmailRef.current, p);
+    if (userEmailRef.current) {
+      await saveServerProfile(userEmailRef.current, p);
+      // 프로필이 완전해지면 paid_pending_profile → pending_approval로 자동 전환
+      if (isProfileComplete(p)) {
+        const updated = await postBookings(userEmailRef.current, { action: "advance" });
+        if (updated) setBookings(updated);
+      }
+    }
   }, []);
+
+  const refreshBookings = useCallback(async () => {
+    if (!userEmailRef.current) return;
+    const data = await fetchServerBookings(userEmailRef.current);
+    if (data !== null) setBookings(data);
+  }, []);
+
+  const createBookings = useCallback(async (partyIds: string[], paymentId?: string, total?: number) => {
+    if (!userEmailRef.current || partyIds.length === 0) return;
+    const updated = await postBookings(userEmailRef.current, {
+      action: "create",
+      partyIds,
+      paymentId: paymentId ?? null,
+      total: total ?? 0,
+    });
+    if (updated) setBookings(updated);
+  }, []);
+
+  const deleteAccount = useCallback(async (): Promise<boolean> => {
+    const email = userEmailRef.current;
+    if (!email) return false;
+    try {
+      const res = await fetch("/api/delete-account.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (!data.ok) return false;
+    } catch {
+      return false;
+    }
+    // Clear all local session + SNS markers
+    setIsLoggedIn(false);
+    setUserEmail(null);
+    setCartSync([]);
+    setProfile(null);
+    userEmailRef.current = null;
+    try {
+      localStorage.removeItem("woollim_auth");
+      localStorage.removeItem("woollim_cart");
+      localStorage.removeItem("woollim_profile");
+      localStorage.removeItem("woollim_pending_profile");
+      localStorage.removeItem("woollim_sns_provider");
+    } catch {}
+    return true;
+  }, [setCartSync]);
 
   return (
     <AuthContext.Provider value={{
@@ -283,6 +389,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login, logout,
       cart, addToCart, removeFromCart, refreshCart,
       profile, updateProfile,
+      deleteAccount,
+      bookings, createBookings, refreshBookings,
     }}>
       {children}
     </AuthContext.Provider>

@@ -1,13 +1,41 @@
-export const PARTIES = [
-  { id: "1", title: "IT 기획자 와인 밋업", dateString: "2026. 5. 20 (토) 19:00", calendarDate: "2026-05-20", location: "강남 라운지", target: "만 25-35세 / 남녀비율 1:1", price: 50000, tag: "주제별" },
-  { id: "2", title: "주말 브런치 독서 모임", dateString: "2026. 5. 21 (일) 11:00", calendarDate: "2026-05-21", location: "성수 플로어", target: "만 28-38세 / 직장인", price: 30000, tag: "주제별" },
-  { id: "3", title: "프라이빗 다이닝 나이트", dateString: "2026. 5. 27 (토) 19:30", calendarDate: "2026-05-27", location: "청담 티에스", target: "만 30-40세 / 프리미엄", price: 100000, tag: "지역별" },
-  { id: "4", title: "감성 루프탑 와인 파티", dateString: "2026. 6. 7 (토) 18:30", calendarDate: "2026-06-07", location: "이태원 루프탑", target: "만 27-37세 / 남녀비율 1:1", price: 65000, tag: "지역별" },
-  { id: "5", title: "아트 갤러리 소셜 나이트", dateString: "2026. 6. 14 (토) 19:00", calendarDate: "2026-06-14", location: "한남동 갤러리", target: "만 25-35세 / 문화예술인", price: 45000, tag: "주제별" },
-  { id: "6", title: "주말 러닝 & 브런치 모임", dateString: "2026. 6. 21 (토) 09:00", calendarDate: "2026-06-21", location: "여의도 한강공원", target: "만 23-33세 / 러닝 입문자 환영", price: 25000, tag: "연령별" },
-  { id: "7", title: "판교 스타트업 네트워킹", dateString: "2026. 6. 28 (토) 18:00", calendarDate: "2026-06-28", location: "판교 카페라운지", target: "만 28-40세 / IT·스타트업 종사자", price: 40000, tag: "지역별" },
-  { id: "8", title: "40대 프리미엄 위스키 살롱", dateString: "2026. 7. 5 (토) 19:30", calendarDate: "2026-07-05", location: "압구정 위스키바", target: "만 35-45세 / 프리미엄", price: 120000, tag: "연령별" },
+export type Party = {
+  id: string;
+  title: string;
+  dateString: string;
+  calendarDate: string;
+  location: string;
+  target: string;
+  price: number;
+  tag: string;
+  maleStock: number;     // 남성 모집 정원 (기본 12)
+  femaleStock: number;   // 여성 모집 정원 (기본 12)
+  maleBooked: number;    // 현재 남성 신청 인원
+  femaleBooked: number;  // 현재 여성 신청 인원
+};
+
+export const PARTIES: Party[] = [
+  { id: "1", title: "IT 기획자 와인 밋업",         dateString: "2026. 5. 20 (토) 19:00", calendarDate: "2026-05-20", location: "강남 라운지",      target: "만 25-35세 / 남녀비율 1:1",        price: 50000,  tag: "주제별", maleStock: 12, femaleStock: 12, maleBooked:  8, femaleBooked:  6 },
+  { id: "2", title: "주말 브런치 독서 모임",       dateString: "2026. 5. 21 (일) 11:00", calendarDate: "2026-05-21", location: "성수 플로어",      target: "만 28-38세 / 직장인",              price: 30000,  tag: "주제별", maleStock: 12, femaleStock: 12, maleBooked: 12, femaleBooked:  5 },
+  { id: "3", title: "프라이빗 다이닝 나이트",       dateString: "2026. 5. 27 (토) 19:30", calendarDate: "2026-05-27", location: "청담 티에스",      target: "만 30-40세 / 프리미엄",             price: 100000, tag: "지역별", maleStock: 12, femaleStock: 12, maleBooked:  3, femaleBooked: 12 },
+  { id: "4", title: "감성 루프탑 와인 파티",        dateString: "2026. 6. 7 (토) 18:30",  calendarDate: "2026-06-07", location: "이태원 루프탑",    target: "만 27-37세 / 남녀비율 1:1",         price: 65000,  tag: "지역별", maleStock: 12, femaleStock: 12, maleBooked:  5, femaleBooked:  4 },
+  { id: "5", title: "아트 갤러리 소셜 나이트",       dateString: "2026. 6. 14 (토) 19:00", calendarDate: "2026-06-14", location: "한남동 갤러리",    target: "만 25-35세 / 문화예술인",           price: 45000,  tag: "주제별", maleStock: 12, femaleStock: 12, maleBooked:  2, femaleBooked:  3 },
+  { id: "6", title: "주말 러닝 & 브런치 모임",       dateString: "2026. 6. 21 (토) 09:00", calendarDate: "2026-06-21", location: "여의도 한강공원",  target: "만 23-33세 / 러닝 입문자 환영",    price: 25000,  tag: "연령별", maleStock: 12, femaleStock: 12, maleBooked: 10, femaleBooked: 11 },
+  { id: "7", title: "판교 스타트업 네트워킹",        dateString: "2026. 6. 28 (토) 18:00", calendarDate: "2026-06-28", location: "판교 카페라운지",  target: "만 28-40세 / IT·스타트업 종사자",  price: 40000,  tag: "지역별", maleStock: 12, femaleStock: 12, maleBooked: 11, femaleBooked:  4 },
+  { id: "8", title: "40대 프리미엄 위스키 살롱",     dateString: "2026. 7. 5 (토) 19:30",  calendarDate: "2026-07-05", location: "압구정 위스키바",  target: "만 35-45세 / 프리미엄",             price: 120000, tag: "연령별", maleStock: 12, femaleStock: 12, maleBooked: 12, femaleBooked: 12 },
 ];
+
+/** 파티 재고 상태 계산 (UI·검증 공통 사용) */
+export function partyStockStatus(party: Party) {
+  const maleRemaining   = Math.max(0, party.maleStock   - party.maleBooked);
+  const femaleRemaining = Math.max(0, party.femaleStock - party.femaleBooked);
+  return {
+    maleRemaining,
+    femaleRemaining,
+    maleFull:   maleRemaining   <= 0,
+    femaleFull: femaleRemaining <= 0,
+    allFull:    maleRemaining   <= 0 && femaleRemaining <= 0,
+  };
+}
 
 export const CALENDAR_EVENTS = PARTIES.map(p => ({
   id: p.id,

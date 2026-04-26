@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence, Variants } from "framer-motion";
 import { ArrowRight, ChevronDown, Users, Calendar, MapPin, X } from "lucide-react";
 import FullCalendar from "@fullcalendar/react";
@@ -11,14 +11,31 @@ import Link from "next/link";
 import Image from "next/image";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
-import { PARTIES, CALENDAR_EVENTS, PARTICIPANTS, FAQS } from "./lib/data";
+import { PARTIES, CALENDAR_EVENTS, PARTICIPANTS, FAQS, partyStockStatus } from "./lib/data";
 
 export default function SmoothOnePage() {
   const [activeTab, setActiveTab] = useState("일정별");
   const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(null);
   const [selectedGalleryImage, setSelectedGalleryImage] = useState<string | null>(null);
   const [isGalleryExpanded, setIsGalleryExpanded] = useState(false);
+  const [liveMembers, setLiveMembers] = useState<typeof PARTICIPANTS>([]);
   const router = useRouter();
+
+  // 실시간 신규 가입자 fetch (DB users 테이블 기반)
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/participants.php", { cache: "no-store" })
+      .then(r => r.ok ? r.json() : [])
+      .then((data) => { if (!cancelled && Array.isArray(data)) setLiveMembers(data); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  // 실시간 가입자(최신) + 큐레이션 mock 데이터를 결합
+  const allParticipants = useMemo(
+    () => [...liveMembers, ...PARTICIPANTS],
+    [liveMembers]
+  );
 
   const TABS = ["일정별", "지역별", "주제별", "연령별"];
 
@@ -126,7 +143,9 @@ export default function SmoothOnePage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
               <AnimatePresence mode="popLayout">
-                {sortedParties.map(card => (
+                {sortedParties.map(card => {
+                  const stock = partyStockStatus(card);
+                  return (
                   <motion.div
                     key={card.id}
                     layout
@@ -134,22 +153,54 @@ export default function SmoothOnePage() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -12 }}
                     transition={{ duration: 0.35, type: "spring", stiffness: 300, damping: 28 }}
-                    className="bg-brand-lightgray border border-gray-100 p-5 md:p-8 rounded-2xl md:rounded-3xl hover:border-brand-point transition-all flex flex-col h-full group"
+                    className="bg-brand-lightgray border border-gray-100 p-5 md:p-8 rounded-2xl md:rounded-3xl hover:border-brand-point transition-all flex flex-col h-full group relative"
                   >
+                    {stock.allFull && (
+                      <div className="absolute top-4 right-4 md:top-5 md:right-5 bg-gray-900 text-white text-[11px] md:text-xs font-black px-2.5 py-1 rounded-full shadow-md z-10">모집 마감</div>
+                    )}
                     <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-5 group-hover:text-brand-point transition-colors leading-snug">{card.title}</h3>
-                    <div className="space-y-2.5 md:space-y-3 mb-5 md:mb-8 text-gray-600 font-medium flex-1 text-sm md:text-base">
+                    <div className="space-y-2.5 md:space-y-3 mb-5 md:mb-6 text-gray-600 font-medium flex-1 text-sm md:text-base">
                       <div className="flex items-center gap-2.5"><Calendar size={16} className="text-gray-400 group-hover:text-brand-point transition-colors flex-shrink-0" /> {card.dateString}</div>
                       <div className="flex items-center gap-2.5"><MapPin size={16} className="text-gray-400 group-hover:text-brand-point transition-colors flex-shrink-0" /> {card.location}</div>
                       <div className="flex items-center gap-2.5"><Users size={16} className="text-gray-400 group-hover:text-brand-point transition-colors flex-shrink-0" /> {card.target}</div>
                     </div>
+
+                    {/* Gender stock — minimal underline typography */}
+                    <div className="flex items-center border-b border-gray-300 pb-3 md:pb-4 mb-4 md:mb-5">
+                      <div className="flex-1 flex items-baseline justify-center gap-2">
+                        <span className="text-xs md:text-sm font-bold text-gray-400 tracking-wider">남성</span>
+                        <span className={`text-base md:text-lg font-black tabular-nums ${stock.maleFull ? "text-gray-400" : "text-brand-black"}`}>
+                          {card.maleBooked}/{card.maleStock}
+                        </span>
+                        {stock.maleFull && (
+                          <span className="text-[10px] md:text-xs font-black text-gray-400 tracking-wider">마감</span>
+                        )}
+                      </div>
+                      <div className="w-px h-5 md:h-6 bg-gray-200" />
+                      <div className="flex-1 flex items-baseline justify-center gap-2">
+                        <span className="text-xs md:text-sm font-bold text-gray-400 tracking-wider">여성</span>
+                        <span className={`text-base md:text-lg font-black tabular-nums ${stock.femaleFull ? "text-gray-400" : "text-brand-black"}`}>
+                          {card.femaleBooked}/{card.femaleStock}
+                        </span>
+                        {stock.femaleFull && (
+                          <span className="text-[10px] md:text-xs font-black text-gray-400 tracking-wider">마감</span>
+                        )}
+                      </div>
+                    </div>
+
                     <Link
                       href={`/party/${card.id}`}
-                      className="w-full text-center bg-brand-black text-white font-bold py-3.5 md:py-4 text-sm md:text-base rounded-xl hover:bg-brand-point transition-colors duration-300 block"
+                      className={`w-full text-center font-bold py-3.5 md:py-4 text-sm md:text-base rounded-xl transition-colors duration-300 block ${
+                        stock.allFull
+                          ? "bg-gray-200 text-gray-500 hover:bg-gray-300"
+                          : "bg-brand-black text-white hover:bg-brand-point"
+                      }`}
                     >
-                      매칭파티 참여하기
+                      {stock.allFull ? "모집 마감 · 상세보기" : "매칭파티 참여하기"}
                     </Link>
                   </motion.div>
-                ))}
+                  );
+                })}
               </AnimatePresence>
             </div>
           </div>
@@ -318,7 +369,7 @@ export default function SmoothOnePage() {
               style={{ width: "fit-content" }}
             >
               {/* Combine participants twice for seamless loop */}
-              {[...PARTICIPANTS, ...PARTICIPANTS].map((p, idx) => (
+              {[...allParticipants, ...allParticipants].map((p, idx) => (
                 <motion.div
                   key={`${p.id}-${idx}`}
                   whileHover={{ y: -12, scale: 1.04, boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.15)" }}

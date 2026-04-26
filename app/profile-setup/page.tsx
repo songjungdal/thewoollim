@@ -5,8 +5,8 @@ import { motion } from "framer-motion";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  User, Phone, MapPin, Briefcase, Heart, Sparkles,
-  ChevronDown, ChevronUp, CheckCircle2, ArrowLeft,
+  User, Phone, MapPin, Briefcase, Heart, Cake,
+  ChevronDown, ChevronUp, CheckCircle2, ArrowLeft, Lock,
 } from "lucide-react";
 import { useAuth, type Profile } from "../context/AuthContext";
 import Header from "../components/Header";
@@ -41,8 +41,19 @@ const CONSENT_DETAIL = `"어울림"(이하 '서비스')은 최적의 매칭 환�
 
 const EMPTY_FORM: Profile = {
   name: "", gender: "", phone: "", location: "",
-  job: "", mbti: "", interests: "", idealType: "",
+  job: "", mbti: "", birthDate: "", interests: "", idealType: "",
 };
+
+const INTEREST_TAGS = [
+  "결혼",   "연애",   "와인",   "위스키",
+  "맛집",   "요리",   "베이킹", "카페",
+  "여행",   "독서",   "영화",   "공연",
+  "전시회", "사진",   "음악",   "패션",
+  "골프",   "테니스", "러닝",   "필라테스",
+  "요가",   "헬스",   "등산",   "자전거",
+];
+
+const MAX_INTERESTS = 5;
 
 function ProfileSetupContent() {
   const searchParams = useSearchParams();
@@ -105,7 +116,7 @@ function ProfileSetupContent() {
 
   const validate = (): boolean => {
     const e: Partial<Profile> = {};
-    const req: Array<keyof Profile> = ["name","gender","phone","job","mbti","interests","idealType"];
+    const req: Array<keyof Profile> = ["name","gender","phone","job","mbti","birthDate","interests","idealType"];
     req.forEach(f => {
       const v = form[f];
       if (!v || !v.trim()) e[f] = "필수 입력 항목입니다.";
@@ -181,14 +192,13 @@ function ProfileSetupContent() {
             </p>
           </motion.div>
         ) : (
-          <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+          <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} className="mb-7 md:mb-9">
             <button onClick={() => router.push("/mypage")}
-              className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors font-bold text-sm mb-6"
+              className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors font-bold text-sm mb-5 md:mb-6"
             >
               <ArrowLeft size={16} /> 마이페이지로 돌아가기
             </button>
-            <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight">프로필 정보 수정</h1>
-            <p className="text-gray-400 mt-1 font-medium text-sm">정보를 수정하고 저장해주세요.</p>
+            <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight leading-snug">프로필 정보 수정</h1>
           </motion.div>
         )}
 
@@ -201,49 +211,111 @@ function ProfileSetupContent() {
           <form onSubmit={handleSubmit} noValidate>
             <div className="p-6 md:p-10 space-y-5 md:space-y-6">
 
+              {/* Identity-verified fields notice (edit mode + at least one field filled) */}
+              {isEditMode && (form.name || form.gender || form.phone) && (
+                <div className="flex items-start gap-2.5 bg-brand-point/5 border border-brand-point/20 rounded-xl p-3.5">
+                  <Lock size={15} className="text-brand-point flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-gray-600 leading-relaxed">
+                    <span className="font-bold text-brand-point">본인인증 정보</span>(이름·성별·연락처)는
+                    보안상 임의 수정이 제한됩니다. 변경이 필요하면 고객센터로 문의해주세요.
+                  </p>
+                </div>
+              )}
+
               {/* Name */}
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
+                <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-1.5">
                   이름 <span className="text-brand-point">*</span>
+                  {isEditMode && form.name && <Lock size={12} className="text-gray-400" />}
                 </label>
                 <div className="relative">
                   <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
-                  <input type="text" value={form.name} onChange={e => set("name")(e.target.value)}
-                    placeholder="실명을 입력해주세요" className={inp("name") + " pl-11"} />
+                  <input
+                    type="text"
+                    value={form.name}
+                    onChange={e => set("name")(e.target.value)}
+                    placeholder="실명을 입력해주세요"
+                    className={inp("name") + " pl-11" + (isEditMode && form.name ? " bg-gray-100 text-gray-500 cursor-not-allowed" : "")}
+                    readOnly={isEditMode && !!form.name}
+                    tabIndex={isEditMode && form.name ? -1 : 0}
+                  />
                 </div>
                 {errors.name && <p className="text-xs text-red-500 mt-1 ml-1">{errors.name}</p>}
               </div>
 
               {/* Gender */}
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
+                <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-1.5">
                   성별 <span className="text-brand-point">*</span>
+                  {isEditMode && form.gender && <Lock size={12} className="text-gray-400" />}
                 </label>
                 <div className="flex gap-2 md:gap-3">
-                  {["남성", "여성"].map(g => (
-                    <button key={g} type="button" onClick={() => set("gender")(g)}
-                      className={`flex-1 py-3.5 rounded-xl font-bold text-sm transition-all ${
-                        form.gender === g
-                          ? "bg-brand-black text-white shadow-md"
-                          : "bg-gray-50 text-gray-500 border border-gray-100 hover:border-gray-300"
-                      }`}
-                    >{g}</button>
-                  ))}
+                  {["남성", "여성"].map(g => {
+                    const isSelected = form.gender === g;
+                    const locked = isEditMode && !!form.gender;
+                    return (
+                      <button
+                        key={g}
+                        type="button"
+                        onClick={() => !locked && set("gender")(g)}
+                        disabled={locked}
+                        className={`flex-1 py-3.5 rounded-xl font-bold text-sm transition-all ${
+                          isSelected
+                            ? locked
+                              ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                              : "bg-brand-black text-white shadow-md"
+                            : locked
+                              ? "bg-gray-50 text-gray-300 cursor-not-allowed border border-gray-100"
+                              : "bg-gray-50 text-gray-500 border border-gray-100 hover:border-gray-300"
+                        }`}
+                      >
+                        {g}
+                      </button>
+                    );
+                  })}
                 </div>
                 {errors.gender && <p className="text-xs text-red-500 mt-1 ml-1">{errors.gender}</p>}
               </div>
 
               {/* Phone */}
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
+                <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-1.5">
                   연락처 <span className="text-brand-point">*</span>
+                  {isEditMode && form.phone && <Lock size={12} className="text-gray-400" />}
                 </label>
                 <div className="relative">
                   <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
-                  <input type="tel" value={form.phone} onChange={e => set("phone")(e.target.value)}
-                    placeholder="010-0000-0000" className={inp("phone") + " pl-11"} />
+                  <input
+                    type="tel"
+                    value={form.phone}
+                    onChange={e => set("phone")(e.target.value)}
+                    placeholder="010-0000-0000"
+                    className={inp("phone") + " pl-11" + (isEditMode && form.phone ? " bg-gray-100 text-gray-500 cursor-not-allowed" : "")}
+                    readOnly={isEditMode && !!form.phone}
+                    tabIndex={isEditMode && form.phone ? -1 : 0}
+                  />
                 </div>
                 {errors.phone && <p className="text-xs text-red-500 mt-1 ml-1">{errors.phone}</p>}
+              </div>
+
+              {/* Birth Date */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  생년월일 <span className="text-brand-point">*</span>
+                </label>
+                <div className="relative">
+                  <Cake className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={17} />
+                  <input
+                    type="date"
+                    value={form.birthDate}
+                    onChange={e => set("birthDate")(e.target.value)}
+                    max={new Date().toISOString().split("T")[0]}
+                    min="1900-01-01"
+                    className={inp("birthDate") + " pl-11"}
+                    aria-label="생년월일"
+                  />
+                </div>
+                {errors.birthDate && <p className="text-xs text-red-500 mt-1 ml-1">{errors.birthDate}</p>}
               </div>
 
               {/* Location — cascading 시/도 → 시/군/구 */}
@@ -313,21 +385,68 @@ function ProfileSetupContent() {
                 {errors.mbti && <p className="text-xs text-red-500 mt-1 ml-1">{errors.mbti}</p>}
               </div>
 
-              {/* Interests */}
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  관심사 <span className="text-brand-point">*</span>
-                </label>
-                <div className="relative">
-                  <Sparkles className="absolute left-4 top-4 text-gray-400" size={17} />
-                  <textarea value={form.interests} onChange={e => set("interests")(e.target.value)}
-                    placeholder="좋아하거나 관심 있는 분야를 자유롭게 적어주세요. (예: 와인, 테니스, 전시회, 독서)"
-                    rows={2}
-                    className={`w-full pl-11 pr-4 py-4 rounded-xl border ${errors.interests ? "border-red-300 bg-red-50" : "border-gray-100 bg-gray-50"} focus:bg-white focus:ring-2 focus:ring-brand-point focus:border-brand-point transition-all outline-none font-medium text-sm resize-none`}
-                  />
-                </div>
-                {errors.interests && <p className="text-xs text-red-500 mt-1 ml-1">{errors.interests}</p>}
-              </div>
+              {/* Interests — multi-select tag buttons (최대 5개) */}
+              {(() => {
+                const selectedInterests = new Set(
+                  form.interests
+                    ? form.interests.split(",").map(s => s.trim()).filter(Boolean)
+                    : []
+                );
+                const toggleInterest = (tag: string) => {
+                  const next = new Set(selectedInterests);
+                  if (next.has(tag)) {
+                    next.delete(tag);
+                  } else {
+                    if (next.size >= MAX_INTERESTS) {
+                      alert(`관심사는 최대 ${MAX_INTERESTS}개까지 선택할 수 있습니다.`);
+                      return;
+                    }
+                    next.add(tag);
+                  }
+                  // 정의된 태그 순서대로 직렬화 → DB에 일관된 형식으로 저장
+                  const ordered = INTEREST_TAGS.filter(t => next.has(t));
+                  set("interests")(ordered.join(","));
+                };
+                return (
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center justify-between">
+                      <span>
+                        관심사 <span className="text-brand-point">*</span>
+                      </span>
+                      <span className={`text-xs font-bold ${
+                        selectedInterests.size >= MAX_INTERESTS ? "text-brand-point" : "text-gray-400"
+                      }`}>
+                        {selectedInterests.size} / {MAX_INTERESTS}
+                      </span>
+                    </label>
+                    <div className={`flex flex-wrap gap-2 md:gap-2.5 p-3 md:p-4 rounded-xl border ${errors.interests && selectedInterests.size === 0 ? "border-red-300 bg-red-50" : "border-gray-100 bg-gray-50"}`}>
+                      {INTEREST_TAGS.map(tag => {
+                        const sel = selectedInterests.has(tag);
+                        return (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => toggleInterest(tag)}
+                            className={`px-3.5 md:px-4 py-2.5 md:py-3 rounded-full text-sm md:text-base font-bold transition-all min-h-[40px] ${
+                              sel
+                                ? "bg-brand-point text-brand-black shadow-md"
+                                : "bg-white text-gray-500 border border-gray-200 hover:border-brand-point hover:text-brand-point"
+                            }`}
+                          >
+                            {tag}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1.5 ml-1 leading-relaxed">
+                      마음에 드는 키워드를 1~{MAX_INTERESTS}개 선택해주세요. 매칭 추천에 활용됩니다.
+                    </p>
+                    {errors.interests && (
+                      <p className="text-xs text-red-500 mt-1 ml-1">{errors.interests}</p>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Ideal Type */}
               <div>

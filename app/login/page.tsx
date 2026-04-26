@@ -19,6 +19,9 @@ function LoginContent() {
   const [isAuthSent, setIsAuthSent] = useState(false);
   const [isAuthVerified, setIsAuthVerified] = useState(false);
   const [authCode, setAuthCode] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [isSending, setIsSending] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
   // Find ID / PW modals
   const [showFindId, setShowFindId] = useState(false);
   const [showFindPw, setShowFindPw] = useState(false);
@@ -89,19 +92,63 @@ function LoginContent() {
     return `${m}:${s < 10 ? "0" : ""}${s}`;
   };
 
-  const handleSendAuthCode = () => {
-    setIsAuthSent(true);
-    setTimer(180); // 3 minutes
-    alert("인증번호가 발송되었습니다. (테스트용: 123456)");
+  const handleSendAuthCode = async () => {
+    if (isSending || timer > 0) return;
+    const phone = phoneNumber.replace(/[^0-9]/g, "");
+    if (phone.length < 10 || phone.length > 11 || !phone.startsWith("01")) {
+      alert("올바른 휴대폰 번호를 입력해주세요.");
+      return;
+    }
+    setIsSending(true);
+    try {
+      const res = await fetch("/api/send-sms.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setIsAuthSent(true);
+        setTimer(data.cooldown || 60);
+        setAuthCode("");
+        alert("인증번호가 발송되었습니다. SMS를 확인해주세요.");
+      } else {
+        if (data.cooldown) setTimer(data.cooldown);
+        alert(data.error || "발송에 실패했습니다. 잠시 후 다시 시도해주세요.");
+      }
+    } catch {
+      alert("네트워크 오류로 발송에 실패했습니다.");
+    } finally {
+      setIsSending(false);
+    }
   };
 
-  const handleVerifyCode = () => {
-    if (authCode === "123456") {
-      setIsAuthVerified(true);
-      setTimer(0);
-      alert("본인인증이 완료되었습니다.");
-    } else {
-      alert("인증번호가 일치하지 않습니다. 다시 확인해주세요.");
+  const handleVerifyCode = async () => {
+    if (isVerifying) return;
+    const phone = phoneNumber.replace(/[^0-9]/g, "");
+    if (!/^\d{6}$/.test(authCode)) {
+      alert("6자리 인증번호를 입력해주세요.");
+      return;
+    }
+    setIsVerifying(true);
+    try {
+      const res = await fetch("/api/verify-sms.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, code: authCode }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setIsAuthVerified(true);
+        setTimer(0);
+        alert("본인인증이 완료되었습니다.");
+      } else {
+        alert(data.error || "인증번호가 일치하지 않습니다.");
+      }
+    } catch {
+      alert("네트워크 오류로 인증 확인에 실패했습니다.");
+    } finally {
+      setIsVerifying(false);
     }
   };
 
@@ -121,19 +168,20 @@ function LoginContent() {
       alert("본인인증을 먼저 완료해주세요.");
       return;
     }
-    router.push("/profile-setup");
+    alert("어울림 가입을 환영합니다!");
+    router.push("/");
   };
 
   const handleSnsLogin = (provider: string) => {
-    // SNS 로그인 시뮬레이션: 최초 가입자로 간주하고 프로필 입력으로 이동
+    // SNS 로그인 시뮬레이션: 가입 즉시 메인으로 이동 (프로필 입력은 마이페이지에서 선택)
     try { localStorage.setItem("woollim_sns_provider", provider); } catch {}
-    router.push("/profile-setup");
+    router.push("/");
   };
 
   const socialButtons = [
-    { name: "카카오", color: "bg-[#FEE500] text-[#3c1e1e]", logo: "K" },
-    { name: "네이버", color: "bg-[#03C75A] text-white", logo: "N" },
-    { name: "구글", color: "bg-white text-gray-700 border border-gray-200", logo: "G" },
+    { name: "카카오", color: "bg-[#FEE500] text-[#3c1e1e] hover:brightness-95",                      logo: "/images/sns/kakao.jpg",  blend: "multiply" as const },
+    { name: "네이버", color: "bg-[#03C75A] text-white hover:brightness-95",                          logo: "/images/sns/naver.jpg",  blend: "multiply" as const },
+    { name: "구글",   color: "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50",       logo: "/images/sns/google.jpg", blend: "normal"   as const },
   ];
 
   const inputClass = "w-full pl-12 pr-4 py-4 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-brand-point focus:border-brand-point transition-all outline-none font-medium";
@@ -233,10 +281,15 @@ function LoginContent() {
                           key={btn.name}
                           type="button"
                           onClick={() => handleSnsLogin(btn.name)}
-                          className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-3 transition-transform hover:scale-[1.02] ${btn.color}`}
+                          className={`w-full py-3 md:py-3.5 px-4 md:px-5 rounded-xl font-bold flex items-center justify-center gap-3 md:gap-3.5 transition-all hover:scale-[1.02] text-sm md:text-base ${btn.color}`}
                         >
-                          <span className="w-6 h-6 rounded-full flex items-center justify-center font-black text-sm">{btn.logo}</span>
-                          {btn.name} 계정으로 로그인
+                          <img
+                            src={btn.logo}
+                            alt={`${btn.name} 로고`}
+                            className="w-9 h-9 md:w-10 md:h-10 object-contain flex-shrink-0"
+                            style={{ mixBlendMode: btn.blend }}
+                          />
+                          <span className="leading-none">{btn.name}로 로그인</span>
                         </button>
                       ))}
                     </div>
@@ -252,37 +305,62 @@ function LoginContent() {
                     <form className="space-y-6" onSubmit={handleRegister}>
                       <div>
                         <label className={labelClass}>본인인증</label>
-                        <div className="flex gap-2 mb-2">
-                           <div className="relative flex-1">
+                        <div className="flex flex-wrap sm:flex-nowrap gap-2 mb-2">
+                           <div className="relative flex-1 min-w-0 basis-full sm:basis-auto">
                               <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                              <input type="tel" placeholder="010-0000-0000" className={inputClass} disabled={isAuthVerified} />
+                              <input
+                                type="tel"
+                                inputMode="numeric"
+                                placeholder="010-0000-0000"
+                                className={inputClass}
+                                value={phoneNumber}
+                                onChange={e => setPhoneNumber(e.target.value)}
+                                readOnly={isAuthVerified}
+                                aria-label="휴대폰 번호"
+                              />
                            </div>
-                           <button 
-                             type="button" onClick={handleSendAuthCode} disabled={isAuthVerified}
-                             className="px-4 bg-brand-black text-white rounded-xl font-bold text-sm whitespace-nowrap hover:bg-brand-point transition-colors disabled:bg-gray-200"
+                           <button
+                             type="button"
+                             onClick={handleSendAuthCode}
+                             disabled={isAuthVerified || isSending || timer > 0}
+                             className="w-full sm:w-auto px-4 py-3 sm:py-0 min-h-[44px] bg-brand-black text-white rounded-xl font-bold text-sm whitespace-nowrap hover:bg-brand-point transition-colors disabled:bg-gray-200 disabled:cursor-not-allowed"
                            >
-                              {isAuthSent ? "재발송" : "인증번호 받기"}
+                              {isSending
+                                ? "발송 중..."
+                                : isAuthVerified
+                                  ? "인증완료"
+                                  : timer > 0 && isAuthSent
+                                    ? `재전송 (${timer}s)`
+                                    : isAuthSent
+                                      ? "재전송"
+                                      : "인증번호 받기"}
                            </button>
                         </div>
                         {isAuthSent && !isAuthVerified && (
-                          <div className="flex gap-2 animate-in fade-in slide-in-from-top-1">
-                            <div className="relative flex-1">
+                          <div className="flex flex-wrap sm:flex-nowrap gap-2 animate-in fade-in slide-in-from-top-1">
+                            <div className="relative flex-1 min-w-0 basis-full sm:basis-auto">
                               <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                              <input 
-                                type="text" 
-                                placeholder="인증번호 6자리" 
-                                className={inputClass} 
-                                maxLength={6} 
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                placeholder="인증번호 6자리"
+                                className={inputClass}
+                                maxLength={6}
                                 value={authCode}
-                                onChange={(e) => setAuthCode(e.target.value)}
+                                onChange={(e) => setAuthCode(e.target.value.replace(/[^0-9]/g, ""))}
+                                aria-label="인증번호"
                               />
-                              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-brand-point font-black text-sm">{formatTime(timer)}</span>
+                              {timer > 0 && (
+                                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-brand-point font-black text-sm">{formatTime(timer)}</span>
+                              )}
                             </div>
-                            <button 
-                              type="button" onClick={handleVerifyCode}
-                              className="px-4 bg-brand-point text-white rounded-xl font-bold text-sm whitespace-nowrap hover:brightness-110 transition-all"
+                            <button
+                              type="button"
+                              onClick={handleVerifyCode}
+                              disabled={isVerifying}
+                              className="w-full sm:w-auto px-4 py-3 sm:py-0 min-h-[44px] bg-brand-point text-white rounded-xl font-bold text-sm whitespace-nowrap hover:brightness-110 transition-all disabled:bg-gray-300"
                             >
-                              인증 확인
+                              {isVerifying ? "확인 중..." : "인증 확인"}
                             </button>
                           </div>
                         )}
