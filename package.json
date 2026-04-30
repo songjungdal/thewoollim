@@ -4,9 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node scripts/sync-company.mjs",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "sync:company": "node scripts/sync-company.mjs"
   },
   "dependencies": {
     "@fullcalendar/daygrid": "^6.1.20",

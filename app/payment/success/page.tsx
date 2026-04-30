@@ -8,12 +8,21 @@ import { CheckCircle2, AlertTriangle, ArrowRight, X, Sparkles } from "lucide-rea
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import { useAuth, isProfileComplete } from "../../context/AuthContext";
-import { PARTIES } from "../../lib/data";
+import { useParties } from "../../lib/useParties";
 
 function PaymentSuccessContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { mounted, isLoggedIn, profile } = useAuth();
+  const { mounted, isLoggedIn, profile, userEmail, refreshBookings } = useAuth();
+  const PARTIES = useParties();
+  const [checkingProfile, setCheckingProfile] = useState(false);
+
+  // 결제 직후 booking이 backend에서 'pending_approval' 자동 전환되었을 가능성 →
+  // 진입 시점에 1회 강제 동기화하여 마이페이지 상태가 즉시 정확하게 보이도록 보장.
+  useEffect(() => {
+    if (!mounted || !isLoggedIn) return;
+    refreshBookings();
+  }, [mounted, isLoggedIn, refreshBookings]);
 
   const ids   = (searchParams.get("ids") || "").split(",").filter(Boolean);
   const total = Number(searchParams.get("total") || 0);
@@ -57,6 +66,35 @@ function PaymentSuccessContent() {
     const href = pendingHrefRef.current ?? "/";
     setShowLeaveModal(false);
     router.push(href);
+  };
+
+  /**
+   * [프로필 작성하기] 클릭 핸들러.
+   * 클릭 시점에 서버에서 최신 프로필을 재확인 (다른 탭/세션에서 이미 작성했을 수 있음).
+   * - 프로필이 이미 완성되어 있으면: alert 후 마이페이지로 리다이렉트 (중복 작성 방지)
+   * - 프로필이 없거나 미완성이면: /profile-setup/ 으로 이동
+   */
+  const handleStartProfile = async () => {
+    if (checkingProfile) return;
+    if (!userEmail) { router.push("/profile-setup/"); return; }
+    setCheckingProfile(true);
+    try {
+      const res = await fetch(`/api/profile.php?email=${encodeURIComponent(userEmail)}`, { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && isProfileComplete(data)) {
+          alert("이미 등록된 프로필 카드가 있습니다.\n마이페이지에서 수정하실 수 있습니다.");
+          router.push("/mypage");
+          return;
+        }
+      }
+      router.push("/profile-setup/");
+    } catch {
+      // 네트워크 오류 시 작성 페이지로 이동 (UX 우선)
+      router.push("/profile-setup/");
+    } finally {
+      setCheckingProfile(false);
+    }
   };
 
   if (!mounted) {
@@ -151,9 +189,10 @@ function PaymentSuccessContent() {
                   <Sparkles size={24} className="text-brand-point hidden md:block" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-black text-base md:text-lg mb-1.5">프로필 카드 작성완료 — 확정 대기 중</h3>
+                  <h3 className="font-black text-base md:text-lg mb-1.5">이미 프로필 카드 정보가 저장되어 있습니다</h3>
                   <p className="text-sm md:text-base text-gray-600 font-medium leading-relaxed">
-                    어울림 운영팀이 확인 후 참가확정 안내 문자를 보내드립니다.
+                    별도 추가작성 없이 기존 프로필 정보의 수정사항이 없는지 확인 후 전송해주시면
+                    어울림 운영팀이 확인하여 <span className="font-black text-brand-point">참가확정</span> 안내 문자를 보내드립니다.
                   </p>
                 </div>
               </div>
@@ -166,13 +205,16 @@ function PaymentSuccessContent() {
             className="space-y-3"
           >
             {!profileDone ? (
-              <Link
-                href="/profile-setup/"
-                className="w-full bg-brand-black text-white py-4 md:py-5 rounded-2xl font-black text-base md:text-lg hover:bg-brand-point transition-all shadow-xl hover:shadow-brand-point/30 flex items-center justify-center gap-2.5"
+              <button
+                type="button"
+                onClick={handleStartProfile}
+                disabled={checkingProfile}
+                className="w-full bg-brand-black text-white py-4 md:py-5 rounded-2xl font-black text-base md:text-lg hover:bg-brand-point transition-all shadow-xl hover:shadow-brand-point/30 flex items-center justify-center gap-2.5 disabled:bg-gray-300 disabled:cursor-not-allowed"
               >
-                지금 바로 프로필 카드 작성하기
-                <ArrowRight size={20} />
-              </Link>
+                {checkingProfile ? "프로필 확인 중..." : (
+                  <>지금 바로 프로필 카드 작성하기 <ArrowRight size={20} /></>
+                )}
+              </button>
             ) : (
               <Link
                 href="/mypage"
@@ -245,11 +287,12 @@ function PaymentSuccessContent() {
                     type="button"
                     onClick={() => {
                       setShowLeaveModal(false);
-                      router.push("/profile-setup/");
+                      handleStartProfile();
                     }}
-                    className="flex-1 bg-brand-black text-white py-3.5 rounded-xl font-black text-sm md:text-base hover:bg-brand-point transition-all shadow-lg order-1 sm:order-2"
+                    disabled={checkingProfile}
+                    className="flex-1 bg-brand-black text-white py-3.5 rounded-xl font-black text-sm md:text-base hover:bg-brand-point transition-all shadow-lg order-1 sm:order-2 disabled:bg-gray-300 disabled:cursor-not-allowed"
                   >
-                    프로필 작성하기
+                    {checkingProfile ? "확인 중..." : "프로필 작성하기"}
                   </button>
                 </div>
               </div>

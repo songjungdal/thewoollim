@@ -11,7 +11,9 @@ import Link from "next/link";
 import Image from "next/image";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
-import { PARTIES, CALENDAR_EVENTS, PARTICIPANTS, FAQS, partyStockStatus } from "./lib/data";
+import { PARTICIPANTS, FAQS, partyStockStatus } from "./lib/data";
+import { useAuth } from "./context/AuthContext";
+import { useParties } from "./lib/useParties";
 
 export default function SmoothOnePage() {
   const [activeTab, setActiveTab] = useState("일정별");
@@ -19,16 +21,42 @@ export default function SmoothOnePage() {
   const [selectedGalleryImage, setSelectedGalleryImage] = useState<string | null>(null);
   const [isGalleryExpanded, setIsGalleryExpanded] = useState(false);
   const [liveMembers, setLiveMembers] = useState<typeof PARTICIPANTS>([]);
+  const { partyCounts } = useAuth();
+  const PARTIES = useParties();
+  const CALENDAR_EVENTS = PARTIES.map(p => ({
+    id: p.id, title: p.title, date: p.calendarDate,
+    extendedProps: { location: p.location, target: p.target, price: p.price },
+  }));
   const router = useRouter();
 
   // 실시간 신규 가입자 fetch (DB users 테이블 기반)
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/participants.php", { cache: "no-store" })
-      .then(r => r.ok ? r.json() : [])
-      .then((data) => { if (!cancelled && Array.isArray(data)) setLiveMembers(data); })
-      .catch(() => {});
-    return () => { cancelled = true; };
+    const fetchParticipants = () => {
+      fetch("/api/participants.php", { cache: "no-store" })
+        .then(r => r.ok ? r.json() : [])
+        .then((data) => { if (!cancelled && Array.isArray(data)) setLiveMembers(data); })
+        .catch(() => {});
+    };
+    fetchParticipants();
+
+    // 관리자 회원 삭제 → 즉시 명단에서 제외 (캐시 무효화)
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel("woollim_users");
+      channel.addEventListener("message", fetchParticipants);
+    } catch {}
+    const onVisibility = () => { if (document.visibilityState === "visible") fetchParticipants(); };
+    window.addEventListener("focus", fetchParticipants);
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      cancelled = true;
+      channel?.removeEventListener("message", fetchParticipants);
+      channel?.close();
+      window.removeEventListener("focus", fetchParticipants);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, []);
 
   // 실시간 가입자(최신) + 큐레이션 mock 데이터를 결합
@@ -37,28 +65,43 @@ export default function SmoothOnePage() {
     [liveMembers]
   );
 
-  const TABS = ["일정별", "지역별", "주제별", "연령별"];
+  // 계층형 카테고리: 상위 축(대상별/테마별/지역별) 선택 후 세부 값 선택.
+  // null = 미선택, "all" = 축 선택했지만 세부 미선택(전체 노출).
+  type Axis = "대상별" | "테마별" | "지역별";
+  const [activeAxis, setActiveAxis] = useState<Axis | null>(null);
+  const [filterValue, setFilterValue] = useState<string | null>(null);
+
+  const AXIS_OPTIONS: Record<Axis, readonly string[]> = {
+    "대상별": ["싱글", "돌싱"],
+    "테마별": ["티타임", "와인파티", "사케파티", "쿠킹클래스"],
+    "지역별": ["서울", "성남", "수원", "인천", "용인", "기타"],
+  };
+  const AXIS_FIELD: Record<Axis, "targetGroup" | "theme" | "locationTag"> = {
+    "대상별": "targetGroup", "테마별": "theme", "지역별": "locationTag",
+  };
+
+  const pickAxis = (axis: Axis) => {
+    if (axis === activeAxis) {
+      // 같은 축 다시 클릭 → 전체로 복귀
+      setActiveAxis(null);
+      setFilterValue(null);
+    } else {
+      setActiveAxis(axis);
+      setFilterValue(null); // 축 변경 시 세부 값 초기화
+    }
+  };
 
   const sortedParties = useMemo(() => {
-    const list = [...PARTIES];
-    switch (activeTab) {
-      case "일정별":
-        return list.sort((a, b) => a.calendarDate.localeCompare(b.calendarDate));
-      case "지역별":
-        return list.sort((a, b) => a.location.localeCompare(b.location, "ko"));
-      case "주제별":
-        return list.sort((a, b) => a.tag.localeCompare(b.tag, "ko") || a.title.localeCompare(b.title, "ko"));
-      case "연령별": {
-        const extractAge = (t: string) => {
-          const m = t.match(/(\d+)/);
-          return m ? parseInt(m[1], 10) : 999;
-        };
-        return list.sort((a, b) => extractAge(a.target) - extractAge(b.target));
-      }
-      default:
-        return list;
-    }
-  }, [activeTab]);
+    return [...PARTIES]
+      .filter(p => {
+        if (!activeAxis || !filterValue) return true;
+        return p[AXIS_FIELD[activeAxis]] === filterValue;
+      })
+      .sort((a, b) => a.calendarDate.localeCompare(b.calendarDate));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeAxis, filterValue, PARTIES]);
+
+  void activeTab; // 기존 useState는 호환을 위해 유지 (warning 회피용 reference)
 
   const fadeInUp: Variants = {
     hidden: { opacity: 0, y: 40 },
@@ -74,7 +117,7 @@ export default function SmoothOnePage() {
         <section className="relative flex flex-col md:h-[88vh] md:min-h-[700px] md:justify-center bg-brand-black overflow-hidden">
 
           {/* Mobile: 이미지를 자연 비율(1904×829)로 상단에 전체 표시 — 크롭 없음 */}
-          <div className="relative w-full md:hidden" style={{ aspectRatio: "1904 / 829" }}>
+          <div className="relative w-full md:hidden aspect-[1904/829]">
             <Image
               src="/images/hero-bg.jpg"
               alt=""
@@ -129,22 +172,97 @@ export default function SmoothOnePage() {
               <p className="text-base md:text-lg text-gray-500 max-w-2xl mx-auto">원하는 테마와 일정을 선택하여 어울림의 감성을 만나보세요.</p>
             </motion.div>
 
-            <div className="flex justify-center gap-2 md:gap-4 mb-10 md:mb-16 border-b border-gray-100 pb-2 overflow-x-auto">
-              {TABS.map(tab => (
-                <button 
-                  key={tab} 
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-4 md:px-6 py-2.5 md:py-3 text-base md:text-lg font-bold rounded-full transition-colors whitespace-nowrap ${activeTab === tab ? 'bg-brand-point text-white shadow-md' : 'text-gray-400 hover:bg-gray-100'}`}
-                >
-                  {tab}
-                </button>
-              ))}
+            {/* 계층형 카테고리 — 중앙 정렬, 상위 축 클릭 → 세부 옵션 전개 */}
+            <div className="mb-10 md:mb-16 border-b border-gray-100 pb-6 md:pb-8">
+              {/* 1단계: 상위 축 (대상별 / 테마별 / 지역별) — 중앙 정렬 */}
+              <div className="flex justify-center flex-wrap gap-2 md:gap-3">
+                {(["대상별", "테마별", "지역별"] as const).map(axis => {
+                  const isActive = activeAxis === axis;
+                  return (
+                    <button
+                      key={axis}
+                      type="button"
+                      onClick={() => pickAxis(axis)}
+                      className={`px-5 md:px-7 py-2.5 md:py-3 text-base md:text-lg font-black rounded-full transition-all whitespace-nowrap ${
+                        isActive
+                          ? "bg-brand-point text-white shadow-md"
+                          : "bg-gray-50 text-gray-500 hover:bg-gray-100 border border-gray-200"
+                      }`}
+                    >
+                      {axis}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* 2단계: 세부 카테고리 (active axis가 있을 때만 노출) — 중앙 정렬, 부드러운 reveal */}
+              <AnimatePresence initial={false}>
+                {activeAxis && (
+                  <motion.div
+                    key={activeAxis}
+                    initial={{ opacity: 0, height: 0, y: -6 }}
+                    animate={{ opacity: 1, height: "auto", y: 0 }}
+                    exit={{ opacity: 0, height: 0, y: -6 }}
+                    transition={{ duration: 0.22, ease: "easeOut" }}
+                    className="overflow-hidden"
+                  >
+                    <div className="flex justify-center flex-wrap gap-2 md:gap-2.5 mt-5 md:mt-6">
+                      <button
+                        type="button"
+                        onClick={() => setFilterValue(null)}
+                        className={`px-3.5 md:px-5 py-1.5 md:py-2 text-xs md:text-sm font-bold rounded-full transition-all ${
+                          !filterValue
+                            ? "bg-brand-point/10 text-brand-point border border-brand-point/30"
+                            : "bg-white text-gray-500 hover:bg-gray-50 border border-gray-200"
+                        }`}
+                      >
+                        전체
+                      </button>
+                      {AXIS_OPTIONS[activeAxis].map(opt => {
+                        const isSelected = filterValue === opt;
+                        return (
+                          <button
+                            key={opt}
+                            type="button"
+                            onClick={() => setFilterValue(opt)}
+                            className={`px-3.5 md:px-5 py-1.5 md:py-2 text-xs md:text-sm font-bold rounded-full transition-all ${
+                              isSelected
+                                ? "bg-brand-point text-white shadow-md"
+                                : "bg-white text-gray-500 hover:bg-gray-50 border border-gray-200"
+                            }`}
+                          >
+                            {opt}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {filterValue && (
+                      <p className="text-center text-xs md:text-sm text-gray-400 font-medium mt-3">
+                        {activeAxis} · <span className="text-brand-point font-bold">{filterValue}</span> · {sortedParties.length}건
+                      </p>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
+            {sortedParties.length === 0 ? (
+              <div className="bg-white border border-gray-100 rounded-2xl md:rounded-3xl p-10 md:p-16 text-center">
+                <p className="text-gray-400 font-bold text-sm md:text-base">선택한 조건에 맞는 매칭파티가 없습니다.</p>
+                <p className="text-xs md:text-sm text-gray-400 mt-2">다른 카테고리를 선택하거나 조건을 초기화해주세요.</p>
+              </div>
+            ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
               <AnimatePresence mode="popLayout">
                 {sortedParties.map(card => {
-                  const stock = partyStockStatus(card);
+                  // 실시간 결제완료 인원만 노출 — 카운트 없으면 0으로 강제 (시드/테스트 데이터 무시)
+                  const live = partyCounts[card.id];
+                  const liveCard = {
+                    ...card,
+                    maleBooked:   live?.male   ?? 0,
+                    femaleBooked: live?.female ?? 0,
+                  };
+                  const stock = partyStockStatus(liveCard);
                   return (
                   <motion.div
                     key={card.id}
@@ -165,12 +283,12 @@ export default function SmoothOnePage() {
                       <div className="flex items-center gap-2.5"><Users size={16} className="text-gray-400 group-hover:text-brand-point transition-colors flex-shrink-0" /> {card.target}</div>
                     </div>
 
-                    {/* Gender stock — minimal underline typography */}
+                    {/* Gender stock — minimal underline typography (실시간 동기화) */}
                     <div className="flex items-center border-b border-gray-300 pb-3 md:pb-4 mb-4 md:mb-5">
                       <div className="flex-1 flex items-baseline justify-center gap-2">
                         <span className="text-xs md:text-sm font-bold text-gray-400 tracking-wider">남성</span>
                         <span className={`text-base md:text-lg font-black tabular-nums ${stock.maleFull ? "text-gray-400" : "text-brand-black"}`}>
-                          {card.maleBooked}/{card.maleStock}
+                          {liveCard.maleBooked}/{liveCard.maleStock}
                         </span>
                         {stock.maleFull && (
                           <span className="text-[10px] md:text-xs font-black text-gray-400 tracking-wider">마감</span>
@@ -180,7 +298,7 @@ export default function SmoothOnePage() {
                       <div className="flex-1 flex items-baseline justify-center gap-2">
                         <span className="text-xs md:text-sm font-bold text-gray-400 tracking-wider">여성</span>
                         <span className={`text-base md:text-lg font-black tabular-nums ${stock.femaleFull ? "text-gray-400" : "text-brand-black"}`}>
-                          {card.femaleBooked}/{card.femaleStock}
+                          {liveCard.femaleBooked}/{liveCard.femaleStock}
                         </span>
                         {stock.femaleFull && (
                           <span className="text-[10px] md:text-xs font-black text-gray-400 tracking-wider">마감</span>
@@ -203,6 +321,7 @@ export default function SmoothOnePage() {
                 })}
               </AnimatePresence>
             </div>
+            )}
           </div>
         </section>
 
@@ -226,11 +345,17 @@ export default function SmoothOnePage() {
                     variants={fadeInUp}
                     className="aspect-square bg-gray-800 rounded-2xl md:rounded-3xl relative overflow-hidden group cursor-pointer border border-white/5"
                   >
-                    <div 
+                    <div
                       onClick={() => setSelectedGalleryImage(`/images/gallery/g${imgId}.png`)}
-                      className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110 group-hover:brightness-110"
-                      style={{ backgroundImage: `url('/images/gallery/g${imgId}.png')` }}
-                    />
+                      className="absolute inset-0 transition-transform duration-700 group-hover:scale-110 group-hover:brightness-110"
+                    >
+                      <Image
+                        src={`/images/gallery/g${imgId}.png`}
+                        alt={`갤러리 이미지 ${idx + 1}`}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
                     <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
                   </motion.div>
                 ))}
@@ -380,7 +505,9 @@ export default function SmoothOnePage() {
                     <Users size={22} className={`hidden md:block ${p.gender === 'male' ? 'text-blue-400' : 'text-pink-400'}`} />
                   </div>
                   <h3 className="text-sm md:text-2xl font-black mb-1.5 md:mb-3 text-gray-900 leading-tight">{p.job}</h3>
-                  <p className="text-brand-point font-bold text-xs md:text-lg mb-3 md:mb-8">{p.age}</p>
+                  {p.age && (
+                    <p className="text-brand-point font-bold text-xs md:text-lg mb-3 md:mb-8 whitespace-nowrap">{p.age}</p>
+                  )}
                   <div className="flex flex-wrap justify-center gap-1.5 md:gap-2">
                     {p.keywords.map((k, kIdx) => (
                       <span key={kIdx} className="bg-gray-50 text-gray-500 text-[10px] md:text-sm font-bold px-2.5 md:px-4 py-1 md:py-1.5 rounded-full border border-gray-100">#{k}</span>

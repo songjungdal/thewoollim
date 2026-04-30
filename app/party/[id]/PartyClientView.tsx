@@ -1,20 +1,131 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Star, Heart, Clock, CheckCircle, ShoppingBag, X, ClipboardList } from "lucide-react";
+import { ArrowLeft, Star, Heart, Clock, CheckCircle, ShoppingBag, X, ClipboardList, Users as UsersIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
-import { PARTIES, partyStockStatus } from "../../lib/data";
+import { partyStockStatus } from "../../lib/data";
 import { useAuth } from "../../context/AuthContext";
+import { useParties } from "../../lib/useParties";
+import { checkEligibility, eligibilitySummary, calculateAge } from "../../lib/eligibility";
+
+type Participant = {
+  id: string;
+  maskedName: string;
+  ageBand: string;
+  mbti: string;
+  job: string;
+};
+
+/** 성별별 참가자 컬럼 — 칩 카드 형태로 정렬 */
+function ParticipantColumn({
+  label, list, toneBg, toneAccent, toneBadge,
+}: {
+  label: string;
+  list: Participant[];
+  toneBg: string;
+  toneAccent: string;
+  toneBadge: string;
+}) {
+  return (
+    <div className="p-4 md:p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <span className={`w-7 h-7 rounded-full ${toneBg} flex items-center justify-center`}>
+          <UsersIcon size={13} className={toneAccent} />
+        </span>
+        <span className={`font-black text-sm ${toneAccent}`}>{label}</span>
+        <span className={`ml-auto text-[10px] md:text-[11px] font-black px-2 py-0.5 rounded-full ${toneBadge}`}>
+          {list.length}명
+        </span>
+      </div>
+      {list.length === 0 ? (
+        <p className="text-xs text-gray-400 font-medium py-4 text-center">
+          아직 확정된 {label} 참가자가 없습니다.
+        </p>
+      ) : (
+        <ul className="space-y-1.5">
+          {list.map(p => (
+            <li
+              key={p.id}
+              className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-gray-50 border border-gray-100"
+            >
+              <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                <span className={`font-black text-sm ${toneAccent}`}>{p.maskedName}</span>
+                {p.ageBand && (
+                  <span className={`text-[10px] md:text-[11px] font-bold px-1.5 py-0.5 rounded-full ${toneBadge}`}>
+                    {p.ageBand}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                {p.mbti && (
+                  <span className="text-[10px] md:text-[11px] font-black text-brand-point bg-brand-point/10 px-1.5 py-0.5 rounded-full">
+                    {p.mbti}
+                  </span>
+                )}
+                {p.job && (
+                  <span className="text-[11px] md:text-xs font-medium text-gray-500 truncate max-w-[7rem]">
+                    {p.job}
+                  </span>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 export default function PartyClientView({ id }: { id: string }) {
-  const detailItem = PARTIES.find(p => p.id === id);
+  const PARTIES = useParties();
+  const baseItem = PARTIES.find(p => p.id === id);
   const router = useRouter();
-  const { isLoggedIn, addToCart, profile } = useAuth();
+  const { isLoggedIn, addToCart, profile, partyCounts } = useAuth();
   const [showCartModal, setShowCartModal] = useState(false);
+  const [participants, setParticipants] = useState<{ male: Participant[]; female: Participant[] }>({ male: [], female: [] });
+
+  // 참가 확정자 fetch — 마운트 + 30초 폴링 + focus 갱신
+  useEffect(() => {
+    let cancelled = false;
+    const load = () => {
+      fetch(`/api/party-participants.php?partyId=${encodeURIComponent(id)}`, { cache: "no-store" })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => {
+          if (cancelled || !d?.ok) return;
+          setParticipants({
+            male:   Array.isArray(d.male)   ? d.male   : [],
+            female: Array.isArray(d.female) ? d.female : [],
+          });
+        })
+        .catch(() => {});
+    };
+    load();
+    const onFocus = () => load();
+    const onVisibility = () => { if (document.visibilityState === "visible") load(); };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    const interval = setInterval(load, 30000);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+      clearInterval(interval);
+    };
+  }, [id]);
+
+  // 실시간 결제완료 인원만 노출 — DB 카운트가 없으면 0/12로 표시 (시드/테스트 데이터 무시)
+  const live = partyCounts[id];
+  const detailItem = baseItem
+    ? {
+        ...baseItem,
+        maleBooked:   live?.male   ?? 0,
+        femaleBooked: live?.female ?? 0,
+      }
+    : undefined;
 
   if (!detailItem) {
     return (
@@ -33,6 +144,13 @@ export default function PartyClientView({ id }: { id: string }) {
 
   const stock = partyStockStatus(detailItem);
 
+  // 자격 요약 + 검증 (로그인한 회원에 한해 평가)
+  const eligibilityLabel = eligibilitySummary(detailItem);
+  const eligibility = isLoggedIn && profile
+    ? checkEligibility(detailItem, { birthDate: profile.birthDate, maritalStatus: profile.maritalStatus })
+    : { ok: true };
+  const userAge = profile?.birthDate ? calculateAge(profile.birthDate) : null;
+
   const checkGenderAvailability = (): string | null => {
     if (stock.allFull) return "모집이 마감되었습니다.";
     const g = profile?.gender;
@@ -41,18 +159,25 @@ export default function PartyClientView({ id }: { id: string }) {
     return null;
   };
 
+  const checkBlockedReason = (): string | null => {
+    const stockBlocked = checkGenderAvailability();
+    if (stockBlocked) return stockBlocked;
+    if (!eligibility.ok) return eligibility.message ?? "참가 자격이 일치하지 않습니다.";
+    return null;
+  };
+
   const handleCheckout = () => {
     if (!isLoggedIn) {
       router.push(`/login?redirect=${encodeURIComponent(`/checkout/?id=${id}`)}`);
       return;
     }
-    const blocked = checkGenderAvailability();
-    if (blocked) { alert(blocked); return; }
     if (!profile?.gender) {
       alert("프로필 정보(성별)가 필요합니다. 프로필을 먼저 완성해주세요.");
-      router.push("/profile-setup/?edit=true");
+      router.push("/profile-setup/");
       return;
     }
+    const blocked = checkBlockedReason();
+    if (blocked) { alert(blocked); return; }
     router.push(`/checkout/?id=${id}`);
   };
 
@@ -61,7 +186,7 @@ export default function PartyClientView({ id }: { id: string }) {
       router.push("/login");
       return;
     }
-    const blocked = checkGenderAvailability();
+    const blocked = checkBlockedReason();
     if (blocked) { alert(blocked); return; }
     addToCart(id);
     setShowCartModal(true);
@@ -84,11 +209,20 @@ export default function PartyClientView({ id }: { id: string }) {
 
           {/* TOP SECTION: MAIN INFO */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-7 md:gap-16 mb-10 md:mb-24">
-            {/* Left: Emotional Image Placeholder — mobile/tablet use fixed aspect, desktop (lg+) stretches to match right column height */}
+            {/* Left: 대표 이미지 — 관리자가 등록한 imageUrl을 동적 렌더링, 없으면 placeholder */}
             <div className="aspect-[5/3] lg:aspect-auto lg:h-full lg:min-h-[520px] bg-neutral-900 rounded-2xl md:rounded-[2rem] flex items-center justify-center relative overflow-hidden group">
-              <div className="absolute inset-0 bg-neutral-800 flex items-center justify-center opacity-40">
-                <Star size={48} className="text-gray-400" />
-              </div>
+              {detailItem.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={detailItem.imageUrl}
+                  alt={detailItem.title}
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
+              ) : (
+                <div className="absolute inset-0 bg-neutral-800 flex items-center justify-center opacity-40">
+                  <Star size={48} className="text-gray-400" />
+                </div>
+              )}
               <div className="absolute top-4 left-4 md:top-6 md:left-6 bg-brand-point text-white font-bold px-4 py-1.5 md:px-5 md:py-2 rounded-full text-xs md:text-sm shadow-xl z-10">모집중</div>
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
             </div>
@@ -97,9 +231,11 @@ export default function PartyClientView({ id }: { id: string }) {
             <div className="flex flex-col justify-between min-h-0">
               <div>
                 <h1 className="text-3xl md:text-5xl font-black tracking-tight mb-3 md:mb-4 leading-snug">{detailItem.title}</h1>
-                <p className="text-sm md:text-lg text-gray-500 mb-5 md:mb-8 font-medium leading-relaxed">
-                  단순한 만남을 넘어 감성을 향유하는 시간.<br />
-                  어울림이 큐레이션한 프리미엄 네트워킹에 초대합니다.
+                {/* 관리자가 등록한 소개(description) 우선 노출 — 없으면 기본 카피 */}
+                <p className="text-sm md:text-lg text-gray-500 mb-5 md:mb-8 font-medium leading-relaxed whitespace-pre-line break-keep">
+                  {detailItem.description?.trim()
+                    ? detailItem.description
+                    : "단순한 만남을 넘어 감성을 향유하는 시간.\n어울림이 큐레이션한 프리미엄 네트워킹에 초대합니다."}
                 </p>
 
                 {/* Info rows */}
@@ -155,20 +291,40 @@ export default function PartyClientView({ id }: { id: string }) {
                 </div>
               </div>
 
+              {/* 참가 자격 안내 — 자격 제한이 설정된 경우 노출 */}
+              {eligibilityLabel && (
+                <div className={`mb-4 md:mb-5 px-4 py-2.5 rounded-xl text-xs md:text-sm font-bold border ${
+                  isLoggedIn && !eligibility.ok
+                    ? "bg-red-50 border-red-100 text-red-700"
+                    : "bg-brand-point/10 border-brand-point/20 text-brand-point"
+                }`}>
+                  <span className="font-black">참가 대상</span> · {eligibilityLabel}
+                  {isLoggedIn && !eligibility.ok && (
+                    <span className="block mt-1 font-medium text-red-600">
+                      {eligibility.message}
+                      {userAge !== null && eligibility.reason === "ageOutOfRange" && ` (현재 만 ${userAge}세)`}
+                    </span>
+                  )}
+                </div>
+              )}
+
               {/* CTA Buttons — pinned to bottom */}
               {(() => {
                 const userGender = profile?.gender;
                 const userSideFull =
                   (userGender === "남성" && stock.maleFull) ||
                   (userGender === "여성" && stock.femaleFull);
-                const disabled = stock.allFull || userSideFull;
+                const eligibilityBlocked = isLoggedIn && !eligibility.ok;
+                const disabled = stock.allFull || userSideFull || eligibilityBlocked;
                 const label = stock.allFull
                   ? "모집 마감"
                   : userGender === "남성" && stock.maleFull
                     ? "남성 마감"
                     : userGender === "여성" && stock.femaleFull
                       ? "여성 마감"
-                      : "참가신청";
+                      : eligibilityBlocked
+                        ? "참가 대상 아님"
+                        : "참가신청";
                 return (
                   <div className="flex gap-3 md:gap-4 mt-auto">
                     <button
@@ -198,6 +354,47 @@ export default function PartyClientView({ id }: { id: string }) {
               })()}
             </div>
           </div>
+
+          {/* PARTICIPANTS PANEL — 다른 섹션들(참가 신청 방법/Party Timeline 등)과 동일 폭 max-w-4xl */}
+          {(participants.male.length > 0 || participants.female.length > 0) && (
+            <div className="max-w-4xl mx-auto mb-10 md:mb-16">
+              {/* 안내 헤드라인 — 청록 포인트 컬러 */}
+              <div className="flex items-center gap-3 mb-5 md:mb-7">
+                <UsersIcon size={20} className="text-brand-point flex-shrink-0" />
+                <h3 className="text-xl md:text-3xl font-bold tracking-tight">실시간 참가 인원을 확인하실 수 있습니다</h3>
+              </div>
+
+              <section className="bg-white rounded-2xl md:rounded-3xl border border-gray-100 overflow-hidden shadow-sm">
+                <header className="bg-brand-point/5 px-4 md:px-6 py-3 md:py-3.5 border-b border-gray-100 flex items-center justify-between gap-3">
+                  <span className="text-xs md:text-sm font-bold text-gray-500 tracking-wider">참가 확정자 명단</span>
+                  <span className="text-[11px] md:text-xs font-black text-brand-point bg-brand-point/10 px-2.5 py-1 rounded-full whitespace-nowrap">
+                    총 {participants.male.length + participants.female.length}명
+                  </span>
+                </header>
+                {/* 모바일: 세로 적층 / 데스크톱: 좌우 분할 */}
+                <div className="flex flex-col md:flex-row md:divide-x divide-y md:divide-y-0 divide-gray-100">
+                  <div className="flex-1">
+                    <ParticipantColumn
+                      label="남성"
+                      list={participants.male}
+                      toneBg="bg-[#E3F2FD]"
+                      toneAccent="text-[#3a85d9]"
+                      toneBadge="bg-[#E3F2FD] text-[#3a85d9]"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <ParticipantColumn
+                      label="여성"
+                      list={participants.female}
+                      toneBg="bg-[#FCE4EC]"
+                      toneAccent="text-rose-500"
+                      toneBadge="bg-rose-100 text-rose-700"
+                    />
+                  </div>
+                </div>
+              </section>
+            </div>
+          )}
 
           {/* INTRO — Party-specific OUR EXPERIENCE style */}
           <div className="mb-10 md:mb-24">

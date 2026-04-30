@@ -37,20 +37,22 @@ export default function AboutPage() {
                   <h3 className="text-xs md:text-sm font-black tracking-[0.2em] text-brand-point uppercase">Brand Identity</h3>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-6 md:gap-10 items-stretch">
-                  {/* Logo Box */}
-                  <div className="md:col-span-2 bg-brand-lightgray border border-gray-100 rounded-3xl p-10 md:p-14 flex items-center justify-center aspect-[4/3] md:aspect-auto">
+                <div className="space-y-5 md:space-y-7">
+                  {/* Logo Box — 위 (이미지 원본 비율 유지, 잘림 없음) */}
+                  <div className="bg-brand-lightgray border border-gray-100 rounded-3xl overflow-hidden">
                     <Image
-                      src="/images/logo_black.png"
-                      alt="어울림 로고"
-                      width={220}
-                      height={72}
-                      className="object-contain w-full max-w-[220px] h-auto"
+                      src="/images/brand_logo.jpg"
+                      alt="어울림 브랜드 로고"
+                      width={900}
+                      height={500}
+                      sizes="(max-width: 768px) 100vw, 800px"
+                      className="w-full h-auto block"
+                      priority
                     />
                   </div>
 
-                  {/* Description Box */}
-                  <div className="md:col-span-3 bg-white border border-gray-100 rounded-3xl p-7 md:p-10 flex flex-col justify-center">
+                  {/* Description Box — 아래 */}
+                  <div className="bg-white border border-gray-100 rounded-3xl p-6 md:p-10">
                     <h4 className="text-lg md:text-2xl font-black text-gray-900 mb-4 md:mb-5 leading-snug">
                       기분 좋은 <span className="text-brand-point">울림</span>을 시각화한 로고
                     </h4>

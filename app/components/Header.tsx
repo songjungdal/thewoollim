@@ -35,7 +35,7 @@ export default function Header() {
         <nav className="hidden md:flex items-center gap-8 font-semibold text-sm">
           <Link href="/#apply" onClick={(e) => handleScroll(e, 'apply')} className="hover:text-brand-point transition-colors">참여하기</Link>
           <Link href="/#gallery" onClick={(e) => handleScroll(e, 'gallery')} className="hover:text-brand-point transition-colors">후기갤러리</Link>
-          <Link href="/#participants" onClick={(e) => handleScroll(e, 'participants')} className="hover:text-brand-point transition-colors">참여자 명단</Link>
+          <Link href="/#participants" onClick={(e) => handleScroll(e, 'participants')} className="hover:text-brand-point transition-colors">실시간 참여자</Link>
           <Link href="/#schedule" onClick={(e) => handleScroll(e, 'schedule')} className="hover:text-brand-point transition-colors">매칭파티 일정</Link>
           <Link href="/#faq" onClick={(e) => handleScroll(e, 'faq')} className="hover:text-brand-point transition-colors">FAQ</Link>
           {mounted && isLoggedIn ? (
@@ -43,7 +43,7 @@ export default function Header() {
               <Link href="/mypage" className="relative hover:text-brand-point transition-colors">
                 <ShoppingBag size={22} />
                 {cart.length > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-brand-point text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center">{cart.length}</span>
+                  <span className="absolute -top-2 -right-2 bg-brand-point text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center">{cart.reduce((s, i) => s + (i.quantity ?? 1), 0)}</span>
                 )}
               </Link>
               <Link href="/mypage" className="text-brand-point font-bold transition-transform hover:scale-105">마이페이지</Link>
@@ -62,11 +62,12 @@ export default function Header() {
         <div className="md:hidden absolute top-[72px] left-0 w-full bg-black border-b border-gray-800 p-6 flex flex-col gap-6 font-semibold text-white shadow-2xl">
           <Link href="/#apply" onClick={(e) => handleScroll(e, 'apply')}>참여하기</Link>
           <Link href="/#gallery" onClick={(e) => handleScroll(e, 'gallery')}>후기갤러리</Link>
+          <Link href="/#participants" onClick={(e) => handleScroll(e, 'participants')}>실시간 참여자</Link>
           <Link href="/#schedule" onClick={(e) => handleScroll(e, 'schedule')}>매칭파티 일정</Link>
           <Link href="/#faq" onClick={(e) => handleScroll(e, 'faq')}>FAQ</Link>
           {mounted && isLoggedIn ? (
             <Link href="/mypage" className="text-brand-point font-bold flex items-center gap-2" onClick={() => setIsMenuOpen(false)}>
-              마이페이지 {cart.length > 0 && <span className="bg-brand-point text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center">{cart.length}</span>}
+              마이페이지 {cart.length > 0 && <span className="bg-brand-point text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center">{cart.reduce((s, i) => s + (i.quantity ?? 1), 0)}</span>}
             </Link>
           ) : (
             <Link href="/login" className="text-brand-point font-bold" onClick={() => setIsMenuOpen(false)}>로그인</Link>

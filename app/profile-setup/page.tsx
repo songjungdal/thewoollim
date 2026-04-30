@@ -42,6 +42,7 @@ const CONSENT_DETAIL = `"어울림"(이하 '서비스')은 최적의 매칭 환�
 const EMPTY_FORM: Profile = {
   name: "", gender: "", phone: "", location: "",
   job: "", mbti: "", birthDate: "", interests: "", idealType: "",
+  maritalStatus: "",
 };
 
 const INTEREST_TAGS = [
@@ -56,10 +57,13 @@ const INTEREST_TAGS = [
 const MAX_INTERESTS = 5;
 
 function ProfileSetupContent() {
+  // 페이지 통합: ?edit=true 유무와 무관하게 항상 편집 모드 UI/로직 사용
   const searchParams = useSearchParams();
-  const isEditMode   = searchParams.get("edit") === "true";
+  const isEditMode   = true;
   const router       = useRouter();
   const { mounted, isLoggedIn, profile, updateProfile } = useAuth();
+  // searchParams는 향후 확장(섹션 점프 등)을 위해 유지
+  void searchParams;
 
   const [form,             setForm]             = useState<Profile>(EMPTY_FORM);
   const [sido,             setSido]             = useState("");
@@ -68,6 +72,15 @@ function ProfileSetupContent() {
   const [consentExpanded,  setConsentExpanded]  = useState(false);
   const [submitting,       setSubmitting]       = useState(false);
   const [errors,           setErrors]           = useState<Partial<Profile>>({});
+
+  /**
+   * 본인인증 5종(이름·성별·연락처·생년월일·혼인여부)의 lock 상태.
+   * 프리필 시점에 *이미 저장된 값이 있는 필드*만 set에 추가.
+   *  - 신규 입력은 허용 (form 값을 키 입력 시 즉시 잠그지 않음)
+   *  - 한 번 저장된 값은 다음 진입 시 lock으로 노출
+   */
+  const [lockedFields, setLockedFields] = useState<Set<keyof Profile>>(new Set());
+  const isLocked = (f: keyof Profile) => lockedFields.has(f);
 
   /* Parse stored "시도 시군구" string into 2 dropdowns */
   const parseLocation = (loc: string) => {
@@ -91,6 +104,14 @@ function ProfileSetupContent() {
         setForm(merged);
         parseLocation(merged.location);
         setAgreed(true);
+        // 저장된 값이 있는 본인인증 필드만 lock 대상으로 등록 (최초 입력은 허용)
+        const locked = new Set<keyof Profile>();
+        if (profile.name?.trim())                                                locked.add("name");
+        if (profile.gender === "남성" || profile.gender === "여성")                 locked.add("gender");
+        if (profile.phone?.trim())                                               locked.add("phone");
+        if (profile.birthDate?.trim())                                           locked.add("birthDate");
+        if (profile.maritalStatus === "미혼" || profile.maritalStatus === "돌싱") locked.add("maritalStatus");
+        setLockedFields(locked);
       }
     } else {
       try {
@@ -198,7 +219,7 @@ function ProfileSetupContent() {
             >
               <ArrowLeft size={16} /> 마이페이지로 돌아가기
             </button>
-            <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight leading-snug">프로필 정보 수정</h1>
+            <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight leading-snug">프로필 카드 정보 수정</h1>
           </motion.div>
         )}
 
@@ -211,13 +232,13 @@ function ProfileSetupContent() {
           <form onSubmit={handleSubmit} noValidate>
             <div className="p-6 md:p-10 space-y-5 md:space-y-6">
 
-              {/* Identity-verified fields notice (edit mode + at least one field filled) */}
-              {isEditMode && (form.name || form.gender || form.phone) && (
+              {/* 본인인증 안내 — 5종 중 하나라도 이미 잠겨 있을 때 노출 */}
+              {(isLocked("name") || isLocked("gender") || isLocked("phone") || isLocked("birthDate") || isLocked("maritalStatus")) && (
                 <div className="flex items-start gap-2.5 bg-brand-point/5 border border-brand-point/20 rounded-xl p-3.5">
                   <Lock size={15} className="text-brand-point flex-shrink-0 mt-0.5" />
                   <p className="text-xs text-gray-600 leading-relaxed">
-                    <span className="font-bold text-brand-point">본인인증 정보</span>(이름·성별·연락처)는
-                    보안상 임의 수정이 제한됩니다. 변경이 필요하면 고객센터로 문의해주세요.
+                    <span className="font-bold text-brand-point">본인인증 정보</span>(이름·성별·연락처·생년월일·혼인여부)는
+                    최초 저장 후 보안상 수정이 제한됩니다. 변경이 필요하면 고객센터로 문의해주세요.
                   </p>
                 </div>
               )}
@@ -226,7 +247,7 @@ function ProfileSetupContent() {
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-1.5">
                   이름 <span className="text-brand-point">*</span>
-                  {isEditMode && form.name && <Lock size={12} className="text-gray-400" />}
+                  {isLocked("name") && <Lock size={12} className="text-gray-400" />}
                 </label>
                 <div className="relative">
                   <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
@@ -235,9 +256,9 @@ function ProfileSetupContent() {
                     value={form.name}
                     onChange={e => set("name")(e.target.value)}
                     placeholder="실명을 입력해주세요"
-                    className={inp("name") + " pl-11" + (isEditMode && form.name ? " bg-gray-100 text-gray-500 cursor-not-allowed" : "")}
-                    readOnly={isEditMode && !!form.name}
-                    tabIndex={isEditMode && form.name ? -1 : 0}
+                    className={inp("name") + " pl-11" + (isLocked("name") ? " bg-gray-100 text-gray-500 cursor-not-allowed" : "")}
+                    readOnly={isLocked("name")}
+                    tabIndex={isLocked("name") ? -1 : 0}
                   />
                 </div>
                 {errors.name && <p className="text-xs text-red-500 mt-1 ml-1">{errors.name}</p>}
@@ -247,12 +268,12 @@ function ProfileSetupContent() {
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-1.5">
                   성별 <span className="text-brand-point">*</span>
-                  {isEditMode && form.gender && <Lock size={12} className="text-gray-400" />}
+                  {isLocked("gender") && <Lock size={12} className="text-gray-400" />}
                 </label>
                 <div className="flex gap-2 md:gap-3">
                   {["남성", "여성"].map(g => {
                     const isSelected = form.gender === g;
-                    const locked = isEditMode && !!form.gender;
+                    const locked = isLocked("gender");
                     return (
                       <button
                         key={g}
@@ -281,7 +302,7 @@ function ProfileSetupContent() {
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-1.5">
                   연락처 <span className="text-brand-point">*</span>
-                  {isEditMode && form.phone && <Lock size={12} className="text-gray-400" />}
+                  {isLocked("phone") && <Lock size={12} className="text-gray-400" />}
                 </label>
                 <div className="relative">
                   <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
@@ -290,18 +311,19 @@ function ProfileSetupContent() {
                     value={form.phone}
                     onChange={e => set("phone")(e.target.value)}
                     placeholder="010-0000-0000"
-                    className={inp("phone") + " pl-11" + (isEditMode && form.phone ? " bg-gray-100 text-gray-500 cursor-not-allowed" : "")}
-                    readOnly={isEditMode && !!form.phone}
-                    tabIndex={isEditMode && form.phone ? -1 : 0}
+                    className={inp("phone") + " pl-11" + (isLocked("phone") ? " bg-gray-100 text-gray-500 cursor-not-allowed" : "")}
+                    readOnly={isLocked("phone")}
+                    tabIndex={isLocked("phone") ? -1 : 0}
                   />
                 </div>
                 {errors.phone && <p className="text-xs text-red-500 mt-1 ml-1">{errors.phone}</p>}
               </div>
 
-              {/* Birth Date */}
+              {/* Birth Date — onboarding에서 입력된 값은 lock */}
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
+                <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-1.5">
                   생년월일 <span className="text-brand-point">*</span>
+                  {isLocked("birthDate") && <Lock size={12} className="text-gray-400" />}
                 </label>
                 <div className="relative">
                   <Cake className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={17} />
@@ -311,11 +333,51 @@ function ProfileSetupContent() {
                     onChange={e => set("birthDate")(e.target.value)}
                     max={new Date().toISOString().split("T")[0]}
                     min="1900-01-01"
-                    className={inp("birthDate") + " pl-11"}
+                    className={inp("birthDate") + " pl-11" + (isLocked("birthDate") ? " bg-gray-100 text-gray-500 cursor-not-allowed" : "")}
+                    readOnly={isLocked("birthDate")}
+                    tabIndex={isLocked("birthDate") ? -1 : 0}
                     aria-label="생년월일"
                   />
                 </div>
                 {errors.birthDate && <p className="text-xs text-red-500 mt-1 ml-1">{errors.birthDate}</p>}
+              </div>
+
+              {/* Marital status — 최초 입력은 허용, 저장된 값은 read-only로 lock */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-1.5">
+                  혼인여부 <span className="text-brand-point">*</span>
+                  {isLocked("maritalStatus") && <Lock size={12} className="text-gray-400" />}
+                </label>
+                <div className="flex gap-2 md:gap-3">
+                  {(["미혼", "돌싱"] as const).map(m => {
+                    const sel = form.maritalStatus === m;
+                    const locked = isLocked("maritalStatus");
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => !locked && set("maritalStatus")(m)}
+                        disabled={locked}
+                        className={`flex-1 py-3.5 rounded-xl font-bold text-sm transition-all ${
+                          sel
+                            ? locked
+                              ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                              : "bg-brand-black text-white shadow-md"
+                            : locked
+                              ? "bg-gray-50 text-gray-300 cursor-not-allowed border border-gray-100"
+                              : "bg-gray-50 text-gray-500 border border-gray-100 hover:border-gray-300"
+                        }`}
+                      >
+                        {m}
+                      </button>
+                    );
+                  })}
+                </div>
+                {!isLocked("maritalStatus") && (
+                  <p className="text-xs text-gray-400 mt-1.5 ml-1 leading-relaxed">
+                    혼인여부는 최초 1회만 선택 가능하며, 저장 후에는 변경이 제한됩니다.
+                  </p>
+                )}
               </div>
 
               {/* Location — cascading 시/도 → 시/군/구 */}
@@ -330,6 +392,7 @@ function ProfileSetupContent() {
                       value={sido}
                       onChange={e => { setSido(e.target.value); setSigungu(""); }}
                       className={inp("location") + " pl-11 appearance-none cursor-pointer"}
+                      aria-label="시/도 선택"
                     >
                       <option value="">시/도 선택</option>
                       {SIDO_LIST.map(s => <option key={s} value={s}>{s}</option>)}
@@ -341,6 +404,7 @@ function ProfileSetupContent() {
                       onChange={e => setSigungu(e.target.value)}
                       disabled={!sido || (LOCATIONS[sido]?.length ?? 0) === 0}
                       className={inp("location") + " appearance-none cursor-pointer disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"}
+                      aria-label="시/군/구 선택"
                     >
                       <option value="">
                         {!sido
@@ -378,6 +442,7 @@ function ProfileSetupContent() {
                 </label>
                 <select value={form.mbti} onChange={e => set("mbti")(e.target.value)}
                   className={inp("mbti") + " cursor-pointer"}
+                  aria-label="MBTI 선택"
                 >
                   <option value="">MBTI를 선택해주세요</option>
                   {MBTI_TYPES.map(m => <option key={m} value={m}>{m}</option>)}
