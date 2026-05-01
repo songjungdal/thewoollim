@@ -110,7 +110,7 @@ function ProfileSetupContent() {
         if (profile.gender === "남성" || profile.gender === "여성")                 locked.add("gender");
         if (profile.phone?.trim())                                               locked.add("phone");
         if (profile.birthDate?.trim())                                           locked.add("birthDate");
-        if (profile.maritalStatus === "미혼" || profile.maritalStatus === "돌싱") locked.add("maritalStatus");
+        if (profile.maritalStatus === "싱글" || profile.maritalStatus === "돌싱") locked.add("maritalStatus");
         setLockedFields(locked);
       }
     } else {
@@ -349,7 +349,7 @@ function ProfileSetupContent() {
                   {isLocked("maritalStatus") && <Lock size={12} className="text-gray-400" />}
                 </label>
                 <div className="flex gap-2 md:gap-3">
-                  {(["미혼", "돌싱"] as const).map(m => {
+                  {(["싱글", "돌싱"] as const).map(m => {
                     const sel = form.maritalStatus === m;
                     const locked = isLocked("maritalStatus");
                     return (

@@ -34,7 +34,7 @@ try {
           AND name IS NOT NULL    AND name != ''
           AND gender IN ('남성','여성')
           AND birth_date IS NOT NULL
-          AND marital_status IN ('미혼','돌싱')
+          AND marital_status IN ('싱글','돌싱')
           AND job  IS NOT NULL    AND job  != ''
           AND mbti IS NOT NULL    AND mbti != ''
         ORDER BY id DESC

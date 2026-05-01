@@ -17,7 +17,7 @@ export type Profile = {
   birthDate: string;       // ISO 'YYYY-MM-DD'
   interests: string;
   idealType: string;
-  maritalStatus?: string;  // '미혼' | '돌싱' (onboarding 완료자만 채워짐)
+  maritalStatus?: string;  // '싱글' | '돌싱' (onboarding 완료자만 채워짐)
 };
 
 export type BookingStatus = "paid_pending_profile" | "pending_approval" | "confirmed" | "cancelled";
@@ -50,7 +50,7 @@ export function isCoreProfileComplete(p: Profile | null): boolean {
     (p.gender === "남성" || p.gender === "여성") &&
     p.phone?.trim() &&
     p.birthDate?.trim() &&
-    (ms === "미혼" || ms === "돌싱")
+    (ms === "싱글" || ms === "돌싱")
   );
 }
 

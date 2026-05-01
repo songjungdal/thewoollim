@@ -61,7 +61,7 @@ export function useParties(): Party[] {
               // 자격 제한
               minAge:       p.minAge != null && p.minAge !== "" ? Number(p.minAge) : undefined,
               maxAge:       p.maxAge != null && p.maxAge !== "" ? Number(p.maxAge) : undefined,
-              allowedMaritalStatus: (ams === "미혼" || ams === "돌싱") ? ams : "all",
+              allowedMaritalStatus: (ams === "싱글" || ams === "돌싱") ? ams : "all",
               // 카테고리 (화이트리스트 매칭 — 잘못된 값은 undefined로 폴백)
               targetGroup: TARGET_GROUPS.includes(p.targetGroup as TargetGroup) ? (p.targetGroup as TargetGroup) : undefined,
               theme:       THEMES.includes(p.theme as Theme)                   ? (p.theme       as Theme)       : undefined,

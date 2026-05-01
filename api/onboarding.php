@@ -9,7 +9,7 @@
  *  - gender         : '남성' | '여성'
  *  - phone          : '010-0000-0000' 포맷 (3-4-4)
  *  - birthDate      : 'YYYY-MM-DD'
- *  - maritalStatus  : '미혼' | '돌싱'
+ *  - maritalStatus  : '싱글' | '돌싱'
  *
  * 처리:
  *  - 기존 row 의 빈 핵심 5종만 UPDATE — 이미 채워진 값은 거부 (재입력 차단)
@@ -40,7 +40,7 @@ if (!preg_match('/^\d{3}-\d{4}-\d{4}$/', $phone))   jsonFail('연락처를 010-0
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $birthDate) || !strtotime($birthDate)) {
     jsonFail('생년월일이 올바르지 않습니다.');
 }
-if ($maritalStatus !== '미혼' && $maritalStatus !== '돌싱') jsonFail('혼인여부를 선택해주세요.');
+if ($maritalStatus !== '싱글' && $maritalStatus !== '돌싱') jsonFail('혼인여부를 선택해주세요.');
 
 try {
     $pdo  = getDB();
@@ -55,7 +55,7 @@ try {
         ($u['gender'] === '남성' || $u['gender'] === '여성') &&
         trim((string)$u['phone']) !== '' &&
         !empty($u['birth_date']) &&
-        ($u['marital_status'] === '미혼' || $u['marital_status'] === '돌싱');
+        ($u['marital_status'] === '싱글' || $u['marital_status'] === '돌싱');
 
     if ($alreadyComplete) jsonOut(['ok' => true, 'alreadyComplete' => true]);
 
@@ -66,7 +66,7 @@ try {
     if ($u['gender'] !== '남성' && $u['gender'] !== '여성')                               { $set[] = "gender = ?";         $params[] = $gender; }
     if (trim((string)$u['phone']) === '')                                                 { $set[] = "phone = ?";          $params[] = $phone; }
     if (empty($u['birth_date']))                                                          { $set[] = "birth_date = ?";     $params[] = $birthDate; }
-    if ($u['marital_status'] !== '미혼' && $u['marital_status'] !== '돌싱')               { $set[] = "marital_status = ?"; $params[] = $maritalStatus; }
+    if ($u['marital_status'] !== '싱글' && $u['marital_status'] !== '돌싱')               { $set[] = "marital_status = ?"; $params[] = $maritalStatus; }
 
     if (empty($set)) jsonOut(['ok' => true, 'alreadyComplete' => true]);
 

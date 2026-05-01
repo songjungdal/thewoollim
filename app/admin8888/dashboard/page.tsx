@@ -10,7 +10,7 @@ import { formatPhoneKR } from "../../lib/phone";
 type AdminUser = {
   id: number; email: string; name: string; gender: string; phone: string;
   location: string; job: string; mbti: string; birth_date: string;
-  maritalStatus?: string;  // '미혼' | '돌싱' | '' (미입력)
+  maritalStatus?: string;  // '싱글' | '돌싱' | '' (미입력)
   interests: string; idealType: string;
   sns_provider: string | null; status: string; created_at: string;
 };
@@ -52,7 +52,7 @@ type PartyForm = {
   // 참가 자격 제한 (선택). 빈 문자열은 무제한 의미.
   minAge: string;
   maxAge: string;
-  allowedMaritalStatus: "all" | "미혼" | "돌싱";
+  allowedMaritalStatus: "all" | "싱글" | "돌싱";
   // 메인 페이지 카테고리 (선택). 빈 문자열은 미지정.
   targetGroup: "" | "싱글" | "돌싱";
   theme: "" | "티타임" | "와인파티" | "사케파티" | "쿠킹클래스";
@@ -226,7 +226,7 @@ export default function AdminDashboard() {
   }, [tab, authChecked, loadLogs]);
   const [genderFilter, setGenderFilter] = useState<"all" | "남성" | "여성">("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "paid_pending_profile" | "pending_approval" | "confirmed">("all");
-  const [memberMaritalFilter, setMemberMaritalFilter] = useState<"all" | "미혼" | "돌싱" | "empty">("all");
+  const [memberMaritalFilter, setMemberMaritalFilter] = useState<"all" | "싱글" | "돌싱" | "empty">("all");
 
   // 매칭파티 CRUD state
   const [partyForm, setPartyForm] = useState<PartyForm>(EMPTY_PARTY);
@@ -249,7 +249,7 @@ export default function AdminDashboard() {
       imageUrl: (p as any).imageUrl ?? "",
       minAge: p.minAge != null ? String(p.minAge) : "",
       maxAge: p.maxAge != null ? String(p.maxAge) : "",
-      allowedMaritalStatus: (ams === "미혼" || ams === "돌싱") ? ams : "all",
+      allowedMaritalStatus: (ams === "싱글" || ams === "돌싱") ? ams : "all",
       targetGroup: (tg === "싱글" || tg === "돌싱") ? tg : "",
       theme:       (th === "티타임" || th === "와인파티" || th === "사케파티" || th === "쿠킹클래스") ? th : "",
       locationTag: (lt === "서울" || lt === "성남" || lt === "수원" || lt === "인천" || lt === "용인" || lt === "기타") ? lt : "",
@@ -584,11 +584,11 @@ export default function AdminDashboard() {
                     <select
                       aria-label="혼인여부 필터"
                       value={memberMaritalFilter}
-                      onChange={e => setMemberMaritalFilter(e.target.value as "all" | "미혼" | "돌싱" | "empty")}
+                      onChange={e => setMemberMaritalFilter(e.target.value as "all" | "싱글" | "돌싱" | "empty")}
                       className="px-3 py-2 rounded-lg border border-gray-200 text-sm font-medium bg-white"
                     >
                       <option value="all">전체</option>
-                      <option value="미혼">미혼만</option>
+                      <option value="싱글">싱글만</option>
                       <option value="돌싱">돌싱만</option>
                       <option value="empty">미입력</option>
                     </select>
@@ -613,8 +613,8 @@ export default function AdminDashboard() {
                             <td className="px-3 py-2.5 font-bold">{u.name}</td>
                             <td className="px-3 py-2.5">{u.gender || "-"}</td>
                             <td className="px-3 py-2.5">
-                              {ms === "미혼" ? (
-                                <span className="inline-block px-2 py-0.5 rounded-full text-[11px] md:text-xs font-black bg-blue-100 text-blue-800">미혼</span>
+                              {ms === "싱글" ? (
+                                <span className="inline-block px-2 py-0.5 rounded-full text-[11px] md:text-xs font-black bg-blue-100 text-blue-800">싱글</span>
                               ) : ms === "돌싱" ? (
                                 <span className="inline-block px-2 py-0.5 rounded-full text-[11px] md:text-xs font-black bg-purple-100 text-purple-800">돌싱</span>
                               ) : (
@@ -902,12 +902,12 @@ export default function AdminDashboard() {
                             <label className="block text-xs font-bold text-gray-500 mb-1.5">혼인여부</label>
                             <select
                               value={partyForm.allowedMaritalStatus}
-                              onChange={e => setPartyForm(p => ({ ...p, allowedMaritalStatus: e.target.value as "all" | "미혼" | "돌싱" }))}
+                              onChange={e => setPartyForm(p => ({ ...p, allowedMaritalStatus: e.target.value as "all" | "싱글" | "돌싱" }))}
                               className="w-full px-4 py-3 rounded-lg border border-gray-200 text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none"
                               aria-label="혼인여부 제한"
                             >
                               <option value="all">무관</option>
-                              <option value="미혼">미혼 전용</option>
+                              <option value="싱글">싱글 전용</option>
                               <option value="돌싱">돌싱 전용</option>
                             </select>
                           </div>

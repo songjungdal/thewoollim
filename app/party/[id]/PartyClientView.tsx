@@ -437,7 +437,7 @@ export default function PartyClientView({ id }: { id: string }) {
             const tg = detailItem.targetGroup;
             const ams = detailItem.allowedMaritalStatus;
             const variant: "single" | "divorced" | null =
-              tg === "싱글" || ams === "미혼"
+              tg === "싱글" || ams === "싱글"
                 ? "single"
                 : tg === "돌싱" || ams === "돌싱"
                   ? "divorced"
@@ -461,7 +461,7 @@ export default function PartyClientView({ id }: { id: string }) {
                             Singles Only
                           </p>
                           <p className="text-sm md:text-base text-gray-700 leading-relaxed break-keep">
-                            해당 파티는 법적으로 미혼인 <strong className="font-black text-brand-black">&apos;싱글&apos;</strong> 회원님만을 대상으로 진행되는 매칭 파티입니다.{" "}
+                            해당 파티는 법적 혼인 이력이 없는 <strong className="font-black text-brand-black">&apos;싱글&apos;</strong> 회원님만을 대상으로 진행되는 매칭 파티입니다.{" "}
                             <strong className="font-black text-brand-black">&apos;싱글&apos;</strong>이 아님이 확인될 경우, 즉시{" "}
                             <strong className="font-black text-rose-700">회원탈퇴</strong>와 함께 블랙리스트 조치되며,
                             허위 정보 기재에 따른 민·형사상의{" "}

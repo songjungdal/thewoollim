@@ -1,5 +1,5 @@
 /** 매칭파티 참가 자격 — 혼인여부 제한 */
-export type AllowedMaritalStatus = "all" | "미혼" | "돌싱";
+export type AllowedMaritalStatus = "all" | "싱글" | "돌싱";
 
 /** 메인 페이지 카테고리 분류값 */
 export const TARGET_GROUPS = ["싱글", "돌싱"] as const;
@@ -25,7 +25,7 @@ export type Party = {
   // 참가 자격 제한 (선택) — 누락 시 모든 회원 신청 가능
   minAge?: number;                            // 최소 나이 (만 나이)
   maxAge?: number;                            // 최대 나이 (만 나이)
-  allowedMaritalStatus?: AllowedMaritalStatus; // "all" | "미혼" | "돌싱"
+  allowedMaritalStatus?: AllowedMaritalStatus; // "all" | "싱글" | "돌싱"
   // 콘텐츠 (관리자가 등록 폼에서 입력) — 누락 시 placeholder
   imageUrl?: string;     // /uploads/parties/<file> 형태의 절대경로 또는 외부 URL
   description?: string;  // 파티 소개/내용 (multiline 가능)

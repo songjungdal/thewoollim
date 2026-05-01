@@ -33,7 +33,7 @@ export type EligibilityResult = {
  * 회원이 해당 파티에 신청 가능한지 검증.
  *  - minAge/maxAge: 미설정 시 무제한
  *  - allowedMaritalStatus: "all" 또는 미설정 시 무제한
- *  - targetGroup="싱글": allowedMaritalStatus 미설정 시 미혼 전용으로 동작
+ *  - targetGroup="싱글": allowedMaritalStatus 미설정 시 싱글 전용으로 동작
  *    (targetGroup="돌싱"은 안내문구 분기용 — 자체적인 차단 규칙 없음)
  */
 export function checkEligibility(
@@ -44,12 +44,12 @@ export function checkEligibility(
 
   const ageRequired = party.minAge != null || party.maxAge != null;
 
-  // 혼인여부 요구 — allowedMaritalStatus 우선, 미설정 시 targetGroup="싱글"이면 "미혼"로 fallback
-  const requiredMarital: "미혼" | "돌싱" | null =
+  // 혼인여부 요구 — allowedMaritalStatus 우선, 미설정 시 targetGroup="싱글"이면 "싱글"로 fallback
+  const requiredMarital: "싱글" | "돌싱" | null =
     party.allowedMaritalStatus && party.allowedMaritalStatus !== "all"
       ? party.allowedMaritalStatus
       : party.targetGroup === "싱글"
-        ? "미혼"
+        ? "싱글"
         : null;
 
   // 연령 검증
@@ -72,9 +72,9 @@ export function checkEligibility(
       return { ok: false, reason: "missingProfile", message: "혼인여부가 입력되지 않았습니다." };
     }
     if (user.maritalStatus !== requiredMarital) {
-      const msg = requiredMarital === "미혼"
-        ? "본 파티는 '싱글(미혼)' 회원 전용입니다."
-        : "참가 대상(미혼/돌싱)이 일치하지 않습니다.";
+      const msg = requiredMarital === "싱글"
+        ? "본 파티는 '싱글' 회원 전용입니다."
+        : "참가 대상(싱글/돌싱)이 일치하지 않습니다.";
       return { ok: false, reason: "maritalMismatch", message: msg };
     }
   }
@@ -91,7 +91,7 @@ export function eligibilitySummary(p: Pick<Party, "minAge" | "maxAge" | "allowed
   if (p.allowedMaritalStatus && p.allowedMaritalStatus !== "all") {
     parts.push(`${p.allowedMaritalStatus} 전용`);
   } else if (p.targetGroup === "싱글") {
-    parts.push("싱글(미혼) 전용");
+    parts.push("싱글 전용");
   }
   return parts.join(" · ");
 }

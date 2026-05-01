@@ -112,7 +112,7 @@ function sanitizeParty(array $p): array {
         $clean['maxAge'] = (int)$p['maxAge'];
     }
     $ams = (string)($p['allowedMaritalStatus'] ?? '');
-    if (in_array($ams, ['all', '미혼', '돌싱'], true)) {
+    if (in_array($ams, ['all', '싱글', '돌싱'], true)) {
         $clean['allowedMaritalStatus'] = $ams;
     }
 

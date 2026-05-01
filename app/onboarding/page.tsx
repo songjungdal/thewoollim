@@ -28,7 +28,7 @@ export default function OnboardingPage() {
   const [gender,        setGender]        = useState<"" | "남성" | "여성">("");
   const [phone,         setPhone]         = useState("");
   const [birthDate,     setBirthDate]     = useState("");
-  const [maritalStatus, setMaritalStatus] = useState<"" | "미혼" | "돌싱">("");
+  const [maritalStatus, setMaritalStatus] = useState<"" | "싱글" | "돌싱">("");
   const [submitting,    setSubmitting]    = useState(false);
 
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -45,7 +45,7 @@ export default function OnboardingPage() {
     if ((profile.gender === "남성" || profile.gender === "여성") && !gender) setGender(profile.gender);
     if (profile.phone && !phone)           setPhone(formatPhone(profile.phone));
     if (profile.birthDate && !birthDate)   setBirthDate(profile.birthDate);
-    if ((profile.maritalStatus === "미혼" || profile.maritalStatus === "돌싱") && !maritalStatus) setMaritalStatus(profile.maritalStatus);
+    if ((profile.maritalStatus === "싱글" || profile.maritalStatus === "돌싱") && !maritalStatus) setMaritalStatus(profile.maritalStatus);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile]);
 
@@ -62,7 +62,7 @@ export default function OnboardingPage() {
     if (gender !== "남성" && gender !== "여성")           { alert("성별을 선택해주세요."); return; }
     if (!birthDate)                                    { alert("생년월일을 선택해주세요."); return; }
     if (!/^\d{3}-\d{4}-\d{4}$/.test(phone))            { alert("연락처를 010-0000-0000 형식으로 입력해주세요."); return; }
-    if (maritalStatus !== "미혼" && maritalStatus !== "돌싱") { alert("혼인여부를 선택해주세요."); return; }
+    if (maritalStatus !== "싱글" && maritalStatus !== "돌싱") { alert("혼인여부를 선택해주세요."); return; }
 
     setSubmitting(true);
     try {
@@ -200,7 +200,7 @@ export default function OnboardingPage() {
               <span className="inline-flex items-center gap-1.5"><Heart size={13} className="text-brand-point" /> 혼인여부 <span className="text-brand-point">*</span></span>
             </label>
             <div className="grid grid-cols-2 gap-2 md:gap-3">
-              {(["미혼", "돌싱"] as const).map(m => {
+              {(["싱글", "돌싱"] as const).map(m => {
                 const sel = maritalStatus === m;
                 return (
                   <button

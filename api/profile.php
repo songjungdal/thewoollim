@@ -94,7 +94,7 @@ if ($method === 'POST') {
         $applyGender   = ($cur['gender'] === '남성' || $cur['gender'] === '여성') ? $cur['gender'] : $gender;
         $applyPhone    = trim((string)$cur['phone']) === ''      ? $phone     : $cur['phone'];
         $applyBirth    = empty($cur['birth_date'])               ? $birthDate : $cur['birth_date'];
-        $applyMarital  = ($cur['marital_status'] === '미혼' || $cur['marital_status'] === '돌싱')
+        $applyMarital  = ($cur['marital_status'] === '싱글' || $cur['marital_status'] === '돌싱')
                          ? $cur['marital_status'] : $maritalStatus;
 
         // 입력값 자체 검증 (잠긴 필드는 cur 사용이라 검증 skip)
