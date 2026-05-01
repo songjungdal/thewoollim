@@ -587,13 +587,7 @@ function LoginContent() {
 
                       <button
                         type="submit"
-                        disabled={
-                          !isPhoneVerified
-                          || registering
-                          || !registerConsent
-                          || !registerPasswordConfirm
-                          || registerPassword !== registerPasswordConfirm
-                        }
+                        disabled={registering}
                         className="w-full bg-brand-black text-white py-4 rounded-xl font-bold text-lg hover:bg-brand-point transition-all shadow-xl disabled:bg-gray-200 disabled:shadow-none mt-4 disabled:cursor-not-allowed"
                       >
                         {registering ? "가입 중..." : "가입 완료하기"}
