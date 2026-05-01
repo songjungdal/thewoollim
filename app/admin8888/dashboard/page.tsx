@@ -10,7 +10,7 @@ import { formatPhoneKR } from "../../lib/phone";
 type AdminUser = {
   id: number; email: string; name: string; gender: string; phone: string;
   location: string; job: string; mbti: string; birth_date: string;
-  maritalStatus?: string;  // '싱글' | '돌싱' | '' (미입력)
+  marital_status?: string;  // '싱글' | '돌싱' | '' (미입력) — DB 컬럼명 그대로 (admin/users.php 응답)
   interests: string; idealType: string;
   sns_provider: string | null; status: string; created_at: string;
   role?: "user" | "admin";
@@ -568,8 +568,8 @@ export default function AdminDashboard() {
           {tab === "members" && (() => {
             const filteredUsers = users.filter(u => {
               if (memberMaritalFilter === "all")    return true;
-              if (memberMaritalFilter === "empty")  return !(u.maritalStatus ?? "").trim();
-              return u.maritalStatus === memberMaritalFilter;
+              if (memberMaritalFilter === "empty")  return !(u.marital_status ?? "").trim();
+              return u.marital_status === memberMaritalFilter;
             });
             return (
               <section>
@@ -606,7 +606,12 @@ export default function AdminDashboard() {
                     </thead>
                     <tbody>
                       {filteredUsers.map(u => {
-                        const ms = (u.maritalStatus ?? "").trim();
+                        // 관용성: DB legacy 값('single'/'divorced') 도 한글로 정규화
+                        const rawMs = (u.marital_status ?? "").trim().toLowerCase();
+                        const ms =
+                          rawMs === "싱글"  || rawMs === "single"   || rawMs === "미혼" ? "싱글" :
+                          rawMs === "돌싱"  || rawMs === "divorced"                     ? "돌싱" :
+                          "";
                         return (
                           <tr key={u.id} className="border-t border-gray-100 hover:bg-gray-50">
                             <td className="px-3 py-2.5 font-bold">{u.id}</td>
