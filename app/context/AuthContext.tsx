@@ -317,6 +317,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // ── 즉시 hydration: localStorage 캐시 → 페이지가 열리는 순간 데이터 노출 (체감 SSR)
           const cachedBookings = readBookingsCache(sessionEmail);
           if (cachedBookings) setBookings(cachedBookings);
+
+          // ⚠️ profile 즉시 hydration — OnboardingGuard / 마이페이지 등이
+          //    mounted=true 직후 profile===null 을 "incomplete" 로 오판하여
+          //    /onboarding → / 로 잘못 튕기는 race 차단
+          try {
+            const localProfileRaw = localStorage.getItem("woollim_profile");
+            if (localProfileRaw) {
+              const cachedProfile: Profile = JSON.parse(localProfileRaw);
+              if (cachedProfile && typeof cachedProfile === "object") {
+                setProfile(cachedProfile);
+              }
+            }
+          } catch {}
+
           // mounted = true 를 가능한 빨리 → 첫 페인트 차단 해제
           setMounted(true);
 
@@ -327,7 +341,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             fetchServerBookings(sessionEmail),
           ]);
           if (serverCart !== null) setCartSync(serverCart);
-          if (serverProfile) setProfile(serverProfile);
+          if (serverProfile) {
+            setProfile(serverProfile);
+            // localStorage 동기화 — 다음 새로고침 즉시 hydration 가능
+            try { localStorage.setItem("woollim_profile", JSON.stringify(serverProfile)); } catch {}
+          }
           if (serverBookings !== null) {
             setBookings(serverBookings);
             writeBookingsCache(sessionEmail, serverBookings);
@@ -344,6 +362,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setIsLoggedIn(true);
             setUserEmail(parsed.email);
             userEmailRef.current = parsed.email;
+
+            // ⚠️ profile localStorage 즉시 hydration — 동일 race 차단 (cookie-session 경로 주석 참조)
+            try {
+              const localProfileRaw = localStorage.getItem("woollim_profile");
+              if (localProfileRaw) {
+                const cachedProfile: Profile = JSON.parse(localProfileRaw);
+                if (cachedProfile && typeof cachedProfile === "object") {
+                  setProfile(cachedProfile);
+                }
+              }
+            } catch {}
 
             // Cart sync — server is authoritative. If server returns a valid
             // array (even empty), trust it. Only fall back to local on network error.

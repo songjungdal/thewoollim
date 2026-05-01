@@ -36,6 +36,15 @@ export default function OnboardingGuard() {
     if (!mounted || !isLoggedIn) return;
     if (ALLOW(pathname)) return;
 
+    // ⚠️ profile === null 은 두 가지 의미:
+    //   (a) 아직 서버 fetch 가 끝나지 않은 로딩 상태
+    //   (b) 회원가입 직후 한 번도 저장된 적이 없는 신규 회원
+    // 새로고침 시 (a) 케이스에서 잘못 redirect 되어 메인으로 튕기는 버그 방지를 위해
+    // profile 이 null 인 동안에는 redirect 보류. AuthContext 가 localStorage hydration
+    // 으로 거의 즉시 profile 을 채우므로, 정상 회원에게 onboarding 으로 보내져야 할
+    // 시점에는 profile 이 null 이 아닐 가능성이 매우 높음.
+    if (profile === null) return;
+
     // 핵심 정보가 채워지면 스누즈도 의미 없어지므로 정리
     if (isCoreProfileComplete(profile)) {
       clearOnboardingSnooze();
