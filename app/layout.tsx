@@ -36,9 +36,11 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-import LoadingSpinner from "./components/LoadingSpinner";
 import ClientProviders from "./components/ClientProviders";
-import { Suspense } from "react";
+
+// LoadingSpinner 제거됨 — useSearchParams 의 ref instability 로 인한 effect 무한 재실행이
+// stale closure 와 결합해 spinner 가 영구 표시되는 버그가 있었음.
+// 정적 export 환경(SSG)에서는 실제 라우트 전환 지연이 없어 spinner 자체가 무의미.
 
 export default function RootLayout({
   children,
@@ -54,9 +56,6 @@ export default function RootLayout({
       </head>
       <body className="bg-brand-lightgray text-brand-black antialiased font-sans selection:bg-brand-point selection:text-white">
         <ClientProviders>
-          <Suspense fallback={null}>
-            <LoadingSpinner />
-          </Suspense>
           {children}
         </ClientProviders>
       </body>
