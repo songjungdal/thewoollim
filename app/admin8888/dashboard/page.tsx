@@ -13,6 +13,7 @@ type AdminUser = {
   maritalStatus?: string;  // '싱글' | '돌싱' | '' (미입력)
   interests: string; idealType: string;
   sns_provider: string | null; status: string; created_at: string;
+  role?: "user" | "admin";
 };
 type BookingRow = {
   id: string; partyId: string; status: string; createdAt: string; total?: number;
@@ -609,9 +610,14 @@ export default function AdminDashboard() {
                         return (
                           <tr key={u.id} className="border-t border-gray-100 hover:bg-gray-50">
                             <td className="px-3 py-2.5 font-bold">{u.id}</td>
-                            <td className="px-3 py-2.5">{u.email}</td>
-                            <td className="px-3 py-2.5 font-bold">{u.name}</td>
-                            <td className="px-3 py-2.5">{u.gender || "-"}</td>
+                            <td className="px-3 py-2.5">
+                              {u.email}
+                              {u.role === "admin" && (
+                                <span className="ml-1.5 inline-block px-1.5 py-0.5 rounded text-[10px] font-black bg-red-100 text-red-700 align-middle">ADMIN</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2.5 font-bold">{u.name || <span className="text-gray-400 text-xs">미입력</span>}</td>
+                            <td className="px-3 py-2.5">{u.gender || <span className="text-gray-400 text-xs">미입력</span>}</td>
                             <td className="px-3 py-2.5">
                               {ms === "싱글" ? (
                                 <span className="inline-block px-2 py-0.5 rounded-full text-[11px] md:text-xs font-black bg-blue-100 text-blue-800">싱글</span>
@@ -621,13 +627,13 @@ export default function AdminDashboard() {
                                 <span className="text-gray-400 text-xs">미입력</span>
                               )}
                             </td>
-                            <td className="px-3 py-2.5 tabular-nums">{formatPhoneKR(u.phone)}</td>
+                            <td className="px-3 py-2.5 tabular-nums">{u.phone ? formatPhoneKR(u.phone) : <span className="text-gray-400 text-xs">미입력</span>}</td>
                             <td className="px-3 py-2.5">{u.location || "-"}</td>
                             <td className="px-3 py-2.5">{u.job || "-"}</td>
                             <td className="px-3 py-2.5">{u.mbti || "-"}</td>
-                            <td className="px-3 py-2.5">{u.birth_date || "-"}</td>
+                            <td className="px-3 py-2.5">{u.birth_date || <span className="text-gray-400 text-xs">미입력</span>}</td>
                             <td className="px-3 py-2.5">{u.sns_provider || "일반"}</td>
-                            <td className="px-3 py-2.5 text-gray-500">{u.created_at}</td>
+                            <td className="px-3 py-2.5 text-gray-500">{u.created_at || "-"}</td>
                             <td className="px-3 py-2.5">
                               <button
                                 type="button"
