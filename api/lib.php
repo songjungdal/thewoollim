@@ -10,6 +10,11 @@
 
 declare(strict_types=1);
 
+// ─── 타임존 ────────────────────────────────────────────────────────
+//   서버 OS(UTC) 무관 — 모든 PHP date(), strtotime() 등에 KST 적용.
+//   db.php 가 require 되지 않는 엔드포인트(send-sms 등)도 동일 보장.
+date_default_timezone_set('Asia/Seoul');
+
 // ─── HTTP 응답 ────────────────────────────────────────────────────
 function jsonHeaders(): void {
     header('Content-Type: application/json; charset=utf-8');

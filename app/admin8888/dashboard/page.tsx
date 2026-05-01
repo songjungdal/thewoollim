@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { Users, Ticket, Tag, Building2, LogOut, ShieldCheck, CheckCircle2, Clock, AlertTriangle, Calendar, Plus, Pencil, Trash2, ImageIcon, X, FileText, Search } from "lucide-react";
 import { useParties, broadcastPartiesUpdated } from "../../lib/useParties";
 import { formatPhoneKR } from "../../lib/phone";
+import { formatKST } from "../../lib/datetime";
 
 type AdminUser = {
   id: number; email: string; name: string; gender: string; phone: string;
@@ -740,7 +741,7 @@ export default function AdminDashboard() {
                             <td className="px-3 py-2.5">{u.mbti || "-"}</td>
                             <td className="px-3 py-2.5">{u.birth_date || <span className="text-gray-400 text-xs">미입력</span>}</td>
                             <td className="px-3 py-2.5">{u.sns_provider || "일반"}</td>
-                            <td className="px-3 py-2.5 text-gray-500">{u.created_at || "-"}</td>
+                            <td className="px-3 py-2.5 text-gray-500">{formatKST(u.created_at)}</td>
                             <td className="px-3 py-2.5">
                               <button
                                 type="button"
@@ -1409,7 +1410,7 @@ export default function AdminDashboard() {
                       return (
                         <Fragment key={row.id}>
                           <tr className={`border-t border-gray-100 ${isHighlight ? "bg-red-50/40 hover:bg-red-50" : "hover:bg-gray-50"}`}>
-                            <td className="px-3 py-2.5 first:pl-5 text-gray-600 tabular-nums">{row.created_at}</td>
+                            <td className="px-3 py-2.5 first:pl-5 text-gray-600 tabular-nums">{formatKST(row.created_at)}</td>
                             <td className="px-3 py-2.5 font-bold">{row.admin_id || "-"}</td>
                             <td className="px-3 py-2.5 text-gray-500 tabular-nums">{row.ip || "-"}</td>
                             <td className="px-3 py-2.5">
