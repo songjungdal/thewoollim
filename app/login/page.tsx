@@ -219,18 +219,29 @@ function LoginContent() {
           phone,
         }),
       });
-      const data = await res.json();
-      if (data.ok) {
+      // 응답이 JSON 이 아닌 경우(HTML 에러 페이지 등)도 안전하게 처리
+      let data: { ok?: boolean; error?: string } = {};
+      try {
+        data = await res.json();
+      } catch (parseErr) {
+        // eslint-disable-next-line no-console
+        console.error("[register] JSON parse failed", parseErr, "status=", res.status);
+        alert(`가입 처리 중 서버 응답을 해석할 수 없습니다. (HTTP ${res.status})\n잠시 후 다시 시도해주세요.`);
+        return;
+      }
+      if (data?.ok) {
         alert("어울림 가입을 환영합니다!");
         // 서버가 세션 쿠키를 발급했으므로 메인 페이지로 이동.
         // 메인 마운트 시 AuthContext가 /api/auth/me.php로 세션을 검증하고 자동 로그인 → 헤더가 '마이페이지'로 전환됨.
         // 풀 페이지 이동으로 쿠키 즉시 전송 보장.
         window.location.href = "/";
       } else {
-        alert(data.error || "가입 처리 중 오류가 발생했습니다.");
+        alert(data?.error || `가입 처리 중 오류가 발생했습니다. (HTTP ${res.status})`);
       }
-    } catch {
-      alert("네트워크 오류로 가입에 실패했습니다.");
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error("[register] network error", err);
+      alert("네트워크 오류로 가입에 실패했습니다.\n인터넷 연결을 확인하고 다시 시도해주세요.");
     } finally {
       setRegistering(false);
     }
