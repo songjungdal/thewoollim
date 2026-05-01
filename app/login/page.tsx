@@ -17,7 +17,7 @@ function LoginContent() {
   const [loginPassword, setLoginPassword] = useState("");
   const [timer, setTimer] = useState(0);
   const [isAuthSent, setIsAuthSent] = useState(false);
-  const [isAuthVerified, setIsAuthVerified] = useState(false);
+  const [isPhoneVerified, setIsPhoneVerified] = useState(false);
   const [authCode, setAuthCode] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -161,7 +161,7 @@ function LoginContent() {
       });
       const data = await res.json();
       if (data.ok) {
-        setIsAuthVerified(true);
+        setIsPhoneVerified(true);
         setTimer(0);
         alert("본인인증이 완료되었습니다.");
       } else {
@@ -186,8 +186,8 @@ function LoginContent() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isAuthVerified) {
-      alert("본인인증을 먼저 완료해주세요.");
+    if (!isPhoneVerified) {
+      alert("휴대폰 번호 인증이 완료되지 않았습니다.\n인증번호 확인을 먼저 진행해 주세요.");
       return;
     }
     // 누락 항목 한 번에 모아서 안내 (사용자가 어떤 부분을 채워야 하는지 명확하게)
@@ -384,19 +384,19 @@ function LoginContent() {
                                 value={phoneNumber}
                                 onChange={e => setPhoneNumber(formatPhone(e.target.value))}
                                 maxLength={13}
-                                readOnly={isAuthVerified}
+                                readOnly={isPhoneVerified}
                                 aria-label="휴대폰 번호"
                               />
                            </div>
                            <button
                              type="button"
                              onClick={handleSendAuthCode}
-                             disabled={isAuthVerified || isSending || timer > 0}
+                             disabled={isPhoneVerified || isSending || timer > 0}
                              className="w-full sm:w-auto px-4 py-3 sm:py-0 min-h-[44px] bg-brand-black text-white rounded-xl font-bold text-sm whitespace-nowrap hover:bg-brand-point transition-colors disabled:bg-gray-200 disabled:cursor-not-allowed"
                            >
                               {isSending
                                 ? "발송 중..."
-                                : isAuthVerified
+                                : isPhoneVerified
                                   ? "인증완료"
                                   : timer > 0 && isAuthSent
                                     ? `재전송 (${timer}s)`
@@ -405,7 +405,7 @@ function LoginContent() {
                                       : "인증번호 받기"}
                            </button>
                         </div>
-                        {isAuthSent && !isAuthVerified && (
+                        {isAuthSent && (
                           <div className="flex flex-wrap sm:flex-nowrap gap-2 animate-in fade-in slide-in-from-top-1">
                             <div className="relative flex-1 min-w-0 basis-full sm:basis-auto">
                               <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
@@ -413,27 +413,29 @@ function LoginContent() {
                                 type="text"
                                 inputMode="numeric"
                                 placeholder="인증번호 6자리"
-                                className={inputClass}
+                                className={inputClass + (isPhoneVerified ? " bg-gray-100 text-gray-500 cursor-not-allowed" : "")}
                                 maxLength={6}
                                 value={authCode}
                                 onChange={(e) => setAuthCode(e.target.value.replace(/[^0-9]/g, ""))}
+                                readOnly={isPhoneVerified}
+                                disabled={isPhoneVerified}
                                 aria-label="인증번호"
                               />
-                              {timer > 0 && (
+                              {timer > 0 && !isPhoneVerified && (
                                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-brand-point font-black text-sm">{formatTime(timer)}</span>
                               )}
                             </div>
                             <button
                               type="button"
                               onClick={handleVerifyCode}
-                              disabled={isVerifying}
-                              className="w-full sm:w-auto px-4 py-3 sm:py-0 min-h-[44px] bg-brand-point text-white rounded-xl font-bold text-sm whitespace-nowrap hover:brightness-110 transition-all disabled:bg-gray-300"
+                              disabled={isVerifying || isPhoneVerified}
+                              className="w-full sm:w-auto px-4 py-3 sm:py-0 min-h-[44px] bg-brand-point text-white rounded-xl font-bold text-sm whitespace-nowrap hover:brightness-110 transition-all disabled:bg-gray-300 disabled:cursor-not-allowed"
                             >
-                              {isVerifying ? "확인 중..." : "인증 확인"}
+                              {isPhoneVerified ? "인증 완료" : (isVerifying ? "확인 중..." : "인증 확인")}
                             </button>
                           </div>
                         )}
-                        {isAuthVerified && (
+                        {isPhoneVerified && (
                           <div className="flex items-center gap-2 text-brand-point font-bold text-sm mt-2 ml-1">
                             <CheckCircle size={16} /> 본인인증이 완료되었습니다.
                           </div>
@@ -586,7 +588,7 @@ function LoginContent() {
                       <button
                         type="submit"
                         disabled={
-                          !isAuthVerified
+                          !isPhoneVerified
                           || registering
                           || !registerConsent
                           || !registerPasswordConfirm
