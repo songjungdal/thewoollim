@@ -44,9 +44,9 @@ export default function AboutPage() {
                       src="/images/brand_logo.jpg"
                       alt="어울림 브랜드 로고"
                       width={900}
-                      height={500}
+                      height={422}
                       sizes="(max-width: 768px) 100vw, 800px"
-                      className="w-full h-auto block"
+                      className="w-full h-auto block max-w-full"
                       priority
                     />
                   </div>
