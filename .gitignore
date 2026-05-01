@@ -33,6 +33,16 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# DB credentials — never commit. Use api/db-config.example.php as the template.
+/api/db-config.php
+/api/**/db-config.php
+
+# Server-side runtime data (preserved on server, not in repo)
+/api/data/
+/api/uploads/
+/api/admin/sessions/
+/api/auth/sessions/
+
 # vercel
 .vercel
 

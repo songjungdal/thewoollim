@@ -60,23 +60,25 @@ export default function AdminLoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1.5">아이디</label>
+            <label htmlFor="admin-id" className="block text-sm font-bold text-gray-700 mb-1.5">아이디</label>
             <div className="relative">
               <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
               <input
+                id="admin-id"
                 type="text" value={id} onChange={e => setId(e.target.value)}
-                autoComplete="username" required
+                autoComplete="username" required placeholder="아이디 입력"
                 className="w-full pl-11 pr-4 py-4 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-brand-point focus:border-brand-point transition-all outline-none font-medium text-sm"
               />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1.5">비밀번호</label>
+            <label htmlFor="admin-pw" className="block text-sm font-bold text-gray-700 mb-1.5">비밀번호</label>
             <div className="relative">
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
               <input
+                id="admin-pw"
                 type="password" value={pw} onChange={e => setPw(e.target.value)}
-                autoComplete="current-password" required
+                autoComplete="current-password" required placeholder="비밀번호 입력"
                 className="w-full pl-11 pr-4 py-4 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-brand-point focus:border-brand-point transition-all outline-none font-medium text-sm"
               />
             </div>

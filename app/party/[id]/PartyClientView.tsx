@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Star, Heart, Clock, CheckCircle, ShoppingBag, X, ClipboardList, Users as UsersIcon } from "lucide-react";
+import { ArrowLeft, Star, Heart, Clock, CheckCircle, ShoppingBag, X, ClipboardList, Users as UsersIcon, ShieldCheck, Info } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Header from "../../components/Header";
@@ -431,6 +431,72 @@ export default function PartyClientView({ id }: { id: string }) {
               </motion.div>
             </div>
           </div>
+
+          {/* PARTICIPATION GUIDE NOTICE — 대상별 맞춤 안내 (싱글/돌싱). 미지정·all일 때 숨김. */}
+          {(() => {
+            const tg = detailItem.targetGroup;
+            const ams = detailItem.allowedMaritalStatus;
+            const variant: "single" | "divorced" | null =
+              tg === "싱글" || ams === "미혼"
+                ? "single"
+                : tg === "돌싱" || ams === "돌싱"
+                  ? "divorced"
+                  : null;
+            if (!variant) return null;
+
+            return (
+              <div className="mb-7 md:mb-10">
+                <div className="max-w-4xl mx-auto">
+                  {variant === "single" ? (
+                    <div className="bg-rose-50/70 border border-rose-200 rounded-2xl md:rounded-3xl p-5 md:p-7 shadow-sm">
+                      <div className="flex gap-3 md:gap-4">
+                        <div className="flex-shrink-0">
+                          <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-rose-100 flex items-center justify-center">
+                            <ShieldCheck size={20} className="text-rose-600 md:hidden" />
+                            <ShieldCheck size={24} className="text-rose-600 hidden md:block" />
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0 pt-0.5">
+                          <p className="text-[11px] md:text-xs font-black tracking-[0.2em] text-rose-600 mb-1.5 md:mb-2 uppercase">
+                            Singles Only
+                          </p>
+                          <p className="text-sm md:text-base text-gray-700 leading-relaxed break-keep">
+                            해당 파티는 법적으로 미혼인 <strong className="font-black text-brand-black">&apos;싱글&apos;</strong> 회원님만을 대상으로 진행되는 매칭 파티입니다.{" "}
+                            <strong className="font-black text-brand-black">&apos;싱글&apos;</strong>이 아님이 확인될 경우, 즉시{" "}
+                            <strong className="font-black text-rose-700">회원탈퇴</strong>와 함께 블랙리스트 조치되며,
+                            허위 정보 기재에 따른 민·형사상의{" "}
+                            <strong className="font-black text-rose-700">강력한 법적 책임</strong>을 물을 수 있음을 고지합니다.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-brand-point/5 border border-brand-point/25 rounded-2xl md:rounded-3xl p-5 md:p-7 shadow-sm">
+                      <div className="flex gap-3 md:gap-4">
+                        <div className="flex-shrink-0">
+                          <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-brand-point/15 flex items-center justify-center">
+                            <Info size={20} className="text-brand-point md:hidden" />
+                            <Info size={24} className="text-brand-point hidden md:block" />
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0 pt-0.5">
+                          <p className="text-[11px] md:text-xs font-black tracking-[0.2em] text-brand-point mb-1.5 md:mb-2 uppercase">
+                            Open Matching
+                          </p>
+                          <p className="text-sm md:text-base text-gray-700 leading-relaxed break-keep">
+                            해당 파티는 새로운 시작을 꿈꾸는 <strong className="font-black text-brand-black">&apos;돌싱&apos;</strong> 회원님까지 참여하실 수 있는{" "}
+                            <strong className="font-black text-brand-point">열린 매칭 파티</strong>입니다.
+                            물론 <strong className="font-black text-brand-black">&apos;싱글&apos;</strong> 회원님도 제한 없이 자유롭게 신청 및 참여가 가능하오니,
+                            넓은 마음으로 소중한 인연을 만나보세요.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* HOW TO JOIN — Timeline-styled Application Guide */}
           <div className="mb-10 md:mb-24">

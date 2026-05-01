@@ -33,15 +33,24 @@ export type EligibilityResult = {
  * 회원이 해당 파티에 신청 가능한지 검증.
  *  - minAge/maxAge: 미설정 시 무제한
  *  - allowedMaritalStatus: "all" 또는 미설정 시 무제한
+ *  - targetGroup="싱글": allowedMaritalStatus 미설정 시 미혼 전용으로 동작
+ *    (targetGroup="돌싱"은 안내문구 분기용 — 자체적인 차단 규칙 없음)
  */
 export function checkEligibility(
-  party: Pick<Party, "minAge" | "maxAge" | "allowedMaritalStatus">,
+  party: Pick<Party, "minAge" | "maxAge" | "allowedMaritalStatus" | "targetGroup">,
   user: { birthDate?: string; maritalStatus?: string } | null,
 ): EligibilityResult {
   if (!user) return { ok: false, reason: "missingProfile", message: "프로필 정보가 필요합니다." };
 
   const ageRequired = party.minAge != null || party.maxAge != null;
-  const maritalRequired = party.allowedMaritalStatus && party.allowedMaritalStatus !== "all";
+
+  // 혼인여부 요구 — allowedMaritalStatus 우선, 미설정 시 targetGroup="싱글"이면 "미혼"로 fallback
+  const requiredMarital: "미혼" | "돌싱" | null =
+    party.allowedMaritalStatus && party.allowedMaritalStatus !== "all"
+      ? party.allowedMaritalStatus
+      : party.targetGroup === "싱글"
+        ? "미혼"
+        : null;
 
   // 연령 검증
   if (ageRequired) {
@@ -58,12 +67,15 @@ export function checkEligibility(
   }
 
   // 혼인여부 검증
-  if (maritalRequired) {
+  if (requiredMarital) {
     if (!user.maritalStatus) {
       return { ok: false, reason: "missingProfile", message: "혼인여부가 입력되지 않았습니다." };
     }
-    if (user.maritalStatus !== party.allowedMaritalStatus) {
-      return { ok: false, reason: "maritalMismatch", message: "참가 대상(미혼/돌싱)이 일치하지 않습니다." };
+    if (user.maritalStatus !== requiredMarital) {
+      const msg = requiredMarital === "미혼"
+        ? "본 파티는 '싱글(미혼)' 회원 전용입니다."
+        : "참가 대상(미혼/돌싱)이 일치하지 않습니다.";
+      return { ok: false, reason: "maritalMismatch", message: msg };
     }
   }
 
@@ -71,13 +83,15 @@ export function checkEligibility(
 }
 
 /** 자격 라벨 (UI 노출용 짧은 요약) */
-export function eligibilitySummary(p: Pick<Party, "minAge" | "maxAge" | "allowedMaritalStatus">): string {
+export function eligibilitySummary(p: Pick<Party, "minAge" | "maxAge" | "allowedMaritalStatus" | "targetGroup">): string {
   const parts: string[] = [];
   if (p.minAge != null && p.maxAge != null) parts.push(`만 ${p.minAge}~${p.maxAge}세`);
   else if (p.minAge != null)                parts.push(`만 ${p.minAge}세 이상`);
   else if (p.maxAge != null)                parts.push(`만 ${p.maxAge}세 이하`);
   if (p.allowedMaritalStatus && p.allowedMaritalStatus !== "all") {
     parts.push(`${p.allowedMaritalStatus} 전용`);
+  } else if (p.targetGroup === "싱글") {
+    parts.push("싱글(미혼) 전용");
   }
   return parts.join(" · ");
 }
