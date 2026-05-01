@@ -434,39 +434,63 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [isLoggedIn, mounted, refreshCart]);
 
   const login = useCallback(async (email: string, password: string): Promise<boolean> => {
-    if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-      setIsLoggedIn(true);
-      setUserEmail(email);
-      userEmailRef.current = email;
-      localStorage.setItem("woollim_auth", JSON.stringify({ loggedIn: true, email }));
-
-      // Cart sync — server is authoritative. Trust its response fully (even empty).
-      const serverCart = await fetchServerCart(email);
-      if (serverCart !== null) {
-        setCartSync(serverCart);
-        localStorage.setItem("woollim_cart", JSON.stringify(serverCart));
-      } else {
-        // Network error — fall back to local cache
-        const localRaw = localStorage.getItem("woollim_cart");
-        if (localRaw) setCartSync(JSON.parse(localRaw));
-      }
-
-      // Profile sync
-      const serverProfile = await fetchServerProfile(email);
-      if (serverProfile) {
-        setProfile(serverProfile);
-        localStorage.setItem("woollim_profile", JSON.stringify(serverProfile));
-      } else {
-        const localRaw = localStorage.getItem("woollim_profile");
-        if (localRaw) {
-          const localProfile: Profile = JSON.parse(localRaw);
-          setProfile(localProfile);
-          await saveServerProfile(email, localProfile);
-        }
-      }
-      return true;
+    // DB 기반 일반 회원 인증 — /api/auth/login.php 가 role='user' AND status='active' 만 통과시킴
+    // 관리자는 본 엔드포인트로 인증 불가 (role='admin' 거부) — 별도 /admin8888/ 사용
+    let serverOk = false;
+    try {
+      const res = await fetch("/api/auth/login.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      serverOk = !!data?.ok;
+    } catch {
+      serverOk = false;
     }
-    return false;
+
+    // 백업 — 하드코딩 admin (다음 turn 에서 제거 예정, DB 마이그레이션 후 안전망 역할)
+    const adminFallback = email === ADMIN_EMAIL && password === ADMIN_PASSWORD;
+
+    if (!serverOk && !adminFallback) return false;
+
+    setIsLoggedIn(true);
+    setUserEmail(email);
+    userEmailRef.current = email;
+    localStorage.setItem("woollim_auth", JSON.stringify({ loggedIn: true, email }));
+
+    // Cart sync — server is authoritative
+    const serverCart = await fetchServerCart(email);
+    if (serverCart !== null) {
+      setCartSync(serverCart);
+      localStorage.setItem("woollim_cart", JSON.stringify(serverCart));
+    } else {
+      const localRaw = localStorage.getItem("woollim_cart");
+      if (localRaw) setCartSync(JSON.parse(localRaw));
+    }
+
+    // Profile sync
+    const serverProfile = await fetchServerProfile(email);
+    if (serverProfile) {
+      setProfile(serverProfile);
+      localStorage.setItem("woollim_profile", JSON.stringify(serverProfile));
+    } else {
+      const localRaw = localStorage.getItem("woollim_profile");
+      if (localRaw) {
+        const localProfile: Profile = JSON.parse(localRaw);
+        setProfile(localProfile);
+        await saveServerProfile(email, localProfile);
+      }
+    }
+
+    // Bookings 즉시 hydration
+    const serverBookings = await fetchServerBookings(email);
+    if (serverBookings !== null) {
+      setBookings(serverBookings);
+      writeBookingsCache(email, serverBookings);
+    }
+    return true;
   }, []);
 
   const logout = useCallback(() => {
