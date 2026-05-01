@@ -20,6 +20,9 @@ export default function SmoothOnePage() {
   const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(null);
   const [selectedGalleryImage, setSelectedGalleryImage] = useState<string | null>(null);
   const [isGalleryExpanded, setIsGalleryExpanded] = useState(false);
+  // 후기 갤러리 — DB 라이브 fetch (관리자가 수정 시 BroadcastChannel + 폴링으로 즉시 반영)
+  type GalleryItem = { id: number; image_path: string; alt_text: string; sort_order: number };
+  const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
   const [liveMembers, setLiveMembers] = useState<typeof PARTICIPANTS>([]);
   const { partyCounts } = useAuth();
   const PARTIES = useParties();
@@ -28,6 +31,37 @@ export default function SmoothOnePage() {
     extendedProps: { location: p.location, target: p.target, price: p.price },
   }));
   const router = useRouter();
+
+  // 후기 갤러리 fetch — 관리자 변경 시 BroadcastChannel('woollim_gallery') 으로 즉시 동기화
+  useEffect(() => {
+    let cancelled = false;
+    const loadGallery = () => {
+      fetch("/api/gallery.php", { cache: "no-store" })
+        .then(r => r.ok ? r.json() : [])
+        .then((data) => { if (!cancelled && Array.isArray(data)) setGalleryItems(data); })
+        .catch(() => {});
+    };
+    loadGallery();
+
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel("woollim_gallery");
+      channel.addEventListener("message", loadGallery);
+    } catch {}
+    const onVis = () => { if (document.visibilityState === "visible") loadGallery(); };
+    window.addEventListener("focus", loadGallery);
+    document.addEventListener("visibilitychange", onVis);
+    const interval = setInterval(loadGallery, 30000);
+
+    return () => {
+      cancelled = true;
+      channel?.removeEventListener("message", loadGallery);
+      channel?.close();
+      window.removeEventListener("focus", loadGallery);
+      document.removeEventListener("visibilitychange", onVis);
+      clearInterval(interval);
+    };
+  }, []);
 
   // 실시간 신규 가입자 fetch (DB users 테이블 기반)
   useEffect(() => {
@@ -335,30 +369,45 @@ export default function SmoothOnePage() {
             
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6 px-4 md:px-0 transition-all duration-700">
               <AnimatePresence mode="popLayout">
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 1, 2, 3, 4, 5, 6, 7].slice(0, isGalleryExpanded ? 16 : (typeof window !== 'undefined' && window.innerWidth < 768 ? 4 : 6)).map((imgId, idx) => (
-                  <motion.div 
-                    key={`${imgId}-${idx}`} 
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    layout
-                    variants={fadeInUp}
-                    className="aspect-square bg-gray-800 rounded-2xl md:rounded-3xl relative overflow-hidden group cursor-pointer border border-white/5"
-                  >
-                    <div
-                      onClick={() => setSelectedGalleryImage(`/images/gallery/g${imgId}.png`)}
-                      className="absolute inset-0 transition-transform duration-700 group-hover:scale-110 group-hover:brightness-110"
+                {(() => {
+                  // DB 라이브 데이터 우선, 비어있으면(네트워크 실패 등) 정적 g1~9 fallback
+                  const fallback = [1,2,3,4,5,6,7,8,9].map(i => ({
+                    id: -i,
+                    image_path: `/images/gallery/g${i}.png`,
+                    alt_text: `갤러리 이미지 ${i}`,
+                    sort_order: i*10,
+                  }));
+                  const source = galleryItems.length > 0 ? galleryItems : fallback;
+                  // 모바일: 4장 / 데스크톱: 6장 / 펼침: 16장
+                  const limit = isGalleryExpanded
+                    ? 16
+                    : (typeof window !== "undefined" && window.innerWidth < 768 ? 4 : 6);
+                  return source.slice(0, limit).map((item, idx) => (
+                    <motion.div
+                      key={`${item.id}-${idx}`}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.9 }}
+                      layout
+                      variants={fadeInUp}
+                      className="aspect-square bg-gray-800 rounded-2xl md:rounded-3xl relative overflow-hidden group cursor-pointer border border-white/5"
                     >
-                      <Image
-                        src={`/images/gallery/g${imgId}.png`}
-                        alt={`갤러리 이미지 ${idx + 1}`}
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
-                  </motion.div>
-                ))}
+                      <div
+                        onClick={() => setSelectedGalleryImage(item.image_path)}
+                        className="absolute inset-0 transition-transform duration-700 group-hover:scale-110 group-hover:brightness-110"
+                      >
+                        <Image
+                          src={item.image_path}
+                          alt={item.alt_text || `갤러리 이미지 ${idx + 1}`}
+                          fill
+                          sizes="(max-width: 768px) 50vw, 33vw"
+                          className="object-cover"
+                        />
+                      </div>
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+                    </motion.div>
+                  ));
+                })()}
               </AnimatePresence>
             </div>
 

@@ -21,7 +21,15 @@ type BookingRow = {
   userMbti?: string; userJob?: string; userBirthDate?: string;
   userInterests?: string; userIdealType?: string;
 };
-type TabKey = "members" | "bookings" | "parties" | "coupons" | "company" | "logs";
+type TabKey = "members" | "bookings" | "parties" | "coupons" | "company" | "gallery" | "logs";
+
+type GalleryItem = {
+  id: number;
+  image_path: string;
+  alt_text: string;
+  sort_order: number;
+  created_at?: string;
+};
 
 type AdminLogRow = {
   id: number;
@@ -190,6 +198,8 @@ export default function AdminDashboard() {
   type Coupon = { code: string; amount: number; expiresAt: string; active: boolean; createdAt?: string };
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [company, setCompany] = useState({ name: "", ceo: "", biz_no: "", address: "", telecom: "" });
+  const [gallery, setGallery] = useState<GalleryItem[]>([]);
+  const [galleryUploading, setGalleryUploading] = useState(false);
 
   // 로그 관리 상태
   const [logs, setLogs]                 = useState<AdminLogRow[]>([]);
@@ -372,17 +382,108 @@ export default function AdminDashboard() {
   }, [router]);
 
   const loadAll = useCallback(async () => {
-    const [u, b, c, co] = await Promise.all([
+    const [u, b, c, co, g] = await Promise.all([
       fetch("/api/admin/users.php",    { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
       fetch("/api/admin/bookings.php", { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
       fetch("/api/admin/coupons.php",  { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
       fetch("/api/admin/company.php",  { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
+      fetch("/api/admin/gallery.php",  { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
     ]);
     if (u?.users)    setUsers(u.users);
     if (b?.rows)     setBookings(b.rows);
     if (c?.coupons)  setCoupons(Array.isArray(c.coupons) ? c.coupons : []);
     if (co?.company) setCompany(co.company);
+    if (g?.items)    setGallery(Array.isArray(g.items) ? g.items : []);
   }, []);
+
+  // 후기 갤러리 — 메인페이지 즉시 동기화 broadcast 헬퍼
+  const broadcastGallery = () => {
+    try { new BroadcastChannel("woollim_gallery").postMessage({ at: Date.now() }); } catch {}
+  };
+
+  const uploadGalleryImage = async (file: File) => {
+    setGalleryUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+      const upRes = await fetch("/api/admin/upload-gallery.php", {
+        method: "POST", credentials: "include", body: fd,
+      });
+      const upD = await upRes.json();
+      if (!upD?.ok) { alert(upD?.error || "업로드 실패"); return; }
+
+      // DB 등록
+      const regRes = await fetch("/api/admin/gallery.php", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "create", image_path: upD.url, alt_text: "" }),
+      });
+      const regD = await regRes.json();
+      if (!regD?.ok) { alert(regD?.error || "DB 등록 실패"); return; }
+
+      broadcastGallery();
+      await loadAll();
+    } catch {
+      alert("업로드 네트워크 오류");
+    } finally {
+      setGalleryUploading(false);
+    }
+  };
+
+  const deleteGalleryItem = async (id: number, alt: string) => {
+    if (!confirm(`이 갤러리 이미지를 삭제하시겠습니까?\n\n${alt || `#${id}`}`)) return;
+    const res = await fetch("/api/admin/gallery.php", {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "delete", id }),
+    });
+    const d = await res.json();
+    if (!d?.ok) { alert(d?.error || "삭제 실패"); return; }
+    setGallery(prev => prev.filter(g => g.id !== id));
+    broadcastGallery();
+    await loadAll();
+  };
+
+  const moveGalleryItem = async (id: number, direction: -1 | 1) => {
+    const idx = gallery.findIndex(g => g.id === id);
+    if (idx < 0) return;
+    const swapIdx = idx + direction;
+    if (swapIdx < 0 || swapIdx >= gallery.length) return;
+    // 두 항목의 sort_order 값을 swap
+    const next = [...gallery];
+    const a = { ...next[idx],     sort_order: gallery[swapIdx].sort_order };
+    const b = { ...next[swapIdx], sort_order: gallery[idx].sort_order };
+    next[idx]     = swapIdx > idx ? b : a;
+    next[swapIdx] = swapIdx > idx ? a : b;
+    setGallery(next.sort((x, y) => x.sort_order - y.sort_order));
+
+    const res = await fetch("/api/admin/gallery.php", {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "reorder",
+        items: [
+          { id: a.id, sort_order: a.sort_order },
+          { id: b.id, sort_order: b.sort_order },
+        ],
+      }),
+    });
+    const d = await res.json();
+    if (!d?.ok) { alert(d?.error || "순서 변경 실패"); await loadAll(); return; }
+    broadcastGallery();
+  };
+
+  const updateGalleryAlt = async (id: number, alt_text: string) => {
+    const res = await fetch("/api/admin/gallery.php", {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "update", id, alt_text }),
+    });
+    const d = await res.json();
+    if (!d?.ok) { alert(d?.error || "수정 실패"); return; }
+    setGallery(prev => prev.map(g => g.id === id ? { ...g, alt_text } : g));
+    broadcastGallery();
+  };
 
   useEffect(() => { if (authChecked) loadAll(); }, [authChecked, loadAll]);
 
@@ -523,6 +624,7 @@ export default function AdminDashboard() {
     { key: "parties",  label: "매칭파티",        icon: Calendar },
     { key: "coupons",  label: "쿠폰 관리",       icon: Tag },
     { key: "company",  label: "기업 정보",       icon: Building2 },
+    { key: "gallery",  label: "후기 갤러리 관리", icon: ImageIcon },
     { key: "logs",     label: "로그 관리",        icon: FileText },
   ];
 
@@ -1115,6 +1217,102 @@ export default function AdminDashboard() {
                 </button>
                 <p className="text-xs text-gray-400 leading-relaxed pt-2">변경 사항은 푸터에 자동 반영됩니다 (페이지 새로고침 후).</p>
               </div>
+            </section>
+          )}
+
+          {/* === 후기 갤러리 관리 === */}
+          {tab === "gallery" && (
+            <section>
+              <div className="flex items-end justify-between mb-4 md:mb-5 flex-wrap gap-3">
+                <div>
+                  <h2 className="text-xl md:text-2xl font-black tracking-tight">후기 갤러리 관리</h2>
+                  <p className="text-xs md:text-sm text-gray-500 mt-1">
+                    메인페이지 후기 섹션에 노출되는 이미지를 관리합니다. 변경 사항은 즉시 메인에 반영됩니다.
+                  </p>
+                </div>
+                <label className="inline-flex items-center gap-2 bg-brand-point hover:brightness-110 text-white px-4 py-2.5 rounded-xl font-bold text-sm cursor-pointer transition-all">
+                  <Plus size={16} />
+                  {galleryUploading ? "업로드 중..." : "이미지 추가"}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    disabled={galleryUploading}
+                    onChange={e => {
+                      const f = e.target.files?.[0];
+                      if (f) uploadGalleryImage(f);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+              </div>
+
+              {gallery.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-gray-200 p-10 text-center">
+                  <ImageIcon size={32} className="text-gray-300 mx-auto mb-3" />
+                  <p className="text-sm text-gray-500">등록된 갤러리 이미지가 없습니다. 우측 상단 [이미지 추가] 버튼으로 업로드하세요.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-5">
+                  {gallery.map((g, idx) => (
+                    <div key={g.id} className="bg-white rounded-2xl border border-gray-200 overflow-hidden group">
+                      <div className="relative aspect-square bg-gray-100">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={g.image_path}
+                          alt={g.alt_text || `갤러리 #${g.id}`}
+                          className="absolute inset-0 w-full h-full object-cover"
+                        />
+                        <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] font-black px-2 py-0.5 rounded-full">
+                          {idx + 1} / {gallery.length}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => deleteGalleryItem(g.id, g.alt_text)}
+                          className="absolute top-2 right-2 w-7 h-7 bg-red-500/90 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          aria-label="삭제"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                      <div className="p-2.5 space-y-2">
+                        <input
+                          type="text"
+                          value={g.alt_text}
+                          placeholder="alt 설명 (검색·접근성)"
+                          maxLength={200}
+                          onChange={e => setGallery(prev => prev.map(x => x.id === g.id ? { ...x, alt_text: e.target.value } : x))}
+                          onBlur={e => updateGalleryAlt(g.id, e.target.value)}
+                          className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:border-brand-point focus:outline-none"
+                        />
+                        <div className="flex gap-1">
+                          <button
+                            type="button"
+                            onClick={() => moveGalleryItem(g.id, -1)}
+                            disabled={idx === 0}
+                            className="flex-1 px-2 py-1.5 text-xs font-bold bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-300 rounded-md transition-colors"
+                            title="앞으로 이동"
+                          >
+                            ↑
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => moveGalleryItem(g.id, 1)}
+                            disabled={idx === gallery.length - 1}
+                            className="flex-1 px-2 py-1.5 text-xs font-bold bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-300 rounded-md transition-colors"
+                            title="뒤로 이동"
+                          >
+                            ↓
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-gray-400 truncate" title={g.image_path}>
+                          {g.image_path.replace(/^.*\//, "")}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </section>
           )}
 
