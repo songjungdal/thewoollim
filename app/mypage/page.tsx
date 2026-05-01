@@ -46,7 +46,7 @@ const STATUS_DISPLAY: Record<BookingStatus, { label: string; tone: string; strip
 };
 
 export default function MyPage() {
-  const { mounted, isLoggedIn, userEmail, logout, cart, removeFromCart, setItemQuantity, profile, deleteAccount, bookings, appliedCoupon, applyCoupon, clearCoupon, partyCounts } = useAuth();
+  const { mounted, isLoggedIn, userEmail, userRole, logout, cart, removeFromCart, setItemQuantity, profile, deleteAccount, bookings, appliedCoupon, applyCoupon, clearCoupon, partyCounts } = useAuth();
   const PARTIES = useParties();
   const router = useRouter();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -206,8 +206,14 @@ export default function MyPage() {
                 <User size={38} className="text-white hidden md:block" />
               </div>
               <div>
-                <p className="text-gray-400 text-xs md:text-sm font-medium mb-1">관리자 계정</p>
-                <h1 className="text-xl md:text-3xl font-black">안녕하세요!</h1>
+                <p className="text-gray-400 text-xs md:text-sm font-medium mb-1">
+                  {userRole === "admin" ? "관리자 계정" : "회원 계정"}
+                </p>
+                <h1 className="text-xl md:text-3xl font-black">
+                  {userRole === "admin"
+                    ? "관리자 계정님, 안녕하세요!"
+                    : `${(profile?.name?.trim() || "어울림 회원")}님, 안녕하세요!`}
+                </h1>
                 <p className="text-gray-400 text-sm mt-1">{userEmail}</p>
               </div>
             </div>

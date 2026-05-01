@@ -61,13 +61,23 @@ const PARTY_COUNTS_API = "/api/party-counts.php";
 const AUTH_ME_API      = "/api/auth/me.php";
 const AUTH_LOGOUT_API  = "/api/auth/logout.php";
 
-async function fetchSessionEmail(): Promise<string | null> {
+type SessionInfo = { email: string; role: "user" | "admin"; name?: string };
+
+async function fetchSessionInfo(): Promise<SessionInfo | null> {
   try {
     const res = await fetch(AUTH_ME_API, { cache: "no-store", credentials: "include" });
     if (!res.ok) return null;
     const data = await res.json();
-    return data?.ok && data?.email ? data.email : null;
+    if (!data?.ok || !data?.email) return null;
+    const role: "user" | "admin" = data.role === "admin" ? "admin" : "user";
+    return { email: String(data.email), role, name: typeof data.name === "string" ? data.name : "" };
   } catch { return null; }
+}
+
+// 하위 호환 alias — 기존 호출자
+async function fetchSessionEmail(): Promise<string | null> {
+  const info = await fetchSessionInfo();
+  return info?.email ?? null;
 }
 
 export type PartyCount = { male: number; female: number };
@@ -174,6 +184,7 @@ type AuthContextType = {
   mounted: boolean;
   isLoggedIn: boolean;
   userEmail: string | null;
+  userRole: "user" | "admin" | null;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   cart: CartItem[];
@@ -199,6 +210,7 @@ const AuthContext = createContext<AuthContextType>({
   mounted: false,
   isLoggedIn: false,
   userEmail: null,
+  userRole: null,
   login: async () => false,
   logout: () => {},
   cart: [],
@@ -227,6 +239,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [mounted,    setMounted]    = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userEmail,  setUserEmail]  = useState<string | null>(null);
+  const [userRole,   setUserRole]   = useState<"user" | "admin" | null>(null);
   const [cart,       setCart]       = useState<CartItem[]>([]);
   const [profile,    setProfile]    = useState<Profile | null>(null);
   const [bookings,   setBookings]   = useState<Booking[]>([]);
@@ -292,10 +305,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const init = async () => {
       try {
         // OAuth 세션 우선 확인 (HTTP-only 쿠키 기반)
-        const sessionEmail = await fetchSessionEmail();
+        const sessionInfo = await fetchSessionInfo();
+        const sessionEmail = sessionInfo?.email ?? null;
         if (sessionEmail) {
           setIsLoggedIn(true);
           setUserEmail(sessionEmail);
+          setUserRole(sessionInfo?.role ?? "user");
           userEmailRef.current = sessionEmail;
           localStorage.setItem("woollim_auth", JSON.stringify({ loggedIn: true, email: sessionEmail }));
 
@@ -457,6 +472,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setIsLoggedIn(true);
     setUserEmail(email);
+    setUserRole(serverOk ? "user" : "admin");
     userEmailRef.current = email;
     localStorage.setItem("woollim_auth", JSON.stringify({ loggedIn: true, email }));
 
@@ -498,6 +514,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // 1) 로컬 세션/캐시 즉시 정리 (서버 응답 기다리지 않음)
     setIsLoggedIn(false);
     setUserEmail(null);
+    setUserRole(null);
     setCartSync([]);
     setProfile(null);
     setBookings([]);
@@ -694,7 +711,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider value={{
-      mounted, isLoggedIn, userEmail,
+      mounted, isLoggedIn, userEmail, userRole,
       login, logout,
       cart, addToCart, removeFromCart, setItemQuantity, refreshCart,
       profile, updateProfile, refreshProfile,
