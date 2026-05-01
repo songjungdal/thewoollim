@@ -32,9 +32,10 @@ export type EligibilityResult = {
 /**
  * 회원이 해당 파티에 신청 가능한지 검증.
  *  - minAge/maxAge: 미설정 시 무제한
- *  - allowedMaritalStatus: "all" 또는 미설정 시 무제한
- *  - targetGroup="싱글": allowedMaritalStatus 미설정 시 싱글 전용으로 동작
- *    (targetGroup="돌싱"은 안내문구 분기용 — 자체적인 차단 규칙 없음)
+ *  - 혼인여부 차단 규칙은 '싱글' 전용 파티에만 적용:
+ *    · allowedMaritalStatus="싱글" 또는 targetGroup="싱글" → 돌싱 회원 차단
+ *    · 그 외(ams="돌싱"/all/null, tg="돌싱"/null) → 차단 없음 (싱글·돌싱 모두 가능)
+ *  - "돌싱" 파티는 마케팅 분류일 뿐 자격 차단 규칙 없음 — 싱글 회원도 자유롭게 신청 가능
  */
 export function checkEligibility(
   party: Pick<Party, "minAge" | "maxAge" | "allowedMaritalStatus" | "targetGroup">,
@@ -42,15 +43,8 @@ export function checkEligibility(
 ): EligibilityResult {
   if (!user) return { ok: false, reason: "missingProfile", message: "프로필 정보가 필요합니다." };
 
-  const ageRequired = party.minAge != null || party.maxAge != null;
-
-  // 혼인여부 요구 — allowedMaritalStatus 우선, 미설정 시 targetGroup="싱글"이면 "싱글"로 fallback
-  const requiredMarital: "싱글" | "돌싱" | null =
-    party.allowedMaritalStatus && party.allowedMaritalStatus !== "all"
-      ? party.allowedMaritalStatus
-      : party.targetGroup === "싱글"
-        ? "싱글"
-        : null;
+  const ageRequired   = party.minAge != null || party.maxAge != null;
+  const singlesOnly   = party.allowedMaritalStatus === "싱글" || party.targetGroup === "싱글";
 
   // 연령 검증
   if (ageRequired) {
@@ -66,16 +60,13 @@ export function checkEligibility(
     }
   }
 
-  // 혼인여부 검증
-  if (requiredMarital) {
+  // 혼인여부 검증 — 오직 '싱글 전용' 파티에서만 돌싱 회원을 차단
+  if (singlesOnly) {
     if (!user.maritalStatus) {
       return { ok: false, reason: "missingProfile", message: "혼인여부가 입력되지 않았습니다." };
     }
-    if (user.maritalStatus !== requiredMarital) {
-      const msg = requiredMarital === "싱글"
-        ? "본 파티는 '싱글' 회원 전용입니다."
-        : "참가 대상(싱글/돌싱)이 일치하지 않습니다.";
-      return { ok: false, reason: "maritalMismatch", message: msg };
+    if (user.maritalStatus !== "싱글") {
+      return { ok: false, reason: "maritalMismatch", message: "본 파티는 '싱글' 회원 전용입니다." };
     }
   }
 
@@ -88,9 +79,8 @@ export function eligibilitySummary(p: Pick<Party, "minAge" | "maxAge" | "allowed
   if (p.minAge != null && p.maxAge != null) parts.push(`만 ${p.minAge}~${p.maxAge}세`);
   else if (p.minAge != null)                parts.push(`만 ${p.minAge}세 이상`);
   else if (p.maxAge != null)                parts.push(`만 ${p.maxAge}세 이하`);
-  if (p.allowedMaritalStatus && p.allowedMaritalStatus !== "all") {
-    parts.push(`${p.allowedMaritalStatus} 전용`);
-  } else if (p.targetGroup === "싱글") {
+  // '싱글 전용' 만 명시 — '돌싱' 파티는 모두 허용이므로 라벨 노출 안 함
+  if (p.allowedMaritalStatus === "싱글" || p.targetGroup === "싱글") {
     parts.push("싱글 전용");
   }
   return parts.join(" · ");

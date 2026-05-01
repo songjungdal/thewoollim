@@ -906,9 +906,9 @@ export default function AdminDashboard() {
                               className="w-full px-4 py-3 rounded-lg border border-gray-200 text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none"
                               aria-label="혼인여부 제한"
                             >
-                              <option value="all">무관</option>
-                              <option value="싱글">싱글 전용</option>
-                              <option value="돌싱">돌싱 전용</option>
+                              <option value="all">무관 (모두 허용)</option>
+                              <option value="싱글">싱글 전용 (돌싱 차단)</option>
+                              <option value="돌싱">돌싱 환영 (싱글도 허용)</option>
                             </select>
                           </div>
                         </div>
