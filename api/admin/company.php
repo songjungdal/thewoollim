@@ -52,6 +52,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         FILE_APPEND
     );
 
+    logAdminActivity('update', 'company', '', "회사정보 수정", null, $clean);
+
     jsonOut(['ok' => true, 'company' => $clean]);
 }
 

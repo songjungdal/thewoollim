@@ -91,6 +91,8 @@ if ($method === 'POST') {
                 date('c'), $_SESSION['adminId'] ?? '?', $userId, $email),
             FILE_APPEND
         );
+
+        logAdminActivity('delete', 'user', $email, "회원 삭제 (익명화) — userId={$userId}", null, null);
     } catch (Throwable $e) {
         error_log('[admin/users POST] ' . $e->getMessage());
         jsonFail('처리 중 오류', 500);

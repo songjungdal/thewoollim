@@ -63,6 +63,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         FILE_APPEND
     );
 
+    logAdminActivity('update', 'coupon', '', "쿠폰 일괄 저장 — " . count($clean) . "건", null, $clean);
+
     jsonOut(['ok' => true, 'coupons' => $clean]);
 }
 

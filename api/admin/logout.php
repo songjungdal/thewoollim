@@ -7,6 +7,10 @@ declare(strict_types=1);
 require_once __DIR__ . '/_session.php';
 adminJsonHeaders();
 
+if (adminIsLoggedIn()) {
+    logAdminActivity('logout', 'session', (string)($_SESSION['adminId'] ?? '?'), "관리자 로그아웃");
+}
+
 $_SESSION = [];
 if (ini_get('session.use_cookies')) {
     $params = session_get_cookie_params();

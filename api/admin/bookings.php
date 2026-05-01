@@ -105,6 +105,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             "[%s] APPROVED email=%s bid=%s\n", date('c'), $email, $bid
         ), FILE_APPEND);
 
+        logAdminActivity(
+            'update', 'booking', $bid,
+            "예약 참가확정 — 회원 {$email}, 파티 #" . ($approvedBooking['partyId'] ?? '?'),
+            ['status' => $approvedBooking['status'] ?? null],
+            ['status' => 'confirmed']
+        );
+
         echo json_encode(['ok' => true]);
         exit;
     }
@@ -154,6 +161,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         "[%s] CANCELLED email=%s bid=%s partyId=%s gender=%s\n",
         date('c'), $email, $bid, $partyId, $gender
     ), FILE_APPEND);
+
+    logAdminActivity(
+        'update', 'booking', $bid,
+        "예약 강제 취소 — 회원 {$email}, 파티 #{$partyId}, 성별 {$gender}",
+        ['status' => $beforeBooking['status'] ?? ''],
+        ['status' => 'cancelled']
+    );
 
     echo json_encode(['ok' => true, 'partyId' => $partyId, 'gender' => $gender]);
     exit;

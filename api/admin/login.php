@@ -96,6 +96,11 @@ if (!$pwOk) {
         FILE_APPEND
     );
 
+    // 활동 로그 — adminId 미설정 상태이므로 시도한 id 를 임시 적용
+    $_SESSION['adminId'] = $id;
+    logAdminActivity('login_fail', 'session', $id, "관리자 로그인 실패");
+    unset($_SESSION['adminId']);
+
     http_response_code(401);
     echo json_encode(['ok' => false, 'error' => '아이디 또는 비밀번호가 일치하지 않습니다.']);
     exit;
@@ -116,5 +121,7 @@ unset($_SESSION['_loginGate']);
         date('c'), $id, $user['id'], $_SERVER['REMOTE_ADDR'] ?? '-'),
     FILE_APPEND
 );
+
+logAdminActivity('login', 'session', $id, "관리자 로그인 성공");
 
 echo json_encode(['ok' => true, 'id' => $id, 'name' => $user['name']]);

@@ -67,6 +67,8 @@ if (!move_uploaded_file($f['tmp_name'], $dest)) {
     FILE_APPEND
 );
 
+logAdminActivity('create', 'image', $base, "이미지 업로드 — {$base} ({$mime}, " . round((int)$f['size'] / 1024) . "KB)");
+
 jsonOut([
     'ok'  => true,
     'url' => '/uploads/parties/' . $base,

@@ -72,6 +72,17 @@ try {
     FILE_APPEND
 );
 
+$pid     = (string)($body['party']['id'] ?? $body['id'] ?? '');
+$pTitle  = (string)($body['party']['title'] ?? '');
+$summary = match ($action) {
+    'create' => "매칭파티 생성 — #{$pid} {$pTitle}",
+    'update' => "매칭파티 수정 — #{$pid} {$pTitle}",
+    'delete' => "매칭파티 삭제 — #{$pid}",
+    default  => "매칭파티 {$action}"
+};
+logAdminActivity($action === 'delete' ? 'delete' : ($action === 'create' ? 'create' : 'update'),
+    'party', $pid, $summary, null, $body['party'] ?? null);
+
 jsonOut(['ok' => true]);
 
 /**

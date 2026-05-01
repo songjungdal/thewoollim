@@ -45,3 +45,61 @@ function adminRequire(): void {
         exit;
     }
 }
+
+/**
+ * 통합 관리자 활동 로그 기록.
+ *  /api/data/admin_activity.json 에 append (flock 보호)
+ *  → /api/admin/logs.php 가 읽어 dashboard "활동 로그" 탭에 노출
+ *
+ * @param string $action      'login'|'logout'|'login_fail'|'create'|'update'|'delete'|'view'
+ * @param string $targetType  'booking'|'party'|'user'|'coupon'|'company'|'image'|'session'
+ * @param string $targetId    대상 식별자 (예: bookingId, partyId, email)
+ * @param string $summary     한글 한 줄 요약
+ * @param mixed  $before      변경 전 값 (선택, JSON-encodable)
+ * @param mixed  $after       변경 후 값 (선택, JSON-encodable)
+ */
+function logAdminActivity(
+    string $action,
+    string $targetType,
+    string $targetId,
+    string $summary,
+    $before = null,
+    $after  = null
+): void {
+    $file = __DIR__ . '/../data/admin_activity.json';
+    $row = [
+        'id'           => 0,                    // 저장 시 부여
+        'created_at'   => date('Y-m-d H:i:s'),
+        'admin_id'     => (string)($_SESSION['adminId'] ?? '?'),
+        'ip'           => (string)($_SERVER['REMOTE_ADDR']     ?? '-'),
+        'user_agent'   => substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 200),
+        'action'       => $action,
+        'target_type'  => $targetType,
+        'target_id'    => $targetId,
+        'summary'      => $summary,
+        'before_value' => $before,
+        'after_value'  => $after,
+    ];
+
+    $fp = @fopen($file, 'c+');
+    if (!$fp) return;
+    @flock($fp, LOCK_EX);
+    $raw  = stream_get_contents($fp);
+    $list = $raw ? json_decode($raw, true) : [];
+    if (!is_array($list)) $list = [];
+
+    $row['id'] = (int)(end($list)['id'] ?? 0) + 1;
+    $list[] = $row;
+
+    // 최대 5000건 유지 (오래된 것부터 trim)
+    if (count($list) > 5000) {
+        $list = array_slice($list, -5000);
+    }
+
+    ftruncate($fp, 0);
+    rewind($fp);
+    fwrite($fp, json_encode($list, JSON_UNESCAPED_UNICODE));
+    fflush($fp);
+    @flock($fp, LOCK_UN);
+    fclose($fp);
+}
