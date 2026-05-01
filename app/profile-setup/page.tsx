@@ -9,6 +9,7 @@ import {
   ChevronDown, ChevronUp, CheckCircle2, ArrowLeft, Lock,
 } from "lucide-react";
 import { useAuth, type Profile } from "../context/AuthContext";
+import { isTestUser } from "../lib/testUsers";
 import Header from "../components/Header";
 import { LOCATIONS, SIDO_LIST } from "../lib/locations";
 
@@ -61,7 +62,8 @@ function ProfileSetupContent() {
   const searchParams = useSearchParams();
   const isEditMode   = true;
   const router       = useRouter();
-  const { mounted, isLoggedIn, profile, updateProfile } = useAuth();
+  const { mounted, isLoggedIn, userEmail, profile, updateProfile } = useAuth();
+  const testUser = isTestUser(userEmail);
   // searchParams는 향후 확장(섹션 점프 등)을 위해 유지
   void searchParams;
 
@@ -105,12 +107,15 @@ function ProfileSetupContent() {
         parseLocation(merged.location);
         setAgreed(true);
         // 저장된 값이 있는 본인인증 필드만 lock 대상으로 등록 (최초 입력은 허용)
+        // 테스트 회원(a1~a10, b1~b10@naver.com)은 잠금 우회 — 자유 수정 허용
         const locked = new Set<keyof Profile>();
-        if (profile.name?.trim())                                                locked.add("name");
-        if (profile.gender === "남성" || profile.gender === "여성")                 locked.add("gender");
-        if (profile.phone?.trim())                                               locked.add("phone");
-        if (profile.birthDate?.trim())                                           locked.add("birthDate");
-        if (profile.maritalStatus === "싱글" || profile.maritalStatus === "돌싱") locked.add("maritalStatus");
+        if (!testUser) {
+          if (profile.name?.trim())                                                locked.add("name");
+          if (profile.gender === "남성" || profile.gender === "여성")                 locked.add("gender");
+          if (profile.phone?.trim())                                               locked.add("phone");
+          if (profile.birthDate?.trim())                                           locked.add("birthDate");
+          if (profile.maritalStatus === "싱글" || profile.maritalStatus === "돌싱") locked.add("maritalStatus");
+        }
         setLockedFields(locked);
       }
     } else {
@@ -239,6 +244,15 @@ function ProfileSetupContent() {
                   <p className="text-xs text-gray-600 leading-relaxed">
                     <span className="font-bold text-brand-point">본인인증 정보</span>(이름·성별·연락처·생년월일·혼인여부)는
                     최초 저장 후 보안상 수정이 제한됩니다. 변경이 필요하면 고객센터로 문의해주세요.
+                  </p>
+                </div>
+              )}
+
+              {testUser && (
+                <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl p-3.5">
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-white text-[11px] font-black flex-shrink-0 mt-0.5">T</span>
+                  <p className="text-xs text-gray-700 leading-relaxed">
+                    <span className="font-bold text-amber-700">테스트 계정</span>으로 로그인되어 있어 본인인증 정보(이름·성별·연락처·생년월일·혼인여부)를 자유롭게 수정할 수 있습니다.
                   </p>
                 </div>
               )}

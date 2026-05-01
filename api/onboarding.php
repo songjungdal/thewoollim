@@ -49,7 +49,10 @@ try {
     $u = $stmt->fetch();
     if (!$u) jsonFail('회원 정보를 찾을 수 없습니다.', 404);
 
-    // 이미 5종 모두 채워져있으면 idempotent
+    // 테스트 회원(a/b 시리즈)은 항상 자유 수정 허용 — alreadyComplete 도 우회
+    $bypass = isTestUser($email);
+
+    // 이미 5종 모두 채워져있으면 idempotent (일반 회원만)
     $alreadyComplete =
         trim((string)$u['name'])   !== '' &&
         ($u['gender'] === '남성' || $u['gender'] === '여성') &&
@@ -57,16 +60,16 @@ try {
         !empty($u['birth_date']) &&
         ($u['marital_status'] === '싱글' || $u['marital_status'] === '돌싱');
 
-    if ($alreadyComplete) jsonOut(['ok' => true, 'alreadyComplete' => true]);
+    if ($alreadyComplete && !$bypass) jsonOut(['ok' => true, 'alreadyComplete' => true]);
 
-    // 비어있는 필드만 채움 — 한 번 채워진 값은 보존
+    // 비어있는 필드만 채움 — 한 번 채워진 값은 보존 (테스트 회원은 항상 덮어쓰기)
     $set    = [];
     $params = [];
-    if (trim((string)$u['name']) === '')                                                  { $set[] = "name = ?";           $params[] = $name; }
-    if ($u['gender'] !== '남성' && $u['gender'] !== '여성')                               { $set[] = "gender = ?";         $params[] = $gender; }
-    if (trim((string)$u['phone']) === '')                                                 { $set[] = "phone = ?";          $params[] = $phone; }
-    if (empty($u['birth_date']))                                                          { $set[] = "birth_date = ?";     $params[] = $birthDate; }
-    if ($u['marital_status'] !== '싱글' && $u['marital_status'] !== '돌싱')               { $set[] = "marital_status = ?"; $params[] = $maritalStatus; }
+    if ($bypass || trim((string)$u['name']) === '')                                                  { $set[] = "name = ?";           $params[] = $name; }
+    if ($bypass || ($u['gender'] !== '남성' && $u['gender'] !== '여성'))                             { $set[] = "gender = ?";         $params[] = $gender; }
+    if ($bypass || trim((string)$u['phone']) === '')                                                 { $set[] = "phone = ?";          $params[] = $phone; }
+    if ($bypass || empty($u['birth_date']))                                                          { $set[] = "birth_date = ?";     $params[] = $birthDate; }
+    if ($bypass || ($u['marital_status'] !== '싱글' && $u['marital_status'] !== '돌싱'))             { $set[] = "marital_status = ?"; $params[] = $maritalStatus; }
 
     if (empty($set)) jsonOut(['ok' => true, 'alreadyComplete' => true]);
 

@@ -90,12 +90,14 @@ if ($method === 'POST') {
         if (!$cur) jsonFail('회원 정보를 찾을 수 없습니다.', 404);
 
         // 핵심 5종 잠금 — 이미 채워졌으면 입력 무시
-        $applyName     = trim((string)$cur['name']) === ''       ? $name      : $cur['name'];
-        $applyGender   = ($cur['gender'] === '남성' || $cur['gender'] === '여성') ? $cur['gender'] : $gender;
-        $applyPhone    = trim((string)$cur['phone']) === ''      ? $phone     : $cur['phone'];
-        $applyBirth    = empty($cur['birth_date'])               ? $birthDate : $cur['birth_date'];
-        $applyMarital  = ($cur['marital_status'] === '싱글' || $cur['marital_status'] === '돌싱')
-                         ? $cur['marital_status'] : $maritalStatus;
+        // 단, 테스트 회원(a/b 시리즈)은 잠금 우회 → 자유 수정 허용
+        $bypass = isTestUser($email);
+        $applyName     = $bypass || trim((string)$cur['name']) === ''                        ? $name      : $cur['name'];
+        $applyGender   = $bypass || !($cur['gender'] === '남성' || $cur['gender'] === '여성') ? $gender    : $cur['gender'];
+        $applyPhone    = $bypass || trim((string)$cur['phone']) === ''                       ? $phone     : $cur['phone'];
+        $applyBirth    = $bypass || empty($cur['birth_date'])                                ? $birthDate : $cur['birth_date'];
+        $applyMarital  = $bypass || !($cur['marital_status'] === '싱글' || $cur['marital_status'] === '돌싱')
+                         ? $maritalStatus : $cur['marital_status'];
 
         // 입력값 자체 검증 (잠긴 필드는 cur 사용이라 검증 skip)
         if (trim((string)$applyName) === '') jsonFail('이름이 필요합니다.');

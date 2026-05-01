@@ -70,6 +70,17 @@ function normalizeEmail(string $email): string {
     return strtolower(trim($email));
 }
 
+/**
+ * 테스트 회원 식별.
+ *  패턴: a1@naver.com ~ a10@naver.com / b1@naver.com ~ b10@naver.com
+ *  → 프로필 핵심 5종 잠금 해제 (관리자 권한 부여 — 테스트 편의)
+ *  클라이언트 동일 로직: app/lib/testUsers.ts
+ */
+function isTestUser(string $email): bool {
+    $e = normalizeEmail($email);
+    return (bool)preg_match('/^(a|b)([1-9]|10)@naver\.com$/', $e);
+}
+
 // ─── 회원·참가자 표시 헬퍼 ─────────────────────────────────────────
 
 /**
