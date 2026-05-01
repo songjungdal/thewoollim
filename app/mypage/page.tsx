@@ -566,14 +566,14 @@ export default function MyPage() {
           </div>
         </section>
 
-        {/* 취소 요청 + 회원탈퇴 — low-key, bottom of content */}
+        {/* 취소요청 + 회원탈퇴 — low-key, bottom of content */}
         <section className="px-4 md:px-6 pb-10 md:pb-16">
           <div className="max-w-4xl mx-auto flex justify-center md:justify-end items-center gap-5">
             <Link
               href="/mypage/cancel/"
               className="text-xs md:text-sm text-gray-400 hover:text-gray-600 underline underline-offset-4 py-2 transition-colors no-underline-link"
             >
-              취소 요청
+              취소요청
             </Link>
             <span className="text-gray-200" aria-hidden>|</span>
             <button
