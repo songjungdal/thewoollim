@@ -12,6 +12,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import Footer from "../../components/Footer";
 import { useAuth } from "../../context/AuthContext";
 
@@ -164,13 +165,27 @@ export default function MatchingResultsPage() {
         <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" />
       </div>
 
-      {/* 상단 작은 로고만 — 헤더 없음 */}
-      <div className="px-4 md:px-8 py-5 md:py-7">
-        <Link href="/" className="inline-flex items-center gap-2 text-white text-xs md:text-sm font-bold tracking-[0.2em] uppercase">
-          <span className="w-1.5 h-4 bg-brand-point rounded-full" />
-          THE WOOLLIM
-        </Link>
-      </div>
+      {/*
+        헤더 — 메인 페이지 디자인 스타일 동기화 (검정 배경 + 하단 보더)
+        nav 메뉴는 spec 따라 제거 (투표 프로세스 집중용 독립 구조)
+        로고: /images/logo_white.png — 메인(120×39) 대비 8% 축소 (110×36)
+              - 수직 중앙 정렬: items-center
+              - 모바일 안전: object-contain (Image className) + 여백 조절
+      */}
+      <header className="sticky top-0 z-40 bg-black border-b border-gray-800">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 h-[64px] md:h-[88px] flex items-center justify-center md:justify-start">
+          <Link href="/" className="inline-flex items-center" aria-label="어울림 홈으로">
+            <Image
+              src="/images/logo_white.png"
+              alt="어울림"
+              width={110}
+              height={36}
+              priority
+              className="h-auto w-[110px] max-w-full object-contain"
+            />
+          </Link>
+        </div>
+      </header>
 
       {/* 메인 콘텐츠 */}
       <main className="flex-1 flex items-center justify-center px-4 py-8 md:py-12">
@@ -273,6 +288,7 @@ export default function MatchingResultsPage() {
                   <select
                     value={selectedPartyId ?? ""}
                     onChange={e => setSelectedPartyId(e.target.value)}
+                    aria-label="참가 파티 선택"
                     className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm font-bold focus:ring-2 focus:ring-brand-point outline-none"
                   >
                     {data.parties.map(p => (
