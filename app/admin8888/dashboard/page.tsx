@@ -1127,15 +1127,29 @@ export default function AdminDashboard() {
                               )}
 
                               {/* === 매칭 투표 제어 — 콤팩트 인라인 (host 정보 바로 아래) ===
-                                    관리자 전용: dashboard 진입 시 admin/me.php 검증 게이트 통과 필수 */}
+                                    관리자 전용: dashboard 진입 시 admin/me.php 검증 게이트 통과 필수
+                                    투표 시작 가드: 취소자(cancelled) 제외 후 모두 'confirmed' 일 때만 허용
+                                                     pending_approval / paid_pending_profile 1명이라도 → 차단 */}
                               {(() => {
                                 const vs = votingStatusMap[pid] ?? "closed";
+                                // 취소자 제외 후 미확정 상태 검사
+                                const nonCancelled = partyRows.filter(r => r.status !== "cancelled");
+                                const hasUnconfirmed = nonCancelled.some(r => r.status !== "confirmed");
+                                const canStart = !hasUnconfirmed; // empty 파티(0명) 도 허용
+                                const startDisabledClass = canStart ? "" : "opacity-50 cursor-not-allowed hover:brightness-100 active:scale-100";
+                                const handleStartClick = () => {
+                                  if (!canStart) {
+                                    alert("현재 투표를 진행할 수 없습니다. 취소 완료 상태인 참여자를 제외한 모든 참여자를 '참가 확정 완료' 상태로 변경한 후 다시 시도해 주세요.");
+                                    return;
+                                  }
+                                  changeVotingStatus(pid, "start");
+                                };
                                 return (
                                   <div className="inline-flex items-center gap-1.5 flex-wrap justify-end">
                                     {vs === "closed" && (
-                                      <button type="button" onClick={() => changeVotingStatus(pid, "start")}
-                                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-brand-point text-white text-xs font-black rounded-md hover:brightness-110 active:scale-95 transition-all shadow-sm"
-                                        title="투표를 시작합니다">
+                                      <button type="button" onClick={handleStartClick}
+                                        className={`inline-flex items-center gap-1 px-3 py-1.5 bg-brand-point text-white text-xs font-black rounded-md hover:brightness-110 active:scale-95 transition-all shadow-sm ${startDisabledClass}`}
+                                        title={canStart ? "투표를 시작합니다" : "확정 대기 중인 참여자가 있어 시작할 수 없습니다"}>
                                         ▶ 투표 시작
                                       </button>
                                     )}
