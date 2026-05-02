@@ -280,6 +280,11 @@ export default function AdminDashboard() {
   }, [tab, authChecked, loadLogs]);
   const [genderFilter, setGenderFilter] = useState<"all" | "남성" | "여성">("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "paid_pending_profile" | "pending_approval" | "confirmed">("all");
+  // 월 필터 — 기본값: 현재 KST 월 (Asia/Seoul). 'all' = 모든 월 노출
+  const [monthFilter, setMonthFilter] = useState<string>(() => {
+    const kst = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+    return `${kst.getFullYear()}-${String(kst.getMonth() + 1).padStart(2, "0")}`;
+  });
   const [memberMaritalFilter, setMemberMaritalFilter] = useState<"all" | "싱글" | "돌싱" | "empty">("all");
 
   // 매칭파티 CRUD state
@@ -949,32 +954,67 @@ export default function AdminDashboard() {
 
           {/* === 예약 / 신청 현황 (파티별 그룹화 + 성별 분리) === */}
           {tab === "bookings" && (() => {
+            // 신청자 정렬: 결제일 ASC (이른 결제 먼저)
+            const sortByCreatedAsc = (a: BookingRow, b: BookingRow) =>
+              (a.createdAt || "").localeCompare(b.createdAt || "");
+
             // 파티별로 그룹화 (status filter 적용)
             const byParty: Record<string, BookingRow[]> = {};
             for (const b of bookings) {
               if (statusFilter !== "all" && b.status !== statusFilter) continue;
               (byParty[b.partyId] = byParty[b.partyId] || []).push(b);
             }
-            // 신청자 0명인 파티도 포함 — PARTIES 전체를 calendarDate 오름차순으로 노출
-            const orderedPartyIds = [...PARTIES]
-              .sort((a, b) => a.calendarDate.localeCompare(b.calendarDate))
-              .map(p => p.id);
+            // 각 파티 신청자 결제일 ASC 정렬
+            for (const pid in byParty) byParty[pid].sort(sortByCreatedAsc);
+
+            // 월 옵션 — PARTIES.calendarDate 에서 unique YYYY-MM 추출 (DESC, 최신 월 먼저)
+            const monthSet = new Set<string>();
+            for (const p of PARTIES) {
+              if (p.calendarDate && /^\d{4}-\d{2}/.test(p.calendarDate)) {
+                monthSet.add(p.calendarDate.slice(0, 7));
+              }
+            }
+            const monthOptions = Array.from(monthSet).sort((a, b) => b.localeCompare(a));
+
+            // 월 필터 적용 + calendarDate ASC 정렬 (이른 일정 먼저)
+            const filteredParties = [...PARTIES]
+              .filter(p => monthFilter === "all" || (p.calendarDate || "").startsWith(monthFilter))
+              .sort((a, b) => a.calendarDate.localeCompare(b.calendarDate));
+            const orderedPartyIds = filteredParties.map(p => p.id);
+
+            // 월 라벨 헬퍼
+            const labelMonth = (m: string) => {
+              if (m === "all") return "전체 월";
+              const [y, mm] = m.split("-");
+              return `${y}년 ${parseInt(mm, 10)}월`;
+            };
+
             return (
               <section>
                 <div className="flex items-end justify-between mb-4 md:mb-5 flex-wrap gap-3">
                   <div>
                     <h2 className="text-xl md:text-2xl font-black">예약 / 신청 현황</h2>
                     <p className="text-sm text-gray-500 font-medium mt-1">
-                      전체 {bookings.length}건 · 매칭파티 {orderedPartyIds.length}개
+                      <span className="font-bold text-brand-point">{labelMonth(monthFilter)}</span> · 매칭파티 {orderedPartyIds.length}개 · 전체 {bookings.length}건
                     </p>
                   </div>
-                  <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)}
-                    className="px-3 py-2 rounded-lg border border-gray-200 text-sm font-medium bg-white" aria-label="상태 필터">
-                    <option value="all">전체 상태</option>
-                    <option value="paid_pending_profile">결제완료(프로필 대기)</option>
-                    <option value="pending_approval">확정 대기 중</option>
-                    <option value="confirmed">참가 확정 완료</option>
-                  </select>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <select value={monthFilter} onChange={e => setMonthFilter(e.target.value)}
+                      className="px-3 py-2 rounded-lg border border-gray-200 text-sm font-bold bg-white text-brand-black"
+                      aria-label="월 필터">
+                      <option value="all">전체 월</option>
+                      {monthOptions.map(m => (
+                        <option key={m} value={m}>{labelMonth(m)}</option>
+                      ))}
+                    </select>
+                    <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)}
+                      className="px-3 py-2 rounded-lg border border-gray-200 text-sm font-medium bg-white" aria-label="상태 필터">
+                      <option value="all">전체 상태</option>
+                      <option value="paid_pending_profile">결제완료(프로필 대기)</option>
+                      <option value="pending_approval">확정 대기 중</option>
+                      <option value="confirmed">참가 확정 완료</option>
+                    </select>
+                  </div>
                 </div>
 
                 {/* 통계 요약 */}
