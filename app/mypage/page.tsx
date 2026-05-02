@@ -308,7 +308,7 @@ export default function MyPage() {
         )}
 
         {/* Cart Section */}
-        <section className="py-10 md:py-16 px-4 md:px-6">
+        <section id="cart" className="py-10 md:py-16 px-4 md:px-6 scroll-mt-20">
           <div className="max-w-4xl mx-auto">
 
             <div className="flex items-center gap-3 mb-7 md:mb-10">

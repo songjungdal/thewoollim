@@ -84,7 +84,7 @@ export default function PartyClientView({ id }: { id: string }) {
   const PARTIES = useParties();
   const baseItem = PARTIES.find(p => p.id === id);
   const router = useRouter();
-  const { isLoggedIn, addToCart, profile, partyCounts } = useAuth();
+  const { isLoggedIn, addToCart, profile, partyCounts, cart } = useAuth();
   const [showCartModal, setShowCartModal] = useState(false);
   const [participants, setParticipants] = useState<{ male: Participant[]; female: Participant[] }>({ male: [], female: [] });
 
@@ -166,9 +166,10 @@ export default function PartyClientView({ id }: { id: string }) {
     return null;
   };
 
+  // 참가신청 — 카트에 담고 마이페이지로 이동 (이미 담긴 경우 안내)
   const handleCheckout = () => {
     if (!isLoggedIn) {
-      router.push(`/login?redirect=${encodeURIComponent(`/checkout/?id=${id}`)}`);
+      router.push(`/login?redirect=${encodeURIComponent(`/party/${id}/`)}`);
       return;
     }
     if (!profile?.gender) {
@@ -178,16 +179,31 @@ export default function PartyClientView({ id }: { id: string }) {
     }
     const blocked = checkBlockedReason();
     if (blocked) { alert(blocked); return; }
-    router.push(`/checkout/?id=${id}`);
+
+    if (cart.some(c => c.partyId === id)) {
+      alert("이미 장바구니에 담겨 있습니다. 마이페이지에서 결제를 진행해주세요.");
+      router.push("/mypage");
+      return;
+    }
+    addToCart(id);
+    router.push("/mypage");
   };
 
+  // 장바구니 — 동일 partyId 가 이미 있으면 새 행을 만들지 않고 quantity 만 +1.
+  // (AuthContext.addToCart 가 합산 로직 보유 — 쿠폰/수동 수량 조정값은 그대로 유지됨)
   const handleAddToCart = () => {
     if (!isLoggedIn) {
       router.push("/login");
       return;
     }
+    if (!profile?.gender) {
+      alert("프로필 정보(성별)가 필요합니다. 프로필을 먼저 완성해주세요.");
+      router.push("/profile-setup/");
+      return;
+    }
     const blocked = checkBlockedReason();
     if (blocked) { alert(blocked); return; }
+
     addToCart(id);
     setShowCartModal(true);
   };
@@ -328,6 +344,7 @@ export default function PartyClientView({ id }: { id: string }) {
                 return (
                   <div className="flex gap-3 md:gap-4 mt-auto">
                     <button
+                      type="button"
                       onClick={handleCheckout}
                       disabled={disabled}
                       className={`flex-[2] px-5 md:px-8 py-4 md:py-5 rounded-xl md:rounded-2xl text-base md:text-xl font-bold transition-all shadow-xl ${
@@ -339,6 +356,7 @@ export default function PartyClientView({ id }: { id: string }) {
                       {label}
                     </button>
                     <button
+                      type="button"
                       onClick={handleAddToCart}
                       disabled={disabled}
                       className={`flex-1 px-5 md:px-8 py-4 md:py-5 rounded-xl md:rounded-2xl text-base md:text-xl font-bold transition-all shadow-xl ${
@@ -748,6 +766,7 @@ export default function PartyClientView({ id }: { id: string }) {
               className="bg-white rounded-3xl shadow-2xl w-full max-w-sm md:max-w-md p-7 md:p-9 relative"
             >
               <button
+                type="button"
                 onClick={() => setShowCartModal(false)}
                 className="absolute top-4 right-4 text-gray-300 hover:text-gray-600 transition-colors"
                 aria-label="닫기"
@@ -770,12 +789,14 @@ export default function PartyClientView({ id }: { id: string }) {
 
                 <div className="flex flex-col w-full gap-2.5">
                   <button
+                    type="button"
                     onClick={() => router.push("/mypage")}
                     className="w-full bg-brand-black text-white py-4 rounded-xl font-black text-sm md:text-base hover:bg-brand-point transition-all shadow-lg hover:shadow-brand-point/30 flex items-center justify-center gap-2"
                   >
                     <ShoppingBag size={17} /> 장바구니로 가기
                   </button>
                   <button
+                    type="button"
                     onClick={() => setShowCartModal(false)}
                     className="w-full bg-white border-2 border-gray-200 text-gray-700 py-4 rounded-xl font-bold text-sm md:text-base hover:border-brand-black hover:text-brand-black transition-all"
                   >
