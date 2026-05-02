@@ -1936,16 +1936,13 @@ export default function AdminDashboard() {
                         ) : (
                           <div
                             onClick={() => startEditMemo(m)}
-                            className="cursor-text whitespace-pre-wrap break-words text-sm md:text-base text-gray-800 font-medium leading-relaxed pb-10 min-h-[100px] font-gaegu"
+                            className="cursor-text whitespace-pre-wrap break-words text-sm md:text-base text-gray-800 font-medium leading-relaxed pb-10 min-h-[120px] font-gaegu"
                           >
                             {m.content}
                           </div>
                         )}
 
-                        {/* 작성/수정자 + 시각 */}
-                        <p className="absolute bottom-12 left-4 text-[10px] text-gray-700/70 font-medium">
-                          @{m.author_id || "?"} · {m.updated_at}
-                        </p>
+                        {/* 작성자/수정시각 노출 제거 — 추적은 admin_activity 로그(로그관리 탭)에 기록됨 */}
 
                         {/* 하단 액션 영역 */}
                         <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
