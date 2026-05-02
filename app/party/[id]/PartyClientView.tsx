@@ -575,28 +575,126 @@ export default function PartyClientView({ id }: { id: string }) {
                   <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
                 </div>
 
-                {/* Timeline / Schedule Section */}
+                {/* Timeline / Schedule Section — STEP 방식 + 인원별 소요시간 표 */}
                 <div className="bg-white p-6 md:p-20 rounded-2xl md:rounded-[3rem] shadow-sm border border-gray-100">
-                  <div className="flex items-center gap-3 md:gap-4 mb-7 md:mb-12">
+                  <div className="flex items-center gap-3 md:gap-4 mb-3 md:mb-4">
                     <Clock size={26} className="text-brand-point md:hidden" />
                     <Clock size={32} className="text-brand-point hidden md:block" />
                     <h3 className="text-xl md:text-3xl font-bold tracking-tight">Party Timeline</h3>
                   </div>
+                  <p className="text-sm md:text-base text-gray-500 font-medium mb-7 md:mb-12 leading-relaxed">
+                    편안한 분위기 속에서, 자연스럽게 이어지는 인연의 시작
+                  </p>
 
-                  <div className="space-y-7 md:space-y-12 relative before:absolute before:left-2.5 md:before:left-3 before:top-2 before:bottom-2 before:w-px before:bg-gray-100">
+                  {/* STEP 카드 4종 */}
+                  <div className="space-y-5 md:space-y-7">
                     {[
-                      { time: "19:00", event: "게스트 입장 및 등록", desc: "웰컴 드링크와 함께 어울림의 분위기를 만끽하세요." },
-                      { time: "19:30", event: "아이스브레이킹 톡", desc: "가벼운 질문과 함께 서로를 알아가는 부드러운 시작." },
-                      { time: "20:30", event: "프리 네트워킹", desc: "주제별 테이블에서 깊이 있는 대화와 취향을 공유합니다." },
-                      { time: "21:30", event: "럭키 드로우 & 랩업", desc: "어울림이 준비한 작은 선물과 인사를 나눕니다." }
+                      {
+                        step: "STEP 01",
+                        title: "설레는 첫 만남과 입장",
+                        time: "10분",
+                        desc: "프라이빗한 만남을 위한 간단한 확인 후 입장이 진행됩니다. 웰컴 드링크와 함께 여유롭게 긴장을 풀고, 오늘의 만남을 편안하게 시작해 보세요.",
+                      },
+                      {
+                        step: "STEP 02",
+                        title: "나를 표현하는 매칭 카드 작성",
+                        time: "10분",
+                        desc: "나의 취향과 가치관을 담은 프로필을 작성합니다. 부담 없이 서로를 이해하고 자연스럽게 대화를 시작할 수 있는 준비 시간입니다.",
+                      },
+                      {
+                        step: "STEP 03",
+                        title: "1:1 로테이션 대화",
+                        time: null,
+                        desc: "모든 참가자와 한 분씩 돌아가며 1:1 대화를 나눕니다. 각 테마에 맞춰 큐레이션된 스페셜 페어링(티, 와인, 사케 등)이 대화의 즐거움을 더해줍니다.",
+                        note: "대화 시간은 인원 구성에 따라 1인당 10~15분 내외로 유연하게 운영됩니다.",
+                      },
+                      {
+                        step: "STEP 04",
+                        title: "최종 매칭 및 종료",
+                        time: "20분",
+                        desc: "모든 대화가 끝난 후, 가장 인상 깊었던 분을 선택하는 시간입니다. 서로의 마음이 닿은 커플에게는 인연을 이어갈 수 있는 연락처를 조심스럽게 전달해 드립니다.",
+                      },
                     ].map((item, idx) => (
-                      <div key={idx} className="relative pl-9 md:pl-12">
-                        <div className="absolute left-0 top-2 w-5 h-5 md:w-6 md:h-6 bg-brand-point rounded-full border-4 border-white shadow-md" />
-                        <div className="text-brand-point font-black text-sm md:text-lg mb-0.5 md:mb-1">{item.time}</div>
-                        <div className="font-bold text-base md:text-xl mb-1 md:mb-2">{item.event}</div>
-                        <div className="text-gray-500 font-medium text-sm md:text-base">{item.desc}</div>
+                      <div
+                        key={idx}
+                        className="relative pl-12 md:pl-16 pb-5 md:pb-7 border-b border-gray-100 last:border-b-0 last:pb-0"
+                      >
+                        {/* STEP 번호 — 청록 #008080 (brand-point) */}
+                        <div className="absolute left-0 top-0 w-9 h-9 md:w-11 md:h-11 rounded-full bg-brand-point text-white shadow-md flex items-center justify-center font-black text-xs md:text-sm">
+                          {String(idx + 1).padStart(2, "0")}
+                        </div>
+                        <div className="flex items-baseline flex-wrap gap-x-2 gap-y-1 mb-1.5 md:mb-2">
+                          <span className="text-[11px] md:text-xs font-black tracking-[0.2em] text-brand-point">
+                            {item.step}
+                          </span>
+                          {item.time && (
+                            <span className="inline-flex items-center text-[11px] md:text-xs font-bold text-brand-point bg-brand-point/10 px-2 py-0.5 rounded-full">
+                              {item.time}
+                            </span>
+                          )}
+                        </div>
+                        <div className="font-bold text-base md:text-xl mb-2 md:mb-2.5 text-brand-black leading-snug">
+                          {item.title}
+                        </div>
+                        <p className="text-sm md:text-base text-gray-600 leading-relaxed break-keep">
+                          {item.desc}
+                        </p>
+                        {item.note && (
+                          <p className="mt-2.5 md:mt-3 text-[11px] md:text-xs text-gray-500 italic bg-brand-point/5 border-l-2 border-brand-point/40 pl-3 py-2 rounded-r-md leading-relaxed">
+                            &ldquo;{item.note}&rdquo;
+                          </p>
+                        )}
                       </div>
                     ))}
+                  </div>
+
+                  {/* 인원별 소요 시간 안내 표 */}
+                  <div className="mt-8 md:mt-12">
+                    <h4 className="text-sm md:text-base font-black tracking-tight text-brand-black mb-3 md:mb-4 flex items-center gap-2">
+                      <span className="w-1 h-4 bg-brand-point rounded-full" />
+                      인원별 소요 시간 안내
+                    </h4>
+                    {/* 모바일: 카드 뷰 / 데스크톱: 테이블 */}
+                    <div className="md:hidden space-y-2.5">
+                      {[
+                        { kind: "8 : 8 파티",   total: "약 2시간 30분", type: "대화 시간 여유로운 편" },
+                        { kind: "10 : 10 파티", total: "약 3시간",      type: "표준 로테이션" },
+                        { kind: "12 : 12 파티", total: "약 3시간 30분", type: "가장 많은 만남" },
+                      ].map((row, i) => (
+                        <div key={i} className="bg-brand-point/5 border border-brand-point/15 rounded-xl p-4">
+                          <div className="font-black text-base text-brand-black mb-1.5">{row.kind}</div>
+                          <div className="flex items-baseline gap-2 text-sm">
+                            <span className="text-gray-500 font-medium">총</span>
+                            <span className="font-bold text-brand-point">{row.total}</span>
+                          </div>
+                          <p className="text-xs text-gray-500 font-medium mt-1">{row.type}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="hidden md:block overflow-hidden rounded-xl border border-gray-100">
+                      <table className="w-full text-sm">
+                        <thead className="bg-brand-point/10 text-gray-600">
+                          <tr>
+                            <th className="px-5 py-3 text-left font-black tracking-wider text-brand-point uppercase text-xs">구분</th>
+                            <th className="px-5 py-3 text-left font-black tracking-wider text-brand-point uppercase text-xs">총 소요 시간</th>
+                            <th className="px-5 py-3 text-left font-black tracking-wider text-brand-point uppercase text-xs">유형</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {[
+                            { kind: "8 : 8 파티",   total: "약 2시간 30분", type: "대화 시간 여유로운 편" },
+                            { kind: "10 : 10 파티", total: "약 3시간",      type: "표준 로테이션" },
+                            { kind: "12 : 12 파티", total: "약 3시간 30분", type: "가장 많은 만남" },
+                          ].map((row, i) => (
+                            <tr key={i} className="bg-white hover:bg-brand-point/5 transition-colors">
+                              <td className="px-5 py-3.5 font-bold text-brand-black">{row.kind}</td>
+                              <td className="px-5 py-3.5 font-black text-brand-point tabular-nums">{row.total}</td>
+                              <td className="px-5 py-3.5 text-gray-600">{row.type}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
 
