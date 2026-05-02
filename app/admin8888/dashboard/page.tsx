@@ -1024,57 +1024,103 @@ export default function AdminDashboard() {
                                 (총 결제 금액: {totalRevenue.toLocaleString()}원)
                               </span>
                             </div>
-                            {/* 호스트 (관리자 전용 노출) — 인라인 편집 */}
-                            {hostEditingId === pid ? (
-                              <div className="inline-flex items-center gap-1 bg-white border border-brand-point rounded-lg px-2 py-1 shadow-sm">
-                                <span className="text-[11px] md:text-xs font-bold text-gray-500 whitespace-nowrap">호스트:</span>
-                                <input
-                                  autoFocus
-                                  type="text"
-                                  value={hostDraft}
-                                  onChange={e => setHostDraft(e.target.value)}
-                                  onKeyDown={e => {
-                                    if (e.key === "Enter") { e.preventDefault(); saveEditHost(); }
-                                    if (e.key === "Escape") { e.preventDefault(); cancelEditHost(); }
-                                  }}
-                                  maxLength={100}
-                                  placeholder="이름 입력 (비우면 '없음')"
-                                  className="text-xs md:text-sm font-bold outline-none border-none bg-transparent w-32 md:w-40"
-                                  aria-label={`파티 #${pid} 호스트 이름 편집`}
-                                />
-                                <button
-                                  type="button"
-                                  onClick={saveEditHost}
-                                  className="p-1 bg-brand-black text-white hover:bg-brand-point rounded transition-colors"
-                                  aria-label="저장"
-                                  title="Enter — 저장"
+                            {/* 우측 그룹 — 호스트 정보 + 매칭 투표 제어 (한 묶음, 모바일 자동 wrap) */}
+                            <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                              {/* 호스트 인라인 편집 */}
+                              {hostEditingId === pid ? (
+                                <div className="inline-flex items-center gap-1 bg-white border border-brand-point rounded-lg px-2 py-1 shadow-sm">
+                                  <span className="text-[11px] md:text-xs font-bold text-gray-500 whitespace-nowrap">호스트:</span>
+                                  <input
+                                    autoFocus
+                                    type="text"
+                                    value={hostDraft}
+                                    onChange={e => setHostDraft(e.target.value)}
+                                    onKeyDown={e => {
+                                      if (e.key === "Enter") { e.preventDefault(); saveEditHost(); }
+                                      if (e.key === "Escape") { e.preventDefault(); cancelEditHost(); }
+                                    }}
+                                    maxLength={100}
+                                    placeholder="이름 입력 (비우면 '없음')"
+                                    className="text-xs md:text-sm font-bold outline-none border-none bg-transparent w-32 md:w-40"
+                                    aria-label={`파티 #${pid} 호스트 이름 편집`}
+                                  />
+                                  <button type="button" onClick={saveEditHost}
+                                    className="p-1 bg-brand-black text-white hover:bg-brand-point rounded transition-colors"
+                                    aria-label="저장" title="Enter — 저장">
+                                    <Save size={11} />
+                                  </button>
+                                  <button type="button" onClick={cancelEditHost}
+                                    className="p-1 hover:bg-gray-100 rounded text-gray-500 transition-colors"
+                                    aria-label="취소" title="Esc — 취소">
+                                    <X size={11} />
+                                  </button>
+                                </div>
+                              ) : (
+                                <button type="button" onClick={() => startEditHost(pid)}
+                                  className="inline-flex items-center gap-1 bg-white border border-gray-200 hover:border-brand-point hover:bg-brand-point/5 rounded-lg px-2.5 py-1 text-[11px] md:text-xs font-bold text-gray-700 transition-colors group"
+                                  title="클릭하여 호스트 이름 편집 (관리자 전용)"
                                 >
-                                  <Save size={11} />
+                                  <span className="text-gray-500">호스트:</span>
+                                  <span className={hostMap[pid] ? "text-brand-black" : "text-gray-400"}>
+                                    {hostMap[pid] || "없음"}
+                                  </span>
+                                  <Pencil size={10} className="text-gray-300 group-hover:text-brand-point transition-colors" />
                                 </button>
-                                <button
-                                  type="button"
-                                  onClick={cancelEditHost}
-                                  className="p-1 hover:bg-gray-100 rounded text-gray-500 transition-colors"
-                                  aria-label="취소"
-                                  title="Esc — 취소"
-                                >
-                                  <X size={11} />
-                                </button>
-                              </div>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => startEditHost(pid)}
-                                className="inline-flex items-center gap-1 bg-white border border-gray-200 hover:border-brand-point hover:bg-brand-point/5 rounded-lg px-2.5 py-1 text-[11px] md:text-xs font-bold text-gray-700 transition-colors group"
-                                title="클릭하여 호스트 이름 편집 (관리자 전용)"
-                              >
-                                <span className="text-gray-500">호스트:</span>
-                                <span className={hostMap[pid] ? "text-brand-black" : "text-gray-400"}>
-                                  {hostMap[pid] || "없음"}
-                                </span>
-                                <Pencil size={10} className="text-gray-300 group-hover:text-brand-point transition-colors" />
-                              </button>
-                            )}
+                              )}
+
+                              {/* === 매칭 투표 제어 — 콤팩트 인라인 (host 정보 바로 아래) ===
+                                    관리자 전용: dashboard 진입 시 admin/me.php 검증 게이트 통과 필수 */}
+                              {(() => {
+                                const vs = votingStatusMap[pid] ?? "closed";
+                                return (
+                                  <div className="inline-flex items-center gap-1.5 flex-wrap justify-end">
+                                    {vs === "closed" && (
+                                      <button type="button" onClick={() => changeVotingStatus(pid, "start")}
+                                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-brand-point text-white text-xs font-black rounded-md hover:brightness-110 active:scale-95 transition-all shadow-sm"
+                                        title="투표를 시작합니다">
+                                        ▶ 투표 시작
+                                      </button>
+                                    )}
+                                    {vs === "open" && (
+                                      <>
+                                        {/* 진행 중 인디케이터 — 콤팩트 */}
+                                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">
+                                          <span className="relative flex h-1.5 w-1.5">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+                                          </span>
+                                          진행 중
+                                        </span>
+                                        <button type="button" onClick={() => changeVotingStatus(pid, "end")}
+                                          className="inline-flex items-center gap-1 px-3 py-1.5 bg-orange-500 text-white text-xs font-black rounded-md hover:bg-orange-600 active:scale-95 transition-all shadow-sm"
+                                          title="투표를 종료하고 결과를 공개합니다">
+                                          ■ 투표 종료
+                                        </button>
+                                      </>
+                                    )}
+                                    {vs === "finalized" && (
+                                      <>
+                                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-700 bg-purple-100 px-2 py-1 rounded-md">
+                                          종료
+                                        </span>
+                                        <button type="button" onClick={() => openMatchingResults(pid)}
+                                          className="inline-flex items-center gap-1 px-3 py-1.5 bg-purple-600 text-white text-xs font-black rounded-md hover:bg-purple-700 active:scale-95 transition-all shadow-sm"
+                                          title="매칭 결과를 확인합니다">
+                                          📊 결과 보기
+                                        </button>
+                                      </>
+                                    )}
+                                    {vs !== "closed" && (
+                                      <button type="button" onClick={() => changeVotingStatus(pid, "reset")}
+                                        className="inline-flex items-center px-2 py-1.5 bg-white border border-gray-200 text-gray-500 text-xs font-bold rounded-md hover:bg-gray-100 transition-colors"
+                                        title="투표 상태를 초기화합니다 (기록은 보존)">
+                                        ↺
+                                      </button>
+                                    )}
+                                  </div>
+                                );
+                              })()}
+                            </div>
                           </div>
                           <div className="flex gap-3 md:gap-4 mt-2 text-xs md:text-sm">
                             <span className="font-bold text-[#4facfe]">남성 {males.length}명</span>
@@ -1082,71 +1128,6 @@ export default function AdminDashboard() {
                             <span className="font-bold text-gray-500">총 {partyRows.length}명</span>
                           </div>
                         </div>
-
-                        {/* === 매칭 투표 제어 (관리자 전용 — admin role 게이트는 dashboard 진입 자체에 적용됨) === */}
-                        {(() => {
-                          const vs = votingStatusMap[pid] ?? "closed";
-                          return (
-                            <div className="bg-gray-50 border-b border-gray-100 px-5 md:px-7 py-3 md:py-4">
-                              <div className="flex items-center flex-wrap gap-3 md:gap-4">
-                                <span className="text-xs md:text-sm font-black text-gray-500 uppercase tracking-wider">매칭 투표</span>
-
-                                {/* 액션 버튼 — spec: 큰 버튼, 청록(시작) / 오렌지(종료) */}
-                                {vs === "closed" && (
-                                  <button type="button"
-                                    onClick={() => changeVotingStatus(pid, "start")}
-                                    className="inline-flex items-center gap-1.5 px-5 md:px-6 py-2.5 md:py-3 bg-brand-point text-white text-sm md:text-base font-black rounded-xl hover:brightness-110 active:scale-95 shadow-md hover:shadow-lg transition-all"
-                                    title="투표를 시작합니다"
-                                  >
-                                    ▶ 투표 시작
-                                  </button>
-                                )}
-                                {vs === "open" && (
-                                  <>
-                                    <button type="button"
-                                      onClick={() => changeVotingStatus(pid, "end")}
-                                      className="inline-flex items-center gap-1.5 px-5 md:px-6 py-2.5 md:py-3 bg-orange-500 text-white text-sm md:text-base font-black rounded-xl hover:bg-orange-600 active:scale-95 shadow-md hover:shadow-lg transition-all"
-                                      title="투표를 종료하고 결과를 공개합니다"
-                                    >
-                                      ■ 투표 종료
-                                    </button>
-                                    {/* 진행 중 인디케이터 — 깜빡이는 점 + 텍스트 */}
-                                    <span className="inline-flex items-center gap-2 text-sm md:text-base font-bold text-emerald-600">
-                                      <span className="relative flex h-2.5 w-2.5">
-                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
-                                      </span>
-                                      현재 투표 진행 중
-                                    </span>
-                                  </>
-                                )}
-                                {vs === "finalized" && (
-                                  <>
-                                    <button type="button"
-                                      onClick={() => openMatchingResults(pid)}
-                                      className="inline-flex items-center gap-1.5 px-5 md:px-6 py-2.5 md:py-3 bg-purple-600 text-white text-sm md:text-base font-black rounded-xl hover:bg-purple-700 active:scale-95 shadow-md hover:shadow-lg transition-all"
-                                      title="매칭 결과를 확인합니다"
-                                    >
-                                      📊 결과 보기
-                                    </button>
-                                    <span className="inline-flex items-center text-xs md:text-sm font-bold text-purple-700 bg-purple-100 px-3 py-1.5 rounded-full">
-                                      종료됨 · 결과 공개 중
-                                    </span>
-                                  </>
-                                )}
-                                {vs !== "closed" && (
-                                  <button type="button"
-                                    onClick={() => changeVotingStatus(pid, "reset")}
-                                    className="ml-auto inline-flex items-center gap-1 px-3 py-2 bg-white border border-gray-200 text-gray-500 text-xs font-bold rounded-lg hover:bg-gray-100 transition-colors"
-                                    title="투표 상태를 초기화합니다 (기록은 보존)"
-                                  >
-                                    ↺ 초기화
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })()}
 
                         {/* 남성 신청자 */}
                         <BookingTable label="남성 신청자" toneClass="bg-[#4facfe]/10 text-[#3a85d9]" rows={males} party={party} onApprove={approveBooking} onCancel={cancelBooking} />
