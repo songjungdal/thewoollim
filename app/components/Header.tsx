@@ -51,7 +51,7 @@ export default function Header() {
               key={item.id}
               href={item.href}
               onClick={(e) => handleScroll(e, item.id)}
-              className="inline-block px-1 py-1.5 origin-center hover:text-brand-point hover:scale-[1.08] transition-all duration-300 ease-in-out"
+              className="inline-block px-1 py-1.5 origin-center hover:text-brand-point hover:scale-[1.2] transition-all duration-300 ease-in-out"
             >
               {item.label}
             </Link>
@@ -60,7 +60,7 @@ export default function Header() {
             <div className="flex items-center gap-4">
               <Link
                 href="/mypage"
-                className="relative inline-block p-1.5 origin-center hover:text-brand-point hover:scale-[1.08] transition-all duration-300 ease-in-out"
+                className="relative inline-block p-1.5 origin-center hover:text-brand-point hover:scale-[1.2] transition-all duration-300 ease-in-out"
               >
                 <ShoppingBag size={22} />
                 {cart.length > 0 && (
@@ -69,7 +69,7 @@ export default function Header() {
               </Link>
               <Link
                 href="/mypage"
-                className="inline-block px-1 py-1.5 origin-center text-brand-point font-bold hover:scale-[1.08] transition-all duration-300 ease-in-out"
+                className="inline-block px-1 py-1.5 origin-center text-brand-point font-bold hover:scale-[1.2] transition-all duration-300 ease-in-out"
               >
                 마이페이지
               </Link>
@@ -77,7 +77,7 @@ export default function Header() {
           ) : (
             <Link
               href="/login"
-              className="inline-block px-1 py-1.5 origin-center text-brand-point font-bold hover:scale-[1.08] transition-all duration-300 ease-in-out"
+              className="inline-block px-1 py-1.5 origin-center text-brand-point font-bold hover:scale-[1.2] transition-all duration-300 ease-in-out"
             >
               로그인
             </Link>
