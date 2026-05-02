@@ -211,5 +211,10 @@ function sanitizeParty(array $p): array {
         }
     }
 
+    // voting_status (매칭 투표 상태) — admin/matching.php 가 주로 변경하지만
+    // sanitize 화이트리스트에 포함 — admin/parties.php update 시 보존
+    $vs = (string)($p['voting_status'] ?? 'closed');
+    $clean['voting_status'] = in_array($vs, ['closed', 'open', 'finalized'], true) ? $vs : 'closed';
+
     return $clean;
 }

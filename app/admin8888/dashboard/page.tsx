@@ -231,6 +231,18 @@ export default function AdminDashboard() {
   const [hostMap, setHostMap] = useState<Record<string, string>>({});
   const [hostEditingId, setHostEditingId] = useState<string | null>(null);
   const [hostDraft, setHostDraft] = useState("");
+  // 매칭 투표 상태 매핑 (partyId → 'closed'|'open'|'finalized')
+  const [votingStatusMap, setVotingStatusMap] = useState<Record<string, "closed" | "open" | "finalized">>({});
+  // 매칭 결과 모달
+  type MatchVote = { voter_number: number; gender: string; name: string; email: string; picks: number[]; updated_at: string };
+  type MatchPair = { a: { number: number; name: string; gender: string }; b: { number: number; name: string; gender: string } };
+  const [matchingModalPartyId, setMatchingModalPartyId] = useState<string | null>(null);
+  const [matchingModalData, setMatchingModalData] = useState<{
+    partyTitle: string;
+    voting_status: string;
+    votes: MatchVote[];
+    matches: MatchPair[];
+  } | null>(null);
 
   // 로그 관리 상태
   const [logs, setLogs] = useState<AdminLogRow[]>([]);
@@ -428,15 +440,58 @@ export default function AdminDashboard() {
     if (co?.company) setCompany(co.company);
     if (g?.items) setGallery(Array.isArray(g.items) ? g.items : []);
     if (m?.items) setMemos(Array.isArray(m.items) ? m.items : []);
-    // 호스트 매핑 — 관리자 전용 GET 응답에서만 host_name 노출
+    // 호스트 + 투표 상태 매핑 — 관리자 전용 GET 응답에서만 노출
     if (Array.isArray(p?.items)) {
-      const map: Record<string, string> = {};
+      const hMap: Record<string, string> = {};
+      const vMap: Record<string, "closed" | "open" | "finalized"> = {};
       for (const it of p.items) {
-        if (it && it.id != null) map[String(it.id)] = String(it.host_name ?? "");
+        if (it && it.id != null) {
+          const id = String(it.id);
+          hMap[id] = String(it.host_name ?? "");
+          const vs = String(it.voting_status ?? "closed");
+          vMap[id] = (vs === "open" || vs === "finalized") ? vs : "closed";
+        }
       }
-      setHostMap(map);
+      setHostMap(hMap);
+      setVotingStatusMap(vMap);
     }
   }, []);
+
+  // 매칭 투표 상태 변경 (start/end/reset)
+  const changeVotingStatus = async (partyId: string, action: "start" | "end" | "reset") => {
+    const labels = { start: "투표를 시작", end: "투표를 종료", reset: "투표 상태를 초기화" } as const;
+    if (!confirm(`이 파티의 ${labels[action]}하시겠습니까?`)) return;
+    const res = await fetch("/api/admin/matching.php", {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, partyId }),
+    });
+    const d = await res.json();
+    if (!d?.ok) { alert(d?.error || "처리 실패"); return; }
+    setVotingStatusMap(prev => ({ ...prev, [partyId]: d.voting_status }));
+  };
+
+  // 매칭 결과 모달 열기 — admin/matching.php GET
+  const openMatchingResults = async (partyId: string) => {
+    setMatchingModalPartyId(partyId);
+    setMatchingModalData(null);
+    try {
+      const res = await fetch(`/api/admin/matching.php?partyId=${encodeURIComponent(partyId)}`,
+        { cache: "no-store", credentials: "include" });
+      const d = await res.json();
+      if (!d?.ok) { alert(d?.error || "조회 실패"); setMatchingModalPartyId(null); return; }
+      setMatchingModalData({
+        partyTitle: d.partyTitle ?? `파티 #${partyId}`,
+        voting_status: d.voting_status ?? "closed",
+        votes: d.votes ?? [],
+        matches: d.matches ?? [],
+      });
+    } catch {
+      alert("네트워크 오류");
+      setMatchingModalPartyId(null);
+    }
+  };
+  const closeMatchingModal = () => { setMatchingModalPartyId(null); setMatchingModalData(null); };
 
   // 호스트 이름 인라인 편집 — 즉시 DB 반영
   const startEditHost = (partyId: string) => {
@@ -1057,7 +1112,7 @@ export default function AdminDashboard() {
                 <table className="w-full text-sm whitespace-nowrap">
                   <thead className="bg-gray-50 text-gray-600 font-bold">
                     <tr>
-                      {["#", "이미지", "제목", "태그", "일시", "장소", "대상", "참가비", "정원(남/여)", "액션"].map(h => (
+                      {["#", "이미지", "제목", "태그", "일시", "장소", "대상", "참가비", "정원(남/여)", "투표", "액션"].map(h => (
                         <th key={h} className="text-left px-3 py-3">{h}</th>
                       ))}
                     </tr>
@@ -1079,6 +1134,44 @@ export default function AdminDashboard() {
                         <td className="px-3 py-2.5 font-black text-brand-point">₩{p.price.toLocaleString()}</td>
                         <td className="px-3 py-2.5 text-gray-600">{p.maleStock}명 / {p.femaleStock}명</td>
                         <td className="px-3 py-2.5">
+                          {(() => {
+                            const vs = votingStatusMap[p.id] ?? "closed";
+                            const badgeCls = vs === "open"
+                              ? "bg-emerald-100 text-emerald-800"
+                              : vs === "finalized"
+                                ? "bg-purple-100 text-purple-800"
+                                : "bg-gray-100 text-gray-500";
+                            const badgeLabel = vs === "open" ? "진행 중" : vs === "finalized" ? "종료/공개" : "닫힘";
+                            return (
+                              <div className="flex flex-col gap-1">
+                                <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black w-fit ${badgeCls}`}>{badgeLabel}</span>
+                                <div className="flex gap-1">
+                                  {vs === "closed" && (
+                                    <button type="button" onClick={() => changeVotingStatus(p.id, "start")}
+                                      className="px-2 py-1 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-[10px] font-black transition-colors"
+                                      title="투표 시작">시작</button>
+                                  )}
+                                  {vs === "open" && (
+                                    <button type="button" onClick={() => changeVotingStatus(p.id, "end")}
+                                      className="px-2 py-1 rounded bg-purple-50 text-purple-700 hover:bg-purple-100 text-[10px] font-black transition-colors"
+                                      title="투표 종료(결과 공개)">종료</button>
+                                  )}
+                                  {vs === "finalized" && (
+                                    <button type="button" onClick={() => openMatchingResults(p.id)}
+                                      className="px-2 py-1 rounded bg-brand-point/10 text-brand-point hover:bg-brand-point/20 text-[10px] font-black transition-colors"
+                                      title="매칭 결과 보기">결과</button>
+                                  )}
+                                  {vs !== "closed" && (
+                                    <button type="button" onClick={() => changeVotingStatus(p.id, "reset")}
+                                      className="px-2 py-1 rounded bg-gray-50 text-gray-500 hover:bg-gray-100 text-[10px] font-black transition-colors"
+                                      title="상태 초기화">↺</button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </td>
+                        <td className="px-3 py-2.5">
                           <div className="flex gap-1.5">
                             <button onClick={() => openPartyEdit(p.id)} className="bg-brand-black text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-brand-point transition-all">
                               <Pencil size={11} className="inline mr-1" />수정
@@ -1090,7 +1183,7 @@ export default function AdminDashboard() {
                         </td>
                       </tr>
                     ))}
-                    {PARTIES.length === 0 && <tr><td colSpan={10} className="text-center text-gray-400 py-8">등록된 매칭파티 없음</td></tr>}
+                    {PARTIES.length === 0 && <tr><td colSpan={11} className="text-center text-gray-400 py-8">등록된 매칭파티 없음</td></tr>}
                   </tbody>
                 </table>
               </div>
@@ -1274,6 +1367,95 @@ export default function AdminDashboard() {
                       <button onClick={savePartyForm} className="px-5 py-2.5 rounded-lg text-sm font-black bg-brand-black text-white hover:bg-brand-point transition-all">
                         {partyEditMode === "create" ? "등록" : "수정 저장"}
                       </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* === 매칭 결과 모달 (관리자 전용) === */}
+              {matchingModalPartyId && (
+                <div className="fixed inset-0 z-[210] bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 md:p-4">
+                  <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden">
+                    <div className="bg-white border-b border-gray-200 px-5 md:px-7 py-4 flex items-center justify-between flex-shrink-0">
+                      <div>
+                        <p className="text-[11px] font-black tracking-[0.2em] text-brand-point uppercase">Matching Results</p>
+                        <h3 className="font-black text-base md:text-lg mt-0.5">{matchingModalData?.partyTitle ?? "..."}</h3>
+                      </div>
+                      <button type="button" onClick={closeMatchingModal} className="text-gray-400 hover:text-gray-700 p-1 -mr-1" aria-label="닫기"><X size={20} /></button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-5 md:p-7 space-y-6">
+                      {!matchingModalData ? (
+                        <p className="text-center text-gray-400 py-8">불러오는 중...</p>
+                      ) : (
+                        <>
+                          {/* 상호 매칭 쌍 */}
+                          <div>
+                            <h4 className="text-sm font-black text-brand-black mb-3 flex items-center gap-2">
+                              <span className="w-1 h-4 bg-brand-point rounded-full" />
+                              상호 매칭 ({matchingModalData.matches.length}쌍)
+                            </h4>
+                            {matchingModalData.matches.length === 0 ? (
+                              <p className="text-sm text-gray-400 bg-gray-50 rounded-xl p-4 text-center">매칭된 쌍이 없습니다.</p>
+                            ) : (
+                              <div className="space-y-2">
+                                {matchingModalData.matches.map((m, i) => (
+                                  <div key={i} className="flex items-center gap-3 bg-brand-point/5 border border-brand-point/20 rounded-xl px-4 py-3">
+                                    <span className="text-2xl">💕</span>
+                                    <div className="flex-1 grid grid-cols-2 gap-3 text-sm">
+                                      <div>
+                                        <p className="text-[10px] text-gray-400 font-bold">{m.a.gender} #{m.a.number}</p>
+                                        <p className="font-black text-brand-black">{m.a.name || "-"}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-[10px] text-gray-400 font-bold">{m.b.gender} #{m.b.number}</p>
+                                        <p className="font-black text-brand-black">{m.b.name || "-"}</p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 전체 투표 현황 */}
+                          <div>
+                            <h4 className="text-sm font-black text-brand-black mb-3 flex items-center gap-2">
+                              <span className="w-1 h-4 bg-brand-point rounded-full" />
+                              전체 투표 현황 ({matchingModalData.votes.length}건)
+                            </h4>
+                            {matchingModalData.votes.length === 0 ? (
+                              <p className="text-sm text-gray-400 bg-gray-50 rounded-xl p-4 text-center">아직 투표가 없습니다.</p>
+                            ) : (
+                              <div className="overflow-x-auto rounded-xl border border-gray-100">
+                                <table className="w-full text-xs whitespace-nowrap">
+                                  <thead className="bg-gray-50 text-gray-500 font-bold">
+                                    <tr>
+                                      <th className="text-left px-3 py-2.5">번호</th>
+                                      <th className="text-left px-3 py-2.5">성별</th>
+                                      <th className="text-left px-3 py-2.5">이름</th>
+                                      <th className="text-left px-3 py-2.5">이메일</th>
+                                      <th className="text-left px-3 py-2.5">선택한 번호</th>
+                                      <th className="text-left px-3 py-2.5">최종 수정</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {matchingModalData.votes.map((v, i) => (
+                                      <tr key={i} className="border-t border-gray-100">
+                                        <td className="px-3 py-2.5 font-black text-brand-black tabular-nums">#{v.voter_number}</td>
+                                        <td className="px-3 py-2.5">{v.gender}</td>
+                                        <td className="px-3 py-2.5 font-bold">{v.name || "-"}</td>
+                                        <td className="px-3 py-2.5 text-gray-500">{v.email}</td>
+                                        <td className="px-3 py-2.5 font-bold text-brand-point tabular-nums">{v.picks.join(", ")}</td>
+                                        <td className="px-3 py-2.5 text-gray-400 tabular-nums">{v.updated_at}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
