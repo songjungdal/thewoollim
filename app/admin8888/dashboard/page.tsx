@@ -228,6 +228,10 @@ export default function AdminDashboard() {
   const [memoNewOpen, setMemoNewOpen] = useState(false);
   const [memoNewContent, setMemoNewContent] = useState("");
   const [memoNewColor, setMemoNewColor] = useState(MEMO_COLORS[0]);
+  // 호스트 이름 매핑 (관리자 전용 — partyId → host_name)
+  const [hostMap, setHostMap] = useState<Record<string, string>>({});
+  const [hostEditingId, setHostEditingId] = useState<string | null>(null);
+  const [hostDraft, setHostDraft] = useState("");
 
   // 로그 관리 상태
   const [logs, setLogs]                 = useState<AdminLogRow[]>([]);
@@ -410,13 +414,14 @@ export default function AdminDashboard() {
   }, [router]);
 
   const loadAll = useCallback(async () => {
-    const [u, b, c, co, g, m] = await Promise.all([
+    const [u, b, c, co, g, m, p] = await Promise.all([
       fetch("/api/admin/users.php",    { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
       fetch("/api/admin/bookings.php", { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
       fetch("/api/admin/coupons.php",  { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
       fetch("/api/admin/company.php",  { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
       fetch("/api/admin/gallery.php",  { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
       fetch("/api/admin/memos.php",    { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
+      fetch("/api/admin/parties.php",  { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
     ]);
     if (u?.users)    setUsers(u.users);
     if (b?.rows)     setBookings(b.rows);
@@ -424,7 +429,43 @@ export default function AdminDashboard() {
     if (co?.company) setCompany(co.company);
     if (g?.items)    setGallery(Array.isArray(g.items) ? g.items : []);
     if (m?.items)    setMemos(Array.isArray(m.items) ? m.items : []);
+    // 호스트 매핑 — 관리자 전용 GET 응답에서만 host_name 노출
+    if (Array.isArray(p?.items)) {
+      const map: Record<string, string> = {};
+      for (const it of p.items) {
+        if (it && it.id != null) map[String(it.id)] = String(it.host_name ?? "");
+      }
+      setHostMap(map);
+    }
   }, []);
+
+  // 호스트 이름 인라인 편집 — 즉시 DB 반영
+  const startEditHost = (partyId: string) => {
+    setHostEditingId(partyId);
+    setHostDraft(hostMap[partyId] ?? "");
+  };
+  const cancelEditHost = () => {
+    setHostEditingId(null);
+    setHostDraft("");
+  };
+  const saveEditHost = async () => {
+    if (hostEditingId == null) return;
+    const partyId = hostEditingId;
+    const next = hostDraft.trim();
+    // 클라이언트 1차 sanitize — 서버에서 동일 검증 재수행
+    if (/[<>]/.test(next)) { alert("사용할 수 없는 문자가 포함돼있습니다."); return; }
+    if (next.length > 100) { alert("호스트 이름이 너무 깁니다 (최대 100자)."); return; }
+    const res = await fetch("/api/admin/parties.php", {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "update_host", id: partyId, host_name: next }),
+    });
+    const d = await res.json();
+    if (!d?.ok) { alert(d?.error || "저장 실패"); return; }
+    setHostMap(prev => ({ ...prev, [partyId]: d.host_name ?? next }));
+    setHostEditingId(null);
+    setHostDraft("");
+  };
 
   // 업무 메모 — CRUD
   const createMemo = async () => {
@@ -922,12 +963,65 @@ export default function AdminDashboard() {
                       <div key={pid} className="bg-white rounded-2xl border-2 border-brand-point/20 overflow-hidden">
                         {/* 파티 헤더 */}
                         <div className="bg-gradient-to-r from-brand-point/10 to-white px-5 md:px-7 py-4 md:py-5 border-b border-gray-100">
-                          <div className="flex items-baseline gap-x-3 gap-y-1 flex-wrap">
-                            <h3 className="text-lg md:text-2xl font-black text-brand-black">{party?.title ?? `파티 #${pid}`}</h3>
-                            <span className="text-xs md:text-sm text-gray-500 font-bold">{party?.dateString ?? ""}</span>
-                            <span className="text-base md:text-xl font-black text-brand-black">
-                              (총 결제 금액: {totalRevenue.toLocaleString()}원)
-                            </span>
+                          <div className="flex items-start justify-between gap-3 flex-wrap">
+                            <div className="flex items-baseline gap-x-3 gap-y-1 flex-wrap min-w-0">
+                              <h3 className="text-lg md:text-2xl font-black text-brand-black">{party?.title ?? `파티 #${pid}`}</h3>
+                              <span className="text-xs md:text-sm text-gray-500 font-bold">{party?.dateString ?? ""}</span>
+                              <span className="text-base md:text-xl font-black text-brand-black">
+                                (총 결제 금액: {totalRevenue.toLocaleString()}원)
+                              </span>
+                            </div>
+                            {/* 호스트 (관리자 전용 노출) — 인라인 편집 */}
+                            {hostEditingId === pid ? (
+                              <div className="inline-flex items-center gap-1 bg-white border border-brand-point rounded-lg px-2 py-1 shadow-sm">
+                                <span className="text-[11px] md:text-xs font-bold text-gray-500 whitespace-nowrap">호스트:</span>
+                                <input
+                                  autoFocus
+                                  type="text"
+                                  value={hostDraft}
+                                  onChange={e => setHostDraft(e.target.value)}
+                                  onKeyDown={e => {
+                                    if (e.key === "Enter") { e.preventDefault(); saveEditHost(); }
+                                    if (e.key === "Escape") { e.preventDefault(); cancelEditHost(); }
+                                  }}
+                                  maxLength={100}
+                                  placeholder="이름 입력 (비우면 '없음')"
+                                  className="text-xs md:text-sm font-bold outline-none border-none bg-transparent w-32 md:w-40"
+                                  aria-label={`파티 #${pid} 호스트 이름 편집`}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={saveEditHost}
+                                  className="p-1 bg-brand-black text-white hover:bg-brand-point rounded transition-colors"
+                                  aria-label="저장"
+                                  title="Enter — 저장"
+                                >
+                                  <Save size={11} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={cancelEditHost}
+                                  className="p-1 hover:bg-gray-100 rounded text-gray-500 transition-colors"
+                                  aria-label="취소"
+                                  title="Esc — 취소"
+                                >
+                                  <X size={11} />
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => startEditHost(pid)}
+                                className="inline-flex items-center gap-1 bg-white border border-gray-200 hover:border-brand-point hover:bg-brand-point/5 rounded-lg px-2.5 py-1 text-[11px] md:text-xs font-bold text-gray-700 transition-colors group"
+                                title="클릭하여 호스트 이름 편집 (관리자 전용)"
+                              >
+                                <span className="text-gray-500">호스트:</span>
+                                <span className={hostMap[pid] ? "text-brand-black" : "text-gray-400"}>
+                                  {hostMap[pid] || "없음"}
+                                </span>
+                                <Pencil size={10} className="text-gray-300 group-hover:text-brand-point transition-colors" />
+                              </button>
+                            )}
                           </div>
                           <div className="flex gap-3 md:gap-4 mt-2 text-xs md:text-sm">
                             <span className="font-bold text-[#4facfe]">남성 {males.length}명</span>
