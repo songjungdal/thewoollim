@@ -714,7 +714,7 @@ export default function PartyClientView({ id }: { id: string }) {
                     <CheckCircle size={40} className="text-brand-point md:hidden" />
                     <CheckCircle size={48} className="text-brand-point hidden md:block" />
                   </div>
-                  <h3 className="text-xl md:text-3xl font-bold mb-4 md:mb-6 italic tracking-tight">"Where connections resonate deeply."</h3>
+                  <h3 className="text-xl md:text-3xl font-bold mb-4 md:mb-6 italic tracking-tight">&ldquo;Where connections resonate deeply.&rdquo;</h3>
                   <p className="text-gray-400 text-xs md:text-base max-w-2xl mx-auto leading-relaxed">
                     우리는 숫자로 설명할 수 없는 가치를 믿습니다.<br />
                     어울림이 엄선한 멤버들과 함께하는 특별한 만남에 당신을 초대합니다.

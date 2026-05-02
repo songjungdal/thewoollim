@@ -22,7 +22,7 @@ export default function PrivacyPage() {
           <div className="max-w-4xl mx-auto">
             <div className="text-gray-900 leading-relaxed font-medium text-sm md:text-base space-y-10 md:space-y-16">
               <section>
-                <p>"어울림"(이하 '사이트')은 회원의 개인정보를 중요시하며, 「개인정보 보호법」 등 관련 법령을 준수하고 있습니다. 사이트는 개인정보처리방침을 통하여 회원이 제공하는 개인정보가 어떠한 용도와 방식으로 이용되고 있으며, 개인정보보호를 위해 어떠한 조치가 취해지고 있는지 알려드립니다.</p>
+                <p>&ldquo;어울림&rdquo;(이하 &lsquo;사이트&rsquo;)은 회원의 개인정보를 중요시하며, 「개인정보 보호법」 등 관련 법령을 준수하고 있습니다. 사이트는 개인정보처리방침을 통하여 회원이 제공하는 개인정보가 어떠한 용도와 방식으로 이용되고 있으며, 개인정보보호를 위해 어떠한 조치가 취해지고 있는지 알려드립니다.</p>
               </section>
 
               <section>
@@ -75,7 +75,7 @@ export default function PrivacyPage() {
               <section>
                 <h2 className="text-xl md:text-2xl font-black text-black mb-4 md:mb-6">6. 개인정보 자동 수집 장치의 설치·운영 및 거부에 관한 사항</h2>
                 <div className="space-y-3 md:space-y-4 text-gray-800">
-                  <p>사이트는 이용자의 정보를 수시로 저장하고 찾아내는 '쿠키(cookie)' 등을 운용합니다. 이용자는 쿠키 설치에 대한 선택권을 가지고 있으며, 웹브라우저 설정을 통해 모든 쿠키를 허용하거나, 거부할 수 있습니다.</p>
+                  <p>사이트는 이용자의 정보를 수시로 저장하고 찾아내는 &lsquo;쿠키(cookie)&rsquo; 등을 운용합니다. 이용자는 쿠키 설치에 대한 선택권을 가지고 있으며, 웹브라우저 설정을 통해 모든 쿠키를 허용하거나, 거부할 수 있습니다.</p>
                 </div>
               </section>
 

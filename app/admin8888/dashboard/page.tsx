@@ -102,7 +102,7 @@ function BookingTable({ label, toneClass, rows, party, onApprove, onCancel }: {
   rows: BookingRow[];
   party: { title: string; price: number } | undefined;
   onApprove: (email: string, bookingId: string) => void;
-  onCancel:  (email: string, bookingId: string) => void;
+  onCancel: (email: string, bookingId: string) => void;
 }) {
   return (
     <div className="border-t border-gray-100">
@@ -113,7 +113,7 @@ function BookingTable({ label, toneClass, rows, party, onApprove, onCancel }: {
         <table className="w-full text-xs md:text-sm whitespace-nowrap">
           <thead className="bg-gray-50 text-gray-500 font-bold">
             <tr>
-              {["취소","이름","연락처","생년월일","MBTI","직업","결제일","결제금액","상태","관리"].map(h => (
+              {["취소", "이름", "연락처", "생년월일", "MBTI", "직업", "결제일", "결제금액", "상태", "관리"].map(h => (
                 <th key={h} className="text-left px-3 py-2.5 first:pl-5 md:first:pl-7">{h}</th>
               ))}
             </tr>
@@ -128,11 +128,10 @@ function BookingTable({ label, toneClass, rows, party, onApprove, onCancel }: {
               const confirmed = b.status === "confirmed";
               const birth = (b.userBirthDate ?? "").slice(0, 10) || "-";
               return (
-                <tr key={b.id} className={`border-t border-gray-100 transition-colors ${
-                  isCancelled
+                <tr key={b.id} className={`border-t border-gray-100 transition-colors ${isCancelled
                     ? "bg-gray-50 text-gray-400"
                     : "hover:bg-gray-50"
-                }`}>
+                  }`}>
                   {/* 좌측 [취소] 버튼 */}
                   <td className="px-3 py-2.5 first:pl-5 md:first:pl-7">
                     {isCancelled ? (
@@ -192,10 +191,10 @@ function FormField({ label, value, onChange, placeholder, textarea }: {
       <label className="block text-sm font-bold text-gray-700 mb-1.5">{label}</label>
       {textarea ? (
         <textarea value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={3}
-          className="w-full px-4 py-3 rounded-lg border border-gray-200 text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none resize-none"/>
+          className="w-full px-4 py-3 rounded-lg border border-gray-200 text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none resize-none" />
       ) : (
         <input type="text" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-          className="w-full px-4 py-3 rounded-lg border border-gray-200 text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none"/>
+          className="w-full px-4 py-3 rounded-lg border border-gray-200 text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none" />
       )}
     </div>
   );
@@ -203,9 +202,9 @@ function FormField({ label, value, onChange, placeholder, textarea }: {
 
 const STATUS_LABEL: Record<string, { label: string; tone: string }> = {
   paid_pending_profile: { label: "결제완료(프로필 대기)", tone: "bg-amber-100 text-amber-800" },
-  pending_approval:     { label: "확정 대기 중",         tone: "bg-blue-100 text-blue-800" },
-  confirmed:            { label: "참가 확정 완료",       tone: "bg-emerald-100 text-emerald-800" },
-  cancelled:            { label: "취소됨",               tone: "bg-gray-200 text-gray-600" },
+  pending_approval: { label: "확정 대기 중", tone: "bg-blue-100 text-blue-800" },
+  confirmed: { label: "참가 확정 완료", tone: "bg-emerald-100 text-emerald-800" },
+  cancelled: { label: "취소됨", tone: "bg-gray-200 text-gray-600" },
 };
 
 export default function AdminDashboard() {
@@ -234,14 +233,14 @@ export default function AdminDashboard() {
   const [hostDraft, setHostDraft] = useState("");
 
   // 로그 관리 상태
-  const [logs, setLogs]                 = useState<AdminLogRow[]>([]);
-  const [logsLoading, setLogsLoading]   = useState(false);
-  const [logsTotal, setLogsTotal]       = useState(0);
-  const [logFromDate, setLogFromDate]   = useState("");
-  const [logToDate, setLogToDate]       = useState("");
+  const [logs, setLogs] = useState<AdminLogRow[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsTotal, setLogsTotal] = useState(0);
+  const [logFromDate, setLogFromDate] = useState("");
+  const [logToDate, setLogToDate] = useState("");
   const [logAdminFilter, setLogAdminFilter] = useState("");
   const [logActionFilter, setLogActionFilter] = useState("");
-  const [logExpanded, setLogExpanded]   = useState<Set<number>>(new Set());
+  const [logExpanded, setLogExpanded] = useState<Set<number>>(new Set());
 
   const loadLogs = useCallback(async () => {
     setLogsLoading(true);
@@ -269,12 +268,6 @@ export default function AdminDashboard() {
   }, [tab, authChecked, loadLogs]);
   const [genderFilter, setGenderFilter] = useState<"all" | "남성" | "여성">("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "paid_pending_profile" | "pending_approval" | "confirmed">("all");
-  // 월별 필터 — 기본값: 현재 KST 월. 'all' = 모든 월 노출
-  const [monthFilter, setMonthFilter] = useState<string>(() => {
-    const now = new Date();
-    const kst = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
-    return `${kst.getFullYear()}-${String(kst.getMonth() + 1).padStart(2, "0")}`;
-  });
   const [memberMaritalFilter, setMemberMaritalFilter] = useState<"all" | "싱글" | "돌싱" | "empty">("all");
 
   // 매칭파티 CRUD state
@@ -287,9 +280,9 @@ export default function AdminDashboard() {
     const p = PARTIES.find(x => x.id === id);
     if (!p) return;
     const ams = (p as any).allowedMaritalStatus;
-    const tg  = (p as any).targetGroup;
-    const th  = (p as any).theme;
-    const lt  = (p as any).locationTag;
+    const tg = (p as any).targetGroup;
+    const th = (p as any).theme;
+    const lt = (p as any).locationTag;
     setPartyForm({
       id: p.id, title: p.title, description: (p as any).description ?? "",
       dateString: p.dateString, calendarDate: p.calendarDate,
@@ -300,7 +293,7 @@ export default function AdminDashboard() {
       maxAge: p.maxAge != null ? String(p.maxAge) : "",
       allowedMaritalStatus: (ams === "싱글" || ams === "돌싱") ? ams : "all",
       targetGroup: (tg === "싱글" || tg === "돌싱") ? tg : "",
-      theme:       (th === "티타임" || th === "와인파티" || th === "사케파티" || th === "쿠킹클래스") ? th : "",
+      theme: (th === "티타임" || th === "와인파티" || th === "사케파티" || th === "쿠킹클래스") ? th : "",
       locationTag: (lt === "서울" || lt === "성남" || lt === "수원" || lt === "인천" || lt === "용인" || lt === "기타") ? lt : "",
     });
     setPartyEditMode("edit");
@@ -421,20 +414,20 @@ export default function AdminDashboard() {
 
   const loadAll = useCallback(async () => {
     const [u, b, c, co, g, m, p] = await Promise.all([
-      fetch("/api/admin/users.php",    { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
+      fetch("/api/admin/users.php", { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
       fetch("/api/admin/bookings.php", { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
-      fetch("/api/admin/coupons.php",  { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
-      fetch("/api/admin/company.php",  { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
-      fetch("/api/admin/gallery.php",  { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
-      fetch("/api/admin/memos.php",    { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
-      fetch("/api/admin/parties.php",  { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
+      fetch("/api/admin/coupons.php", { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
+      fetch("/api/admin/company.php", { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
+      fetch("/api/admin/gallery.php", { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
+      fetch("/api/admin/memos.php", { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
+      fetch("/api/admin/parties.php", { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
     ]);
-    if (u?.users)    setUsers(u.users);
-    if (b?.rows)     setBookings(b.rows);
-    if (c?.coupons)  setCoupons(Array.isArray(c.coupons) ? c.coupons : []);
+    if (u?.users) setUsers(u.users);
+    if (b?.rows) setBookings(b.rows);
+    if (c?.coupons) setCoupons(Array.isArray(c.coupons) ? c.coupons : []);
     if (co?.company) setCompany(co.company);
-    if (g?.items)    setGallery(Array.isArray(g.items) ? g.items : []);
-    if (m?.items)    setMemos(Array.isArray(m.items) ? m.items : []);
+    if (g?.items) setGallery(Array.isArray(g.items) ? g.items : []);
+    if (m?.items) setMemos(Array.isArray(m.items) ? m.items : []);
     // 호스트 매핑 — 관리자 전용 GET 응답에서만 host_name 노출
     if (Array.isArray(p?.items)) {
       const map: Record<string, string> = {};
@@ -536,7 +529,7 @@ export default function AdminDashboard() {
 
   // 후기 갤러리 — 메인페이지 즉시 동기화 broadcast 헬퍼
   const broadcastGallery = () => {
-    try { new BroadcastChannel("woollim_gallery").postMessage({ at: Date.now() }); } catch {}
+    try { new BroadcastChannel("woollim_gallery").postMessage({ at: Date.now() }); } catch { }
   };
 
   const uploadGalleryImage = async (file: File) => {
@@ -589,9 +582,9 @@ export default function AdminDashboard() {
     if (swapIdx < 0 || swapIdx >= gallery.length) return;
     // 두 항목의 sort_order 값을 swap
     const next = [...gallery];
-    const a = { ...next[idx],     sort_order: gallery[swapIdx].sort_order };
+    const a = { ...next[idx], sort_order: gallery[swapIdx].sort_order };
     const b = { ...next[swapIdx], sort_order: gallery[idx].sort_order };
-    next[idx]     = swapIdx > idx ? b : a;
+    next[idx] = swapIdx > idx ? b : a;
     next[swapIdx] = swapIdx > idx ? a : b;
     setGallery(next.sort((x, y) => x.sort_order - y.sort_order));
 
@@ -669,7 +662,7 @@ export default function AdminDashboard() {
     const d = await res.json();
     if (d?.ok) {
       // 다른 탭(메인/상세)의 partyCounts 즉시 갱신
-      try { new BroadcastChannel("woollim_party_counts").postMessage({ at: Date.now() }); } catch {}
+      try { new BroadcastChannel("woollim_party_counts").postMessage({ at: Date.now() }); } catch { }
       alert("취소 처리 완료");
       await loadAll();
     } else {
@@ -695,7 +688,7 @@ export default function AdminDashboard() {
       const ch = new BroadcastChannel("woollim_users");
       ch.postMessage({ type: "deleted", email, at: Date.now() });
       ch.close();
-    } catch {}
+    } catch { }
     await loadAll();
     alert("회원 삭제 완료 — 홈페이지에 즉시 반영되었습니다.");
   };
@@ -739,8 +732,8 @@ export default function AdminDashboard() {
         const ch = new BroadcastChannel("woollim_company");
         ch.postMessage({ company: d.company, at: Date.now() });
         ch.close();
-      } catch {}
-      try { localStorage.setItem("woollim_company", JSON.stringify(d.company)); } catch {}
+      } catch { }
+      try { localStorage.setItem("woollim_company", JSON.stringify(d.company)); } catch { }
       alert("기업 정보 저장 완료 — 홈페이지에 즉시 반영되었습니다.");
     }
     else alert("저장 실패");
@@ -757,14 +750,14 @@ export default function AdminDashboard() {
   });
 
   const TABS: { key: TabKey; label: string; icon: typeof Users }[] = [
-    { key: "members",  label: "회원 관리",       icon: Users },
+    { key: "members", label: "회원 관리", icon: Users },
     { key: "bookings", label: "예약 / 신청 현황", icon: Ticket },
-    { key: "parties",  label: "매칭파티",        icon: Calendar },
-    { key: "coupons",  label: "쿠폰 관리",       icon: Tag },
-    { key: "company",  label: "기업 정보",       icon: Building2 },
-    { key: "gallery",  label: "후기 갤러리 관리", icon: ImageIcon },
-    { key: "logs",     label: "로그 관리",        icon: FileText },
-    { key: "memos",    label: "업무 메모",        icon: StickyNote },
+    { key: "parties", label: "매칭파티", icon: Calendar },
+    { key: "coupons", label: "쿠폰 관리", icon: Tag },
+    { key: "company", label: "기업 정보", icon: Building2 },
+    { key: "gallery", label: "후기 갤러리 관리", icon: ImageIcon },
+    { key: "logs", label: "로그 관리", icon: FileText },
+    { key: "memos", label: "업무 메모", icon: StickyNote },
   ];
 
   return (
@@ -790,9 +783,8 @@ export default function AdminDashboard() {
               const active = tab === t.key;
               return (
                 <button key={t.key} onClick={() => setTab(t.key)}
-                  className={`flex items-center gap-2 px-3 md:px-5 py-3 text-xs md:text-sm font-bold whitespace-nowrap transition-all border-b-2 ${
-                    active ? "border-brand-point text-brand-point" : "border-transparent text-gray-400 hover:text-white"
-                  }`}
+                  className={`flex items-center gap-2 px-3 md:px-5 py-3 text-xs md:text-sm font-bold whitespace-nowrap transition-all border-b-2 ${active ? "border-brand-point text-brand-point" : "border-transparent text-gray-400 hover:text-white"
+                    }`}
                 >
                   <Icon size={14} /> {t.label}
                 </button>
@@ -808,8 +800,8 @@ export default function AdminDashboard() {
           {/* === 회원 관리 === */}
           {tab === "members" && (() => {
             const filteredUsers = users.filter(u => {
-              if (memberMaritalFilter === "all")    return true;
-              if (memberMaritalFilter === "empty")  return !(u.marital_status ?? "").trim();
+              if (memberMaritalFilter === "all") return true;
+              if (memberMaritalFilter === "empty") return !(u.marital_status ?? "").trim();
               return u.marital_status === memberMaritalFilter;
             });
             return (
@@ -840,7 +832,7 @@ export default function AdminDashboard() {
                   <table className="w-full text-sm whitespace-nowrap">
                     <thead className="bg-gray-50 text-gray-600 font-bold">
                       <tr>
-                        {["#","이메일","이름","성별","혼인여부","연락처","지역","직업","MBTI","생년월일","SNS","가입일","관리"].map(h => (
+                        {["#", "이메일", "이름", "성별", "혼인여부", "연락처", "지역", "직업", "MBTI", "생년월일", "SNS", "가입일", "관리"].map(h => (
                           <th key={h} className="text-left px-3 py-3">{h}</th>
                         ))}
                       </tr>
@@ -850,9 +842,9 @@ export default function AdminDashboard() {
                         // 관용성: DB legacy 값('single'/'divorced') 도 한글로 정규화
                         const rawMs = (u.marital_status ?? "").trim().toLowerCase();
                         const ms =
-                          rawMs === "싱글"  || rawMs === "single"   || rawMs === "미혼" ? "싱글" :
-                          rawMs === "돌싱"  || rawMs === "divorced"                     ? "돌싱" :
-                          "";
+                          rawMs === "싱글" || rawMs === "single" || rawMs === "미혼" ? "싱글" :
+                            rawMs === "돌싱" || rawMs === "divorced" ? "돌싱" :
+                              "";
                         return (
                           <tr key={u.id} className="border-t border-gray-100 hover:bg-gray-50">
                             <td className="px-3 py-2.5 font-bold">{u.id}</td>
@@ -900,61 +892,27 @@ export default function AdminDashboard() {
             );
           })()}
 
-          {/* === 예약 / 신청 현황 (월별 + 파티별 그룹화 + 성별 분리) === */}
+          {/* === 예약 / 신청 현황 (파티별 그룹화 + 성별 분리) === */}
           {tab === "bookings" && (() => {
-            // 신청자별 정렬: 결제일 ASC (이른 결제 먼저). admin/bookings.php 가 DESC 로 주는 것을 reverse.
-            const sortByCreatedAsc = (a: BookingRow, b: BookingRow) =>
-              (a.createdAt || "").localeCompare(b.createdAt || "");
-
             // 파티별로 그룹화 (status filter 적용)
             const byParty: Record<string, BookingRow[]> = {};
             for (const b of bookings) {
               if (statusFilter !== "all" && b.status !== statusFilter) continue;
               (byParty[b.partyId] = byParty[b.partyId] || []).push(b);
             }
-            // 각 파티 신청자 결제일 ASC 정렬
-            for (const pid in byParty) byParty[pid].sort(sortByCreatedAsc);
-
-            // 월 옵션 — PARTIES 의 calendarDate 에서 unique YYYY-MM 추출 (DESC, 최신 월 먼저)
-            const monthSet = new Set<string>();
-            for (const p of PARTIES) {
-              if (p.calendarDate && /^\d{4}-\d{2}/.test(p.calendarDate)) {
-                monthSet.add(p.calendarDate.slice(0, 7));
-              }
-            }
-            const monthOptions = Array.from(monthSet).sort((a, b) => b.localeCompare(a));
-
-            // 월 필터 적용 + 파티 일시 ASC 정렬
-            const filteredParties = [...PARTIES]
-              .filter(p => monthFilter === "all" || (p.calendarDate || "").startsWith(monthFilter))
-              .sort((a, b) => a.calendarDate.localeCompare(b.calendarDate));
-            const orderedPartyIds = filteredParties.map(p => p.id);
-
-            // 월 라벨 헬퍼
-            const labelMonth = (m: string) => {
-              if (m === "all") return "전체 월";
-              const [y, mm] = m.split("-");
-              return `${y}년 ${parseInt(mm, 10)}월`;
-            };
-
+            // 신청자 0명인 파티도 포함 — PARTIES 전체를 calendarDate 오름차순으로 노출
+            const orderedPartyIds = [...PARTIES]
+              .sort((a, b) => a.calendarDate.localeCompare(b.calendarDate))
+              .map(p => p.id);
             return (
               <section>
                 <div className="flex items-end justify-between mb-4 md:mb-5 flex-wrap gap-3">
                   <div>
                     <h2 className="text-xl md:text-2xl font-black">예약 / 신청 현황</h2>
                     <p className="text-sm text-gray-500 font-medium mt-1">
-                      <span className="font-bold text-brand-point">{labelMonth(monthFilter)}</span> · 매칭파티 {orderedPartyIds.length}개 · 전체 {bookings.length}건
+                      전체 {bookings.length}건 · 매칭파티 {orderedPartyIds.length}개
                     </p>
                   </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <select value={monthFilter} onChange={e => setMonthFilter(e.target.value)}
-                      className="px-3 py-2 rounded-lg border border-gray-200 text-sm font-bold bg-white text-brand-black"
-                      aria-label="월 필터">
-                      <option value="all">전체 월</option>
-                      {monthOptions.map(m => (
-                        <option key={m} value={m}>{labelMonth(m)}</option>
-                      ))}
-                    </select>
                   <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)}
                     className="px-3 py-2 rounded-lg border border-gray-200 text-sm font-medium bg-white" aria-label="상태 필터">
                     <option value="all">전체 상태</option>
@@ -962,16 +920,15 @@ export default function AdminDashboard() {
                     <option value="pending_approval">확정 대기 중</option>
                     <option value="confirmed">참가 확정 완료</option>
                   </select>
-                  </div>
                 </div>
 
                 {/* 통계 요약 */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-5 md:mb-6">
                   {[
                     { key: "paid_pending_profile", label: "결제완료(프로필 대기)", icon: AlertTriangle },
-                    { key: "pending_approval",     label: "확정 대기 중",         icon: Clock },
-                    { key: "confirmed",            label: "참가 확정 완료",       icon: CheckCircle2 },
-                    { key: "all",                  label: "전체",                  icon: Ticket },
+                    { key: "pending_approval", label: "확정 대기 중", icon: Clock },
+                    { key: "confirmed", label: "참가 확정 완료", icon: CheckCircle2 },
+                    { key: "all", label: "전체", icon: Ticket },
                   ].map(s => {
                     const count = s.key === "all" ? bookings.length : bookings.filter(b => b.status === s.key).length;
                     const Icon = s.icon;
@@ -994,7 +951,7 @@ export default function AdminDashboard() {
                   {orderedPartyIds.map(pid => {
                     const party = PARTIES.find(p => p.id === pid);
                     const partyRows = byParty[pid] || [];
-                    const males   = partyRows.filter(r => r.userGender === "남성");
+                    const males = partyRows.filter(r => r.userGender === "남성");
                     const females = partyRows.filter(r => r.userGender === "여성");
                     // 취소건 제외한 결제 합계
                     const totalRevenue = partyRows
@@ -1074,7 +1031,7 @@ export default function AdminDashboard() {
                         {/* 남성 신청자 */}
                         <BookingTable label="남성 신청자" toneClass="bg-[#4facfe]/10 text-[#3a85d9]" rows={males} party={party} onApprove={approveBooking} onCancel={cancelBooking} />
                         {/* 여성 신청자 */}
-                        <BookingTable label="여성 신청자" toneClass="bg-rose-100 text-rose-700"        rows={females} party={party} onApprove={approveBooking} onCancel={cancelBooking} />
+                        <BookingTable label="여성 신청자" toneClass="bg-rose-100 text-rose-700" rows={females} party={party} onApprove={approveBooking} onCancel={cancelBooking} />
                       </div>
                     );
                   })}
@@ -1100,7 +1057,7 @@ export default function AdminDashboard() {
                 <table className="w-full text-sm whitespace-nowrap">
                   <thead className="bg-gray-50 text-gray-600 font-bold">
                     <tr>
-                      {["#","이미지","제목","태그","일시","장소","대상","참가비","정원(남/여)","액션"].map(h => (
+                      {["#", "이미지", "제목", "태그", "일시", "장소", "대상", "참가비", "정원(남/여)", "액션"].map(h => (
                         <th key={h} className="text-left px-3 py-3">{h}</th>
                       ))}
                     </tr>
@@ -1112,7 +1069,7 @@ export default function AdminDashboard() {
                         <td className="px-3 py-2.5">
                           {(p as any).imageUrl
                             ? <img src={(p as any).imageUrl} alt="" className="w-12 h-9 object-cover rounded" />
-                            : <div className="w-12 h-9 bg-gray-100 rounded flex items-center justify-center text-gray-300"><ImageIcon size={14}/></div>}
+                            : <div className="w-12 h-9 bg-gray-100 rounded flex items-center justify-center text-gray-300"><ImageIcon size={14} /></div>}
                         </td>
                         <td className="px-3 py-2.5 font-bold">{p.title}</td>
                         <td className="px-3 py-2.5"><span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">{p.tag}</span></td>
@@ -1124,10 +1081,10 @@ export default function AdminDashboard() {
                         <td className="px-3 py-2.5">
                           <div className="flex gap-1.5">
                             <button onClick={() => openPartyEdit(p.id)} className="bg-brand-black text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-brand-point transition-all">
-                              <Pencil size={11} className="inline mr-1"/>수정
+                              <Pencil size={11} className="inline mr-1" />수정
                             </button>
                             <button onClick={() => deleteParty(p.id)} className="bg-red-50 text-red-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-100 transition-all">
-                              <Trash2 size={11} className="inline mr-1"/>삭제
+                              <Trash2 size={11} className="inline mr-1" />삭제
                             </button>
                           </div>
                         </td>
@@ -1151,7 +1108,7 @@ export default function AdminDashboard() {
                     {/* 고정 헤더 */}
                     <div className="bg-white border-b border-gray-200 px-5 md:px-7 py-4 flex items-center justify-between flex-shrink-0">
                       <h3 className="font-black text-base md:text-lg">{partyEditMode === "create" ? "신규 매칭파티 등록" : `매칭파티 수정 #${partyForm.id}`}</h3>
-                      <button onClick={closePartyForm} className="text-gray-400 hover:text-gray-700 p-1 -mr-1" aria-label="닫기"><X size={20}/></button>
+                      <button onClick={closePartyForm} className="text-gray-400 hover:text-gray-700 p-1 -mr-1" aria-label="닫기"><X size={20} /></button>
                     </div>
                     {/* 스크롤 가능한 본문 */}
                     <div className="flex-1 overflow-y-auto overscroll-contain p-5 md:p-7 space-y-4">
@@ -1161,17 +1118,17 @@ export default function AdminDashboard() {
                         <div className="flex items-start gap-3">
                           <div className="w-28 h-20 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0">
                             {partyForm.imageUrl
-                              ? <img src={partyForm.imageUrl} alt="" className="w-full h-full object-cover"/>
-                              : <ImageIcon size={20} className="text-gray-300"/>}
+                              ? <img src={partyForm.imageUrl} alt="" className="w-full h-full object-cover" />
+                              : <ImageIcon size={20} className="text-gray-300" />}
                           </div>
                           <div className="flex-1 min-w-0">
                             <input type="file" accept="image/*" aria-label="대표 이미지"
                               onChange={e => { const f = e.target.files?.[0]; if (f) uploadImage(f); }}
-                              className="block w-full text-xs file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-brand-black file:text-white file:font-bold file:cursor-pointer hover:file:bg-brand-point"/>
+                              className="block w-full text-xs file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-brand-black file:text-white file:font-bold file:cursor-pointer hover:file:bg-brand-point" />
                             <p className="text-xs text-gray-400 mt-1.5">JPG/PNG/WebP, 최대 5MB. 권장 1200×800</p>
                             {uploading && <p className="text-xs text-brand-point mt-1">업로드 중...</p>}
                             {partyForm.imageUrl && (
-                              <button onClick={() => setPartyForm(p => ({...p, imageUrl: ""}))}
+                              <button onClick={() => setPartyForm(p => ({ ...p, imageUrl: "" }))}
                                 className="text-xs text-red-500 mt-1.5 underline">이미지 제거</button>
                             )}
                           </div>
@@ -1179,38 +1136,38 @@ export default function AdminDashboard() {
                       </div>
 
                       {/* 제목 */}
-                      <FormField label="제목 *" value={partyForm.title} onChange={v => setPartyForm(p => ({...p, title: v}))}/>
+                      <FormField label="제목 *" value={partyForm.title} onChange={v => setPartyForm(p => ({ ...p, title: v }))} />
                       {/* 내용 */}
-                      <FormField label="내용 (소개)" value={partyForm.description} onChange={v => setPartyForm(p => ({...p, description: v}))} textarea/>
+                      <FormField label="내용 (소개)" value={partyForm.description} onChange={v => setPartyForm(p => ({ ...p, description: v }))} textarea />
                       {/* 일시 */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <FormField label="일시 (표시용 텍스트) *" value={partyForm.dateString} onChange={v => setPartyForm(p => ({...p, dateString: v}))} placeholder="2026. 8. 1 (토) 19:00"/>
+                        <FormField label="일시 (표시용 텍스트) *" value={partyForm.dateString} onChange={v => setPartyForm(p => ({ ...p, dateString: v }))} placeholder="2026. 8. 1 (토) 19:00" />
                         <div>
                           <label className="block text-sm font-bold text-gray-700 mb-1.5">달력 날짜 *</label>
-                          <input type="date" value={partyForm.calendarDate} onChange={e => setPartyForm(p => ({...p, calendarDate: e.target.value}))}
-                            className="w-full px-4 py-3 rounded-lg border border-gray-200 text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none" aria-label="달력 날짜"/>
+                          <input type="date" value={partyForm.calendarDate} onChange={e => setPartyForm(p => ({ ...p, calendarDate: e.target.value }))}
+                            className="w-full px-4 py-3 rounded-lg border border-gray-200 text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none" aria-label="달력 날짜" />
                         </div>
                       </div>
                       {/* 장소/대상 */}
-                      <FormField label="장소 *" value={partyForm.location} onChange={v => setPartyForm(p => ({...p, location: v}))}/>
-                      <FormField label="대상 *" value={partyForm.target} onChange={v => setPartyForm(p => ({...p, target: v}))} placeholder="만 25-35세 / 남녀비율 1:1"/>
+                      <FormField label="장소 *" value={partyForm.location} onChange={v => setPartyForm(p => ({ ...p, location: v }))} />
+                      <FormField label="대상 *" value={partyForm.target} onChange={v => setPartyForm(p => ({ ...p, target: v }))} placeholder="만 25-35세 / 남녀비율 1:1" />
                       {/* 참가비 */}
                       <div>
                         <label className="block text-sm font-bold text-gray-700 mb-1.5">참가비 (원) *</label>
-                        <input type="number" min={0} value={partyForm.price} onChange={e => setPartyForm(p => ({...p, price: parseInt(e.target.value || "0", 10)}))}
-                          className="w-full px-4 py-3 rounded-lg border border-gray-200 text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none" aria-label="참가비"/>
+                        <input type="number" min={0} value={partyForm.price} onChange={e => setPartyForm(p => ({ ...p, price: parseInt(e.target.value || "0", 10) }))}
+                          className="w-full px-4 py-3 rounded-lg border border-gray-200 text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none" aria-label="참가비" />
                       </div>
                       {/* 정원 */}
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-bold text-gray-700 mb-1.5">남성 정원 *</label>
-                          <input type="number" min={0} max={100} value={partyForm.maleStock} onChange={e => setPartyForm(p => ({...p, maleStock: parseInt(e.target.value || "0", 10)}))}
-                            className="w-full px-4 py-3 rounded-lg border border-gray-200 text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none" aria-label="남성 정원"/>
+                          <input type="number" min={0} max={100} value={partyForm.maleStock} onChange={e => setPartyForm(p => ({ ...p, maleStock: parseInt(e.target.value || "0", 10) }))}
+                            className="w-full px-4 py-3 rounded-lg border border-gray-200 text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none" aria-label="남성 정원" />
                         </div>
                         <div>
                           <label className="block text-sm font-bold text-gray-700 mb-1.5">여성 정원 *</label>
-                          <input type="number" min={0} max={100} value={partyForm.femaleStock} onChange={e => setPartyForm(p => ({...p, femaleStock: parseInt(e.target.value || "0", 10)}))}
-                            className="w-full px-4 py-3 rounded-lg border border-gray-200 text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none" aria-label="여성 정원"/>
+                          <input type="number" min={0} max={100} value={partyForm.femaleStock} onChange={e => setPartyForm(p => ({ ...p, femaleStock: parseInt(e.target.value || "0", 10) }))}
+                            className="w-full px-4 py-3 rounded-lg border border-gray-200 text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none" aria-label="여성 정원" />
                         </div>
                       </div>
 
@@ -1334,7 +1291,7 @@ export default function AdminDashboard() {
                 </div>
                 <div className="flex gap-2">
                   <button onClick={addCoupon} className="inline-flex items-center gap-1.5 bg-brand-point text-brand-black px-4 py-2.5 rounded-lg text-sm font-black hover:brightness-95 transition-all">
-                    <Plus size={14}/> 쿠폰 추가
+                    <Plus size={14} /> 쿠폰 추가
                   </button>
                   <button onClick={saveCoupons} className="bg-brand-black text-white px-4 py-2.5 rounded-lg text-sm font-black hover:bg-brand-point transition-all">
                     저장
@@ -1396,7 +1353,7 @@ export default function AdminDashboard() {
                         </td>
                         <td className="px-3 md:px-4 py-3">
                           <button onClick={() => removeCoupon(idx)} className="bg-red-50 text-red-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-100 transition-all">
-                            <Trash2 size={11} className="inline mr-1"/>삭제
+                            <Trash2 size={11} className="inline mr-1" />삭제
                           </button>
                         </td>
                       </tr>
@@ -1405,9 +1362,9 @@ export default function AdminDashboard() {
                 </table>
               </div>
               <p className="text-xs text-gray-400 mt-3 leading-relaxed">
-                · 쿠폰 코드는 대문자/숫자 조합 권장. 동일 코드 중복 시 자동 병합됩니다.<br/>
-                · 만료일이 비어있으면 무기한 사용 가능. 만료일은 해당 날짜 자정까지 유효.<br/>
-                · 한 사용자가 동일 쿠폰을 두 번 이상 사용할 수 없습니다.<br/>
+                · 쿠폰 코드는 대문자/숫자 조합 권장. 동일 코드 중복 시 자동 병합됩니다.<br />
+                · 만료일이 비어있으면 무기한 사용 가능. 만료일은 해당 날짜 자정까지 유효.<br />
+                · 한 사용자가 동일 쿠폰을 두 번 이상 사용할 수 없습니다.<br />
                 · 변경 후 [저장] 버튼을 눌러야 적용됩니다.
               </p>
             </section>
@@ -1424,9 +1381,9 @@ export default function AdminDashboard() {
               </div>
               <div className="bg-white rounded-2xl border border-gray-200 p-5 md:p-6 space-y-4">
                 {([
-                  ["name",    "상호명"],
-                  ["ceo",     "대표자명"],
-                  ["biz_no",  "사업자등록번호"],
+                  ["name", "상호명"],
+                  ["ceo", "대표자명"],
+                  ["biz_no", "사업자등록번호"],
                   ["address", "주소"],
                   ["telecom", "통신판매업신고"],
                 ] as const).map(([key, label]) => (
@@ -1609,7 +1566,7 @@ export default function AdminDashboard() {
                 <table className="w-full text-xs md:text-sm whitespace-nowrap">
                   <thead className="bg-gray-50 text-gray-600 font-bold">
                     <tr>
-                      {["일시","관리자","IP","활동","대상","요약","상세"].map(h => (
+                      {["일시", "관리자", "IP", "활동", "대상", "요약", "상세"].map(h => (
                         <th key={h} className="text-left px-3 py-3 first:pl-5">{h}</th>
                       ))}
                     </tr>
@@ -1624,13 +1581,13 @@ export default function AdminDashboard() {
                       const isHighlight = row.action === "delete" || row.action === "login_fail";
                       const expanded = logExpanded.has(row.id);
                       const actionMeta: Record<string, { label: string; tone: string }> = {
-                        login:      { label: "로그인",      tone: "bg-blue-100 text-blue-800" },
-                        logout:     { label: "로그아웃",    tone: "bg-gray-200 text-gray-700" },
+                        login: { label: "로그인", tone: "bg-blue-100 text-blue-800" },
+                        logout: { label: "로그아웃", tone: "bg-gray-200 text-gray-700" },
                         login_fail: { label: "로그인 실패", tone: "bg-red-100 text-red-700" },
-                        create:     { label: "등록",        tone: "bg-emerald-100 text-emerald-800" },
-                        update:     { label: "수정",        tone: "bg-amber-100 text-amber-800" },
-                        delete:     { label: "삭제",        tone: "bg-red-100 text-red-700" },
-                        view:       { label: "조회",        tone: "bg-gray-100 text-gray-600" },
+                        create: { label: "등록", tone: "bg-emerald-100 text-emerald-800" },
+                        update: { label: "수정", tone: "bg-amber-100 text-amber-800" },
+                        delete: { label: "삭제", tone: "bg-red-100 text-red-700" },
+                        view: { label: "조회", tone: "bg-gray-100 text-gray-600" },
                       };
                       const meta = actionMeta[row.action] ?? { label: row.action, tone: "bg-gray-100 text-gray-600" };
                       return (
@@ -1671,13 +1628,13 @@ export default function AdminDashboard() {
                                   <div>
                                     <p className="font-black text-gray-500 mb-1">변경 전</p>
                                     <pre className="bg-white border border-gray-200 rounded-lg p-3 overflow-auto max-h-60 whitespace-pre-wrap break-words text-[11px] text-gray-700">
-{row.before_value ? JSON.stringify(row.before_value, null, 2) : "(없음)"}
+                                      {row.before_value ? JSON.stringify(row.before_value, null, 2) : "(없음)"}
                                     </pre>
                                   </div>
                                   <div>
                                     <p className="font-black text-gray-500 mb-1">변경 후</p>
                                     <pre className="bg-white border border-gray-200 rounded-lg p-3 overflow-auto max-h-60 whitespace-pre-wrap break-words text-[11px] text-gray-700">
-{row.after_value ? JSON.stringify(row.after_value, null, 2) : "(없음)"}
+                                      {row.after_value ? JSON.stringify(row.after_value, null, 2) : "(없음)"}
                                     </pre>
                                   </div>
                                 </div>

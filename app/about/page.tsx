@@ -27,7 +27,7 @@ export default function AboutPage() {
                 어울림은 서로 다른 사람들이 자연스럽게 만나 특별한 인연이 되는
                 <span className="font-bold text-gray-900"> 매칭 파티 플랫폼</span>입니다.
                 우리는 숫자와 효율이 지배하는 세상에서 잃어버린
-                <span className="font-bold text-gray-900"> '진짜 연결'</span>의 가치를 회복하고자 합니다.
+                <span className="font-bold text-gray-900"> &lsquo;진짜 연결&rsquo;</span>의 가치를 회복하고자 합니다.
               </p>
 
               {/* Logo Identity Section */}
@@ -59,7 +59,7 @@ export default function AboutPage() {
                     <p className="text-sm md:text-base text-gray-600 leading-relaxed mb-5 md:mb-6">
                       사람과 사람 사이의 유연한
                       <span className="font-bold text-brand-point"> 연결</span>과 만남에서 시작되는
-                      기분 좋은 <span className="font-bold text-brand-point">'울림'</span>을 시각화했습니다.
+                      기분 좋은 <span className="font-bold text-brand-point">&lsquo;울림&rsquo;</span>을 시각화했습니다.
                       포인트 요소는 연결의 시작점과
                       <span className="font-bold text-brand-point"> 설렘</span>을 상징합니다.
                     </p>

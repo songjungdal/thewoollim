@@ -24,7 +24,7 @@ export default function TermsPage() {
               <section>
                 <h2 className="text-xl md:text-2xl font-black text-black mb-4 md:mb-6">제1조 목적</h2>
                 <div className="space-y-3 md:space-y-4 text-gray-800">
-                  <p>본 이용약관은 "어울림"(이하 "사이트")이 제공하는 서비스의 이용조건과 운영에 관한 제반 사항 규정을 목적으로 합니다.</p>
+                  <p>본 이용약관은 &ldquo;어울림&rdquo;(이하 &ldquo;사이트&rdquo;)이 제공하는 서비스의 이용조건과 운영에 관한 제반 사항 규정을 목적으로 합니다.</p>
                 </div>
               </section>
 
@@ -35,7 +35,7 @@ export default function TermsPage() {
                   <ul className="list-disc pl-5 md:pl-6 space-y-3 md:space-y-4">
                     <li><span className="font-bold">회원:</span> 사이트의 약관에 동의하고 개인정보를 제공하여 회원등록을 한 자로서, 사이트와의 이용계약을 체결하고 서비스를 이용하는 이용자를 말합니다.</li>
                     <li><span className="font-bold">이용계약:</span> 사이트 이용과 관련하여 사이트와 회원 간에 체결하는 계약을 말합니다.</li>
-                    <li><span className="font-bold">회원 아이디(이하 "ID"):</span> 회원의 식별과 서비스 이용을 위하여 회원별로 부여하는 고유한 문자와 숫자의 조합을 말합니다.</li>
+                    <li><span className="font-bold">회원 아이디(이하 &ldquo;ID&rdquo;):</span> 회원의 식별과 서비스 이용을 위하여 회원별로 부여하는 고유한 문자와 숫자의 조합을 말합니다.</li>
                     <li><span className="font-bold">비밀번호:</span> 회원이 부여받은 ID와 일치된 회원임을 확인하고 회원의 권익 보호를 위하여 회원이 선정한 문자와 숫자의 조합을 말합니다.</li>
                     <li><span className="font-bold">운영자:</span> 서비스 웹사이트를 개설하여 운영하는 주체를 말합니다.</li>
                     <li><span className="font-bold">해지:</span> 회원이 이용계약을 해약하는 것을 말합니다.</li>
@@ -54,7 +54,7 @@ export default function TermsPage() {
                 <h2 className="text-xl md:text-2xl font-black text-black mb-4 md:mb-6">제4조 이용계약 체결</h2>
                 <div className="space-y-3 md:space-y-4 text-gray-800">
                   <p>이용계약은 회원으로 등록하여 사이트를 이용하려는 자의 본 약관 내용에 대한 동의와 가입신청에 대하여 운영자의 이용승낙으로 성립합니다.</p>
-                  <p>회원으로 등록하여 서비스를 이용하려는 자는 사이트 가입신청 시 본 약관을 읽고 "동의합니다"를 선택하는 것으로 의사 표시를 대신합니다.</p>
+                  <p>회원으로 등록하여 서비스를 이용하려는 자는 사이트 가입신청 시 본 약관을 읽고 &ldquo;동의합니다&rdquo;를 선택하는 것으로 의사 표시를 대신합니다.</p>
                 </div>
               </section>
 

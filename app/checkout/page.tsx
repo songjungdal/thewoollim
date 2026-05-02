@@ -42,6 +42,7 @@ function CheckoutContent() {
   const totalQty = partyIds.length;
 
   const [agreed, setAgreed] = useState(false);
+  const [paying, setPaying] = useState(false);
 
   // 결제 대상 파티 안에 적용된 쿠폰만 유효
   const couponApplicable = !!appliedCoupon && uniquePartyIds.includes(appliedCoupon.partyId);
@@ -90,8 +91,6 @@ function CheckoutContent() {
   const orderName = totalQty === 1
     ? parties[0].title
     : `${parties[0].title} 외 ${totalQty - 1}건`;
-
-  const [paying, setPaying] = useState(false);
 
   const handlePayment = async () => {
     if (paying) return;
