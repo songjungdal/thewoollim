@@ -1016,16 +1016,31 @@ export default function AdminDashboard() {
                       <div key={pid} className="bg-white rounded-2xl border-2 border-brand-point/20 overflow-hidden">
                         {/* 파티 헤더 */}
                         <div className="bg-gradient-to-r from-brand-point/10 to-white px-5 md:px-7 py-4 md:py-5 border-b border-gray-100">
-                          <div className="flex items-start justify-between gap-3 flex-wrap">
-                            <div className="flex items-baseline gap-x-3 gap-y-1 flex-wrap min-w-0">
-                              <h3 className="text-lg md:text-2xl font-black text-brand-black">{party?.title ?? `파티 #${pid}`}</h3>
-                              <span className="text-xs md:text-sm text-gray-500 font-bold">{party?.dateString ?? ""}</span>
-                              <span className="text-base md:text-xl font-black text-brand-black">
+                          {/*
+                            제목 행 컨테이너 — items-center 로 좌우 그룹 수직 중앙 정렬
+                            모바일에선 flex-wrap 으로 우측 그룹이 자연 줄바꿈, 그래도 각 그룹 내부 정렬 유지
+                          */}
+                          <div className="flex items-center justify-between gap-4 md:gap-6 flex-wrap">
+                            {/*
+                              좌측 — 제목 / 날짜 / 매출액
+                              · flex-1 min-w-0 : 가용 공간 채움 + 긴 제목 wrap 허용
+                              · items-center   : 줄바꿈 시에도 수직 중앙 유지
+                              · gap-x-3 gap-y-1 : 한 줄 / 두 줄 모두 균일 간격
+                            */}
+                            <div className="flex items-center gap-x-3 gap-y-1 flex-wrap min-w-0 flex-1">
+                              <h3 className="text-lg md:text-2xl font-black text-brand-black break-keep">{party?.title ?? `파티 #${pid}`}</h3>
+                              <span className="text-xs md:text-sm text-gray-500 font-bold whitespace-nowrap">{party?.dateString ?? ""}</span>
+                              <span className="text-base md:text-xl font-black text-brand-black whitespace-nowrap">
                                 (총 결제 금액: {totalRevenue.toLocaleString()}원)
                               </span>
                             </div>
-                            {/* 우측 그룹 — 호스트 정보 + 매칭 투표 제어 (한 묶음, 모바일 자동 wrap) */}
-                            <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                            {/*
+                              우측 그룹 — 호스트 정보 + 매칭 투표 제어
+                              · self-center  : 부모 items-center 와 함께 수직 중앙 유지
+                              · flex-shrink-0 : 우측 그룹은 항상 고정 너비 (제목이 줄어듦)
+                              · items-end : 내부 두 행(호스트/버튼)을 우측 정렬
+                            */}
+                            <div className="flex flex-col items-end gap-1.5 flex-shrink-0 self-center">
                               {/* 호스트 인라인 편집 */}
                               {hostEditingId === pid ? (
                                 <div className="inline-flex items-center gap-1 bg-white border border-brand-point rounded-lg px-2 py-1 shadow-sm">
