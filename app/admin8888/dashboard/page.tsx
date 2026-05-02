@@ -1906,6 +1906,12 @@ export default function AdminDashboard() {
                   <p className="text-sm text-gray-500">등록된 메모가 없습니다. 우측 상단 [새 메모 추가] 버튼으로 시작하세요.</p>
                 </div>
               ) : (
+                /*
+                  메모 그리드 — PC 4열, 태블릿 3, 모바일 2/1.
+                  카드 높이 고정 h-64 (256px) — 내용 길어도 카드 자체는 일정.
+                  내부 본문 영역만 overflow-y-auto 로 스크롤.
+                  스크롤바: 평소엔 거의 투명, 호버 시 진해짐 (포스트잇 감성 유지)
+                */
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-5">
                   {memos.map((m, idx) => {
                     const editing = memoEditingId === m.id;
@@ -1914,29 +1920,34 @@ export default function AdminDashboard() {
                     return (
                       <div
                         key={m.id}
-                        className={`relative p-4 md:p-5 rounded-md shadow-md hover:shadow-xl transition-all duration-200 group min-h-[180px] [background:var(--memo-bg)] [transform:var(--memo-transform)] ${editing ? "ring-2 ring-brand-point" : ""}`}
+                        className={`relative p-4 md:p-5 rounded-md shadow-md hover:shadow-xl transition-all duration-200 group h-64 flex flex-col [background:var(--memo-bg)] [transform:var(--memo-transform)] ${editing ? "ring-2 ring-brand-point" : ""}`}
                         style={{
                           "--memo-bg": m.color || "#FEF9C3",
                           "--memo-transform": editing ? "rotate(0deg) scale(1.02)" : `rotate(${tilt}deg)`,
                         } as React.CSSProperties}
                       >
-                        {/* 핀 / 코너 효과 */}
-                        <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-red-500 shadow-md opacity-70 group-hover:opacity-90" />
+                        {/* 핀 / 코너 효과 — 카드 외부로 살짝 (overflow-visible) */}
+                        <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-red-500 shadow-md opacity-70 group-hover:opacity-90 z-10" />
 
+                        {/*
+                          본문 영역 — flex-1 로 카드 잔여 공간 채움.
+                          min-h-0  : flex item 이 max-content 로 부풀지 않게 (overflow 트리거 필수)
+                          -mr-2 pr-2 : 스크롤바가 본문을 가리지 않게 시각 보정
+                          스크롤바 webkit 커스텀: 평소 transparent thumb, 호버 시 black/20
+                        */}
                         {editing ? (
                           <textarea
                             autoFocus
                             aria-label={`메모 #${m.id} 수정`}
                             value={memoDraft}
                             onChange={e => setMemoDraft(e.target.value)}
-                            rows={6}
                             maxLength={5000}
-                            className="w-full bg-transparent border-none outline-none resize-none text-sm md:text-base text-gray-800 font-medium leading-relaxed font-gaegu"
+                            className="flex-1 min-h-0 -mr-2 pr-2 w-[calc(100%+0.5rem)] bg-transparent border-none outline-none resize-none text-sm md:text-base text-gray-800 font-medium leading-relaxed font-gaegu overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-black/20 focus:[&::-webkit-scrollbar-thumb]:bg-black/20"
                           />
                         ) : (
                           <div
                             onClick={() => startEditMemo(m)}
-                            className="cursor-text whitespace-pre-wrap break-words text-sm md:text-base text-gray-800 font-medium leading-relaxed pb-10 min-h-[120px] font-gaegu"
+                            className="flex-1 min-h-0 -mr-2 pr-2 cursor-text whitespace-pre-wrap break-words text-sm md:text-base text-gray-800 font-medium leading-relaxed font-gaegu overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full group-hover:[&::-webkit-scrollbar-thumb]:bg-black/20 hover:[&::-webkit-scrollbar-thumb]:bg-black/30"
                           >
                             {m.content}
                           </div>
@@ -1944,8 +1955,8 @@ export default function AdminDashboard() {
 
                         {/* 작성자/수정시각 노출 제거 — 추적은 admin_activity 로그(로그관리 탭)에 기록됨 */}
 
-                        {/* 하단 액션 영역 */}
-                        <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
+                        {/* 하단 액션 영역 — flex item (absolute 제거, 항상 카드 바닥에 고정) */}
+                        <div className="mt-3 pt-2 border-t border-black/10 flex items-center justify-between flex-shrink-0">
                           {/* 색상 팔레트 */}
                           <div className="flex gap-1">
                             {MEMO_COLORS.map(c => (
