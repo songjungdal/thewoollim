@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Users, Ticket, Tag, Building2, LogOut, ShieldCheck, CheckCircle2, Clock, AlertTriangle, Calendar, Plus, Pencil, Trash2, ImageIcon, X, FileText, Search } from "lucide-react";
+import { Users, Ticket, Tag, Building2, LogOut, ShieldCheck, CheckCircle2, Clock, AlertTriangle, Calendar, Plus, Pencil, Trash2, ImageIcon, X, FileText, Search, StickyNote, Save } from "lucide-react";
 import { useParties, broadcastPartiesUpdated } from "../../lib/useParties";
 import { formatPhoneKR } from "../../lib/phone";
 import { formatKST } from "../../lib/datetime";
@@ -22,7 +22,27 @@ type BookingRow = {
   userMbti?: string; userJob?: string; userBirthDate?: string;
   userInterests?: string; userIdealType?: string;
 };
-type TabKey = "members" | "bookings" | "parties" | "coupons" | "company" | "gallery" | "logs";
+type TabKey = "members" | "bookings" | "parties" | "coupons" | "company" | "gallery" | "logs" | "memos";
+
+type MemoItem = {
+  id: number;
+  content: string;
+  color: string;
+  author_id: string;
+  created_at: string;
+  updated_at: string;
+};
+
+const MEMO_COLORS = [
+  "#FEF9C3", // 연한 노랑
+  "#CCFBF1", // 연한 청록
+  "#FCE7F3", // 연한 핑크
+  "#DBEAFE", // 연한 하늘
+  "#DCFCE7", // 연한 연두
+  "#FED7AA", // 연한 주황
+  "#E9D5FF", // 연한 보라
+  "#F3F4F6", // 연한 회색
+];
 
 type GalleryItem = {
   id: number;
@@ -201,6 +221,13 @@ export default function AdminDashboard() {
   const [company, setCompany] = useState({ name: "", ceo: "", biz_no: "", address: "", telecom: "" });
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
   const [galleryUploading, setGalleryUploading] = useState(false);
+  // 업무 메모 (포스트잇)
+  const [memos, setMemos] = useState<MemoItem[]>([]);
+  const [memoEditingId, setMemoEditingId] = useState<number | null>(null);
+  const [memoDraft, setMemoDraft] = useState("");
+  const [memoNewOpen, setMemoNewOpen] = useState(false);
+  const [memoNewContent, setMemoNewContent] = useState("");
+  const [memoNewColor, setMemoNewColor] = useState(MEMO_COLORS[0]);
 
   // 로그 관리 상태
   const [logs, setLogs]                 = useState<AdminLogRow[]>([]);
@@ -383,19 +410,82 @@ export default function AdminDashboard() {
   }, [router]);
 
   const loadAll = useCallback(async () => {
-    const [u, b, c, co, g] = await Promise.all([
+    const [u, b, c, co, g, m] = await Promise.all([
       fetch("/api/admin/users.php",    { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
       fetch("/api/admin/bookings.php", { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
       fetch("/api/admin/coupons.php",  { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
       fetch("/api/admin/company.php",  { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
       fetch("/api/admin/gallery.php",  { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
+      fetch("/api/admin/memos.php",    { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
     ]);
     if (u?.users)    setUsers(u.users);
     if (b?.rows)     setBookings(b.rows);
     if (c?.coupons)  setCoupons(Array.isArray(c.coupons) ? c.coupons : []);
     if (co?.company) setCompany(co.company);
     if (g?.items)    setGallery(Array.isArray(g.items) ? g.items : []);
+    if (m?.items)    setMemos(Array.isArray(m.items) ? m.items : []);
   }, []);
+
+  // 업무 메모 — CRUD
+  const createMemo = async () => {
+    const content = memoNewContent.trim();
+    if (!content) { alert("내용을 입력해주세요."); return; }
+    const res = await fetch("/api/admin/memos.php", {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "create", content, color: memoNewColor }),
+    });
+    const d = await res.json();
+    if (!d?.ok) { alert(d?.error || "저장 실패"); return; }
+    setMemoNewOpen(false);
+    setMemoNewContent("");
+    setMemoNewColor(MEMO_COLORS[0]);
+    await loadAll();
+  };
+
+  const startEditMemo = (m: MemoItem) => {
+    setMemoEditingId(m.id);
+    setMemoDraft(m.content);
+  };
+
+  const saveEditMemo = async () => {
+    if (memoEditingId == null) return;
+    const content = memoDraft.trim();
+    if (!content) { alert("내용을 입력해주세요."); return; }
+    const res = await fetch("/api/admin/memos.php", {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "update", id: memoEditingId, content }),
+    });
+    const d = await res.json();
+    if (!d?.ok) { alert(d?.error || "저장 실패"); return; }
+    setMemoEditingId(null);
+    setMemoDraft("");
+    await loadAll();
+  };
+
+  const updateMemoColor = async (id: number, color: string) => {
+    const res = await fetch("/api/admin/memos.php", {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "update", id, color }),
+    });
+    const d = await res.json();
+    if (!d?.ok) { alert(d?.error || "색상 변경 실패"); return; }
+    setMemos(prev => prev.map(m => m.id === id ? { ...m, color } : m));
+  };
+
+  const deleteMemo = async (id: number) => {
+    if (!confirm("이 메모를 삭제하시겠습니까?")) return;
+    const res = await fetch("/api/admin/memos.php", {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "delete", id }),
+    });
+    const d = await res.json();
+    if (!d?.ok) { alert(d?.error || "삭제 실패"); return; }
+    setMemos(prev => prev.filter(m => m.id !== id));
+  };
 
   // 후기 갤러리 — 메인페이지 즉시 동기화 broadcast 헬퍼
   const broadcastGallery = () => {
@@ -627,6 +717,7 @@ export default function AdminDashboard() {
     { key: "company",  label: "기업 정보",       icon: Building2 },
     { key: "gallery",  label: "후기 갤러리 관리", icon: ImageIcon },
     { key: "logs",     label: "로그 관리",        icon: FileText },
+    { key: "memos",    label: "업무 메모",        icon: StickyNote },
   ];
 
   return (
@@ -1471,6 +1562,195 @@ export default function AdminDashboard() {
                 <Search size={11} className="inline mr-1" />
                 삭제 / 로그인 실패는 붉은색으로 강조됩니다. 조회 항목은 최대 300건까지, 전체 건수는 헤더에 표시됩니다.
               </p>
+            </section>
+          )}
+
+          {/* === 업무 메모 (포스트잇) === */}
+          {tab === "memos" && (
+            <section>
+              <div className="flex items-end justify-between mb-4 md:mb-5 flex-wrap gap-3">
+                <div>
+                  <h2 className="text-xl md:text-2xl font-black tracking-tight">업무 메모</h2>
+                  <p className="text-xs md:text-sm text-gray-500 mt-1">
+                    모든 관리자 계정이 공유하는 메모판입니다. 클릭하여 수정, 색상 변경, 삭제할 수 있습니다.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setMemoNewOpen(true); setMemoNewContent(""); setMemoNewColor(MEMO_COLORS[0]); }}
+                  className="inline-flex items-center gap-2 bg-brand-point hover:brightness-110 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-all"
+                >
+                  <Plus size={16} /> 새 메모 추가
+                </button>
+              </div>
+
+              {/* 새 메모 입력창 (모달 대신 인라인 카드) */}
+              {memoNewOpen && (
+                <div
+                  className="mb-5 p-5 rounded-2xl shadow-xl border border-gray-200 transform -rotate-1"
+                  style={{ background: memoNewColor }}
+                >
+                  <textarea
+                    autoFocus
+                    aria-label="새 메모 내용"
+                    value={memoNewContent}
+                    onChange={e => setMemoNewContent(e.target.value)}
+                    placeholder="메모 내용을 입력하세요..."
+                    rows={4}
+                    maxLength={5000}
+                    className="w-full bg-transparent border-none outline-none resize-none text-sm md:text-base text-gray-800 font-medium placeholder:text-gray-500 leading-relaxed"
+                    style={{ fontFamily: "'Gaegu', 'Pretendard', sans-serif" }}
+                  />
+                  <div className="flex flex-wrap items-center justify-between gap-2 mt-3 pt-3 border-t border-black/10">
+                    <div className="flex gap-1.5">
+                      {MEMO_COLORS.map(c => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setMemoNewColor(c)}
+                          className={`w-6 h-6 rounded-full border transition-all ${memoNewColor === c ? "ring-2 ring-offset-2 ring-gray-700 scale-110" : "border-gray-300 hover:scale-110"}`}
+                          style={{ background: c }}
+                          aria-label={`색상 ${c}`}
+                        />
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => { setMemoNewOpen(false); setMemoNewContent(""); }}
+                        className="px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-black/5 rounded-md transition-colors"
+                      >
+                        취소
+                      </button>
+                      <button
+                        type="button"
+                        onClick={createMemo}
+                        className="inline-flex items-center gap-1 px-4 py-1.5 text-xs font-black bg-brand-black text-white hover:bg-brand-point rounded-md transition-colors"
+                      >
+                        <Save size={12} /> 저장
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 메모 그리드 */}
+              {memos.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-gray-200 p-10 text-center">
+                  <StickyNote size={32} className="text-gray-300 mx-auto mb-3" />
+                  <p className="text-sm text-gray-500">등록된 메모가 없습니다. 우측 상단 [새 메모 추가] 버튼으로 시작하세요.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-5">
+                  {memos.map((m, idx) => {
+                    const editing = memoEditingId === m.id;
+                    // 자연스러운 포스트잇 느낌 — id 기반 약간의 회전
+                    const tilt = ((m.id % 5) - 2) * 0.6; // -1.2 ~ 1.2deg
+                    return (
+                      <div
+                        key={m.id}
+                        className={`relative p-4 md:p-5 rounded-md shadow-md hover:shadow-xl transition-all duration-200 group ${editing ? "ring-2 ring-brand-point" : ""}`}
+                        style={{
+                          background: m.color || "#FEF9C3",
+                          transform: editing ? "rotate(0deg) scale(1.02)" : `rotate(${tilt}deg)`,
+                          minHeight: 180,
+                        }}
+                      >
+                        {/* 핀 / 코너 효과 */}
+                        <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-red-500 shadow-md opacity-70 group-hover:opacity-90" />
+
+                        {editing ? (
+                          <textarea
+                            autoFocus
+                            aria-label={`메모 #${m.id} 수정`}
+                            value={memoDraft}
+                            onChange={e => setMemoDraft(e.target.value)}
+                            rows={6}
+                            maxLength={5000}
+                            className="w-full bg-transparent border-none outline-none resize-none text-sm md:text-base text-gray-800 font-medium leading-relaxed"
+                            style={{ fontFamily: "'Gaegu', 'Pretendard', sans-serif" }}
+                          />
+                        ) : (
+                          <div
+                            onClick={() => startEditMemo(m)}
+                            className="cursor-text whitespace-pre-wrap break-words text-sm md:text-base text-gray-800 font-medium leading-relaxed pb-10"
+                            style={{ fontFamily: "'Gaegu', 'Pretendard', sans-serif", minHeight: 100 }}
+                          >
+                            {m.content}
+                          </div>
+                        )}
+
+                        {/* 작성/수정자 + 시각 */}
+                        <p className="absolute bottom-12 left-4 text-[10px] text-gray-700/70 font-medium">
+                          @{m.author_id || "?"} · {m.updated_at}
+                        </p>
+
+                        {/* 하단 액션 영역 */}
+                        <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
+                          {/* 색상 팔레트 */}
+                          <div className="flex gap-1">
+                            {MEMO_COLORS.map(c => (
+                              <button
+                                key={c}
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); updateMemoColor(m.id, c); }}
+                                className={`w-3.5 h-3.5 rounded-full border transition-all ${m.color === c ? "ring-1 ring-offset-1 ring-gray-700" : "border-gray-400/50 hover:scale-125"}`}
+                                style={{ background: c }}
+                                aria-label={`색상 ${c}`}
+                              />
+                            ))}
+                          </div>
+                          {/* 수정/삭제 */}
+                          <div className="flex gap-1">
+                            {editing ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); setMemoEditingId(null); }}
+                                  className="p-1.5 hover:bg-black/10 rounded text-gray-700 transition-colors"
+                                  aria-label="취소"
+                                >
+                                  <X size={13} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); saveEditMemo(); }}
+                                  className="p-1.5 bg-brand-black text-white hover:bg-brand-point rounded transition-colors"
+                                  aria-label="저장"
+                                >
+                                  <Save size={13} />
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); startEditMemo(m); }}
+                                  className="p-1.5 hover:bg-black/10 rounded text-gray-700 transition-colors opacity-0 group-hover:opacity-100"
+                                  aria-label="수정"
+                                >
+                                  <Pencil size={13} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); deleteMemo(m.id); }}
+                                  className="p-1.5 hover:bg-red-500 hover:text-white rounded text-gray-700 transition-colors opacity-0 group-hover:opacity-100"
+                                  aria-label="삭제"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* 첫번째 카드 idx 표시 (디버깅) */}
+                        <span className="sr-only">메모 #{m.id} ({idx + 1}/{memos.length})</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </section>
           )}
 
