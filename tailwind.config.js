@@ -17,7 +17,10 @@ module.exports = {
       },
       borderRadius: {
         '3xl': '1.5rem',
-      }
+      },
+      fontFamily: {
+        gaegu: ["'Gaegu'", "'Pretendard'", 'sans-serif'],
+      },
     },
   },
   plugins: [],
