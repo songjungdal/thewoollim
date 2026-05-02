@@ -47,33 +47,66 @@ if ((int)$pending['expectedAmount'] !== $amount) {
     redirectFail('결제 금액이 일치하지 않습니다');
 }
 
-// ── Toss confirm API 호출
+// ── Toss confirm API 호출 (Basic auth: SECRET_KEY + ":" → Base64)
 $cfg = require __DIR__ . '/toss-config.php';
+if (empty($cfg['secret_key']) || !str_starts_with((string)$cfg['secret_key'], 'test_') && !str_starts_with((string)$cfg['secret_key'], 'live_')) {
+    @file_put_contents($dataDir . '/_toss_failures.log', sprintf(
+        "[%s] config fail — secret_key 형식 비정상\n", date('c')
+    ), FILE_APPEND);
+    redirectFail('결제 시스템 설정 오류 (관리자 문의)');
+}
+
+$confirmBody = json_encode([
+    'paymentKey' => $paymentKey,
+    'orderId'    => $orderId,
+    'amount'     => $amount,
+]);
+
 $ch = curl_init($cfg['confirm_url']);
 curl_setopt_array($ch, [
     CURLOPT_POST           => true,
-    CURLOPT_POSTFIELDS     => json_encode([
-        'paymentKey' => $paymentKey,
-        'orderId'    => $orderId,
-        'amount'     => $amount,
-    ]),
+    CURLOPT_POSTFIELDS     => $confirmBody,
     CURLOPT_HTTPHEADER     => [
         'Authorization: Basic ' . base64_encode($cfg['secret_key'] . ':'),
         'Content-Type: application/json',
     ],
     CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_CONNECTTIMEOUT => 10,
     CURLOPT_TIMEOUT        => 20,
 ]);
-$tossBody = curl_exec($ch);
-$tossHttp = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+$tossBody  = curl_exec($ch);
+$tossHttp  = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+$curlErrno = curl_errno($ch);
+$curlErr   = curl_error($ch);
 curl_close($ch);
+
+// 네트워크 오류 — Toss 서버에 도달 못 함
+if ($tossHttp === 0 || $curlErrno !== 0) {
+    @file_put_contents($dataDir . '/_toss_failures.log', sprintf(
+        "[%s] NETWORK orderId=%s curl_errno=%d curl_err=%s\n",
+        date('c'), $orderId, $curlErrno, $curlErr
+    ), FILE_APPEND);
+    redirectFail('결제 서버 연결 실패 — 잠시 후 다시 시도해주세요');
+}
+
+// Toss 응답 파싱 — 에러 코드/메시지 추출
+$tossJson    = is_string($tossBody) ? (json_decode($tossBody, true) ?: []) : [];
+$tossCode    = isset($tossJson['code'])    ? (string)$tossJson['code']    : '';
+$tossMessage = isset($tossJson['message']) ? (string)$tossJson['message'] : '';
 
 if ($tossHttp !== 200) {
     @file_put_contents($dataDir . '/_toss_failures.log', sprintf(
-        "[%s] confirm fail http=%d body=%s\n",
-        date('c'), $tossHttp, substr((string)$tossBody, 0, 800)
+        "[%s] CONFIRM_FAIL orderId=%s http=%d code=%s msg=%s req=%s\n",
+        date('c'), $orderId, $tossHttp, $tossCode, $tossMessage,
+        // request body 도 함께 기록 — 이후 재현 가능
+        $confirmBody
     ), FILE_APPEND);
-    redirectFail('결제 승인이 거절되었습니다');
+
+    // 사용자에게 Toss 측 메시지 그대로 노출 (있으면) — '처리 중 오류' 같은 모호한 표현 회피
+    $userMsg = $tossMessage !== ''
+        ? "결제 승인 실패 [{$tossCode}]: {$tossMessage}"
+        : "결제 승인이 거절되었습니다 (HTTP {$tossHttp})";
+    redirectFail($userMsg);
 }
 
 // ── booking 생성
