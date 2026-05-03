@@ -726,6 +726,61 @@ export default function PartyClientView({ id }: { id: string }) {
                   <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
                 </div>
 
+                {/* ── 필수 확인 사항 — Final CTA 직전, 참가 신청 방법/Party Timeline 과 동일 톤 ── */}
+                <div className="bg-white p-6 md:p-20 rounded-2xl md:rounded-[3rem] shadow-sm border border-gray-100">
+                  <div className="flex items-center gap-3 md:gap-4 mb-3 md:mb-4">
+                    <ShieldCheck size={26} className="text-brand-point md:hidden" />
+                    <ShieldCheck size={32} className="text-brand-point hidden md:block" />
+                    <h3 className="text-xl md:text-3xl font-bold tracking-tight">필수 확인 사항</h3>
+                  </div>
+                  <p className="text-sm md:text-base text-gray-500 font-medium mb-7 md:mb-12 leading-relaxed">
+                    편안하고 신뢰할 수 있는 만남을 위해 아래 내용을 꼭 확인해 주세요.
+                  </p>
+
+                  <div className="space-y-7 md:space-y-12 relative before:absolute before:left-3.5 md:before:left-4 before:top-2 before:bottom-2 before:w-px before:bg-gray-100">
+                    {[
+                      {
+                        title: "본인 확인을 위한 신분증 지참",
+                        desc:  "안전하고 투명한 만남을 위해 사전 인증이 완료된 분들만 참여 가능합니다. 현장에서 본인 확인 절차가 진행되오니, 신분증(주민등록증, 운전면허증 등)을 반드시 지참해 주세요.",
+                        warn:  "미지참 시 입장이 제한될 수 있으며, 이로 인한 환불은 불가합니다.",
+                      },
+                      {
+                        title: "드레스코드 — 깔끔하고 단정한 차림",
+                        desc:  "첫인상은 소중한 인연의 시작입니다. 상대방에 대한 예의를 갖춘 깔끔한 소개팅 복장(셔츠, 슬랙스, 원피스 등)을 권장합니다.",
+                        warn:  "트레이닝복, 슬리퍼 등 과하게 편안한 복장은 입장이 제한될 수 있습니다.",
+                      },
+                      {
+                        title: "성숙한 매너와 배려",
+                        desc:  "서로를 존중하는 따뜻한 분위기를 지향합니다. 과도한 음주, 무례한 언행 등 타인에게 불편을 주는 경우 운영진의 판단에 따라 즉시 퇴장 조치될 수 있으며 참가비는 환불되지 않습니다.",
+                        warn:  null,
+                      },
+                      {
+                        title: "신중한 참가 신청",
+                        desc:  "매칭파티는 정해진 성비를 맞추어 세심하게 준비됩니다. 당일 무단 불참(No-Show)은 다른 참가자분들의 소중한 기회를 저해하므로 신중한 참가신청을 부탁드립니다.",
+                        warn:  "무단 불참 시 향후 모든 매칭파티 참여가 제한될 수 있습니다.",
+                      },
+                      {
+                        title: "현장 기록 및 마케팅 활용 안내",
+                        desc:  "파티의 분위기를 기록하기 위해 현장 스케치 촬영이 진행될 수 있습니다. 촬영된 모든 사진은 참가자의 프라이버시 보호를 위해 얼굴 식별이 불가능하도록 블러/모자이크 처리 후 마케팅 자료로 활용됩니다.",
+                        warn:  null,
+                      },
+                    ].map((item, idx) => (
+                      <div key={idx} className="relative pl-12 md:pl-14">
+                        <div className="absolute left-0 top-0 w-7 h-7 md:w-8 md:h-8 bg-brand-point text-white rounded-full border-4 border-white shadow-md flex items-center justify-center font-black text-xs md:text-sm">
+                          {idx + 1}
+                        </div>
+                        <div className="font-bold text-base md:text-xl mb-1.5 md:mb-2 text-brand-black leading-snug">{item.title}</div>
+                        <div className="text-gray-600 font-medium text-sm md:text-base leading-relaxed break-keep">{item.desc}</div>
+                        {item.warn && (
+                          <div className="mt-2.5 md:mt-3 bg-red-50 border-l-2 border-red-400/60 pl-3 md:pl-4 py-2 md:py-2.5 rounded-r-lg">
+                            <p className="text-xs md:text-sm text-red-700 font-bold leading-relaxed break-keep">⚠ {item.warn}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Final CTA */}
                 <div className="text-center py-12 md:py-20 bg-neutral-900 text-white rounded-2xl md:rounded-[3rem] shadow-2xl px-5 md:px-8">
                   <div className="flex justify-center mb-5 md:mb-8">
