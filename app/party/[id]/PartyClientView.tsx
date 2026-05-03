@@ -246,7 +246,8 @@ export default function PartyClientView({ id }: { id: string }) {
             {/* Right: Info & Checkout */}
             <div className="flex flex-col justify-between min-h-0">
               <div>
-                <h1 className="text-3xl md:text-5xl font-black tracking-tight mb-3 md:mb-4 leading-snug">{detailItem.title}</h1>
+                {/* 모바일/태블릿(md) 가독성 유지 — PC(lg+) 만 5xl→4xl 축소 (~25%) + 자간 -0.015em */}
+                <h1 className="text-3xl md:text-5xl lg:text-4xl font-black tracking-[-0.015em] mb-3 md:mb-4 leading-snug">{detailItem.title}</h1>
                 {/* 관리자가 등록한 소개(description) 우선 노출 — 없으면 기본 카피 */}
                 <p className="text-sm md:text-lg text-gray-500 mb-5 md:mb-8 font-medium leading-relaxed whitespace-pre-line break-keep">
                   {detailItem.description?.trim()
