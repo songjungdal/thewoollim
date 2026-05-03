@@ -255,21 +255,22 @@ export default function PartyClientView({ id }: { id: string }) {
                     : "단순한 만남을 넘어 감성을 향유하는 시간.\n어울림이 큐레이션한 프리미엄 네트워킹에 초대합니다."}
                 </p>
 
-                {/* Info rows */}
+                {/* Info rows — 라벨/값 폰트 한 단계 확대, 행간 미세 증가 */}
                 <div className="space-y-0 mb-5 md:mb-8">
                   {[
                     { label: "일시 (Date)", value: detailItem.dateString },
                     { label: "장소 (Location)", value: detailItem.location },
                     { label: "대상 (Target)", value: detailItem.target },
                   ].map((row) => (
-                    <div key={row.label} className="flex flex-col md:flex-row md:justify-between md:items-center py-3 md:py-3.5 border-b border-gray-200 gap-0.5 md:gap-0">
-                      <span className="text-xs md:text-base text-gray-400 md:text-gray-500 font-medium md:w-36">{row.label}</span>
-                      <span className="font-bold text-sm md:text-base md:text-right">{row.value}</span>
+                    <div key={row.label} className="flex flex-col md:flex-row md:justify-between md:items-center py-3.5 md:py-4 border-b border-gray-200 gap-0.5 md:gap-0">
+                      <span className="text-sm md:text-lg text-gray-400 md:text-gray-500 font-medium md:w-40">{row.label}</span>
+                      <span className="font-bold text-base md:text-lg md:text-right">{row.value}</span>
                     </div>
                   ))}
-                  <div className="flex flex-col md:flex-row md:justify-between md:items-center py-3 md:py-3.5 border-b border-gray-200 gap-0.5 md:gap-0">
-                    <span className="text-xs md:text-base text-gray-400 md:text-gray-500 font-medium md:w-36">참가비 (Price)</span>
-                    <span className="font-black text-xl md:text-2xl text-brand-point">₩{detailItem.price.toLocaleString()}</span>
+                  {/* 참가비 — 가장 중요한 정보 → 검정 볼드 + 한 단계 확대 */}
+                  <div className="flex flex-col md:flex-row md:justify-between md:items-center py-3.5 md:py-4 border-b border-gray-200 gap-0.5 md:gap-0">
+                    <span className="text-sm md:text-lg text-gray-400 md:text-gray-500 font-medium md:w-40">참가비 (Price)</span>
+                    <span className="font-black text-2xl md:text-3xl text-brand-black tabular-nums">₩{detailItem.price.toLocaleString()}</span>
                   </div>
                 </div>
 
