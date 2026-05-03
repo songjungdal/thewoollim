@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Star, Heart, Clock, CheckCircle, ShoppingBag, X, ClipboardList, Users as UsersIcon, ShieldCheck, Info } from "lucide-react";
+import { ArrowLeft, Star, Heart, Clock, ShoppingBag, X, ClipboardList, Users as UsersIcon, ShieldCheck, Info } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Header from "../../components/Header";
@@ -793,18 +793,13 @@ export default function PartyClientView({ id }: { id: string }) {
                   </div>
                 </div>
 
-                {/* Final CTA */}
-                <div className="text-center py-12 md:py-20 bg-neutral-900 text-white rounded-2xl md:rounded-[3rem] shadow-2xl px-5 md:px-8">
-                  <div className="flex justify-center mb-5 md:mb-8">
-                    <CheckCircle size={40} className="text-brand-point md:hidden" />
-                    <CheckCircle size={48} className="text-brand-point hidden md:block" />
-                  </div>
-                  <h3 className="text-xl md:text-3xl font-bold mb-4 md:mb-6 italic tracking-tight">&ldquo;Where connections resonate deeply.&rdquo;</h3>
-                  <p className="text-gray-400 text-xs md:text-base max-w-2xl mx-auto leading-relaxed">
-                    우리는 숫자로 설명할 수 없는 가치를 믿습니다.<br />
-                    어울림이 엄선한 멤버들과 함께하는 특별한 만남에 당신을 초대합니다.
-                  </p>
-                </div>
+                {/* Final CTA — 이미지로 교체 (라운드 X, 1:1 컨테이너 폭, 비율 보존) */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/images/party_cta_cita.jpg"
+                  alt="Where connections resonate deeply"
+                  className="block w-full h-auto object-contain"
+                />
 
               </motion.div>
             </div>
