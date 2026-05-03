@@ -415,41 +415,7 @@ export default function PartyClientView({ id }: { id: string }) {
             </div>
           )}
 
-          {/* INTRO — Party-specific OUR EXPERIENCE style */}
-          <div className="mb-10 md:mb-24">
-            <div className="max-w-4xl mx-auto">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.7 }}
-                className="space-y-6 md:space-y-10"
-              >
-                <div className="text-center space-y-3 md:space-y-5">
-                  <p className="text-xs md:text-sm font-black tracking-[0.25em] text-brand-point uppercase">Private Matching Party</p>
-                  <h2 className="text-2xl md:text-5xl font-black tracking-tighter leading-tight">
-                    프라이빗 매칭 파티<br className="md:hidden" />
-                    <span className="hidden md:inline"> : </span>
-                    <span className="md:hidden">: </span>
-                    <span className="text-brand-point">{detailItem.title}</span>
-                  </h2>
-                  <p className="text-sm md:text-lg text-gray-600 leading-relaxed max-w-2xl mx-auto">
-                    어울림<span className="text-brand-point font-bold">(THEWOOLLIM)</span>이 제안하는 엄선된 만남.<br />
-                    같은 취향과 가치관을 가진 분들과의 특별한 시간을 경험해 보세요.
-                  </p>
-                </div>
-
-                <div className="relative group overflow-hidden rounded-2xl md:rounded-3xl shadow-2xl aspect-[16/9] md:aspect-[21/9]">
-                  <img
-                    src="/images/party_vibe_1.png"
-                    alt={`${detailItem.title} — 프라이빗 매칭 파티 분위기`}
-                    className="w-full h-full object-cover transform transition-transform duration-1000 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/10 to-transparent group-hover:from-black/30 transition-colors" />
-                </div>
-              </motion.div>
-            </div>
-          </div>
+          {/* (제거됨) Private Matching Party INTRO — 상단 h1 과 제목 중복 → 사용자 요청으로 삭제 */}
 
           {/* PARTICIPATION GUIDE NOTICE — 대상별 맞춤 안내 (싱글/돌싱). 미지정·all일 때 숨김. */}
           {(() => {
