@@ -516,6 +516,18 @@ export default function PartyClientView({ id }: { id: string }) {
             );
           })()}
 
+          {/* 참가 신청 방법 안내 헤드 이미지 — 컨테이너 폭(max-w-4xl) 1:1 매칭, 라운드 X, 비율 보존 */}
+          <div className="mb-7 md:mb-10">
+            <div className="max-w-4xl mx-auto">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/images/party_apply_guide_head.jpg"
+                alt="참가 신청 안내"
+                className="block w-full h-auto object-contain"
+              />
+            </div>
+          </div>
+
           {/* HOW TO JOIN — Timeline-styled Application Guide */}
           <div className="mb-10 md:mb-24">
             <div className="max-w-4xl mx-auto">
