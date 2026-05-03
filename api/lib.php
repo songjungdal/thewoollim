@@ -175,6 +175,34 @@ function withFileLock(string $path, callable $callback) {
     }
 }
 
+// ─── 쿠폰 할인 계산 ────────────────────────────────────────────────
+//   amount  : KRW 정액 차감 (lineTotal 초과 안 함)
+//   percent : lineTotal × (amount/100), max_discount 가 양수면 그 한도로 캡, 0원 미만 방지.
+//   서버측 단일 진실 — pending.php / success.php 가 모두 이 함수로 계산.
+function calcCouponDiscount(array $coupon, int $lineTotal): int {
+    if ($lineTotal <= 0) return 0;
+    $type   = (string)($coupon['discount_type'] ?? 'amount');
+    $amount = max(0, (int)($coupon['amount'] ?? 0));
+
+    if ($type === 'percent') {
+        $discount = (int)floor($lineTotal * $amount / 100);
+        $maxDisc  = max(0, (int)($coupon['max_discount'] ?? 0));
+        if ($maxDisc > 0) $discount = min($discount, $maxDisc);
+        return min($discount, $lineTotal);
+    }
+    return min($amount, $lineTotal);
+}
+
+// ─── 쿠폰 사용 횟수 (max_count 검증용) ──────────────────────────────
+function countCouponUsages(array $usages, string $code): int {
+    $code = strtoupper($code);
+    $n = 0;
+    foreach ($usages as $u) {
+        if (strtoupper((string)($u['code'] ?? '')) === $code) $n++;
+    }
+    return $n;
+}
+
 // ─── 데이터 디렉토리 경로 ──────────────────────────────────────────
 function dataDir(): string {
     // /var/www/thewoollim/api/<this>.php → /var/www/thewoollim/api/data

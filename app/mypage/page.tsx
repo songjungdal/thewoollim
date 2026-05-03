@@ -7,7 +7,7 @@ import Link from "next/link";
 import { ShoppingBag, LogOut, User, Trash2, Calendar, MapPin, CheckSquare, Square, CreditCard, Pencil, AlertTriangle, X, Ticket, Clock, CheckCircle2, Check, Plus, Minus } from "lucide-react";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
-import { useAuth, type BookingStatus } from "../context/AuthContext";
+import { useAuth, calcCouponDiscount, type BookingStatus } from "../context/AuthContext";
 import { useParties } from "../lib/useParties";
 import { partyStockStatus } from "../lib/data";
 
@@ -83,8 +83,16 @@ export default function MyPage() {
 
   const computeRowPrice = (partyId: string, originalPrice: number) =>
     appliedCoupon?.partyId === partyId
-      ? Math.max(0, originalPrice - appliedCoupon.amount)
+      ? Math.max(0, originalPrice - calcCouponDiscount(appliedCoupon, originalPrice))
       : originalPrice;
+
+  // 쿠폰 표시 문구 — 정액: "5,000원 할인 적용됨" / 정률: "10% 할인 적용됨"
+  const couponLabel = (): string => {
+    if (!appliedCoupon) return "";
+    return appliedCoupon.discount_type === "percent"
+      ? `${appliedCoupon.amount}% 할인 적용됨`
+      : `${appliedCoupon.amount.toLocaleString()}원 할인 적용됨`;
+  };
 
   const cartParties = cart
     .map(item => PARTIES.find(p => p.id === item.partyId))
@@ -457,7 +465,7 @@ export default function MyPage() {
                               <div className="flex items-center gap-2 px-4 py-3 rounded-xl border-2 border-brand-point bg-brand-point/5">
                                 <Check size={16} className="text-brand-point flex-shrink-0" strokeWidth={3} />
                                 <span className="font-black text-sm md:text-base text-brand-point truncate">{appliedCoupon!.code}</span>
-                                <span className="ml-auto text-xs md:text-sm font-black text-brand-point whitespace-nowrap">할인 적용됨</span>
+                                <span className="ml-auto text-xs md:text-sm font-black text-brand-point whitespace-nowrap">{couponLabel()}</span>
                               </div>
                               <button
                                 onClick={handleRemoveCoupon}

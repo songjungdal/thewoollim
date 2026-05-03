@@ -5,7 +5,25 @@ import { clearOnboardingSnooze } from "../lib/onboardingSnooze";
 
 export type CartItem = { partyId: string; quantity: number };
 
-export type AppliedCoupon = { code: string; amount: number; partyId: string };
+export type AppliedCoupon = {
+  code: string;
+  partyId: string;
+  amount: number;                              // type=amount 면 KRW, type=percent 면 % (1~100)
+  discount_type?: "amount" | "percent";        // 기본 "amount" (legacy 호환)
+  max_discount?: number;                       // type=percent 의 차감 한도 (KRW), 0 = 무제한
+};
+
+/** 행 단위 (수량 반영된 lineTotal) 에서 쿠폰 할인 금액 계산 — 백엔드 calcCouponDiscount 와 동일 로직 */
+export function calcCouponDiscount(coupon: AppliedCoupon, lineTotal: number): number {
+  if (lineTotal <= 0) return 0;
+  if (coupon.discount_type === "percent") {
+    let d = Math.floor(lineTotal * coupon.amount / 100);
+    const cap = coupon.max_discount ?? 0;
+    if (cap > 0) d = Math.min(d, cap);
+    return Math.min(d, lineTotal);
+  }
+  return Math.min(coupon.amount, lineTotal);
+}
 
 export type Profile = {
   name: string;
@@ -689,7 +707,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       const d = await res.json();
       if (d?.ok && d?.coupon) {
-        const next: AppliedCoupon = { code: d.coupon.code, amount: Number(d.coupon.amount) || 0, partyId };
+        const c = d.coupon;
+        const next: AppliedCoupon = {
+          code:          c.code,
+          partyId,
+          amount:        Number(c.amount) || 0,
+          discount_type: c.discount_type === "percent" ? "percent" : "amount",
+          max_discount:  Number(c.max_discount) || 0,
+        };
         setAppliedCoupon(next);
         try { localStorage.setItem("woollim_coupon", JSON.stringify(next)); } catch {}
         return { ok: true };

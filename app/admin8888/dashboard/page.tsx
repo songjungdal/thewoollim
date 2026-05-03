@@ -215,7 +215,17 @@ export default function AdminDashboard() {
 
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [bookings, setBookings] = useState<BookingRow[]>([]);
-  type Coupon = { code: string; amount: number; expiresAt: string; active: boolean; createdAt?: string };
+  type Coupon = {
+    code: string;
+    discount_type: "amount" | "percent";    // 정액(KRW) / 정률(%)
+    amount: number;                          // type=amount → KRW, type=percent → 1~100
+    max_discount: number;                    // type=percent 의 차감 한도 (KRW), 0 = 무제한
+    max_count: number;                       // 총 발급 가능 수량, 0 = 무제한
+    expiresAt: string;
+    active: boolean;
+    createdAt?: string;
+    used_count?: number;                     // 서버에서 GET 시점 집계 (read-only)
+  };
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [company, setCompany] = useState({ name: "", ceo: "", biz_no: "", address: "", telecom: "" });
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
@@ -766,7 +776,16 @@ export default function AdminDashboard() {
 
   const addCoupon = () => {
     setCoupons(prev => [
-      { code: "", amount: 10000, expiresAt: "", active: true, createdAt: new Date().toISOString() },
+      {
+        code:          "",
+        discount_type: "amount",
+        amount:        10000,
+        max_discount:  0,
+        max_count:     0,
+        expiresAt:     "",
+        active:        true,
+        createdAt:     new Date().toISOString(),
+      },
       ...prev,
     ]);
   };
@@ -1461,7 +1480,7 @@ export default function AdminDashboard() {
               <div className="flex items-end justify-between mb-4 md:mb-5 flex-wrap gap-3">
                 <div>
                   <h2 className="text-xl md:text-2xl font-black">쿠폰 관리</h2>
-                  <p className="text-sm text-gray-500 font-medium mt-1">모든 결제에 사용 가능한 범용 쿠폰 코드 · 정액 할인</p>
+                  <p className="text-sm text-gray-500 font-medium mt-1">모든 결제에 사용 가능한 범용 쿠폰 — 정액(원) / 정률(%) · 발급 수량 한도</p>
                 </div>
                 <div className="flex gap-2">
                   <button onClick={addCoupon} className="inline-flex items-center gap-1.5 bg-brand-point text-brand-black px-4 py-2.5 rounded-lg text-sm font-black hover:brightness-95 transition-all">
@@ -1477,69 +1496,118 @@ export default function AdminDashboard() {
                   <thead className="bg-gray-50 text-gray-600 font-bold">
                     <tr>
                       <th className="text-left px-3 md:px-4 py-3">쿠폰 코드</th>
-                      <th className="text-left px-3 md:px-4 py-3">할인 금액 (원)</th>
+                      <th className="text-left px-3 md:px-4 py-3">종류</th>
+                      <th className="text-left px-3 md:px-4 py-3">할인값</th>
+                      <th className="text-left px-3 md:px-4 py-3">최대 할인 (정률)</th>
+                      <th className="text-left px-3 md:px-4 py-3">총 수량</th>
                       <th className="text-left px-3 md:px-4 py-3">만료일</th>
-                      <th className="text-left px-3 md:px-4 py-3">사용 상태</th>
+                      <th className="text-left px-3 md:px-4 py-3">상태</th>
                       <th className="text-left px-3 md:px-4 py-3">관리</th>
                     </tr>
                   </thead>
                   <tbody>
                     {coupons.length === 0 && (
-                      <tr><td colSpan={5} className="text-center text-gray-400 py-8">등록된 쿠폰이 없습니다. [쿠폰 추가] 버튼으로 등록하세요.</td></tr>
+                      <tr><td colSpan={8} className="text-center text-gray-400 py-8">등록된 쿠폰이 없습니다. [쿠폰 추가] 버튼으로 등록하세요.</td></tr>
                     )}
-                    {coupons.map((c, idx) => (
-                      <tr key={idx} className="border-t border-gray-100">
-                        <td className="px-3 md:px-4 py-3">
-                          <input
-                            type="text" value={c.code}
-                            onChange={e => updateCoupon(idx, { code: e.target.value.toUpperCase() })}
-                            placeholder="WELCOME2026"
-                            className="w-40 px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm font-black uppercase bg-white"
-                          />
-                        </td>
-                        <td className="px-3 md:px-4 py-3">
-                          <input
-                            type="number" min={0} step={1000}
-                            value={c.amount}
-                            onChange={e => updateCoupon(idx, { amount: Math.max(0, parseInt(e.target.value || "0", 10)) })}
-                            className="w-28 px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm font-bold bg-white text-right" aria-label="할인 금액"
-                          />
-                          <span className="ml-1 text-gray-500 text-xs">원</span>
-                        </td>
-                        <td className="px-3 md:px-4 py-3">
-                          <input
-                            type="date" value={c.expiresAt}
-                            onChange={e => updateCoupon(idx, { expiresAt: e.target.value })}
-                            className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm font-medium bg-white" aria-label="만료일"
-                          />
-                        </td>
-                        <td className="px-3 md:px-4 py-3">
-                          <label className="inline-flex items-center gap-2 cursor-pointer">
+                    {coupons.map((c, idx) => {
+                      const isPercent = c.discount_type === "percent";
+                      const used      = c.used_count ?? 0;
+                      const remain    = c.max_count > 0 ? Math.max(0, c.max_count - used) : null;
+                      return (
+                        <tr key={idx} className="border-t border-gray-100">
+                          <td className="px-3 md:px-4 py-3">
                             <input
-                              type="checkbox" checked={c.active}
-                              onChange={e => updateCoupon(idx, { active: e.target.checked })}
-                              className="w-4 h-4 accent-brand-point cursor-pointer"
+                              type="text" value={c.code}
+                              onChange={e => updateCoupon(idx, { code: e.target.value.toUpperCase() })}
+                              placeholder="WELCOME2026"
+                              className="w-36 px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm font-black uppercase bg-white"
                             />
-                            <span className={`text-xs font-black ${c.active ? "text-emerald-600" : "text-gray-400"}`}>
-                              {c.active ? "활성" : "비활성"}
-                            </span>
-                          </label>
-                        </td>
-                        <td className="px-3 md:px-4 py-3">
-                          <button onClick={() => removeCoupon(idx)} className="bg-red-50 text-red-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-100 transition-all">
-                            <Trash2 size={11} className="inline mr-1" />삭제
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td className="px-3 md:px-4 py-3">
+                            <select
+                              value={c.discount_type}
+                              onChange={e => updateCoupon(idx, { discount_type: e.target.value as "amount" | "percent" })}
+                              className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm font-bold bg-white"
+                              aria-label="할인 종류"
+                            >
+                              <option value="amount">정액 (원)</option>
+                              <option value="percent">정률 (%)</option>
+                            </select>
+                          </td>
+                          <td className="px-3 md:px-4 py-3">
+                            <input
+                              type="number" min={0} max={isPercent ? 100 : undefined}
+                              step={isPercent ? 1 : 1000}
+                              value={c.amount}
+                              onChange={e => {
+                                let v = Math.max(0, parseInt(e.target.value || "0", 10));
+                                if (isPercent) v = Math.min(100, v);
+                                updateCoupon(idx, { amount: v });
+                              }}
+                              className="w-24 px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm font-bold bg-white text-right" aria-label="할인값"
+                            />
+                            <span className="ml-1 text-gray-500 text-xs">{isPercent ? "%" : "원"}</span>
+                          </td>
+                          <td className="px-3 md:px-4 py-3">
+                            <input
+                              type="number" min={0} step={1000}
+                              value={c.max_discount}
+                              disabled={!isPercent}
+                              onChange={e => updateCoupon(idx, { max_discount: Math.max(0, parseInt(e.target.value || "0", 10)) })}
+                              className={`w-28 px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm font-bold bg-white text-right ${!isPercent ? "opacity-40 cursor-not-allowed" : ""}`}
+                              aria-label="최대 할인"
+                              placeholder="0=무제한"
+                            />
+                            <span className="ml-1 text-gray-500 text-xs">원</span>
+                          </td>
+                          <td className="px-3 md:px-4 py-3">
+                            <input
+                              type="number" min={0} step={1}
+                              value={c.max_count}
+                              onChange={e => updateCoupon(idx, { max_count: Math.max(0, parseInt(e.target.value || "0", 10)) })}
+                              className="w-20 px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm font-bold bg-white text-right"
+                              aria-label="총 수량" placeholder="0=무제한"
+                            />
+                            <div className="text-[10px] text-gray-400 mt-0.5 text-right">
+                              사용 {used}건{remain !== null ? ` / 잔여 ${remain}건` : ""}
+                            </div>
+                          </td>
+                          <td className="px-3 md:px-4 py-3">
+                            <input
+                              type="date" value={c.expiresAt}
+                              onChange={e => updateCoupon(idx, { expiresAt: e.target.value })}
+                              className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm font-medium bg-white" aria-label="만료일"
+                            />
+                          </td>
+                          <td className="px-3 md:px-4 py-3">
+                            <label className="inline-flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox" checked={c.active}
+                                onChange={e => updateCoupon(idx, { active: e.target.checked })}
+                                className="w-4 h-4 accent-brand-point cursor-pointer"
+                              />
+                              <span className={`text-xs font-black ${c.active ? "text-emerald-600" : "text-gray-400"}`}>
+                                {c.active ? "활성" : "비활성"}
+                              </span>
+                            </label>
+                          </td>
+                          <td className="px-3 md:px-4 py-3">
+                            <button type="button" onClick={() => removeCoupon(idx)} className="bg-red-50 text-red-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-100 transition-all">
+                              <Trash2 size={11} className="inline mr-1" />삭제
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
               <p className="text-xs text-gray-400 mt-3 leading-relaxed">
-                · 쿠폰 코드는 대문자/숫자 조합 권장. 동일 코드 중복 시 자동 병합됩니다.<br />
-                · 만료일이 비어있으면 무기한 사용 가능. 만료일은 해당 날짜 자정까지 유효.<br />
-                · 한 사용자가 동일 쿠폰을 두 번 이상 사용할 수 없습니다.<br />
-                · 변경 후 [저장] 버튼을 눌러야 적용됩니다.
+                · <strong>종류</strong> — 정액(원): 정해진 금액 차감 / 정률(%): 결제 금액의 N% 차감.<br />
+                · <strong>최대 할인</strong> — 정률 쿠폰의 KRW 차감 한도. 0 = 무제한.<br />
+                · <strong>총 수량</strong> — 전체 사용자 누적 발급 가능 수량. 0 = 무제한. 한도 도달 시 자동 차단.<br />
+                · 한 사용자가 동일 쿠폰을 두 번 이상 사용할 수 없음.<br />
+                · 만료일 비어있으면 무기한. 변경 후 [저장] 버튼 클릭 필요.
               </p>
             </section>
           )}

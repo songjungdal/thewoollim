@@ -72,7 +72,19 @@ if ($couponCode !== '') {
         jsonFail('만료된 쿠폰입니다.');
     }
     if (!in_array($couponPartyId, $partyIds, true)) jsonFail('쿠폰 적용 파티를 선택해주세요.');
-    $couponDiscount = min((int)$found['amount'], (int)($partyMap[$couponPartyId]['price'] ?? 0));
+
+    // 총 수량 한도 사전 체크 (실 차감은 success 의 atomic consume)
+    $maxCount = max(0, (int)($found['max_count'] ?? 0));
+    if ($maxCount > 0) {
+        $usages = json_decode((string)@file_get_contents($dir . '/coupon_usages.json'), true);
+        if (!is_array($usages)) $usages = [];
+        if (countCouponUsages($usages, $couponCode) >= $maxCount) {
+            jsonFail('쿠폰 발급 수량이 모두 소진되었습니다.');
+        }
+    }
+
+    $linePrice      = (int)($partyMap[$couponPartyId]['price'] ?? 0);
+    $couponDiscount = calcCouponDiscount($found, $linePrice);
 }
 
 $amount = max(0, $total - $couponDiscount);

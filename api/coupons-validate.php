@@ -49,10 +49,22 @@ foreach ($usages as $u) {
     }
 }
 
+// 총 발급 수량 한도 — max_count 가 양수면 사용 횟수가 그에 도달했는지 확인
+$maxCount = max(0, (int)($found['max_count'] ?? 0));
+if ($maxCount > 0) {
+    $used = countCouponUsages($usages, $code);
+    if ($used >= $maxCount) jsonFail('쿠폰 발급 수량이 모두 소진되었습니다.');
+}
+
+$type = (string)($found['discount_type'] ?? 'amount');
+if (!in_array($type, ['amount', 'percent'], true)) $type = 'amount';
+
 jsonOut([
     'ok'     => true,
     'coupon' => [
-        'code'   => strtoupper((string)$found['code']),
-        'amount' => (int)($found['amount'] ?? 0),
+        'code'          => strtoupper((string)$found['code']),
+        'discount_type' => $type,
+        'amount'        => (int)($found['amount']       ?? 0),
+        'max_discount'  => (int)($found['max_discount'] ?? 0),
     ],
 ]);

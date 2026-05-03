@@ -144,7 +144,7 @@ if (!empty($soldOut)) {
     redirectFail('잔여 정원을 초과했습니다');
 }
 
-// 쿠폰 atomic consume
+// 쿠폰 atomic consume — 사용 이력 기록 + max_count 한도 enforce
 $couponDiscount = 0;
 if ($couponCode !== '') {
     $couponsFile = "$dataDir/coupons.json";
@@ -160,11 +160,17 @@ if ($couponCode !== '') {
         flock($fp, LOCK_UN); fclose($fp);
         redirectFail('쿠폰이 유효하지 않습니다');
     }
+    // 쿠폰 적용 대상 파티의 단가 기준으로 할인 금액 계산
+    $linePrice      = (int)($partyMap[$couponPartyId]['price'] ?? 0);
+    $couponDiscount = calcCouponDiscount($found, $linePrice);
+
     $cfp = fopen($usagesFile, 'c+');
     flock($cfp, LOCK_EX);
     $craw = stream_get_contents($cfp);
     $usages = $craw ? json_decode($craw, true) : [];
     if (!is_array($usages)) $usages = [];
+
+    // 1) 동일 사용자 중복 사용 차단
     foreach ($usages as $u) {
         if (strtoupper((string)($u['code'] ?? '')) === strtoupper($couponCode) &&
             strtolower((string)($u['email'] ?? '')) === strtolower($email)) {
@@ -173,11 +179,24 @@ if ($couponCode !== '') {
             redirectFail('이미 사용한 쿠폰입니다');
         }
     }
-    $usages[] = ['code' => strtoupper($couponCode), 'email' => $email,
-                 'amount' => (int)$found['amount'], 'usedAt' => date('c')];
+    // 2) 총 발급 수량 한도 atomic enforce — 잠금 안에서 카운트 조회 후 비교
+    $maxCount = max(0, (int)($found['max_count'] ?? 0));
+    if ($maxCount > 0 && countCouponUsages($usages, $couponCode) >= $maxCount) {
+        flock($cfp, LOCK_UN); fclose($cfp);
+        flock($fp, LOCK_UN);  fclose($fp);
+        redirectFail('쿠폰 발급 수량이 모두 소진되었습니다');
+    }
+
+    $usages[] = [
+        'code'          => strtoupper($couponCode),
+        'email'         => $email,
+        'discount_type' => (string)($found['discount_type'] ?? 'amount'),
+        'amount'        => (int)($found['amount'] ?? 0),
+        'discount'      => $couponDiscount,
+        'usedAt'        => date('c'),
+    ];
     ftruncate($cfp, 0); rewind($cfp); fwrite($cfp, json_encode($usages, JSON_UNESCAPED_UNICODE));
     fflush($cfp); flock($cfp, LOCK_UN); fclose($cfp);
-    $couponDiscount = (int)$found['amount'];
 }
 
 // 정원 증가 + 저장

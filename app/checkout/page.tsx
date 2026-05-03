@@ -6,7 +6,7 @@ import Link from "next/link";
 import { ArrowLeft, CreditCard, ShieldCheck, Tag, Check, FileText, ExternalLink } from "lucide-react";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
-import { useAuth } from "../context/AuthContext";
+import { useAuth, calcCouponDiscount } from "../context/AuthContext";
 import { useParties } from "../lib/useParties";
 
 declare global {
@@ -77,7 +77,7 @@ function CheckoutContent() {
 
   const computeRowPrice = (partyId: string, originalPrice: number) =>
     effectiveCoupon?.partyId === partyId
-      ? Math.max(0, originalPrice - effectiveCoupon.amount)
+      ? Math.max(0, originalPrice - calcCouponDiscount(effectiveCoupon, originalPrice))
       : originalPrice;
 
   const originalTotal = parties.reduce((s, p) => s + p.price * (qtyByPartyId[p.id] ?? 1), 0);
@@ -321,7 +321,11 @@ function CheckoutContent() {
                       <div className="mt-3 md:mt-3.5 flex items-center gap-2 bg-brand-point/10 border border-brand-point/30 rounded-lg px-3 py-2 text-xs md:text-sm">
                         <Check size={14} className="text-brand-point flex-shrink-0" />
                         <span className="font-black truncate">{effectiveCoupon!.code}</span>
-                        <span className="font-bold text-brand-point whitespace-nowrap">- ₩{effectiveCoupon!.amount.toLocaleString()}</span>
+                        <span className="font-bold text-brand-point whitespace-nowrap">
+                          {effectiveCoupon!.discount_type === "percent"
+                            ? `${effectiveCoupon!.amount}% 할인`
+                            : `- ₩${effectiveCoupon!.amount.toLocaleString()}`}
+                        </span>
                       </div>
                     )}
                   </div>
