@@ -87,6 +87,11 @@ export default function PartyClientView({ id }: { id: string }) {
   const { isLoggedIn, addToCart, profile, partyCounts, cart, bookings } = useAuth();
   // 이미 신청한 파티 — cancelled 가 아닌 모든 booking 상태(결제완료/확정대기/참가확정)를 차단 사유로 간주
   const alreadyBooked = bookings.some(b => b.partyId === id && b.status !== "cancelled");
+
+  // 행사 일시 경과 여부 — KST 기준 오늘 날짜 > calendarDate (YYYY-MM-DD) 면 종료
+  const todayKST = typeof window !== "undefined"
+    ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date())
+    : "";
   const [showCartModal, setShowCartModal] = useState(false);
   const [participants, setParticipants] = useState<{ male: Participant[]; female: Participant[] }>({ male: [], female: [] });
 
@@ -145,6 +150,8 @@ export default function PartyClientView({ id }: { id: string }) {
   }
 
   const stock = partyStockStatus(detailItem);
+  // 행사 일시 경과 — todayKST > calendarDate 일 때 모집 종료. SSR 단계에선 false (window 없음)
+  const isExpired = !!detailItem.calendarDate && todayKST !== "" && todayKST > detailItem.calendarDate;
 
   // 자격 요약 + 검증 (로그인한 회원에 한해 평가)
   const eligibilityLabel = eligibilitySummary(detailItem);
@@ -258,11 +265,8 @@ export default function PartyClientView({ id }: { id: string }) {
               )}
               {/* 상태 배지 — 우선순위: 행사일 경과(모집종료) > 정원 만석(모집마감) > 모집중 */}
               {(() => {
-                // KST 기준 오늘 날짜 (YYYY-MM-DD) 와 calendarDate 비교
-                const todayKST = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date());
-                const eventEnded = !!detailItem.calendarDate && todayKST > detailItem.calendarDate;
                 const status: "ended" | "full" | "open" =
-                  eventEnded ? "ended" : stock.allFull ? "full" : "open";
+                  isExpired ? "ended" : stock.allFull ? "full" : "open";
                 const badge = {
                   ended: { label: "모집종료", cls: "bg-red-500 text-white" },
                   full:  { label: "모집마감", cls: "bg-gray-300 text-black" },
@@ -363,7 +367,18 @@ export default function PartyClientView({ id }: { id: string }) {
               )}
 
               {/* CTA Buttons — pinned to bottom */}
-              {(() => {
+              {/* 행사 종료된 파티 — 단일 빨간 버튼으로 교체 (클릭 불가) */}
+              {isExpired ? (
+                <div className="mt-auto">
+                  <div
+                    role="status"
+                    aria-disabled="true"
+                    className="w-full px-5 md:px-8 py-4 md:py-5 rounded-xl md:rounded-2xl text-base md:text-xl font-bold shadow-xl text-center bg-red-500 text-white pointer-events-none select-none"
+                  >
+                    모집 종료된 파티
+                  </div>
+                </div>
+              ) : (() => {
                 const userGender = profile?.gender;
                 const userSideFull =
                   (userGender === "남성" && stock.maleFull) ||
