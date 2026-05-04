@@ -108,7 +108,8 @@ export default function SmoothOnePage() {
   const AXIS_OPTIONS: Record<Axis, readonly string[]> = {
     "대상별": ["싱글", "돌싱"],
     "테마별": ["티타임", "와인파티", "사케파티", "쿠킹클래스"],
-    "지역별": ["서울", "성남", "수원", "인천", "용인", "기타"],
+    // '기타' 는 필터 버튼에서 노출 제외 — 기존 '기타' 파티는 전체보기에 그대로 노출됨
+    "지역별": ["서울", "성남", "수원", "인천", "용인"],
   };
   const AXIS_FIELD: Record<Axis, "targetGroup" | "theme" | "locationTag"> = {
     "대상별": "targetGroup", "테마별": "theme", "지역별": "locationTag",

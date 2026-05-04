@@ -1509,7 +1509,9 @@ export default function AdminDashboard() {
                               <option value="수원">수원</option>
                               <option value="인천">인천</option>
                               <option value="용인">용인</option>
-                              <option value="기타">기타</option>
+                              {/* '기타' 옵션 노출 제외 — 신규 등록/수정 시 선택 차단.
+                                  기존 '기타' 파티 데이터는 DB 에 그대로 보존되며,
+                                  관리자가 해당 파티를 열면 select 값이 빈 상태로 표시됨 → 재선택 유도. */}
                             </select>
                           </div>
                         </div>
