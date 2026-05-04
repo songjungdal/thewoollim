@@ -647,15 +647,14 @@ export default function PartyClientView({ id }: { id: string }) {
                 transition={{ duration: 1 }}
                 className="space-y-10 md:space-y-24"
               >
-                {/* Introduction Article */}
-                <div className="text-center space-y-4 md:space-y-6">
-                  <h2 className="text-2xl md:text-5xl font-black tracking-tighter">OUR EXPERIENCE</h2>
-                  <p className="text-sm md:text-lg text-gray-600 leading-relaxed">
-                    어울림의 파티는 단지 사람을 모으는 것에서 그치지 않습니다.<br />
-                    공간의 향기, 흐르는 음악, 정교하게 준비된 다과와 와인까지.<br />
-                    당신의 오감을 자극하는 모든 디테일이 하나의 연결을 완성합니다.
-                  </p>
-                </div>
+                {/* OUR EXPERIENCE — 이미지로 교체 (라운드 X, 1:1 컨테이너 폭, 비율 보존) */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/images/party_our_experience.png"
+                  alt="OUR EXPERIENCE"
+                  className="block w-full h-auto rounded-none select-none pointer-events-none"
+                  draggable={false}
+                />
 
                 {/* Emotional Image 1 */}
                 <div className="relative group overflow-hidden rounded-2xl md:rounded-3xl shadow-2xl">
