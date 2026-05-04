@@ -168,8 +168,19 @@ export default function PartyClientView({ id }: { id: string }) {
     return null;
   };
 
+  // 이미 신청한 파티 안내 — confirm 후 마이페이지 이동 / 취소 시 차단.
+  // (alreadyBooked 가 true 일 때 양 핸들러 최상단에서 호출 — 이후 로직 모두 차단)
+  const handleAlreadyBookedPrompt = (): boolean => {
+    if (!alreadyBooked) return false;
+    if (confirm("이미 신청한 매칭파티 입니다. 마이페이지에서 확인하시겠습니까?")) {
+      router.push("/mypage");
+    }
+    return true; // alreadyBooked 인 경우는 confirm 결과 무관 후속 로직 차단
+  };
+
   // 참가신청 — 카트에 담고 마이페이지로 이동 (중복 신청/카트 시 차단)
   const handleCheckout = () => {
+    if (handleAlreadyBookedPrompt()) return;
     if (!isLoggedIn) {
       router.push(`/login?redirect=${encodeURIComponent(`/party/${id}/`)}`);
       return;
@@ -179,7 +190,6 @@ export default function PartyClientView({ id }: { id: string }) {
       router.push("/profile-setup/");
       return;
     }
-    if (alreadyBooked) { alert("이미 참가신청 중인 파티입니다."); return; }
     const blocked = checkBlockedReason();
     if (blocked) { alert(blocked); return; }
 
@@ -192,8 +202,9 @@ export default function PartyClientView({ id }: { id: string }) {
     router.push("/mypage");
   };
 
-  // 장바구니 — 한 사용자는 같은 파티에 1회만 담을 수 있음 + 이미 신청한 파티 차단
+  // 장바구니 — 한 사용자는 같은 파티에 1회만 담을 수 있음 + 이미 신청한 파티 confirm 안내
   const handleAddToCart = () => {
+    if (handleAlreadyBookedPrompt()) return;
     if (!isLoggedIn) {
       router.push("/login");
       return;
@@ -203,7 +214,6 @@ export default function PartyClientView({ id }: { id: string }) {
       router.push("/profile-setup/");
       return;
     }
-    if (alreadyBooked) { alert("이미 참가신청 중인 파티입니다."); return; }
     const blocked = checkBlockedReason();
     if (blocked) { alert(blocked); return; }
 
@@ -340,8 +350,10 @@ export default function PartyClientView({ id }: { id: string }) {
                   (userGender === "남성" && stock.maleFull) ||
                   (userGender === "여성" && stock.femaleFull);
                 const eligibilityBlocked = isLoggedIn && !eligibility.ok;
-                // alreadyBooked 우선 적용 — 자격/정원 우회보다 명확한 사용자 안내
-                const disabled = alreadyBooked || stock.allFull || userSideFull || eligibilityBlocked;
+                // 실제 disabled 는 정원/자격 사유만 — alreadyBooked 는 클릭 가능 (confirm 으로 안내)
+                const hardDisabled = stock.allFull || userSideFull || eligibilityBlocked;
+                // 회색 스타일 적용 조건 — 시각적으로 비활성처럼 보이지만 alreadyBooked 는 클릭 가능
+                const grayedOut = alreadyBooked || hardDisabled;
                 const label = alreadyBooked
                   ? "이미 신청된 파티"
                   : stock.allFull
@@ -358,10 +370,10 @@ export default function PartyClientView({ id }: { id: string }) {
                     <button
                       type="button"
                       onClick={handleCheckout}
-                      disabled={disabled}
+                      disabled={hardDisabled}
                       className={`flex-[2] px-5 md:px-8 py-4 md:py-5 rounded-xl md:rounded-2xl text-base md:text-xl font-bold transition-all shadow-xl ${
-                        disabled
-                          ? "bg-gray-200 text-gray-400 cursor-not-allowed shadow-none"
+                        grayedOut
+                          ? `bg-gray-200 text-gray-400 shadow-none ${alreadyBooked && !hardDisabled ? "cursor-pointer hover:bg-gray-300" : "cursor-not-allowed"}`
                           : "bg-brand-black text-white hover:bg-brand-point hover:shadow-brand-point/30"
                       }`}
                     >
@@ -370,10 +382,10 @@ export default function PartyClientView({ id }: { id: string }) {
                     <button
                       type="button"
                       onClick={handleAddToCart}
-                      disabled={disabled}
+                      disabled={hardDisabled}
                       className={`flex-1 px-5 md:px-8 py-4 md:py-5 rounded-xl md:rounded-2xl text-base md:text-xl font-bold transition-all shadow-xl ${
-                        disabled
-                          ? "bg-gray-200 text-gray-400 cursor-not-allowed shadow-none"
+                        grayedOut
+                          ? `bg-gray-200 text-gray-400 shadow-none ${alreadyBooked && !hardDisabled ? "cursor-pointer hover:bg-gray-300" : "cursor-not-allowed"}`
                           : "bg-brand-black text-white hover:bg-brand-point"
                       }`}
                     >
