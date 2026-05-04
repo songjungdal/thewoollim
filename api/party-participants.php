@@ -82,6 +82,7 @@ foreach ($users as $u) {
             'ageBand'    => $u['birth_date'] ? ageBand((string)$u['birth_date']) : '',
             'mbti'       => (string)($u['mbti'] ?? ''),
             'job'        => (string)($u['job']  ?? ''),
+            'status'     => (string)($b['status'] ?? ''),  // 'confirmed' | 'pending_approval'
         ];
 
         if ($u['gender'] === '남성')      $male[]   = $entry;

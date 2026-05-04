@@ -18,7 +18,27 @@ type Participant = {
   ageBand: string;
   mbti: string;
   job: string;
+  status?: "confirmed" | "pending_approval" | string;
 };
+
+/** 상태 미니 배지 — 마이페이지 스타일 변형 (참가자 명단 인라인용 컴팩트 사이즈) */
+function StatusMiniBadge({ status }: { status?: string }) {
+  if (status === "confirmed") {
+    return (
+      <span className="inline-flex items-center text-[9px] md:text-[10px] font-black px-1.5 py-0.5 rounded-full bg-[#008080] text-black whitespace-nowrap">
+        참가확정
+      </span>
+    );
+  }
+  if (status === "pending_approval") {
+    return (
+      <span className="inline-flex items-center text-[9px] md:text-[10px] font-black px-1.5 py-0.5 rounded-full bg-[#FFD700] text-black whitespace-nowrap">
+        확정대기
+      </span>
+    );
+  }
+  return null;
+}
 
 /** 성별별 참가자 컬럼 — 칩 카드 형태로 정렬 */
 function ParticipantColumn({
@@ -43,14 +63,14 @@ function ParticipantColumn({
       </div>
       {list.length === 0 ? (
         <p className="text-xs text-gray-400 font-medium py-4 text-center">
-          아직 확정된 {label} 참가자가 없습니다.
+          아직 신청한 {label} 참가자가 없습니다.
         </p>
       ) : (
         <ul className="space-y-1.5">
           {list.map(p => (
             <li
               key={p.id}
-              className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-gray-50 border border-gray-100"
+              className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-gray-50 border border-gray-100 flex-wrap"
             >
               <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
                 <span className={`font-black text-sm ${toneAccent}`}>{p.maskedName}</span>
@@ -59,8 +79,10 @@ function ParticipantColumn({
                     {p.ageBand}
                   </span>
                 )}
+                {/* 상태 미니 배지 — 연령대 바로 우측 */}
+                <StatusMiniBadge status={p.status} />
               </div>
-              <div className="flex items-center gap-1.5 flex-shrink-0">
+              <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap">
                 {p.mbti && (
                   <span className="text-[10px] md:text-[11px] font-black text-brand-point bg-brand-point/10 px-1.5 py-0.5 rounded-full">
                     {p.mbti}
@@ -444,8 +466,19 @@ export default function PartyClientView({ id }: { id: string }) {
               </div>
 
               <section className="bg-white rounded-2xl md:rounded-3xl border border-gray-100 overflow-hidden shadow-sm">
-                <header className="bg-brand-point/5 px-4 md:px-6 py-3 md:py-3.5 border-b border-gray-100 flex items-center justify-between gap-3">
-                  <span className="text-xs md:text-sm font-bold text-gray-500 tracking-wider">참가 확정자 명단</span>
+                <header className="bg-brand-point/5 px-4 md:px-6 py-3 md:py-3.5 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
+                  <span className="text-xs md:text-sm font-bold text-gray-500 tracking-wider break-keep">
+                    {(() => {
+                      // 페이지 렌더 시점 KST — 30s polling 시마다 자동 갱신됨
+                      const parts = new Intl.DateTimeFormat("en-CA", {
+                        timeZone: "Asia/Seoul",
+                        year: "numeric", month: "2-digit", day: "2-digit",
+                        hour: "2-digit", minute: "2-digit", hour12: false,
+                      }).formatToParts(new Date());
+                      const get = (t: string) => parts.find(x => x.type === t)?.value || "";
+                      return `${get("year")}년 ${get("month")}월 ${get("day")}일 ${get("hour")}:${get("minute")} 실시간 참가자 명단`;
+                    })()}
+                  </span>
                   <span className="text-[11px] md:text-xs font-black text-brand-point bg-brand-point/10 px-2.5 py-1 rounded-full whitespace-nowrap">
                     총 {participants.male.length + participants.female.length}명
                   </span>
