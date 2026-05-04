@@ -268,7 +268,7 @@ export default function PartyClientView({ id }: { id: string }) {
                 const status: "ended" | "full" | "open" =
                   isExpired ? "ended" : stock.allFull ? "full" : "open";
                 const badge = {
-                  ended: { label: "모집종료", cls: "bg-red-500 text-white" },
+                  ended: { label: "모집종료", cls: "bg-[#FF0000] text-white" },
                   full:  { label: "모집마감", cls: "bg-gray-300 text-black" },
                   open:  { label: "모집중",   cls: "bg-brand-point text-black" },
                 }[status];
@@ -373,7 +373,7 @@ export default function PartyClientView({ id }: { id: string }) {
                   <div
                     role="status"
                     aria-disabled="true"
-                    className="w-full px-5 md:px-8 py-4 md:py-5 rounded-xl md:rounded-2xl text-base md:text-xl font-bold shadow-xl text-center bg-red-500 text-white pointer-events-none select-none"
+                    className="w-full px-5 md:px-8 py-4 md:py-5 rounded-xl md:rounded-2xl text-base md:text-xl font-bold shadow-xl text-center bg-[#FF0000] text-white pointer-events-none select-none"
                   >
                     모집 종료된 파티
                   </div>
