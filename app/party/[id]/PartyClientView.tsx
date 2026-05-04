@@ -677,20 +677,25 @@ export default function PartyClientView({ id }: { id: string }) {
                       <span className="w-1 h-4 bg-brand-point rounded-full" />
                       인원별 소요 시간 안내
                     </h4>
-                    {/* 모바일: 카드 뷰 / 데스크톱: 테이블 */}
-                    <div className="md:hidden space-y-2.5">
+                    {/* 모바일: 카드 뷰 (수직 쌓기 + bullet + 여유 간격) / 데스크톱: 테이블 */}
+                    <div className="md:hidden space-y-3">
                       {[
                         { kind: "8 : 8 파티",   total: "약 2시간 30분", type: "대화 시간 여유로운 편" },
                         { kind: "10 : 10 파티", total: "약 3시간",      type: "표준 로테이션" },
                         { kind: "12 : 12 파티", total: "약 3시간 30분", type: "가장 많은 만남" },
                       ].map((row, i) => (
-                        <div key={i} className="bg-brand-point/5 border border-brand-point/15 rounded-xl p-4">
-                          <div className="font-black text-base text-brand-black mb-1.5">{row.kind}</div>
-                          <div className="flex items-baseline gap-2 text-sm">
-                            <span className="text-gray-500 font-medium">총</span>
-                            <span className="font-bold text-brand-point">{row.total}</span>
+                        <div key={i} className="bg-brand-point/5 border border-brand-point/15 rounded-xl p-4 leading-relaxed">
+                          {/* kind 라벨 — brand-point 청록 bullet 으로 항목 구분 강화 */}
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-brand-point flex-shrink-0" />
+                            <span className="font-black text-base text-brand-black">{row.kind}</span>
                           </div>
-                          <p className="text-xs text-gray-500 font-medium mt-1">{row.type}</p>
+                          {/* 시간 행 — flex-wrap 으로 좁은 화면에서도 안전 줄바꿈 */}
+                          <div className="flex items-baseline flex-wrap gap-x-2 gap-y-1 text-sm pl-4">
+                            <span className="text-gray-500 font-medium">총</span>
+                            <span className="font-bold text-brand-point break-keep">{row.total}</span>
+                          </div>
+                          <p className="text-xs text-gray-500 font-medium mt-2 pl-4 break-keep leading-relaxed">{row.type}</p>
                         </div>
                       ))}
                     </div>
