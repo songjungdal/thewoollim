@@ -52,82 +52,79 @@ function GallerySlider({
   const goPrev = () => setCurrentPage(p => Math.max(0, p - 1));
   const goNext = () => setCurrentPage(p => Math.min(totalPages - 1, p + 1));
 
-  // 화살표 공통 스타일 — 원형/사각형 박스 X, 화살표 기호만 (#008080 청록).
+  // 화살표 공통 스타일 — 원형/사각형 박스 X, 화살표 기호만.
+  // 그리드 이미지 위에 겹치므로 drop-shadow 로 가독성 확보.
   const arrowBase =
-    "flex-shrink-0 p-1 md:p-2 text-[#008080] hover:text-[#006666] " +
-    "transition-colors disabled:text-gray-600 disabled:cursor-not-allowed " +
-    "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#008080]/40 rounded-md";
+    "absolute top-1/2 -translate-y-1/2 z-10 p-2 text-[#008080] hover:text-[#006666] " +
+    "transition-colors disabled:text-gray-600/60 disabled:cursor-not-allowed " +
+    "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#008080]/40 rounded-md " +
+    "drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]";
 
   return (
-    <div>
-      {/* 좌측 화살표 + 슬라이드 윈도우 + 우측 화살표 — 가로 flex 정렬 */}
-      <div className="flex items-center gap-1 md:gap-3">
-        {totalPages > 1 && (
+    <div className="relative">
+      {/* 슬라이드 윈도우 — 페이지 폭 전체를 사용 (max-w-7xl) */}
+      <div ref={viewportRef} className="overflow-hidden">
+        <motion.div
+          className="flex"
+          style={{ gap: `${pageGap}px`, willChange: "transform" }}
+          animate={{ x: -safePage * pageStride }}
+          transition={{ type: "tween", ease: [0.22, 1, 0.36, 1], duration: 0.7 }}
+        >
+          {Array.from({ length: totalPages }).map((_, pageIdx) => {
+            const pageItems = source.slice(pageIdx * PAGE_SIZE, (pageIdx + 1) * PAGE_SIZE);
+            return (
+              <div
+                key={pageIdx}
+                style={{ width: viewportW || undefined }}
+                className="flex-shrink-0 grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6"
+              >
+                {pageItems.map((item, idx) => (
+                  <div
+                    key={`${item.id}-${idx}`}
+                    className="aspect-square bg-gray-800 rounded-2xl md:rounded-3xl relative overflow-hidden group cursor-pointer border border-white/5"
+                    onClick={() => onImageClick(item.image_path)}
+                  >
+                    <div className="absolute inset-0 transition-transform duration-700 group-hover:scale-110 group-hover:brightness-110 pointer-events-none">
+                      <Image
+                        src={item.image_path}
+                        alt={item.alt_text || `갤러리 이미지 ${idx + 1}`}
+                        fill
+                        sizes="(max-width: 768px) 50vw, 33vw"
+                        className="object-cover"
+                      />
+                    </div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </motion.div>
+      </div>
+
+      {/* 좌/우 화살표 — 그리드 위에 겹쳐 배치 (이미지 가독성을 위해 drop-shadow) */}
+      {totalPages > 1 && (
+        <>
           <button
             type="button"
             onClick={goPrev}
             disabled={safePage === 0}
             aria-label="이전 갤러리"
-            className={arrowBase}
+            className={`${arrowBase} left-1 md:left-3`}
           >
-            <ChevronLeft className="w-7 h-7 md:w-10 md:h-10" strokeWidth={2.5} />
+            <ChevronLeft className="w-8 h-8 md:w-12 md:h-12" strokeWidth={3} />
           </button>
-        )}
-
-        <div
-          ref={viewportRef}
-          className="flex-1 overflow-hidden"
-        >
-          <motion.div
-            className="flex"
-            style={{ gap: `${pageGap}px`, willChange: "transform" }}
-            animate={{ x: -safePage * pageStride }}
-            transition={{ type: "tween", ease: [0.22, 1, 0.36, 1], duration: 0.7 }}
-          >
-            {Array.from({ length: totalPages }).map((_, pageIdx) => {
-              const pageItems = source.slice(pageIdx * PAGE_SIZE, (pageIdx + 1) * PAGE_SIZE);
-              return (
-                <div
-                  key={pageIdx}
-                  style={{ width: viewportW || undefined }}
-                  className="flex-shrink-0 grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6"
-                >
-                  {pageItems.map((item, idx) => (
-                    <div
-                      key={`${item.id}-${idx}`}
-                      className="aspect-square bg-gray-800 rounded-2xl md:rounded-3xl relative overflow-hidden group cursor-pointer border border-white/5"
-                      onClick={() => onImageClick(item.image_path)}
-                    >
-                      <div className="absolute inset-0 transition-transform duration-700 group-hover:scale-110 group-hover:brightness-110 pointer-events-none">
-                        <Image
-                          src={item.image_path}
-                          alt={item.alt_text || `갤러리 이미지 ${idx + 1}`}
-                          fill
-                          sizes="(max-width: 768px) 50vw, 33vw"
-                          className="object-cover"
-                        />
-                      </div>
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
-                    </div>
-                  ))}
-                </div>
-              );
-            })}
-          </motion.div>
-        </div>
-
-        {totalPages > 1 && (
           <button
             type="button"
             onClick={goNext}
             disabled={safePage === totalPages - 1}
             aria-label="다음 갤러리"
-            className={arrowBase}
+            className={`${arrowBase} right-1 md:right-3`}
           >
-            <ChevronRight className="w-7 h-7 md:w-10 md:h-10" strokeWidth={2.5} />
+            <ChevronRight className="w-8 h-8 md:w-12 md:h-12" strokeWidth={3} />
           </button>
-        )}
-      </div>
+        </>
+      )}
 
       {/* 페이지 인디케이터 (dots) */}
       {totalPages > 1 && (
