@@ -403,7 +403,10 @@ export default function PartyClientView({ id }: { id: string }) {
               {/* 안내 헤드라인 — 청록 포인트 컬러 */}
               <div className="flex items-center gap-3 mb-5 md:mb-7">
                 <UsersIcon size={20} className="text-brand-point flex-shrink-0" />
-                <h3 className="text-xl md:text-3xl font-bold tracking-tight">실시간 참가 인원을 확인하실 수 있습니다</h3>
+                <h3 className="text-xl md:text-3xl font-bold tracking-tight break-keep">
+                  <span className="text-brand-point">{detailItem.title}</span>
+                  <span className="text-brand-black">의 실시간 참가 인원</span>
+                </h3>
               </div>
 
               <section className="bg-white rounded-2xl md:rounded-3xl border border-gray-100 overflow-hidden shadow-sm">
