@@ -202,7 +202,7 @@ function FormField({ label, value, onChange, placeholder, textarea }: {
 
 const STATUS_LABEL: Record<string, { label: string; tone: string }> = {
   paid_pending_profile: { label: "결제완료(프로필 대기)", tone: "bg-amber-100 text-amber-800" },
-  pending_approval: { label: "확정 대기 중", tone: "bg-blue-100 text-blue-800" },
+  pending_approval: { label: "확정 대기 중", tone: "bg-[#F5F5DC] text-[#5D4037]" },
   confirmed: { label: "참가 확정 완료", tone: "bg-emerald-100 text-emerald-800" },
   cancelled: { label: "취소됨", tone: "bg-gray-200 text-gray-600" },
 };

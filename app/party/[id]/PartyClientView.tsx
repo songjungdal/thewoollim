@@ -32,7 +32,7 @@ function StatusMiniBadge({ status }: { status?: string }) {
   }
   if (status === "pending_approval") {
     return (
-      <span className="inline-flex items-center text-[9px] md:text-[10px] font-black px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-800 whitespace-nowrap">
+      <span className="inline-flex items-center text-[9px] md:text-[10px] font-black px-1.5 py-0.5 rounded-full bg-[#F5F5DC] text-[#5D4037] whitespace-nowrap">
         확정 대기 중
       </span>
     );

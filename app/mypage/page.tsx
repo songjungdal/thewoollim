@@ -25,8 +25,8 @@ const STATUS_DISPLAY: Record<BookingStatus, { label: string; tone: string; strip
   pending_approval: {
     label:  "확정 대기 중",
     sub:    "운영팀 승인을 기다리고 있어요",
-    tone:   "bg-blue-100 text-blue-800",
-    stripe: "bg-blue-400",
+    tone:   "bg-[#F5F5DC] text-[#5D4037]",   // 파스텔 베이지 + 진한 갈색
+    stripe: "bg-[#8D6E63]",                   // 보색 갈색 (좌측 stripe)
     icon:   Clock,
   },
   // 참가확정: 관리자 최종 승인
