@@ -322,7 +322,7 @@ export default function PartyClientView({ id }: { id: string }) {
                   <p className="text-xs md:text-sm text-gray-500 leading-relaxed break-keep">
                     어울림은 진정성 있는 만남을 위해 <strong className="font-bold text-brand-black">100% 사전 승인제</strong>로 운영됩니다.
                     결제 후 프로필 정보를 입력해 주시면 <strong className="font-bold text-brand-black">[확정 대기 중]</strong> 상태가 되며,
-                    관리자의 꼼꼼한 확인을 거쳐 최종 <strong className="font-bold text-brand-point">[참가 확정]</strong>이 이루어집니다.
+                    관리자의 꼼꼼한 확인을 거쳐 최종 <strong className="font-bold text-brand-black">[참가 확정]</strong>이 이루어집니다.
                     참가 확정 및 안내 문자는 확정 시점에 맞춰 순차적으로 발송됩니다.
                   </p>
                 </div>
