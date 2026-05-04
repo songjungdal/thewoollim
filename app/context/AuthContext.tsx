@@ -595,12 +595,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [setCartSync]);
 
-  // 동일 partyId 추가 시 행을 추가하지 않고 quantity를 1 증가
+  // 동일 partyId 가 이미 있으면 no-op — 중복 추가 차단, quantity 항상 1.
+  // (수량 개념 제거 — 한 사용자는 같은 파티에 1회만 신청)
   const addToCart = useCallback(async (partyId: string) => {
-    const existing = cartRef.current.find(i => i.partyId === partyId);
-    const updated = existing
-      ? cartRef.current.map(i => i.partyId === partyId ? { ...i, quantity: i.quantity + 1 } : i)
-      : [...cartRef.current, { partyId, quantity: 1 }];
+    if (cartRef.current.some(i => i.partyId === partyId)) return;
+    const updated = [...cartRef.current, { partyId, quantity: 1 }];
     await persistCart(updated);
   }, [persistCart]);
 

@@ -189,8 +189,7 @@ export default function PartyClientView({ id }: { id: string }) {
     router.push("/mypage");
   };
 
-  // 장바구니 — 동일 partyId 가 이미 있으면 새 행을 만들지 않고 quantity 만 +1.
-  // (AuthContext.addToCart 가 합산 로직 보유 — 쿠폰/수동 수량 조정값은 그대로 유지됨)
+  // 장바구니 — 한 사용자는 같은 파티에 1회만 담을 수 있음 (수량 개념 제거).
   const handleAddToCart = () => {
     if (!isLoggedIn) {
       router.push("/login");
@@ -204,6 +203,10 @@ export default function PartyClientView({ id }: { id: string }) {
     const blocked = checkBlockedReason();
     if (blocked) { alert(blocked); return; }
 
+    if (cart.some(c => c.partyId === id)) {
+      alert("이미 장바구니에 담긴 파티입니다.");
+      return;
+    }
     addToCart(id);
     setShowCartModal(true);
   };

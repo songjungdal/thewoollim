@@ -44,7 +44,7 @@ function emailToCustomerKey(email: string): string {
 function CheckoutContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { mounted, isLoggedIn, userEmail, profile, appliedCoupon } = useAuth();
+  const { mounted, isLoggedIn, userEmail, profile, appliedCoupon, bookings } = useAuth();
   const PARTIES = useParties();
 
   // Toss redirect 실패 시 ?error=... 로 돌아옴 — 사용자에게 안내
@@ -178,6 +178,19 @@ function CheckoutContent() {
     if (!userEmail)                      { console.warn("[checkout] userEmail 없음 — 중단"); alert("로그인이 필요합니다."); router.push("/login"); return; }
     if (!profile?.gender)                { console.warn("[checkout] 프로필 성별 미설정 — 중단"); alert("프로필 카드에서 성별을 먼저 등록해주세요."); router.push("/profile-setup/"); return; }
     if (totalAmount <= 0)                { console.error("[checkout] totalAmount=0 — 결제 금액 비정상", { partyIds, totalAmount }); alert("결제 금액이 비정상입니다. 장바구니를 다시 확인해주세요."); return; }
+
+    // 중복 신청 차단 — 결제완료/확정 상태의 booking 이 cart 의 partyId 와 겹치면 안 됨
+    const duplicateBookings = bookings.filter(b =>
+      partyIds.includes(b.partyId) && b.status !== "cancelled"
+    );
+    if (duplicateBookings.length > 0) {
+      const dupTitles = Array.from(new Set(
+        duplicateBookings.map(b => parties.find(p => p.id === b.partyId)?.title || `파티 #${b.partyId}`)
+      )).join(", ");
+      console.warn("[checkout] 중복 신청 차단:", duplicateBookings);
+      alert(`이미 신청이 완료된 파티입니다.\n마이페이지에서 예약 현황을 확인해주세요.\n\n· ${dupTitles}`);
+      return;
+    }
 
     setPaying(true);
     console.log("[checkout] pending.php 호출 시작");

@@ -27,6 +27,9 @@ $body = jsonBody();
 $partyIds = array_values(array_filter(array_map('strval', $body['partyIds'] ?? []), fn($x) => $x !== ''));
 if (empty($partyIds)) jsonFail('파티를 선택해주세요.');
 
+// 수량 개념 제거 — 동일 partyId 가 중복돼있으면 unique 화 (legacy clients 방어)
+$partyIds = array_values(array_unique($partyIds));
+
 $couponCode    = strtoupper(trim((string)($body['couponCode']    ?? '')));
 $couponPartyId = trim((string)        ($body['couponPartyId'] ?? ''));
 
@@ -49,6 +52,26 @@ $parties = json_decode((string)file_get_contents($dir . '/parties.json'), true);
 $partyMap = [];
 foreach ((array)$parties as $p) {
     if (isset($p['id'])) $partyMap[(string)$p['id']] = $p;
+}
+
+// ── 중복 신청 차단 (서버 방어선) — 동일 partyId 에 cancelled 가 아닌 booking 이 있으면 거절
+$bookingsFile = $dir . '/bookings_' . md5(strtolower(trim((string)$u['email']))) . '.json';
+if (file_exists($bookingsFile)) {
+    $existing = json_decode((string)file_get_contents($bookingsFile), true);
+    if (is_array($existing)) {
+        $dupTitles = [];
+        foreach ($existing as $b) {
+            if (!is_array($b)) continue;
+            $bpid = (string)($b['partyId'] ?? '');
+            $bst  = (string)($b['status']  ?? '');
+            if (in_array($bpid, $partyIds, true) && $bst !== 'cancelled') {
+                $dupTitles[] = (string)($partyMap[$bpid]['title'] ?? "파티 #$bpid");
+            }
+        }
+        if (!empty($dupTitles)) {
+            jsonFail('이미 신청이 완료된 파티입니다. 마이페이지에서 예약 현황을 확인해주세요. (' . implode(', ', array_unique($dupTitles)) . ')', 409);
+        }
+    }
 }
 
 $total = 0; $orderTitles = [];

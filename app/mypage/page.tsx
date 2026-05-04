@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ShoppingBag, LogOut, User, Trash2, Calendar, MapPin, CheckSquare, Square, CreditCard, Pencil, AlertTriangle, X, Ticket, Clock, CheckCircle2, Check, Plus, Minus } from "lucide-react";
+import { ShoppingBag, LogOut, User, Trash2, Calendar, MapPin, CheckSquare, Square, CreditCard, Pencil, AlertTriangle, X, Ticket, Clock, CheckCircle2, Check } from "lucide-react";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useAuth, calcCouponDiscount, type BookingStatus } from "../context/AuthContext";
@@ -46,7 +46,7 @@ const STATUS_DISPLAY: Record<BookingStatus, { label: string; tone: string; strip
 };
 
 export default function MyPage() {
-  const { mounted, isLoggedIn, userEmail, userRole, logout, cart, removeFromCart, setItemQuantity, profile, deleteAccount, bookings, appliedCoupon, applyCoupon, clearCoupon, partyCounts, refreshCart, refreshBookings } = useAuth();
+  const { mounted, isLoggedIn, userEmail, userRole, logout, cart, removeFromCart, profile, deleteAccount, bookings, appliedCoupon, applyCoupon, clearCoupon, partyCounts, refreshCart, refreshBookings } = useAuth();
   const PARTIES = useParties();
   const router = useRouter();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -98,42 +98,8 @@ export default function MyPage() {
     .map(item => PARTIES.find(p => p.id === item.partyId))
     .filter(Boolean) as typeof PARTIES;
 
-  /** partyId → 수량 (cart 직접 조회) */
-  const qtyOf = (partyId: string) => cart.find(c => c.partyId === partyId)?.quantity ?? 1;
-
-  /** 사용자 성별 기준 해당 파티의 남은 정원 (실시간 partyCounts 우선) */
-  const remainingFor = (party: typeof PARTIES[number]) => {
-    const isMale = profile?.gender === "남성";
-    const live = partyCounts[party.id];
-    const booked = live ? (isMale ? live.male : live.female) : (isMale ? party.maleBooked : party.femaleBooked);
-    const stock  = isMale ? party.maleStock : party.femaleStock;
-    return Math.max(0, stock - booked);
-  };
-
-  const handleIncrement = (party: typeof PARTIES[number]) => {
-    const current = qtyOf(party.id);
-    const remain  = remainingFor(party);
-    if (!profile?.gender) {
-      alert("프로필 카드에서 성별을 먼저 등록해주세요.");
-      return;
-    }
-    if (current >= remain) {
-      alert(`해당 파티의 ${profile.gender} 잔여 정원이 ${remain}석입니다. 더 추가할 수 없습니다.`);
-      return;
-    }
-    setItemQuantity(party.id, current + 1);
-  };
-
-  const handleDecrement = (party: typeof PARTIES[number]) => {
-    const current = qtyOf(party.id);
-    if (current <= 1) {
-      if (confirm(`'${party.title}'을(를) 장바구니에서 삭제하시겠습니까?`)) {
-        removeFromCart(party.id);
-      }
-      return;
-    }
-    setItemQuantity(party.id, current - 1);
-  };
+  /** 수량 개념 제거 — 한 사용자는 같은 파티에 1회만 신청 → 항상 1 반환 (legacy 호출부 호환) */
+  const qtyOf = (_partyId: string) => 1;
 
   useEffect(() => {
     if (mounted && !isLoggedIn) {
@@ -411,67 +377,27 @@ export default function MyPage() {
                         </div>
                       </Link>
 
-                      {/* 수량 / 금액 / 쿠폰 영역 */}
+                      {/* 금액 / 쿠폰 영역 — 수량 UI 제거, 1건 단가 그대로 노출 */}
                       <div className="mt-6 md:mt-7 pt-5 md:pt-6 border-t border-gray-100 space-y-5 md:space-y-6">
 
-                        {/* 수량 조절 행 */}
+                        {/* 금액 행 */}
                         {(() => {
-                          const qty       = qtyOf(party.id);
-                          const remain    = remainingFor(party);
-                          const lineTotal = party.price * qty;
+                          const lineTotal = party.price; // quantity 항상 1
                           const lineFinal = computeRowPrice(party.id, lineTotal);
-                          const incDisabled = qty >= remain;
                           return (
-                            <>
-                              <div className="flex items-center justify-between gap-3">
-                                <span className="text-xs md:text-sm font-bold text-gray-400 uppercase tracking-wider">수량</span>
-                                <div className="flex items-center gap-3">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDecrement(party)}
-                                    aria-label="수량 감소"
-                                    className="w-10 h-10 md:w-11 md:h-11 rounded-full border-2 border-gray-200 flex items-center justify-center text-gray-700 hover:border-brand-point hover:text-brand-point active:scale-95 transition-all"
-                                  >
-                                    <Minus size={16} />
-                                  </button>
-                                  <span className="min-w-[2.5rem] text-center font-black text-lg md:text-xl tabular-nums">{qty}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleIncrement(party)}
-                                    disabled={incDisabled}
-                                    aria-label="수량 증가"
-                                    className="w-10 h-10 md:w-11 md:h-11 rounded-full border-2 border-gray-200 flex items-center justify-center text-gray-700 hover:border-brand-point hover:text-brand-point active:scale-95 transition-all disabled:bg-gray-50 disabled:text-gray-300 disabled:border-gray-100 disabled:cursor-not-allowed disabled:hover:border-gray-100 disabled:hover:text-gray-300"
-                                  >
-                                    <Plus size={16} />
-                                  </button>
-                                </div>
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-xs md:text-sm font-bold text-gray-400 uppercase tracking-wider">결제 금액</span>
+                              <div className="flex flex-col items-end leading-tight gap-0.5">
+                                {couponHere ? (
+                                  <>
+                                    <s className="text-gray-400 text-xs md:text-sm font-medium tabular-nums">₩{lineTotal.toLocaleString()}</s>
+                                    <span className="font-black text-2xl md:text-3xl text-brand-point whitespace-nowrap tabular-nums">₩{lineFinal.toLocaleString()}</span>
+                                  </>
+                                ) : (
+                                  <span className="font-black text-2xl md:text-3xl text-brand-black whitespace-nowrap tabular-nums">₩{lineTotal.toLocaleString()}</span>
+                                )}
                               </div>
-                              {incDisabled && (
-                                <p className="text-[11px] md:text-xs text-gray-400 font-medium text-right -mt-3 md:-mt-4">
-                                  {profile?.gender ?? "성별"} 잔여 정원 {remain}석
-                                </p>
-                              )}
-
-                              {/* 금액 행 */}
-                              <div className="flex items-baseline justify-between gap-3">
-                                <span className="text-xs md:text-sm font-bold text-gray-400 uppercase tracking-wider">결제 금액</span>
-                                <div className="flex flex-col items-end leading-tight gap-0.5">
-                                  {qty > 1 && (
-                                    <span className="text-[11px] md:text-xs text-gray-400 font-medium tabular-nums">
-                                      ₩{party.price.toLocaleString()} × {qty}
-                                    </span>
-                                  )}
-                                  {couponHere ? (
-                                    <>
-                                      <s className="text-gray-400 text-xs md:text-sm font-medium tabular-nums">₩{lineTotal.toLocaleString()}</s>
-                                      <span className="font-black text-2xl md:text-3xl text-brand-point whitespace-nowrap tabular-nums">₩{lineFinal.toLocaleString()}</span>
-                                    </>
-                                  ) : (
-                                    <span className="font-black text-2xl md:text-3xl text-brand-black whitespace-nowrap tabular-nums">₩{lineTotal.toLocaleString()}</span>
-                                  )}
-                                </div>
-                              </div>
-                            </>
+                            </div>
                           );
                         })()}
 
