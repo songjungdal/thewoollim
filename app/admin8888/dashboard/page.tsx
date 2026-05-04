@@ -296,6 +296,7 @@ export default function AdminDashboard() {
     return `${kst.getFullYear()}-${String(kst.getMonth() + 1).padStart(2, "0")}`;
   });
   const [memberMaritalFilter, setMemberMaritalFilter] = useState<"all" | "싱글" | "돌싱" | "empty">("all");
+  const [memberSearch, setMemberSearch] = useState("");   // 이름/연락처/이메일 통합 검색
 
   // 매칭파티 CRUD state
   const [partyForm, setPartyForm] = useState<PartyForm>(EMPTY_PARTY);
@@ -878,55 +879,110 @@ export default function AdminDashboard() {
 
           {/* === 회원 관리 === */}
           {tab === "members" && (() => {
+            // 1) 혼인여부 필터 + 이름/연락처/이메일 통합 검색
+            const q = memberSearch.trim().toLowerCase();
+            const qDigits = q.replace(/\D/g, "");                // 연락처 매칭용 숫자만
             const filteredUsers = users.filter(u => {
-              if (memberMaritalFilter === "all") return true;
-              if (memberMaritalFilter === "empty") return !(u.marital_status ?? "").trim();
-              return u.marital_status === memberMaritalFilter;
+              // 혼인여부
+              if (memberMaritalFilter === "empty") {
+                if ((u.marital_status ?? "").trim()) return false;
+              } else if (memberMaritalFilter !== "all" && u.marital_status !== memberMaritalFilter) {
+                return false;
+              }
+              // 검색어 (없으면 통과)
+              if (q === "") return true;
+              const name  = (u.name  ?? "").toLowerCase();
+              const email = (u.email ?? "").toLowerCase();
+              const phone = (u.phone ?? "").replace(/\D/g, "");
+              if (name.includes(q) || email.includes(q)) return true;
+              if (qDigits !== "" && phone.includes(qDigits)) return true;
+              return false;
             });
+
+            // 2) 가입일 최신순 (DESC) — 빈 값은 맨 뒤
+            const sorted = [...filteredUsers].sort((a, b) => {
+              const at = a.created_at ? new Date(a.created_at).getTime() : 0;
+              const bt = b.created_at ? new Date(b.created_at).getTime() : 0;
+              return bt - at;
+            });
+
             return (
               <section>
                 <div className="flex items-end justify-between mb-4 md:mb-5 flex-wrap gap-3">
                   <div>
                     <h2 className="text-xl md:text-2xl font-black">회원 관리</h2>
                     <p className="text-sm text-gray-500 font-medium mt-1">
-                      전체 가입 회원 {users.length}명 · 표시 {filteredUsers.length}명
+                      전체 가입 회원 {users.length}명 · 표시 {sorted.length}명
                     </p>
                   </div>
-                  <label className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-gray-500">혼인여부</span>
-                    <select
-                      aria-label="혼인여부 필터"
-                      value={memberMaritalFilter}
-                      onChange={e => setMemberMaritalFilter(e.target.value as "all" | "싱글" | "돌싱" | "empty")}
-                      className="px-3 py-2 rounded-lg border border-gray-200 text-sm font-medium bg-white"
-                    >
-                      <option value="all">전체</option>
-                      <option value="싱글">싱글만</option>
-                      <option value="돌싱">돌싱만</option>
-                      <option value="empty">미입력</option>
-                    </select>
-                  </label>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    {/* 통합 검색 — 이름 / 연락처 / 이메일 */}
+                    <label className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-gray-500">검색</span>
+                      <input
+                        type="text"
+                        value={memberSearch}
+                        onChange={e => setMemberSearch(e.target.value)}
+                        placeholder="이름 / 연락처 / 이메일"
+                        className="w-56 md:w-64 px-3 py-2 rounded-lg border border-gray-200 text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point focus:border-brand-point outline-none"
+                        aria-label="회원 검색"
+                      />
+                      {memberSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setMemberSearch("")}
+                          className="text-xs font-bold text-gray-400 hover:text-gray-700 transition-colors"
+                        >
+                          초기화
+                        </button>
+                      )}
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-gray-500">혼인여부</span>
+                      <select
+                        aria-label="혼인여부 필터"
+                        value={memberMaritalFilter}
+                        onChange={e => setMemberMaritalFilter(e.target.value as "all" | "싱글" | "돌싱" | "empty")}
+                        className="px-3 py-2 rounded-lg border border-gray-200 text-sm font-medium bg-white"
+                      >
+                        <option value="all">전체</option>
+                        <option value="싱글">싱글만</option>
+                        <option value="돌싱">돌싱만</option>
+                        <option value="empty">미입력</option>
+                      </select>
+                    </label>
+                  </div>
                 </div>
                 <div className="bg-white rounded-2xl border border-gray-200 overflow-x-auto">
                   <table className="w-full text-sm whitespace-nowrap">
                     <thead className="bg-gray-50 text-gray-600 font-bold">
                       <tr>
-                        {["#", "이메일", "이름", "성별", "혼인여부", "연락처", "지역", "직업", "MBTI", "생년월일", "SNS", "가입일", "관리"].map(h => (
+                        {/* '#' 컬럼 제거, 가입일 활성화 + 최신순 정렬 */}
+                        {["가입일", "이메일", "이름", "성별", "혼인여부", "연락처", "지역", "직업", "MBTI", "생년월일", "SNS", "관리"].map(h => (
                           <th key={h} className="text-left px-3 py-3">{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredUsers.map(u => {
+                      {sorted.map(u => {
                         // 관용성: DB legacy 값('single'/'divorced') 도 한글로 정규화
                         const rawMs = (u.marital_status ?? "").trim().toLowerCase();
                         const ms =
                           rawMs === "싱글" || rawMs === "single" || rawMs === "미혼" ? "싱글" :
                             rawMs === "돌싱" || rawMs === "divorced" ? "돌싱" :
                               "";
+                        // 가입일 — YYYY-MM-DD HH:mm 형식, 빈 값은 '-'
+                        const created = u.created_at
+                          ? (() => {
+                              const d = new Date(u.created_at);
+                              if (isNaN(d.getTime())) return "-";
+                              const pad = (n: number) => String(n).padStart(2, "0");
+                              return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                            })()
+                          : "-";
                         return (
                           <tr key={u.id} className="border-t border-gray-100 hover:bg-gray-50">
-                            <td className="px-3 py-2.5 font-bold">{u.id}</td>
+                            <td className="px-3 py-2.5 text-gray-500 tabular-nums">{created}</td>
                             <td className="px-3 py-2.5">
                               {u.email}
                               {u.role === "admin" && (
@@ -950,7 +1006,6 @@ export default function AdminDashboard() {
                             <td className="px-3 py-2.5">{u.mbti || "-"}</td>
                             <td className="px-3 py-2.5">{u.birth_date || <span className="text-gray-400 text-xs">미입력</span>}</td>
                             <td className="px-3 py-2.5">{u.sns_provider || "일반"}</td>
-                            <td className="px-3 py-2.5 text-gray-500">{formatKST(u.created_at)}</td>
                             <td className="px-3 py-2.5">
                               <button
                                 type="button"
@@ -963,7 +1018,7 @@ export default function AdminDashboard() {
                           </tr>
                         );
                       })}
-                      {filteredUsers.length === 0 && <tr><td colSpan={13} className="text-center text-gray-400 py-8">데이터 없음</td></tr>}
+                      {sorted.length === 0 && <tr><td colSpan={12} className="text-center text-gray-400 py-8">{q ? `'${memberSearch}' 검색 결과 없음` : "데이터 없음"}</td></tr>}
                     </tbody>
                   </table>
                 </div>
