@@ -637,8 +637,9 @@ export default function PartyClientView({ id }: { id: string }) {
             </div>
           </div>
 
-          {/* BOTTOM SECTION: DETAIL NARRATIVE */}
-          <div className="border-t border-gray-200 pt-10 md:pt-24">
+          {/* BOTTOM SECTION: DETAIL NARRATIVE — 참가 신청 방법의 mb-24 가 이미 충분한 간격을
+              제공하므로 border-t/pt-* 제거. 다른 섹션 사이 간격(mb-10 md:mb-24)과 동일 톤. */}
+          <div>
             <div className="max-w-4xl mx-auto">
               <motion.div
                 initial={{ opacity: 0 }}
