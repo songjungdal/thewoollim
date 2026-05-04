@@ -32,31 +32,50 @@ function GallerySlider({
   const PAGE_SIZE  = 6;
   const totalPages = Math.max(1, Math.ceil(source.length / PAGE_SIZE));
   const safePage   = Math.min(currentPage, totalPages - 1);
-  // 드래그 도중에 발생하는 click 이벤트를 차단하기 위한 ref
   const draggingRef = useRef(false);
+
+  // 컨테이너 폭 + 페이지 간 gap 을 픽셀 단위로 측정 → 정확한 위치로 슬라이드.
+  // (페이지 사이에 내부 그리드와 동일한 gap 을 둬서 "맞물리는 이미지가 겹쳐 보이는" 현상 방지)
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const [viewportW, setViewportW] = useState(0);
+  const [pageGap,   setPageGap]   = useState(24); // 24px = gap-6 (PC) / 12px = gap-3 (모바일)
+
+  useEffect(() => {
+    const update = () => {
+      setViewportW(viewportRef.current?.offsetWidth ?? 0);
+      setPageGap(window.innerWidth >= 768 ? 24 : 12);
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
+  // 페이지 전환 픽셀 거리 = 컨테이너 폭 + 페이지 간 gap
+  const pageStride = viewportW + pageGap;
 
   return (
     <div className="relative">
-      {/* 슬라이드 윈도우 — overflow-hidden + cursor-grab */}
-      <div className="overflow-hidden cursor-grab active:cursor-grabbing">
+      <div
+        ref={viewportRef}
+        className="overflow-hidden cursor-grab active:cursor-grabbing"
+      >
         <motion.div
           className="flex"
+          style={{ gap: `${pageGap}px`, willChange: "transform" }}
           drag="x"
           dragConstraints={{ left: 0, right: 0 }}
           dragElastic={0.18}
           onDragStart={() => { draggingRef.current = true; }}
           onDragEnd={(_, info) => {
-            const SWIPE = 80;  // 80px 이상 드래그 시 페이지 전환
+            const SWIPE = 80;
             if (info.offset.x < -SWIPE)      setCurrentPage(p => Math.min(totalPages - 1, p + 1));
             else if (info.offset.x > SWIPE)  setCurrentPage(p => Math.max(0, p - 1));
-            // 클릭 차단 윈도우 — 100ms 후 해제
             setTimeout(() => { draggingRef.current = false; }, 100);
           }}
-          animate={{ x: `-${safePage * 100}%` }}
-          // 양방향(우→좌, 좌→우) 모두 균일하게 부드러운 대칭 easing.
-          // ease 'easeInOut' 은 시작/끝 모두 천천히 감속 → 방향 전환 시 끊김 없음.
-          // dragTransition 은 드래그 후 spring-back / snap 모두 동일 느낌으로 정렬.
-          transition={{ type: "tween", ease: "easeInOut", duration: 0.6 }}
+          // 픽셀 단위 위치 — 컨테이너 폭 + gap 으로 정확히 한 페이지씩 이동.
+          // ease cubic-bezier(0.22, 1, 0.36, 1) = easeOutQuint, 양방향 모두 부드러운 글라이드.
+          animate={{ x: -safePage * pageStride }}
+          transition={{ type: "tween", ease: [0.22, 1, 0.36, 1], duration: 0.7 }}
           dragTransition={{ bounceStiffness: 400, bounceDamping: 28, timeConstant: 200 }}
         >
           {Array.from({ length: totalPages }).map((_, pageIdx) => {
@@ -64,7 +83,8 @@ function GallerySlider({
             return (
               <div
                 key={pageIdx}
-                className="w-full flex-shrink-0 grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6 px-2 md:px-0"
+                style={{ width: viewportW || undefined }}
+                className="flex-shrink-0 grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6"
               >
                 {pageItems.map((item, idx) => (
                   <div
