@@ -46,7 +46,7 @@ const STATUS_DISPLAY: Record<BookingStatus, { label: string; tone: string; strip
 };
 
 export default function MyPage() {
-  const { mounted, isLoggedIn, userEmail, userRole, logout, cart, removeFromCart, setItemQuantity, profile, deleteAccount, bookings, appliedCoupon, applyCoupon, clearCoupon, partyCounts } = useAuth();
+  const { mounted, isLoggedIn, userEmail, userRole, logout, cart, removeFromCart, setItemQuantity, profile, deleteAccount, bookings, appliedCoupon, applyCoupon, clearCoupon, partyCounts, refreshCart, refreshBookings } = useAuth();
   const PARTIES = useParties();
   const router = useRouter();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -144,6 +144,23 @@ export default function MyPage() {
   useEffect(() => {
     setSelectedIds(new Set(cart.map(c => c.partyId)));
   }, [cart]);
+
+  // 마이페이지 진입/포커스 복귀 시 카트 + 예약 강제 동기화 (결제 후 cart 정밀 삭제 반영).
+  // - mount 직후 1회: 결제 → /payment/success → /mypage 동선에서 최신 상태 보장
+  // - focus / visibility 복귀: 다른 탭에서 결제했을 때 즉시 반영
+  useEffect(() => {
+    if (!mounted || !isLoggedIn) return;
+    refreshCart();
+    refreshBookings();
+    const onFocus = () => { refreshCart(); refreshBookings(); };
+    const onVisibility = () => { if (document.visibilityState === "visible") onFocus(); };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [mounted, isLoggedIn, refreshCart, refreshBookings]);
 
   if (!mounted || !isLoggedIn) {
     return (

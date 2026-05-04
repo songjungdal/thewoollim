@@ -255,6 +255,39 @@ foreach ($partyIds as $pid) {
 }
 file_put_contents($bookingsFile, json_encode($bookings, JSON_UNESCAPED_UNICODE));
 
+// ── 결제된 partyId 만 카트에서 정밀 제거 (atomic, flock) ─────────────
+//    혹시라도 결제하지 않은 다른 항목은 그대로 보존.
+$paidPartyIds = array_values(array_unique($partyIds));
+$cartFile     = $dataDir . '/cart_' . md5(strtolower(trim($email))) . '.json';
+if (file_exists($cartFile) && !empty($paidPartyIds)) {
+    $cfp = fopen($cartFile, 'c+');
+    if ($cfp) {
+        flock($cfp, LOCK_EX);
+        $craw = stream_get_contents($cfp);
+        $current = $craw ? json_decode($craw, true) : [];
+        if (!is_array($current)) $current = [];
+
+        $paidSet = array_flip(array_map('strval', $paidPartyIds));
+        $kept    = [];
+        $removed = 0;
+        foreach ($current as $item) {
+            if (!is_array($item)) continue;
+            $pid = (string)($item['partyId'] ?? '');
+            if ($pid !== '' && isset($paidSet[$pid])) { $removed++; continue; }
+            $kept[] = $item;
+        }
+
+        ftruncate($cfp, 0); rewind($cfp);
+        fwrite($cfp, json_encode($kept, JSON_UNESCAPED_UNICODE));
+        fflush($cfp); flock($cfp, LOCK_UN); fclose($cfp);
+
+        @file_put_contents("$dataDir/_cart_cleanup.log", sprintf(
+            "[%s] orderId=%s email=%s removed=%d kept=%d paidIds=%s\n",
+            date('c'), $orderId, $email, $removed, count($kept), implode(',', $paidPartyIds)
+        ), FILE_APPEND);
+    }
+}
+
 // pending 파일 정리
 @unlink($pendingFile);
 
