@@ -149,34 +149,24 @@ export default function SmoothOnePage() {
       <Header />
       
       <main className="flex-1">
-        {/* Hero Section */}
-        <section className="relative flex flex-col md:h-[88vh] md:min-h-[700px] md:justify-center bg-brand-black overflow-hidden">
+        {/* Hero Section — 모바일/PC 통합 풀블리드 오버레이 구조 */}
+        <section className="relative flex flex-col bg-brand-black overflow-hidden min-h-[70vh] md:h-[88vh] md:min-h-[700px]">
 
-          {/* Mobile: 이미지를 자연 비율(1904×829)로 상단에 전체 표시 — 크롭 없음 */}
-          <div className="relative w-full md:hidden aspect-[1904/829]">
-            <Image
-              src="/images/hero-bg.jpg"
-              alt=""
-              fill
-              priority
-              className="object-cover"
-            />
-            {/* 이미지 하단을 배경과 자연스럽게 연결하는 페이드 */}
-            <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/30 to-black" />
-          </div>
-
-          {/* Desktop: 기존 full-bleed 커버 유지 */}
+          {/* 풀블리드 배경 이미지 — 모바일/PC 공통, object-cover 로 잘림 허용 */}
           <Image
             src="/images/hero-bg.jpg"
             alt=""
             fill
             priority
-            className="hidden md:block object-cover object-[center_30%] pointer-events-none"
+            className="object-cover object-[center_30%] pointer-events-none"
           />
+
+          {/* Overlay — 모바일: 균일 다크, PC: 하단으로 진해지는 그라디언트 */}
+          <div className="absolute inset-0 bg-black/40 md:hidden" />
           <div className="hidden md:block absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-black/20" />
 
-          {/* Content — 모바일: 이미지 바로 아래 / 데스크탑: 섹션 하단 고정 */}
-          <div className="relative z-10 max-w-7xl mx-auto px-5 md:px-10 w-full text-white pt-8 pb-12 md:mt-auto md:pb-24 md:pt-[160px]">
+          {/* Content — 두 환경 모두 하단 정렬 (mt-auto), fade-in 유지 */}
+          <div className="relative z-10 mt-auto max-w-7xl mx-auto px-5 md:px-10 w-full text-white pb-12 md:pb-24 md:pt-[160px]">
             <motion.div initial="hidden" animate="visible" variants={fadeInUp}>
               <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black tracking-tighter leading-[1.15] mb-4 md:mb-10 drop-shadow-2xl">
                 세상을 울리는<br />
