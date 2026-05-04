@@ -195,7 +195,9 @@ export default function SmoothOnePage() {
           <div className="max-w-7xl mx-auto">
             <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="text-center mb-10 md:mb-16">
               <h2 className="text-4xl md:text-6xl font-bold mb-4 md:mb-6 tracking-tight">매칭파티 신청</h2>
-              <p className="text-base md:text-lg text-gray-500 max-w-2xl mx-auto">원하는 테마와 일정을 선택하여 어울림의 감성을 만나보세요.</p>
+              <p className="text-sm md:text-lg text-gray-500 max-w-2xl mx-auto leading-relaxed break-keep px-2">
+                돌싱부터 싱글까지, 원하는 테마와 지역을 선택하여 새로운 연결을 시작해보세요.
+              </p>
             </motion.div>
 
             {/* 계층형 카테고리 — 중앙 정렬, 상위 축 클릭 → 세부 옵션 전개 */}
