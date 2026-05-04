@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { motion, AnimatePresence, Variants } from "framer-motion";
-import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, Users, Calendar, MapPin, X } from "lucide-react";
+import { ArrowRight, ChevronDown, Users, Calendar, MapPin, X } from "lucide-react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
@@ -14,6 +14,109 @@ import Footer from "./components/Footer";
 import { PARTICIPANTS, FAQS, partyStockStatus } from "./lib/data";
 import { useAuth } from "./context/AuthContext";
 import { useParties } from "./lib/useParties";
+
+/**
+ * 후기 갤러리 가로 슬라이더 — 페이지당 6장 (PC 2x3 / 모바일 3x2).
+ * 마우스 드래그 + 터치 스와이프로 페이지 전환. 클릭 vs 드래그 구분.
+ */
+type GalleryItem = { id: number; image_path: string; alt_text: string; sort_order: number };
+
+function GallerySlider({
+  source, currentPage, setCurrentPage, onImageClick,
+}: {
+  source: GalleryItem[];
+  currentPage: number;
+  setCurrentPage: (updater: (p: number) => number) => void;
+  onImageClick: (path: string) => void;
+}) {
+  const PAGE_SIZE  = 6;
+  const totalPages = Math.max(1, Math.ceil(source.length / PAGE_SIZE));
+  const safePage   = Math.min(currentPage, totalPages - 1);
+  // 드래그 도중에 발생하는 click 이벤트를 차단하기 위한 ref
+  const draggingRef = useRef(false);
+
+  return (
+    <div className="relative">
+      {/* 슬라이드 윈도우 — overflow-hidden + cursor-grab */}
+      <div className="overflow-hidden cursor-grab active:cursor-grabbing">
+        <motion.div
+          className="flex"
+          drag="x"
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.18}
+          onDragStart={() => { draggingRef.current = true; }}
+          onDragEnd={(_, info) => {
+            const SWIPE = 80;  // 80px 이상 드래그 시 페이지 전환
+            if (info.offset.x < -SWIPE)      setCurrentPage(p => Math.min(totalPages - 1, p + 1));
+            else if (info.offset.x > SWIPE)  setCurrentPage(p => Math.max(0, p - 1));
+            // 클릭 차단 윈도우 — 100ms 후 해제
+            setTimeout(() => { draggingRef.current = false; }, 100);
+          }}
+          animate={{ x: `-${safePage * 100}%` }}
+          transition={{ type: "spring", stiffness: 200, damping: 30 }}
+        >
+          {Array.from({ length: totalPages }).map((_, pageIdx) => {
+            const pageItems = source.slice(pageIdx * PAGE_SIZE, (pageIdx + 1) * PAGE_SIZE);
+            return (
+              <div
+                key={pageIdx}
+                className="w-full flex-shrink-0 grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6 px-2 md:px-0"
+              >
+                {pageItems.map((item, idx) => (
+                  <div
+                    key={`${item.id}-${idx}`}
+                    className="aspect-square bg-gray-800 rounded-2xl md:rounded-3xl relative overflow-hidden group cursor-pointer border border-white/5"
+                    onClick={() => {
+                      // 드래그로 인해 발생한 클릭은 무시 → 라이트박스 보존
+                      if (draggingRef.current) return;
+                      onImageClick(item.image_path);
+                    }}
+                  >
+                    <div className="absolute inset-0 transition-transform duration-700 group-hover:scale-110 group-hover:brightness-110 pointer-events-none">
+                      <Image
+                        src={item.image_path}
+                        alt={item.alt_text || `갤러리 이미지 ${idx + 1}`}
+                        fill
+                        sizes="(max-width: 768px) 50vw, 33vw"
+                        className="object-cover select-none"
+                        draggable={false}
+                      />
+                    </div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </motion.div>
+      </div>
+
+      {/* 페이지 인디케이터 (dots) — 시각 위치 표시용 (클릭 가능) */}
+      {totalPages > 1 && (
+        <div className="flex justify-center gap-2 mt-6 md:mt-8">
+          {Array.from({ length: totalPages }).map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => setCurrentPage(() => i)}
+              aria-label={`갤러리 ${i + 1} 페이지`}
+              className={`h-2 rounded-full transition-all ${
+                i === safePage ? "w-6 bg-[#008080]" : "w-2 bg-white/30 hover:bg-white/50"
+              }`}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* 모바일 스와이프 안내 — 첫 진입 시 자연스럽게 인지 */}
+      {totalPages > 1 && (
+        <p className="text-center text-xs text-gray-500 font-medium mt-3 select-none">
+          ← 드래그하거나 스와이프하여 다음 갤러리 보기 →
+        </p>
+      )}
+    </div>
+  );
+}
 
 export default function SmoothOnePage() {
   const [activeTab, setActiveTab] = useState("일정별");
@@ -363,107 +466,18 @@ export default function SmoothOnePage() {
               </p>
             </motion.div>
             
-            {/* 슬라이더 — 페이지당 6장 (PC 2x3 / 모바일 3x2), 좌우 화살표로 이동 */}
-            {(() => {
-              // DB 라이브 데이터 우선, 비어있으면 정적 g1~9 fallback
-              const fallback = [1,2,3,4,5,6,7,8,9].map(i => ({
+            {/* 슬라이더 — 페이지당 6장 (PC 2x3 / 모바일 3x2), 마우스 드래그 + 터치 스와이프 */}
+            <GallerySlider
+              source={galleryItems.length > 0 ? galleryItems : [1,2,3,4,5,6,7,8,9].map(i => ({
                 id: -i,
                 image_path: `/images/gallery/g${i}.png`,
                 alt_text: `갤러리 이미지 ${i}`,
                 sort_order: i*10,
-              }));
-              const source = galleryItems.length > 0 ? galleryItems : fallback;
-              const PAGE_SIZE = 6;
-              const totalPages = Math.max(1, Math.ceil(source.length / PAGE_SIZE));
-              const safePage = Math.min(currentGalleryPage, totalPages - 1);
-              const goPrev = () => setCurrentGalleryPage(p => Math.max(0, p - 1));
-              const goNext = () => setCurrentGalleryPage(p => Math.min(totalPages - 1, p + 1));
-
-              return (
-                <div className="relative px-2 md:px-12">
-                  {/* 슬라이드 윈도우 */}
-                  <div className="overflow-hidden">
-                    <motion.div
-                      className="flex"
-                      animate={{ x: `-${safePage * 100}%` }}
-                      transition={{ type: "spring", stiffness: 200, damping: 30 }}
-                    >
-                      {Array.from({ length: totalPages }).map((_, pageIdx) => {
-                        const pageItems = source.slice(pageIdx * PAGE_SIZE, (pageIdx + 1) * PAGE_SIZE);
-                        return (
-                          <div
-                            key={pageIdx}
-                            className="w-full flex-shrink-0 grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6 px-2 md:px-0"
-                          >
-                            {pageItems.map((item, idx) => (
-                              <div
-                                key={`${item.id}-${idx}`}
-                                className="aspect-square bg-gray-800 rounded-2xl md:rounded-3xl relative overflow-hidden group cursor-pointer border border-white/5"
-                              >
-                                <div
-                                  onClick={() => setSelectedGalleryImage(item.image_path)}
-                                  className="absolute inset-0 transition-transform duration-700 group-hover:scale-110 group-hover:brightness-110"
-                                >
-                                  <Image
-                                    src={item.image_path}
-                                    alt={item.alt_text || `갤러리 이미지 ${idx + 1}`}
-                                    fill
-                                    sizes="(max-width: 768px) 50vw, 33vw"
-                                    className="object-cover"
-                                  />
-                                </div>
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
-                              </div>
-                            ))}
-                          </div>
-                        );
-                      })}
-                    </motion.div>
-                  </div>
-
-                  {/* 좌우 화살표 — 페이지 1개 초과일 때만 노출 */}
-                  {totalPages > 1 && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={goPrev}
-                        disabled={safePage === 0}
-                        aria-label="이전 갤러리"
-                        className="absolute left-0 md:-left-2 top-1/2 -translate-y-1/2 w-10 h-10 md:w-12 md:h-12 rounded-full bg-[#008080] text-white shadow-lg flex items-center justify-center transition-all hover:bg-[#006666] hover:shadow-[0_8px_20px_rgba(0,128,128,0.4)] active:scale-95 disabled:bg-gray-600 disabled:cursor-not-allowed disabled:shadow-none z-10"
-                      >
-                        <ChevronLeft size={22} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={goNext}
-                        disabled={safePage === totalPages - 1}
-                        aria-label="다음 갤러리"
-                        className="absolute right-0 md:-right-2 top-1/2 -translate-y-1/2 w-10 h-10 md:w-12 md:h-12 rounded-full bg-[#008080] text-white shadow-lg flex items-center justify-center transition-all hover:bg-[#006666] hover:shadow-[0_8px_20px_rgba(0,128,128,0.4)] active:scale-95 disabled:bg-gray-600 disabled:cursor-not-allowed disabled:shadow-none z-10"
-                      >
-                        <ChevronRight size={22} />
-                      </button>
-                    </>
-                  )}
-
-                  {/* 페이지 인디케이터 (dots) */}
-                  {totalPages > 1 && (
-                    <div className="flex justify-center gap-2 mt-6 md:mt-8">
-                      {Array.from({ length: totalPages }).map((_, i) => (
-                        <button
-                          key={i}
-                          type="button"
-                          onClick={() => setCurrentGalleryPage(i)}
-                          aria-label={`갤러리 ${i + 1} 페이지`}
-                          className={`h-2 rounded-full transition-all ${
-                            i === safePage ? "w-6 bg-[#008080]" : "w-2 bg-white/30 hover:bg-white/50"
-                          }`}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
+              }))}
+              currentPage={currentGalleryPage}
+              setCurrentPage={setCurrentGalleryPage}
+              onImageClick={setSelectedGalleryImage}
+            />
           </div>
         </section>
 
