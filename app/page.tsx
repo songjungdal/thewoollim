@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef } from "react";
 import { motion, AnimatePresence, Variants } from "framer-motion";
-import { ArrowRight, ChevronDown, Users, Calendar, MapPin, X } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, Users, Calendar, MapPin, X } from "lucide-react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
@@ -32,13 +32,11 @@ function GallerySlider({
   const PAGE_SIZE  = 6;
   const totalPages = Math.max(1, Math.ceil(source.length / PAGE_SIZE));
   const safePage   = Math.min(currentPage, totalPages - 1);
-  const draggingRef = useRef(false);
 
   // 컨테이너 폭 + 페이지 간 gap 을 픽셀 단위로 측정 → 정확한 위치로 슬라이드.
-  // (페이지 사이에 내부 그리드와 동일한 gap 을 둬서 "맞물리는 이미지가 겹쳐 보이는" 현상 방지)
   const viewportRef = useRef<HTMLDivElement>(null);
   const [viewportW, setViewportW] = useState(0);
-  const [pageGap,   setPageGap]   = useState(24); // 24px = gap-6 (PC) / 12px = gap-3 (모바일)
+  const [pageGap,   setPageGap]   = useState(24); // 24px (PC) / 12px (모바일)
 
   useEffect(() => {
     const update = () => {
@@ -50,72 +48,88 @@ function GallerySlider({
     return () => window.removeEventListener("resize", update);
   }, []);
 
-  // 페이지 전환 픽셀 거리 = 컨테이너 폭 + 페이지 간 gap
   const pageStride = viewportW + pageGap;
+  const goPrev = () => setCurrentPage(p => Math.max(0, p - 1));
+  const goNext = () => setCurrentPage(p => Math.min(totalPages - 1, p + 1));
+
+  // 화살표 공통 스타일 — 원형/사각형 박스 X, 화살표 기호만 (#008080 청록).
+  const arrowBase =
+    "flex-shrink-0 p-1 md:p-2 text-[#008080] hover:text-[#006666] " +
+    "transition-colors disabled:text-gray-600 disabled:cursor-not-allowed " +
+    "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#008080]/40 rounded-md";
 
   return (
-    <div className="relative">
-      <div
-        ref={viewportRef}
-        className="overflow-hidden cursor-grab active:cursor-grabbing"
-      >
-        <motion.div
-          className="flex"
-          style={{ gap: `${pageGap}px`, willChange: "transform" }}
-          drag="x"
-          dragConstraints={{ left: 0, right: 0 }}
-          dragElastic={0.18}
-          onDragStart={() => { draggingRef.current = true; }}
-          onDragEnd={(_, info) => {
-            const SWIPE = 80;
-            if (info.offset.x < -SWIPE)      setCurrentPage(p => Math.min(totalPages - 1, p + 1));
-            else if (info.offset.x > SWIPE)  setCurrentPage(p => Math.max(0, p - 1));
-            setTimeout(() => { draggingRef.current = false; }, 100);
-          }}
-          // 픽셀 단위 위치 — 컨테이너 폭 + gap 으로 정확히 한 페이지씩 이동.
-          // ease cubic-bezier(0.22, 1, 0.36, 1) = easeOutQuint, 양방향 모두 부드러운 글라이드.
-          animate={{ x: -safePage * pageStride }}
-          transition={{ type: "tween", ease: [0.22, 1, 0.36, 1], duration: 0.7 }}
-          dragTransition={{ bounceStiffness: 400, bounceDamping: 28, timeConstant: 200 }}
+    <div>
+      {/* 좌측 화살표 + 슬라이드 윈도우 + 우측 화살표 — 가로 flex 정렬 */}
+      <div className="flex items-center gap-1 md:gap-3">
+        {totalPages > 1 && (
+          <button
+            type="button"
+            onClick={goPrev}
+            disabled={safePage === 0}
+            aria-label="이전 갤러리"
+            className={arrowBase}
+          >
+            <ChevronLeft className="w-7 h-7 md:w-10 md:h-10" strokeWidth={2.5} />
+          </button>
+        )}
+
+        <div
+          ref={viewportRef}
+          className="flex-1 overflow-hidden"
         >
-          {Array.from({ length: totalPages }).map((_, pageIdx) => {
-            const pageItems = source.slice(pageIdx * PAGE_SIZE, (pageIdx + 1) * PAGE_SIZE);
-            return (
-              <div
-                key={pageIdx}
-                style={{ width: viewportW || undefined }}
-                className="flex-shrink-0 grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6"
-              >
-                {pageItems.map((item, idx) => (
-                  <div
-                    key={`${item.id}-${idx}`}
-                    className="aspect-square bg-gray-800 rounded-2xl md:rounded-3xl relative overflow-hidden group cursor-pointer border border-white/5"
-                    onClick={() => {
-                      // 드래그로 인해 발생한 클릭은 무시 → 라이트박스 보존
-                      if (draggingRef.current) return;
-                      onImageClick(item.image_path);
-                    }}
-                  >
-                    <div className="absolute inset-0 transition-transform duration-700 group-hover:scale-110 group-hover:brightness-110 pointer-events-none">
-                      <Image
-                        src={item.image_path}
-                        alt={item.alt_text || `갤러리 이미지 ${idx + 1}`}
-                        fill
-                        sizes="(max-width: 768px) 50vw, 33vw"
-                        className="object-cover select-none"
-                        draggable={false}
-                      />
+          <motion.div
+            className="flex"
+            style={{ gap: `${pageGap}px`, willChange: "transform" }}
+            animate={{ x: -safePage * pageStride }}
+            transition={{ type: "tween", ease: [0.22, 1, 0.36, 1], duration: 0.7 }}
+          >
+            {Array.from({ length: totalPages }).map((_, pageIdx) => {
+              const pageItems = source.slice(pageIdx * PAGE_SIZE, (pageIdx + 1) * PAGE_SIZE);
+              return (
+                <div
+                  key={pageIdx}
+                  style={{ width: viewportW || undefined }}
+                  className="flex-shrink-0 grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6"
+                >
+                  {pageItems.map((item, idx) => (
+                    <div
+                      key={`${item.id}-${idx}`}
+                      className="aspect-square bg-gray-800 rounded-2xl md:rounded-3xl relative overflow-hidden group cursor-pointer border border-white/5"
+                      onClick={() => onImageClick(item.image_path)}
+                    >
+                      <div className="absolute inset-0 transition-transform duration-700 group-hover:scale-110 group-hover:brightness-110 pointer-events-none">
+                        <Image
+                          src={item.image_path}
+                          alt={item.alt_text || `갤러리 이미지 ${idx + 1}`}
+                          fill
+                          sizes="(max-width: 768px) 50vw, 33vw"
+                          className="object-cover"
+                        />
+                      </div>
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
                     </div>
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
-                  </div>
-                ))}
-              </div>
-            );
-          })}
-        </motion.div>
+                  ))}
+                </div>
+              );
+            })}
+          </motion.div>
+        </div>
+
+        {totalPages > 1 && (
+          <button
+            type="button"
+            onClick={goNext}
+            disabled={safePage === totalPages - 1}
+            aria-label="다음 갤러리"
+            className={arrowBase}
+          >
+            <ChevronRight className="w-7 h-7 md:w-10 md:h-10" strokeWidth={2.5} />
+          </button>
+        )}
       </div>
 
-      {/* 페이지 인디케이터 (dots) — 시각 위치 표시용 (클릭 가능) */}
+      {/* 페이지 인디케이터 (dots) */}
       {totalPages > 1 && (
         <div className="flex justify-center gap-2 mt-6 md:mt-8">
           {Array.from({ length: totalPages }).map((_, i) => (
@@ -130,13 +144,6 @@ function GallerySlider({
             />
           ))}
         </div>
-      )}
-
-      {/* 모바일 스와이프 안내 — 첫 진입 시 자연스럽게 인지 */}
-      {totalPages > 1 && (
-        <p className="text-center text-xs text-gray-500 font-medium mt-3 select-none">
-          ← 드래그하거나 스와이프하여 다음 갤러리 보기 →
-        </p>
       )}
     </div>
   );
