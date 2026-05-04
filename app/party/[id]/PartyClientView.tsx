@@ -256,7 +256,24 @@ export default function PartyClientView({ id }: { id: string }) {
                   <Star size={48} className="text-gray-400" />
                 </div>
               )}
-              <div className="absolute top-4 left-4 md:top-6 md:left-6 bg-brand-point text-white font-bold px-4 py-1.5 md:px-5 md:py-2 rounded-full text-xs md:text-sm shadow-xl z-10">모집중</div>
+              {/* 상태 배지 — 우선순위: 행사일 경과(모집종료) > 정원 만석(모집마감) > 모집중 */}
+              {(() => {
+                // KST 기준 오늘 날짜 (YYYY-MM-DD) 와 calendarDate 비교
+                const todayKST = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date());
+                const eventEnded = !!detailItem.calendarDate && todayKST > detailItem.calendarDate;
+                const status: "ended" | "full" | "open" =
+                  eventEnded ? "ended" : stock.allFull ? "full" : "open";
+                const badge = {
+                  ended: { label: "모집종료", cls: "bg-red-500 text-white" },
+                  full:  { label: "모집마감", cls: "bg-gray-300 text-black" },
+                  open:  { label: "모집중",   cls: "bg-brand-point text-black" },
+                }[status];
+                return (
+                  <div className={`absolute top-4 left-4 md:top-6 md:left-6 font-bold px-4 py-1.5 md:px-5 md:py-2 rounded-full text-xs md:text-sm shadow-xl z-10 ${badge.cls}`}>
+                    {badge.label}
+                  </div>
+                );
+              })()}
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
             </div>
 
