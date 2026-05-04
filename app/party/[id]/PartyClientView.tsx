@@ -526,24 +526,26 @@ export default function PartyClientView({ id }: { id: string }) {
               <div className="mb-7 md:mb-10">
                 <div className="max-w-4xl mx-auto">
                   {variant === "single" ? (
-                    <div className="bg-rose-50/70 border border-rose-200 rounded-2xl md:rounded-3xl p-5 md:p-7 shadow-sm">
+                    /* Singles Only — Open Matching 과 동일 톤(brand-point 청록)으로 통일.
+                       문구 출력 로직(variant), ShieldCheck 아이콘, 패딩/라운드/shadow 모두 보존. */
+                    <div className="bg-brand-point/5 border border-brand-point/25 rounded-2xl md:rounded-3xl p-5 md:p-7 shadow-sm">
                       <div className="flex gap-3 md:gap-4">
                         <div className="flex-shrink-0">
-                          <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-rose-100 flex items-center justify-center">
-                            <ShieldCheck size={20} className="text-rose-600 md:hidden" />
-                            <ShieldCheck size={24} className="text-rose-600 hidden md:block" />
+                          <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-brand-point/15 flex items-center justify-center">
+                            <ShieldCheck size={20} className="text-brand-point md:hidden" />
+                            <ShieldCheck size={24} className="text-brand-point hidden md:block" />
                           </div>
                         </div>
                         <div className="flex-1 min-w-0 pt-0.5">
-                          <p className="text-[11px] md:text-xs font-black tracking-[0.2em] text-rose-600 mb-1.5 md:mb-2 uppercase">
+                          <p className="text-[11px] md:text-xs font-black tracking-[0.2em] text-brand-point mb-1.5 md:mb-2 uppercase">
                             Singles Only
                           </p>
                           <p className="text-sm md:text-base text-gray-700 leading-relaxed break-keep">
                             해당 파티는 법적 혼인 이력이 없는 <strong className="font-black text-brand-black">&apos;싱글&apos;</strong> 회원님만을 대상으로 진행되는 매칭 파티입니다.{" "}
                             <strong className="font-black text-brand-black">&apos;싱글&apos;</strong>이 아님이 확인될 경우, 즉시{" "}
-                            <strong className="font-black text-rose-700">회원탈퇴</strong>와 함께 블랙리스트 조치되며,
+                            <strong className="font-black text-brand-point">회원탈퇴</strong>와 함께 블랙리스트 조치되며,
                             허위 정보 기재에 따른 민·형사상의{" "}
-                            <strong className="font-black text-rose-700">강력한 법적 책임</strong>을 물을 수 있음을 고지합니다.
+                            <strong className="font-black text-brand-point">강력한 법적 책임</strong>을 물을 수 있음을 고지합니다.
                           </p>
                         </div>
                       </div>
