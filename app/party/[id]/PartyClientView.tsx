@@ -84,7 +84,9 @@ export default function PartyClientView({ id }: { id: string }) {
   const PARTIES = useParties();
   const baseItem = PARTIES.find(p => p.id === id);
   const router = useRouter();
-  const { isLoggedIn, addToCart, profile, partyCounts, cart } = useAuth();
+  const { isLoggedIn, addToCart, profile, partyCounts, cart, bookings } = useAuth();
+  // 이미 신청한 파티 — cancelled 가 아닌 모든 booking 상태(결제완료/확정대기/참가확정)를 차단 사유로 간주
+  const alreadyBooked = bookings.some(b => b.partyId === id && b.status !== "cancelled");
   const [showCartModal, setShowCartModal] = useState(false);
   const [participants, setParticipants] = useState<{ male: Participant[]; female: Participant[] }>({ male: [], female: [] });
 
@@ -166,7 +168,7 @@ export default function PartyClientView({ id }: { id: string }) {
     return null;
   };
 
-  // 참가신청 — 카트에 담고 마이페이지로 이동 (이미 담긴 경우 안내)
+  // 참가신청 — 카트에 담고 마이페이지로 이동 (중복 신청/카트 시 차단)
   const handleCheckout = () => {
     if (!isLoggedIn) {
       router.push(`/login?redirect=${encodeURIComponent(`/party/${id}/`)}`);
@@ -177,6 +179,7 @@ export default function PartyClientView({ id }: { id: string }) {
       router.push("/profile-setup/");
       return;
     }
+    if (alreadyBooked) { alert("이미 참가신청 중인 파티입니다."); return; }
     const blocked = checkBlockedReason();
     if (blocked) { alert(blocked); return; }
 
@@ -189,7 +192,7 @@ export default function PartyClientView({ id }: { id: string }) {
     router.push("/mypage");
   };
 
-  // 장바구니 — 한 사용자는 같은 파티에 1회만 담을 수 있음 (수량 개념 제거).
+  // 장바구니 — 한 사용자는 같은 파티에 1회만 담을 수 있음 + 이미 신청한 파티 차단
   const handleAddToCart = () => {
     if (!isLoggedIn) {
       router.push("/login");
@@ -200,6 +203,7 @@ export default function PartyClientView({ id }: { id: string }) {
       router.push("/profile-setup/");
       return;
     }
+    if (alreadyBooked) { alert("이미 참가신청 중인 파티입니다."); return; }
     const blocked = checkBlockedReason();
     if (blocked) { alert(blocked); return; }
 
@@ -336,16 +340,19 @@ export default function PartyClientView({ id }: { id: string }) {
                   (userGender === "남성" && stock.maleFull) ||
                   (userGender === "여성" && stock.femaleFull);
                 const eligibilityBlocked = isLoggedIn && !eligibility.ok;
-                const disabled = stock.allFull || userSideFull || eligibilityBlocked;
-                const label = stock.allFull
-                  ? "모집 마감"
-                  : userGender === "남성" && stock.maleFull
-                    ? "남성 마감"
-                    : userGender === "여성" && stock.femaleFull
-                      ? "여성 마감"
-                      : eligibilityBlocked
-                        ? "참가 대상 아님"
-                        : "참가신청";
+                // alreadyBooked 우선 적용 — 자격/정원 우회보다 명확한 사용자 안내
+                const disabled = alreadyBooked || stock.allFull || userSideFull || eligibilityBlocked;
+                const label = alreadyBooked
+                  ? "이미 신청된 파티"
+                  : stock.allFull
+                    ? "모집 마감"
+                    : userGender === "남성" && stock.maleFull
+                      ? "남성 마감"
+                      : userGender === "여성" && stock.femaleFull
+                        ? "여성 마감"
+                        : eligibilityBlocked
+                          ? "참가 대상 아님"
+                          : "참가신청";
                 return (
                   <div className="flex gap-3 md:gap-4 mt-auto">
                     <button
