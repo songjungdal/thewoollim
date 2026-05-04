@@ -53,7 +53,9 @@ function GallerySlider({
             setTimeout(() => { draggingRef.current = false; }, 100);
           }}
           animate={{ x: `-${safePage * 100}%` }}
-          transition={{ type: "spring", stiffness: 200, damping: 30 }}
+          // 부드러운 페이지 전환 — iOS 스타일 cubic-bezier easing (튀는 느낌 없는 premium 슬라이드)
+          // 모바일/PC 동일 적용. dragElastic 은 드래그 중 손가락 추적용이라 변경 없음.
+          transition={{ type: "tween", ease: [0.32, 0.72, 0, 1], duration: 0.55 }}
         >
           {Array.from({ length: totalPages }).map((_, pageIdx) => {
             const pageItems = source.slice(pageIdx * PAGE_SIZE, (pageIdx + 1) * PAGE_SIZE);
