@@ -314,14 +314,16 @@ export default function PartyClientView({ id }: { id: string }) {
                   </div>
                 </div>
 
-                {/* Notice */}
-                <div className="bg-white p-4 md:p-5 rounded-xl md:rounded-2xl border border-gray-200 mb-5 md:mb-6">
+                {/* Notice — 신청 전 확인사항 (좌측 이미지와 하단 라인 맞추기 위해 패딩/마진 미세 조정) */}
+                <div className="bg-white p-3.5 md:p-4 rounded-xl md:rounded-2xl border border-gray-200 mb-4 md:mb-4">
                   <h4 className="font-bold mb-1.5 flex items-center gap-2 text-sm md:text-base">
-                    <Heart size={15} className="text-brand-point" /> 꼭 확인해주세요.
+                    <Heart size={15} className="text-brand-point" /> 신청 전 꼭 확인해주세요.
                   </h4>
-                  <p className="text-xs md:text-sm text-gray-500 leading-relaxed">
-                    어울림은 진정성 있는 네트워크 유지를 위해 철저한 사전 승인제로 운영됩니다.<br />
-                    결제 완료 시 참여 확정 및 안내 문자가 순차적으로 발송됩니다.
+                  <p className="text-xs md:text-sm text-gray-500 leading-relaxed break-keep">
+                    어울림은 진정성 있는 만남을 위해 <strong className="font-bold text-brand-black">100% 사전 승인제</strong>로 운영됩니다.
+                    결제 후 프로필 정보를 입력해 주시면 <strong className="font-bold text-brand-black">[확정 대기 중]</strong> 상태가 되며,
+                    관리자의 꼼꼼한 확인을 거쳐 최종 <strong className="font-bold text-brand-point">[참가 확정]</strong>이 이루어집니다.
+                    참가 확정 및 안내 문자는 확정 시점에 맞춰 순차적으로 발송됩니다.
                   </p>
                 </div>
               </div>
