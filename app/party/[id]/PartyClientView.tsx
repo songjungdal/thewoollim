@@ -499,7 +499,7 @@ export default function PartyClientView({ id }: { id: string }) {
             <div className="max-w-4xl mx-auto">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/images/party_apply_guide_head.jpg"
+                src="/images/party_apply_guide_head.png"
                 alt="참가 신청 안내"
                 className="block w-full h-auto object-contain"
               />
