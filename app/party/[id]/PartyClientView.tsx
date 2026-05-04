@@ -21,19 +21,19 @@ type Participant = {
   status?: "confirmed" | "pending_approval" | string;
 };
 
-/** 상태 미니 배지 — 마이페이지 스타일 변형 (참가자 명단 인라인용 컴팩트 사이즈) */
+/** 상태 미니 배지 — 마이페이지 STATUS_DISPLAY 와 동일 색상/라벨, 사이즈만 컴팩트 */
 function StatusMiniBadge({ status }: { status?: string }) {
   if (status === "confirmed") {
     return (
-      <span className="inline-flex items-center text-[9px] md:text-[10px] font-black px-1.5 py-0.5 rounded-full bg-[#008080] text-black whitespace-nowrap">
+      <span className="inline-flex items-center text-[9px] md:text-[10px] font-black px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 whitespace-nowrap">
         참가확정
       </span>
     );
   }
   if (status === "pending_approval") {
     return (
-      <span className="inline-flex items-center text-[9px] md:text-[10px] font-black px-1.5 py-0.5 rounded-full bg-[#FFD700] text-black whitespace-nowrap">
-        확정대기
+      <span className="inline-flex items-center text-[9px] md:text-[10px] font-black px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-800 whitespace-nowrap">
+        확정 대기 중
       </span>
     );
   }
