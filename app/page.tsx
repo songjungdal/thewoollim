@@ -53,12 +53,12 @@ function GallerySlider({
   const goNext = () => setCurrentPage(p => Math.min(totalPages - 1, p + 1));
 
   // 화살표 공통 스타일 — 원형/사각형 박스 X, 화살표 기호만.
-  // 그리드 이미지 위에 겹치므로 drop-shadow 로 가독성 확보.
+  // 이미지 위에 오버레이되므로 기본 흰색(밝은 가독성) + hover 시 brand-point 청록.
   const arrowBase =
-    "absolute top-1/2 -translate-y-1/2 z-10 p-2 text-[#008080] hover:text-[#006666] " +
-    "transition-colors disabled:text-gray-600/60 disabled:cursor-not-allowed " +
+    "absolute top-1/2 -translate-y-1/2 z-10 p-2 text-white hover:text-[#008080] " +
+    "transition-colors disabled:text-white/30 disabled:cursor-not-allowed " +
     "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#008080]/40 rounded-md " +
-    "drop-shadow-[0_2px_6px_rgba(0,0,0,0.6)]";
+    "drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]";
 
   return (
     <div className="relative">
