@@ -1507,11 +1507,12 @@ export default function AdminDashboard() {
                               <option value="서울">서울</option>
                               <option value="성남">성남</option>
                               <option value="수원">수원</option>
-                              <option value="인천">인천</option>
                               <option value="용인">용인</option>
+                              <option value="인천">인천</option>
                               {/* '기타' 옵션 노출 제외 — 신규 등록/수정 시 선택 차단.
                                   기존 '기타' 파티 데이터는 DB 에 그대로 보존되며,
-                                  관리자가 해당 파티를 열면 select 값이 빈 상태로 표시됨 → 재선택 유도. */}
+                                  관리자가 해당 파티를 열면 select 값이 빈 상태로 표시됨 → 재선택 유도.
+                                  표시 순서: 메인 페이지와 동일하게 인천/용인 위치 교체 (값 무변경). */}
                             </select>
                           </div>
                         </div>
