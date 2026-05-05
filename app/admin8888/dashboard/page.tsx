@@ -1131,8 +1131,13 @@ export default function AdminDashboard() {
                   {orderedPartyIds.map(pid => {
                     const party = PARTIES.find(p => p.id === pid);
                     const partyRows = byParty[pid] || [];
+                    // 테이블 표시용 — 취소건 포함 (line-through 로 시각 구분)
                     const males = partyRows.filter(r => r.userGender === "남성");
                     const females = partyRows.filter(r => r.userGender === "여성");
+                    // 인원 카운트용 — 'cancelled' 제외 (paid_pending_profile / pending_approval / confirmed / completed 만 합산)
+                    const activeMales   = males  .filter(r => r.status !== "cancelled").length;
+                    const activeFemales = females.filter(r => r.status !== "cancelled").length;
+                    const activeTotal   = activeMales + activeFemales;
                     // 취소건 제외한 결제 합계
                     const totalRevenue = partyRows
                       .filter(r => r.status !== "cancelled")
@@ -1280,9 +1285,10 @@ export default function AdminDashboard() {
                             </div>
                           </div>
                           <div className="flex gap-3 md:gap-4 mt-2 text-xs md:text-sm">
-                            <span className="font-bold text-[#4facfe]">남성 {males.length}명</span>
-                            <span className="font-bold text-rose-500">여성 {females.length}명</span>
-                            <span className="font-bold text-gray-500">총 {partyRows.length}명</span>
+                            {/* 카운트는 cancelled 제외 (실제 참가 인원). 취소자는 아래 테이블에 line-through 로 보존 노출. */}
+                            <span className="font-bold text-[#4facfe]">남성 {activeMales}명</span>
+                            <span className="font-bold text-rose-500">여성 {activeFemales}명</span>
+                            <span className="font-bold text-gray-500">총 {activeTotal}명</span>
                           </div>
                         </div>
 
