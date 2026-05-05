@@ -1323,13 +1323,23 @@ export default function AdminDashboard() {
                 <table className="w-full text-sm whitespace-nowrap">
                   <thead className="bg-gray-50 text-gray-600 font-bold">
                     <tr>
-                      {["#", "이미지", "제목", "태그", "일시", "장소", "대상", "참가비", "정원(남/여)", "액션"].map(h => (
+                      {/* '태그' 컬럼 제거 — 주제별/일정별/지역별 등 카테고리 태그는 UI 노출 X.
+                          데이터(p.tag)는 보존 — 파티 등록/수정 폼 / 홈 카테고리 필터에서 계속 활용. */}
+                      {["#", "이미지", "제목", "일시", "장소", "대상", "참가비", "정원(남/여)", "액션"].map(h => (
                         <th key={h} className="text-left px-3 py-3">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {PARTIES.map(p => (
+                    {/* 일자 빠른 순 (calendarDate ASC) 정렬 — 빈 값은 맨 뒤 */}
+                    {[...PARTIES].sort((a, b) => {
+                      const ac = a.calendarDate || "";
+                      const bc = b.calendarDate || "";
+                      if (!ac && !bc) return 0;
+                      if (!ac) return 1;
+                      if (!bc) return -1;
+                      return ac.localeCompare(bc);
+                    }).map(p => (
                       <tr key={p.id} className="border-t border-gray-100 hover:bg-gray-50">
                         <td className="px-3 py-2.5 font-bold text-gray-400">{p.id}</td>
                         <td className="px-3 py-2.5">
@@ -1338,7 +1348,6 @@ export default function AdminDashboard() {
                             : <div className="w-12 h-9 bg-gray-100 rounded flex items-center justify-center text-gray-300"><ImageIcon size={14} /></div>}
                         </td>
                         <td className="px-3 py-2.5 font-bold">{p.title}</td>
-                        <td className="px-3 py-2.5"><span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">{p.tag}</span></td>
                         <td className="px-3 py-2.5 text-gray-600">{p.dateString}</td>
                         <td className="px-3 py-2.5 text-gray-600">{p.location}</td>
                         <td className="px-3 py-2.5 text-gray-600">{p.target}</td>
@@ -1356,7 +1365,7 @@ export default function AdminDashboard() {
                         </td>
                       </tr>
                     ))}
-                    {PARTIES.length === 0 && <tr><td colSpan={10} className="text-center text-gray-400 py-8">등록된 매칭파티 없음</td></tr>}
+                    {PARTIES.length === 0 && <tr><td colSpan={9} className="text-center text-gray-400 py-8">등록된 매칭파티 없음</td></tr>}
                   </tbody>
                 </table>
               </div>
