@@ -386,15 +386,18 @@ export default function AdminDashboard() {
         return; // 모달 유지 — 사용자가 입력값 보존
       }
 
-      // 같은 브라우저 다른 탭(메인/상세 등)에 broadcast — 다음 페이지에서 갱신된 상태 노출
+      // 같은 브라우저 모든 탭(메인/상세 + 본 admin) 에 broadcast → useParties 가 즉시 refetch
       broadcastPartiesUpdated();
       // beforeunload 가드 우회 + dirty 해제 (중복 confirm 차단)
       skipBeforeUnloadRef.current = true;
       setPartyFormDirty(false);
 
-      // 단일 알림 → 확인 누르면 dashboard로 hard refresh 이동
-      alert("수정되었습니다.");
-      window.location.assign("/admin8888/dashboard/");
+      const wasCreate = action === "create";
+      // 페이지 이동 없이 모달만 닫고 매칭파티 탭 유지 → 리스트는 broadcastPartiesUpdated 로 자동 최신화
+      alert(wasCreate ? "등록되었습니다." : "수정되었습니다.");
+      setPartyEditMode(null);
+      setPartyForm(EMPTY_PARTY);
+      setTab("parties");
     } catch {
       alert("수정 중 오류가 발생했습니다.");
     }
@@ -414,7 +417,9 @@ export default function AdminDashboard() {
       skipBeforeUnloadRef.current = true;
       setPartyFormDirty(false);
       alert("삭제되었습니다.");
-      window.location.assign("/admin8888/dashboard/");
+      setPartyEditMode(null);
+      setPartyForm(EMPTY_PARTY);
+      setTab("parties");
     } catch {
       alert("수정 중 오류가 발생했습니다.");
     }
