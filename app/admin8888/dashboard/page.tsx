@@ -369,8 +369,19 @@ export default function AdminDashboard() {
 
   const savePartyForm = async () => {
     const f = partyForm;
-    if (!f.title || !f.dateString || !f.calendarDate || !f.location || !f.target) {
-      alert("필수 항목(제목/일시/장소/대상)을 모두 입력해주세요.");
+    // 7가지 필수 항목 검증 — 누락 항목명을 alert 에 명시
+    const missing: string[] = [];
+    if (!String(f.title).trim())                          missing.push("제목");
+    if (!String((f as any).description ?? "").trim())     missing.push("내용/소개");
+    if (!String(f.dateString).trim() || !String(f.calendarDate).trim()) missing.push("행사 일시");
+    if (!String(f.location).trim())                       missing.push("장소");
+    if (!String(f.target).trim())                         missing.push("대상");
+    if (!Number.isFinite(f.price) || f.price <= 0)        missing.push("참가비");
+    if (!Number.isFinite(f.maleStock)   || f.maleStock   <= 0) missing.push("모집 인원(남성)");
+    if (!Number.isFinite(f.femaleStock) || f.femaleStock <= 0) missing.push("모집 인원(여성)");
+
+    if (missing.length > 0) {
+      alert(`모든 항목을 입력해야 등록이 가능합니다.\n[${missing.join(", ")}]을 확인해주세요.`);
       return;
     }
     const action = partyEditMode === "create" ? "create" : "update";
