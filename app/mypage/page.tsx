@@ -543,7 +543,24 @@ export default function MyPage() {
             <span className="text-gray-200" aria-hidden>|</span>
             <button
               type="button"
-              onClick={() => setShowWithdrawModal(true)}
+              onClick={() => {
+                // 진행 중인 매칭 파티 차단 — paid_pending_profile / pending_approval / confirmed
+                const blocking = bookings.some(b =>
+                  b.status === "paid_pending_profile" ||
+                  b.status === "pending_approval" ||
+                  b.status === "confirmed"
+                );
+                if (blocking) {
+                  alert(
+                    "잠시만요! 아직 진행 중인 매칭 파티가 남아있어요.\n" +
+                    "현재 진행 대기 중인 매칭 파티가 있습니다.\n" +
+                    "탈퇴 버튼 바로 옆에 있는 [취소요청] 버튼을 눌러 먼저 정리를 마쳐주세요.\n" +
+                    "모든 신청 내역이 취소된 후에 회원 탈퇴가 가능합니다."
+                  );
+                  return;
+                }
+                setShowWithdrawModal(true);
+              }}
               className="!bg-transparent hover:!bg-transparent focus:!bg-transparent !border-0 !outline-none !shadow-none text-xs md:text-sm text-gray-400 hover:!text-gray-600 underline underline-offset-4 cursor-pointer py-2 px-0 transition-colors duration-200 ease-out"
             >
               회원탈퇴

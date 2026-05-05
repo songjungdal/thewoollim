@@ -39,11 +39,12 @@ function saveBookings(string $email, array $bookings): void {
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     try {
         $pdo = getDB();
+        // active + withdrawn 모두 포함 — 탈퇴 회원의 completed booking 도 admin 보존 노출
         $stmt = $pdo->query("
             SELECT id, email, name, gender, phone, mbti, job, status,
                    DATE_FORMAT(birth_date, '%Y-%m-%d') AS birth_date,
                    marital_status, interests, ideal_type AS idealType
-            FROM users WHERE status = 'active' ORDER BY id DESC
+            FROM users WHERE status IN ('active', 'withdrawn') ORDER BY id DESC
         ");
         $users = $stmt->fetchAll();
 
@@ -62,6 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                     'userMaritalStatus' => $u['marital_status'],
                     'userInterests'     => $u['interests'],
                     'userIdealType'     => $u['idealType'],
+                    'userStatus'        => $u['status'],   // 'active' | 'withdrawn' — 취소 컬럼 분기용
                 ]);
             }
         }

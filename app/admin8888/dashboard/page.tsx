@@ -20,6 +20,7 @@ type BookingRow = {
   id: string; partyId: string; status: string; createdAt: string; total?: number;
   userEmail: string; userName: string; userGender: string; userPhone: string;
   userMbti?: string; userJob?: string; userBirthDate?: string;
+  userStatus?: string;       // 'active' | 'withdrawn' — 회원 탈퇴 여부
   userInterests?: string; userIdealType?: string;
 };
 type TabKey = "members" | "bookings" | "parties" | "coupons" | "company" | "gallery" | "logs" | "memos";
@@ -132,9 +133,16 @@ function BookingTable({ label, toneClass, rows, party, onApprove, onCancel }: {
                     ? "bg-gray-50 text-gray-400"
                     : "hover:bg-gray-50"
                   }`}>
-                  {/* 좌측 [취소] 버튼 */}
+                  {/* 좌측 [취소] 컬럼 — 3가지 분기:
+                       1) 회원탈퇴: userStatus === 'withdrawn' (booking 은 completed 상태로 보존됨)
+                       2) 취소완료: booking status === 'cancelled'
+                       3) 취소(버튼): 그 외 (정상 active 회원의 진행/완료 booking) */}
                   <td className="px-3 py-2.5 first:pl-5 md:first:pl-7">
-                    {isCancelled ? (
+                    {b.userStatus === "withdrawn" ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-black bg-gray-200 text-black">
+                        회원탈퇴
+                      </span>
+                    ) : isCancelled ? (
                       <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-black bg-red-100 text-red-700">
                         <X size={11} /> 취소 완료
                       </span>

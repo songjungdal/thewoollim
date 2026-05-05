@@ -23,6 +23,29 @@ $body  = jsonBody();
 $email = normalizeEmail((string)($body['email'] ?? ''));
 requireUser($email);
 
+// ── 사전 검증 — 진행 중인 booking 이 있으면 탈퇴 차단 ─────────────────────
+//    paid_pending_profile / pending_approval / confirmed = '진행 중'.
+//    completed (모임종료) / cancelled (취소됨) 만 있으면 탈퇴 허용.
+$bookingsFile = dataDir() . '/bookings_' . md5(strtolower(trim($email))) . '.json';
+if (file_exists($bookingsFile)) {
+    $bookings = json_decode((string)file_get_contents($bookingsFile), true);
+    if (is_array($bookings)) {
+        $blocking = ['paid_pending_profile', 'pending_approval', 'confirmed'];
+        foreach ($bookings as $b) {
+            if (!is_array($b)) continue;
+            if (in_array((string)($b['status'] ?? ''), $blocking, true)) {
+                jsonFail(
+                    "잠시만요! 아직 진행 중인 매칭 파티가 남아있어요.\n" .
+                    "현재 진행 대기 중인 매칭 파티가 있습니다.\n" .
+                    "탈퇴 버튼 바로 옆에 있는 [취소요청] 버튼을 눌러 먼저 정리를 마쳐주세요.\n" .
+                    "모든 신청 내역이 취소된 후에 회원 탈퇴가 가능합니다.",
+                    409
+                );
+            }
+        }
+    }
+}
+
 try {
     $pdo = getDB();
     $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ? AND status='active' LIMIT 1");
@@ -46,6 +69,15 @@ try {
          WHERE id = ?
     ");
     $stmt->execute([$anonEmail, $userId]);
+
+    // ── booking 파일 rename — 익명화된 email 의 hash 로 이동해서 admin 이 계속 조회 가능 ─
+    $oldHash = md5(strtolower(trim($email)));
+    $newHash = md5(strtolower(trim($anonEmail)));
+    $oldFile = dataDir() . '/bookings_' . $oldHash . '.json';
+    $newFile = dataDir() . '/bookings_' . $newHash . '.json';
+    if (file_exists($oldFile)) {
+        @rename($oldFile, $newFile);
+    }
 
     @file_put_contents(
         dataDir() . '/_account_deletions.log',
