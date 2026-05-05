@@ -105,10 +105,12 @@ function BookingTable({ label, toneClass, rows, party, onApprove, onCancel }: {
   onApprove: (email: string, bookingId: string) => void;
   onCancel: (email: string, bookingId: string) => void;
 }) {
+  // 카운트는 cancelled 제외 — 취소자는 아래 테이블 행에 line-through 로 보존만 됨.
+  const activeCount = rows.filter(r => r.status !== "cancelled").length;
   return (
     <div className="border-t border-gray-100">
       <div className={`px-5 md:px-7 py-2.5 ${toneClass} text-xs md:text-sm font-black tracking-wider`}>
-        {label} ({rows.length})
+        {label} ({activeCount})
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs md:text-sm whitespace-nowrap">
