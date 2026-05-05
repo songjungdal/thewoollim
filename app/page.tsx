@@ -435,7 +435,7 @@ export default function SmoothOnePage() {
                     {/* 우측 상단 배지 영역 — 대상별(싱글/돌싱) + 모집마감 세로 스택 */}
                     <div className="absolute top-4 right-4 md:top-5 md:right-5 flex flex-col items-end gap-1.5 z-10">
                       {(card.targetGroup === "싱글" || card.targetGroup === "돌싱") && (
-                        <span className="bg-[#008080]/10 backdrop-blur-sm border border-[#008080] text-[#008080] text-[11px] md:text-xs font-black px-2.5 py-0.5 rounded-full shadow-sm whitespace-nowrap">
+                        <span className="bg-brand-point text-white text-[11px] md:text-xs font-black px-2.5 py-1 rounded-full shadow-md whitespace-nowrap">
                           {card.targetGroup}
                         </span>
                       )}
