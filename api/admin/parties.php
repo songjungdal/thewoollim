@@ -216,5 +216,11 @@ function sanitizeParty(array $p): array {
     $vs = (string)($p['voting_status'] ?? 'closed');
     $clean['voting_status'] = in_array($vs, ['closed', 'open', 'finalized'], true) ? $vs : 'closed';
 
+    // 파티 자체 상태 — 'completed' (모임종료, admin/matching.php 'end' 액션이 설정).
+    // 일반 파티 폼 저장 시에도 기존 값 보존되도록 화이트리스트에 포함.
+    if (isset($p['status']) && $p['status'] === 'completed') {
+        $clean['status'] = 'completed';
+    }
+
     return $clean;
 }

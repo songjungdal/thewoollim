@@ -18,7 +18,7 @@ type Participant = {
   ageBand: string;
   mbti: string;
   job: string;
-  status?: "confirmed" | "pending_approval" | string;
+  status?: "confirmed" | "pending_approval" | "completed" | string;
 };
 
 /** 상태 미니 배지 — 마이페이지 STATUS_DISPLAY 와 동일 색상/라벨, 사이즈만 컴팩트 */
@@ -34,6 +34,13 @@ function StatusMiniBadge({ status }: { status?: string }) {
     return (
       <span className="inline-flex items-center text-[9px] md:text-[10px] font-black px-1.5 py-0.5 rounded-full bg-[#F5F5DC] text-[#5D4037] whitespace-nowrap">
         확정 대기 중
+      </span>
+    );
+  }
+  if (status === "completed") {
+    return (
+      <span className="inline-flex items-center text-[9px] md:text-[10px] font-black px-1.5 py-0.5 rounded-full bg-gray-200 text-black whitespace-nowrap">
+        모임종료
       </span>
     );
   }

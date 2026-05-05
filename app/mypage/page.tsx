@@ -37,6 +37,14 @@ const STATUS_DISPLAY: Record<BookingStatus, { label: string; tone: string; strip
     stripe: "bg-emerald-500",
     icon:   CheckCircle2,
   },
+  // 모임종료 — 투표 종료 시 confirmed 에서 자동 전환
+  completed: {
+    label:  "모임종료",
+    sub:    "이 모임은 종료되었습니다",
+    tone:   "bg-gray-200 text-black font-bold",
+    stripe: "bg-gray-400",
+    icon:   CheckCircle2,
+  },
   cancelled: {
     label:  "취소됨",
     tone:   "bg-gray-200 text-gray-600",

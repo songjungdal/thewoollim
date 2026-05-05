@@ -204,6 +204,8 @@ const STATUS_LABEL: Record<string, { label: string; tone: string }> = {
   paid_pending_profile: { label: "결제완료(프로필 대기)", tone: "bg-amber-100 text-amber-800" },
   pending_approval: { label: "확정 대기 중", tone: "bg-[#F5F5DC] text-[#5D4037]" },
   confirmed: { label: "참가 확정 완료", tone: "bg-emerald-100 text-emerald-800" },
+  // 모임종료 — 투표 종료 시 confirmed → completed 일괄 전환
+  completed: { label: "모임종료", tone: "bg-gray-200 text-black font-bold" },
   cancelled: { label: "취소됨", tone: "bg-gray-200 text-gray-600" },
 };
 
@@ -289,7 +291,7 @@ export default function AdminDashboard() {
     if (tab === "logs" && authChecked) loadLogs();
   }, [tab, authChecked, loadLogs]);
   const [genderFilter, setGenderFilter] = useState<"all" | "남성" | "여성">("all");
-  const [statusFilter, setStatusFilter] = useState<"all" | "paid_pending_profile" | "pending_approval" | "confirmed">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "paid_pending_profile" | "pending_approval" | "confirmed" | "completed">("all");
   // 월 필터 — 기본값: 현재 KST 월 (Asia/Seoul). 'all' = 모든 월 노출
   const [monthFilter, setMonthFilter] = useState<string>(() => {
     const kst = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
@@ -1087,6 +1089,7 @@ export default function AdminDashboard() {
                       <option value="paid_pending_profile">결제완료(프로필 대기)</option>
                       <option value="pending_approval">확정 대기 중</option>
                       <option value="confirmed">참가 확정 완료</option>
+                      <option value="completed">모임종료</option>
                     </select>
                   </div>
                 </div>

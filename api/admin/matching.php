@@ -110,11 +110,18 @@ $nextStatus = match ($action) {
 };
 
 try {
-    withFileLock($file, function (array $parties) use ($partyId, $nextStatus): array {
+    withFileLock($file, function (array $parties) use ($partyId, $nextStatus, $action): array {
         $found = false;
         foreach ($parties as &$p) {
             if ((string)($p['id'] ?? '') === $partyId) {
                 $p['voting_status'] = $nextStatus;
+                // end 액션 → 파티 자체 상태를 'completed' (모임종료) 로 전환.
+                // start/reset 시 이전 'completed' 가 있었다면 해제(삭제).
+                if ($action === 'end') {
+                    $p['status'] = 'completed';
+                } else {
+                    unset($p['status']);
+                }
                 $found = true;
                 break;
             }
@@ -128,8 +135,59 @@ try {
     jsonFail($e->getMessage(), 400);
 }
 
-logAdminActivity('update', 'party', $partyId,
-    "매칭 투표 상태 변경 — 파티 #{$partyId} → {$nextStatus}",
-    null, ['voting_status' => $nextStatus]);
+// ── 모임 종료 시 일괄 booking 상태 전환 (confirmed → completed) ────────
+//    cancelled / paid_pending_profile / pending_approval 등은 변경 안 함.
+//    각 사용자별 bookings_<email_hash>.json 을 atomic 으로 갱신.
+$migratedCount = 0;
+if ($action === 'end') {
+    $dataDir = dataDir();
+    $files   = glob($dataDir . '/bookings_*.json') ?: [];
+    foreach ($files as $bf) {
+        $bfp = fopen($bf, 'c+');
+        if (!$bfp) continue;
+        if (!flock($bfp, LOCK_EX)) { fclose($bfp); continue; }
+        $raw = stream_get_contents($bfp);
+        $bookings = $raw ? json_decode($raw, true) : [];
+        if (!is_array($bookings)) { flock($bfp, LOCK_UN); fclose($bfp); continue; }
 
-jsonOut(['ok' => true, 'voting_status' => $nextStatus]);
+        $changed = false;
+        $now     = date('c');
+        foreach ($bookings as &$b) {
+            if (!is_array($b)) continue;
+            if ((string)($b['partyId'] ?? '') !== $partyId) continue;
+            if ((string)($b['status']  ?? '') !== 'confirmed') continue; // confirmed 만 대상
+            $b['status']    = 'completed';
+            $b['updatedAt'] = $now;
+            $changed = true;
+            $migratedCount++;
+        }
+        unset($b);
+
+        if ($changed) {
+            ftruncate($bfp, 0);
+            rewind($bfp);
+            fwrite($bfp, json_encode($bookings, JSON_UNESCAPED_UNICODE));
+            fflush($bfp);
+        }
+        flock($bfp, LOCK_UN);
+        fclose($bfp);
+    }
+
+    @file_put_contents("$dataDir/_admin_party_changes.log", sprintf(
+        "[%s] adminId=%s party=%s VOTE_END → completed (bookings migrated=%d)\n",
+        date('c'), $_SESSION['adminId'] ?? '?', $partyId, $migratedCount
+    ), FILE_APPEND);
+}
+
+logAdminActivity('update', 'party', $partyId,
+    $action === 'end'
+        ? "매칭 투표 종료 — 파티 #{$partyId} 모임종료 처리 (참가확정 {$migratedCount}명 → 모임종료)"
+        : "매칭 투표 상태 변경 — 파티 #{$partyId} → {$nextStatus}",
+    null, ['voting_status' => $nextStatus, 'bookings_migrated' => $migratedCount]);
+
+jsonOut([
+    'ok' => true,
+    'voting_status' => $nextStatus,
+    'party_status'  => $action === 'end' ? 'completed' : null,
+    'bookings_migrated' => $migratedCount,
+]);

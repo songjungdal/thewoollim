@@ -36,7 +36,7 @@ if ($partyId === '') {
 }
 
 $dir = dataDir();
-$VISIBLE_STATUSES = ['confirmed', 'pending_approval'];
+$VISIBLE_STATUSES = ['confirmed', 'pending_approval', 'completed'];
 
 $male = [];
 $female = [];
