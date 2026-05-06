@@ -342,10 +342,12 @@ export default function PartyClientView({ id }: { id: string }) {
                     const maleAmt   = pm && pm > 0 ? pm : detailItem.price;
                     const femaleAmt = pf && pf > 0 ? pf : detailItem.price;
                     return (
-                      <div className="flex flex-col md:flex-row md:justify-between md:items-center py-3.5 md:py-4 border-b border-gray-200 gap-1 md:gap-0">
+                      {/* 다른 info row 와 동일한 컨테이너 클래스 (gap-0.5 md:gap-0) — 모바일 좌측 정렬 통일 */}
+                      <div className="flex flex-col md:flex-row md:justify-between md:items-center py-3.5 md:py-4 border-b border-gray-200 gap-0.5 md:gap-0">
                         <span className="text-sm md:text-lg text-gray-400 md:text-gray-500 font-medium md:w-40 flex-shrink-0">참가비 (Price)</span>
                         {hasSplit ? (
-                          <span className="font-black text-brand-black md:text-right flex flex-wrap items-baseline justify-end gap-x-2 md:gap-x-3 gap-y-1">
+                          /* justify 는 PC 만 우측 — 모바일은 다른 행처럼 좌측 정렬. flex-wrap 으로 안전 줄바꿈 */
+                          <span className="font-black text-brand-black md:text-right flex flex-wrap items-baseline md:justify-end gap-x-2 md:gap-x-3 gap-y-1">
                             <span className="inline-flex items-baseline gap-1">
                               <span className="text-xs md:text-sm text-gray-500 font-bold">남성</span>
                               <span className="text-2xl md:text-3xl tabular-nums">₩{maleAmt.toLocaleString()}</span>
@@ -357,7 +359,7 @@ export default function PartyClientView({ id }: { id: string }) {
                             </span>
                           </span>
                         ) : (
-                          <span className="font-black text-2xl md:text-3xl text-brand-black tabular-nums">₩{detailItem.price.toLocaleString()}</span>
+                          <span className="font-black text-2xl md:text-3xl text-brand-black tabular-nums md:text-right">₩{detailItem.price.toLocaleString()}</span>
                         )}
                       </div>
                     );
