@@ -334,11 +334,34 @@ export default function PartyClientView({ id }: { id: string }) {
                       <span className="font-bold text-base md:text-lg md:text-right">{row.value}</span>
                     </div>
                   ))}
-                  {/* 참가비 — 가장 중요한 정보 → 검정 볼드 + 한 단계 확대 */}
-                  <div className="flex flex-col md:flex-row md:justify-between md:items-center py-3.5 md:py-4 border-b border-gray-200 gap-0.5 md:gap-0">
-                    <span className="text-sm md:text-lg text-gray-400 md:text-gray-500 font-medium md:w-40">참가비 (Price)</span>
-                    <span className="font-black text-2xl md:text-3xl text-brand-black tabular-nums">₩{detailItem.price.toLocaleString()}</span>
-                  </div>
+                  {/* 참가비 — 성별별 분리 표시 (남성 / 여성). 미설정 시 price 폴백 단일 표시 */}
+                  {(() => {
+                    const pm = (detailItem as { priceMale?: number }).priceMale;
+                    const pf = (detailItem as { priceFemale?: number }).priceFemale;
+                    const hasSplit = (pm && pm > 0) || (pf && pf > 0);
+                    const maleAmt   = pm && pm > 0 ? pm : detailItem.price;
+                    const femaleAmt = pf && pf > 0 ? pf : detailItem.price;
+                    return (
+                      <div className="flex flex-col md:flex-row md:justify-between md:items-center py-3.5 md:py-4 border-b border-gray-200 gap-1 md:gap-0">
+                        <span className="text-sm md:text-lg text-gray-400 md:text-gray-500 font-medium md:w-40 flex-shrink-0">참가비 (Price)</span>
+                        {hasSplit ? (
+                          <span className="font-black text-brand-black md:text-right flex flex-wrap items-baseline justify-end gap-x-2 md:gap-x-3 gap-y-1">
+                            <span className="inline-flex items-baseline gap-1">
+                              <span className="text-xs md:text-sm text-gray-500 font-bold">남성</span>
+                              <span className="text-2xl md:text-3xl tabular-nums">₩{maleAmt.toLocaleString()}</span>
+                            </span>
+                            <span className="text-gray-300 text-base md:text-xl">/</span>
+                            <span className="inline-flex items-baseline gap-1">
+                              <span className="text-xs md:text-sm text-gray-500 font-bold">여성</span>
+                              <span className="text-2xl md:text-3xl tabular-nums">₩{femaleAmt.toLocaleString()}</span>
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="font-black text-2xl md:text-3xl text-brand-black tabular-nums">₩{detailItem.price.toLocaleString()}</span>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Gender stock — minimal underline typography */}

@@ -161,7 +161,8 @@ if ($couponCode !== '') {
         redirectFail('쿠폰이 유효하지 않습니다');
     }
     // 쿠폰 적용 대상 파티의 단가 기준으로 할인 금액 계산
-    $linePrice      = (int)($partyMap[$couponPartyId]['price'] ?? 0);
+    // 쿠폰 대상 파티의 성별별 가격 기준 — pending.php 와 동일 규칙으로 amount 검증 일치 보장
+    $linePrice      = priceForGender($partyMap[$couponPartyId], $gender);
     $couponDiscount = calcCouponDiscount($found, $linePrice);
 
     $cfp = fopen($usagesFile, 'c+');
@@ -234,7 +235,8 @@ if (!is_array($bookings)) $bookings = [];
 $now = date('c');
 $couponApplied = false;
 foreach ($partyIds as $pid) {
-    $partyPrice  = (int)($partyMap[$pid]['price'] ?? 0);
+    // 회원 성별 기반 가격 — pending.php 와 동일 규칙
+    $partyPrice  = priceForGender($partyMap[$pid] ?? [], $gender);
     $isCouponHit = ($couponCode !== '' && $pid === $couponPartyId && !$couponApplied);
     $rowDiscount = $isCouponHit ? $couponDiscount : 0;
     if ($isCouponHit) $couponApplied = true;

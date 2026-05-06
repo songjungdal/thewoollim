@@ -74,10 +74,12 @@ if (file_exists($bookingsFile)) {
     }
 }
 
+// 회원 성별 기준 참가비 — priceMale/priceFemale 우선, 미설정 시 price 폴백.
+$userGender = (string)($u['gender'] ?? '');
 $total = 0; $orderTitles = [];
 foreach ($partyIds as $pid) {
     if (!isset($partyMap[$pid])) jsonFail("파티를 찾을 수 없습니다: $pid", 404);
-    $total += (int)($partyMap[$pid]['price'] ?? 0);
+    $total += priceForGender($partyMap[$pid], $userGender);
     $orderTitles[] = (string)($partyMap[$pid]['title'] ?? '파티');
 }
 
@@ -106,7 +108,8 @@ if ($couponCode !== '') {
         }
     }
 
-    $linePrice      = (int)($partyMap[$couponPartyId]['price'] ?? 0);
+    // 쿠폰 대상 파티의 성별별 가격 기준으로 할인 계산
+    $linePrice      = priceForGender($partyMap[$couponPartyId], $userGender);
     $couponDiscount = calcCouponDiscount($found, $linePrice);
 }
 

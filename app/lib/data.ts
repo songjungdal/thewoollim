@@ -16,7 +16,9 @@ export type Party = {
   calendarDate: string;
   location: string;
   target: string;
-  price: number;
+  price: number;             // 레거시 / 폴백 (priceMale·priceFemale 미설정 시 사용)
+  priceMale?: number;        // 남성 참가비 (KRW). 0 또는 미설정 시 price 폴백
+  priceFemale?: number;      // 여성 참가비 (KRW). 0 또는 미설정 시 price 폴백
   tag: string;
   maleStock: number;     // 남성 모집 정원 (기본 12)
   femaleStock: number;   // 여성 모집 정원 (기본 12)
@@ -47,6 +49,16 @@ export const PARTIES: Party[] = [
 ];
 
 /** 파티 재고 상태 계산 (UI·검증 공통 사용) */
+/**
+ * 회원 성별 기준 파티 참가비 — priceMale / priceFemale 우선, 미설정 시 price 폴백.
+ * 사용처: 카트 합계, /checkout 결제 금액, pending.php 와 동일 규칙으로 클라/서버가 일치해야 함.
+ */
+export function priceForGender(party: Pick<Party, "price" | "priceMale" | "priceFemale">, gender?: string | null): number {
+  if (gender === "남성" && party.priceMale && party.priceMale > 0) return party.priceMale;
+  if (gender === "여성" && party.priceFemale && party.priceFemale > 0) return party.priceFemale;
+  return party.price; // 폴백
+}
+
 export function partyStockStatus(party: Party) {
   const maleRemaining   = Math.max(0, party.maleStock   - party.maleBooked);
   const femaleRemaining = Math.max(0, party.femaleStock - party.femaleBooked);

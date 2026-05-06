@@ -75,7 +75,9 @@ type PartyForm = {
   calendarDate: string;
   location: string;
   target: string;
-  price: number;
+  price: number;        // 레거시 — priceMale/priceFemale 미설정 시 폴백
+  priceMale: number;    // 남성 참가비 (KRW)
+  priceFemale: number;  // 여성 참가비 (KRW)
   tag: string;
   maleStock: number;
   femaleStock: number;
@@ -91,7 +93,7 @@ type PartyForm = {
 };
 const EMPTY_PARTY: PartyForm = {
   title: "", description: "", dateString: "", calendarDate: "",
-  location: "", target: "", price: 0, tag: "주제별",
+  location: "", target: "", price: 0, priceMale: 0, priceFemale: 0, tag: "주제별",
   maleStock: 12, femaleStock: 12, imageUrl: "",
   minAge: "", maxAge: "", allowedMaritalStatus: "all",
   targetGroup: "", theme: "", locationTag: "",
@@ -326,7 +328,10 @@ export default function AdminDashboard() {
     setPartyForm({
       id: p.id, title: p.title, description: (p as any).description ?? "",
       dateString: p.dateString, calendarDate: p.calendarDate,
-      location: p.location, target: p.target, price: p.price, tag: p.tag,
+      location: p.location, target: p.target, price: p.price,
+      priceMale:   Number((p as any).priceMale   ?? 0),
+      priceFemale: Number((p as any).priceFemale ?? 0),
+      tag: p.tag,
       maleStock: p.maleStock, femaleStock: p.femaleStock,
       imageUrl: (p as any).imageUrl ?? "",
       minAge: p.minAge != null ? String(p.minAge) : "",
@@ -376,7 +381,8 @@ export default function AdminDashboard() {
     if (!String(f.dateString).trim() || !String(f.calendarDate).trim()) missing.push("행사 일시");
     if (!String(f.location).trim())                       missing.push("장소");
     if (!String(f.target).trim())                         missing.push("대상");
-    if (!Number.isFinite(f.price) || f.price <= 0)        missing.push("참가비");
+    if (!Number.isFinite(f.priceMale)   || f.priceMale   <= 0) missing.push("남성 참가비");
+    if (!Number.isFinite(f.priceFemale) || f.priceFemale <= 0) missing.push("여성 참가비");
     if (!Number.isFinite(f.maleStock)   || f.maleStock   <= 0) missing.push("모집 인원(남성)");
     if (!Number.isFinite(f.femaleStock) || f.femaleStock <= 0) missing.push("모집 인원(여성)");
 
@@ -1442,11 +1448,35 @@ export default function AdminDashboard() {
                       {/* 장소/대상 */}
                       <FormField label="장소 *" value={partyForm.location} onChange={v => setPartyForm(p => ({ ...p, location: v }))} />
                       <FormField label="대상 *" value={partyForm.target} onChange={v => setPartyForm(p => ({ ...p, target: v }))} placeholder="만 25-35세 / 남녀비율 1:1" />
-                      {/* 참가비 */}
-                      <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-1.5">참가비 (원) *</label>
-                        <input type="number" min={0} value={partyForm.price} onChange={e => setPartyForm(p => ({ ...p, price: parseInt(e.target.value || "0", 10) }))}
-                          className="w-full px-4 py-3 rounded-lg border border-gray-200 text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none" aria-label="참가비" />
+                      {/* 참가비 — 성별별 분리 입력 */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-bold text-gray-700 mb-1.5">남성 참가비 (원) *</label>
+                          <input
+                            type="number" min={0} step={1000} inputMode="numeric"
+                            value={partyForm.priceMale}
+                            onChange={e => {
+                              const v = Math.max(0, parseInt(e.target.value || "0", 10));
+                              // price 폴백 동기화 (남/여 평균 또는 남성가). priceForGender 폴백용.
+                              setPartyForm(p => ({ ...p, priceMale: v, price: v || p.priceFemale || p.price }));
+                            }}
+                            className="w-full px-4 py-3 rounded-lg border border-gray-200 text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none"
+                            aria-label="남성 참가비"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-gray-700 mb-1.5">여성 참가비 (원) *</label>
+                          <input
+                            type="number" min={0} step={1000} inputMode="numeric"
+                            value={partyForm.priceFemale}
+                            onChange={e => {
+                              const v = Math.max(0, parseInt(e.target.value || "0", 10));
+                              setPartyForm(p => ({ ...p, priceFemale: v, price: p.priceMale || v || p.price }));
+                            }}
+                            className="w-full px-4 py-3 rounded-lg border border-gray-200 text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none"
+                            aria-label="여성 참가비"
+                          />
+                        </div>
                       </div>
                       {/* 정원 */}
                       <div className="grid grid-cols-2 gap-4">

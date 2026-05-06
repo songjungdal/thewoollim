@@ -8,6 +8,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useAuth, calcCouponDiscount } from "../context/AuthContext";
 import { useParties } from "../lib/useParties";
+import { priceForGender } from "../lib/data";
 
 declare global {
   interface Window {
@@ -80,8 +81,10 @@ function CheckoutContent() {
       ? Math.max(0, originalPrice - calcCouponDiscount(effectiveCoupon, originalPrice))
       : originalPrice;
 
-  const originalTotal = parties.reduce((s, p) => s + p.price * (qtyByPartyId[p.id] ?? 1), 0);
-  const totalAmount   = parties.reduce((s, p) => s + computeRowPrice(p.id, p.price * (qtyByPartyId[p.id] ?? 1)), 0);
+  // 회원 성별 기반 단가 — priceMale/priceFemale 우선, 미설정 시 price 폴백
+  const unitPrice = (p: typeof PARTIES[number]) => priceForGender(p, profile?.gender);
+  const originalTotal = parties.reduce((s, p) => s + unitPrice(p) * (qtyByPartyId[p.id] ?? 1), 0);
+  const totalAmount   = parties.reduce((s, p) => s + computeRowPrice(p.id, unitPrice(p) * (qtyByPartyId[p.id] ?? 1)), 0);
   const totalDiscount = originalTotal - totalAmount;
 
   useEffect(() => {
@@ -280,7 +283,8 @@ function CheckoutContent() {
             <div className="space-y-4 md:space-y-5">
               {parties.map(party => {
                 const qty        = qtyByPartyId[party.id] ?? 1;
-                const lineTotal  = party.price * qty;
+                const unit       = unitPrice(party);  // 성별 기반 단가
+                const lineTotal  = unit * qty;
                 const couponHere = effectiveCoupon?.partyId === party.id;
                 const rowPrice   = computeRowPrice(party.id, lineTotal);
                 return (
@@ -311,7 +315,7 @@ function CheckoutContent() {
                           <div className="flex flex-col items-end gap-0.5">
                             {qty > 1 && (
                               <span className="text-[11px] md:text-xs text-gray-400 font-medium tabular-nums">
-                                ₩{party.price.toLocaleString()} × {qty}
+                                ₩{unit.toLocaleString()} × {qty}
                               </span>
                             )}
                             {couponHere ? (

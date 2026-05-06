@@ -9,7 +9,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useAuth, calcCouponDiscount, type BookingStatus } from "../context/AuthContext";
 import { useParties } from "../lib/useParties";
-import { partyStockStatus } from "../lib/data";
+import { partyStockStatus, priceForGender } from "../lib/data";
 
 // 관리자 페이지의 신청자 상태 배지 규격과 동일한 색상 조합 사용 (admin8888/dashboard STATUS_LABEL)
 const STATUS_DISPLAY: Record<BookingStatus, { label: string; tone: string; stripe: string; icon: typeof Clock; sub?: string }> = {
@@ -164,12 +164,14 @@ export default function MyPage() {
   };
 
   const selectedParties = cartParties.filter(p => selectedIds.has(p.id));
+  // 회원 성별 기반 단가 — priceMale/priceFemale 우선, 미설정 시 price 폴백 (priceForGender)
+  const unitPrice = (p: typeof PARTIES[number]) => priceForGender(p, profile?.gender);
   const cartTotalQty          = cartParties.reduce((sum, p) => sum + qtyOf(p.id), 0);
-  const selectedOriginalTotal = selectedParties.reduce((sum, p) => sum + p.price * qtyOf(p.id), 0);
-  const selectedTotal         = selectedParties.reduce((sum, p) => sum + computeRowPrice(p.id, p.price * qtyOf(p.id)), 0);
+  const selectedOriginalTotal = selectedParties.reduce((sum, p) => sum + unitPrice(p) * qtyOf(p.id), 0);
+  const selectedTotal         = selectedParties.reduce((sum, p) => sum + computeRowPrice(p.id, unitPrice(p) * qtyOf(p.id)), 0);
   const selectedDiscount      = selectedOriginalTotal - selectedTotal;
-  const cartOriginalTotal     = cartParties.reduce((sum, p) => sum + p.price * qtyOf(p.id), 0);
-  const cartTotal             = cartParties.reduce((sum, p) => sum + computeRowPrice(p.id, p.price * qtyOf(p.id)), 0);
+  const cartOriginalTotal     = cartParties.reduce((sum, p) => sum + unitPrice(p) * qtyOf(p.id), 0);
+  const cartTotal             = cartParties.reduce((sum, p) => sum + computeRowPrice(p.id, unitPrice(p) * qtyOf(p.id)), 0);
 
   const handleLogout = () => {
     // logout() 내부가 풀 페이지 리로드(window.location.replace("/"))를 처리.
@@ -388,9 +390,9 @@ export default function MyPage() {
                       {/* 금액 / 쿠폰 영역 — 수량 UI 제거, 1건 단가 그대로 노출 */}
                       <div className="mt-6 md:mt-7 pt-5 md:pt-6 border-t border-gray-100 space-y-5 md:space-y-6">
 
-                        {/* 금액 행 */}
+                        {/* 금액 행 — 회원 성별 기반 단가 (priceMale/Female 우선) */}
                         {(() => {
-                          const lineTotal = party.price; // quantity 항상 1
+                          const lineTotal = unitPrice(party); // quantity 항상 1
                           const lineFinal = computeRowPrice(party.id, lineTotal);
                           return (
                             <div className="flex items-baseline justify-between gap-3">

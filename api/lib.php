@@ -175,6 +175,17 @@ function withFileLock(string $path, callable $callback) {
     }
 }
 
+// ─── 성별별 참가비 ────────────────────────────────────────────────
+//   priceMale / priceFemale 우선, 미설정 또는 0 이면 price 폴백.
+//   클라이언트(priceForGender) 와 동일 규칙 — 결제 금액 검증 일치.
+function priceForGender(array $party, string $gender): int {
+    $male   = (int)($party['priceMale']   ?? 0);
+    $female = (int)($party['priceFemale'] ?? 0);
+    if ($gender === '남성' && $male   > 0) return $male;
+    if ($gender === '여성' && $female > 0) return $female;
+    return (int)($party['price'] ?? 0);
+}
+
 // ─── 쿠폰 할인 계산 ────────────────────────────────────────────────
 //   amount  : KRW 정액 차감 (lineTotal 초과 안 함)
 //   percent : lineTotal × (amount/100), max_discount 가 양수면 그 한도로 캡, 0원 미만 방지.

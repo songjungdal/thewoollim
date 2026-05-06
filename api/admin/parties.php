@@ -167,6 +167,8 @@ function sanitizeParty(array $p): array {
         'location'             => trim((string)($p['location']     ?? '')),
         'target'               => trim((string)($p['target']       ?? '')),
         'price'                => (int)   ($p['price']        ?? 0),
+        'priceMale'            => max(0, (int)($p['priceMale']   ?? 0)),
+        'priceFemale'          => max(0, (int)($p['priceFemale'] ?? 0)),
         'tag'                  => trim((string)($p['tag']           ?? '주제별')),
         'maleStock'            => max(0, (int)($p['maleStock']    ?? 12)),
         'femaleStock'          => max(0, (int)($p['femaleStock']  ?? 12)),

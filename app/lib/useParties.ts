@@ -50,6 +50,8 @@ export function useParties(): Party[] {
               location:     String(p.location ?? ""),
               target:       String(p.target ?? ""),
               price:        Number(p.price ?? 0),
+              priceMale:    p.priceMale   != null && p.priceMale   !== "" ? Number(p.priceMale)   : undefined,
+              priceFemale:  p.priceFemale != null && p.priceFemale !== "" ? Number(p.priceFemale) : undefined,
               tag:          String(p.tag ?? "주제별"),
               maleStock:    Number(p.maleStock ?? 12),
               femaleStock:  Number(p.femaleStock ?? 12),
