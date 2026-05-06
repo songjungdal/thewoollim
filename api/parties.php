@@ -55,6 +55,8 @@ foreach ($parties as $p) {
         'location'             => (string)($p['location']     ?? ''),
         'target'               => (string)($p['target']       ?? ''),
         'price'                => (int)   ($p['price']        ?? 0),
+        'priceMale'            => isset($p['priceMale'])   ? (int)$p['priceMale']   : null,
+        'priceFemale'          => isset($p['priceFemale']) ? (int)$p['priceFemale'] : null,
         'tag'                  => (string)($p['tag']          ?? '주제별'),
         'maleStock'            => (int)   ($p['maleStock']    ?? 12),
         'femaleStock'          => (int)   ($p['femaleStock']  ?? 12),
