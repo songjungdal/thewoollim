@@ -435,8 +435,8 @@ export default function MyPage() {
                               <button onClick={handleRemoveCoupon} className="text-xs md:text-sm text-brand-point underline font-black whitespace-nowrap flex-shrink-0">변경</button>
                             </div>
                           ) : (
-                            {/* 가로 한 줄 정렬 (모든 화면) — 입력창 75% / 버튼 25%, 높이 h-14 (56px) */}
                             <div className="flex flex-row gap-2">
+                              {/* 가로 한 줄 정렬 (모든 화면) — 입력창 75% / 버튼 25%, 높이 h-14 (56px) */}
                               <input
                                 type="text"
                                 value={couponInputs[party.id] || ""}
