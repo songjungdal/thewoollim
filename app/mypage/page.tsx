@@ -435,7 +435,8 @@ export default function MyPage() {
                               <button onClick={handleRemoveCoupon} className="text-xs md:text-sm text-brand-point underline font-black whitespace-nowrap flex-shrink-0">변경</button>
                             </div>
                           ) : (
-                            <div className="flex flex-col sm:flex-row gap-2">
+                            {/* 가로 한 줄 정렬 (모든 화면) — 입력창 75% / 버튼 25%, 높이 h-14 (56px) */}
+                            <div className="flex flex-row gap-2">
                               <input
                                 type="text"
                                 value={couponInputs[party.id] || ""}
@@ -445,14 +446,14 @@ export default function MyPage() {
                                 autoCapitalize="characters"
                                 autoCorrect="off"
                                 spellCheck={false}
-                                className="flex-1 min-w-0 h-12 px-4 rounded-xl border-2 border-brand-black bg-white focus:ring-2 focus:ring-brand-point focus:border-brand-point outline-none font-bold text-sm uppercase tracking-wide placeholder:text-gray-400 placeholder:tracking-normal placeholder:font-medium"
+                                className="flex-[3] min-w-0 h-14 px-4 rounded-xl border-2 border-brand-black bg-white focus:ring-2 focus:ring-brand-point focus:border-brand-point outline-none font-bold text-base uppercase tracking-wide placeholder:text-gray-400 placeholder:tracking-normal placeholder:font-medium"
                                 onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleApplyCoupon(party.id); } }}
                               />
                               <button
                                 type="button"
                                 onClick={() => handleApplyCoupon(party.id)}
                                 disabled={couponLoadingId === party.id || !(couponInputs[party.id] || "").trim()}
-                                className="h-12 w-full sm:w-auto px-6 sm:px-7 bg-brand-black text-white rounded-xl font-black text-sm whitespace-nowrap hover:bg-brand-point transition-all disabled:bg-gray-200 disabled:text-gray-400 flex-shrink-0"
+                                className="flex-[1] h-14 px-3 sm:px-5 bg-brand-black text-white rounded-xl font-black text-sm whitespace-nowrap hover:bg-brand-point transition-all disabled:bg-gray-200 disabled:text-gray-400"
                               >
                                 {couponLoadingId === party.id ? "확인 중..." : "적용"}
                               </button>
