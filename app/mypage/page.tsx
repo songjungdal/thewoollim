@@ -32,7 +32,7 @@ const STATUS_DISPLAY: Record<BookingStatus, { label: string; tone: string; strip
   // 참가확정: 관리자 최종 승인
   confirmed: {
     label:  "참가확정",
-    sub:    "현장에서 만나요",
+    sub:    "일시와 장소를 확인하여 늦지 않게 현장으로 도착해주세요.",
     tone:   "bg-emerald-100 text-emerald-800",
     stripe: "bg-emerald-500",
     icon:   CheckCircle2,
