@@ -119,20 +119,29 @@ export default function MyPage() {
     setSelectedIds(new Set(cart.map(c => c.partyId)));
   }, [cart]);
 
-  // 마이페이지 진입/포커스 복귀 시 카트 + 예약 강제 동기화 (결제 후 cart 정밀 삭제 반영).
-  // - mount 직후 1회: 결제 → /payment/success → /mypage 동선에서 최신 상태 보장
-  // - focus / visibility 복귀: 다른 탭에서 결제했을 때 즉시 반영
+  // 마이페이지 진입/포커스 복귀 시 카트 + 예약 강제 동기화 — 관리자 status 변경 즉시 반영.
+  // 다중 트리거 (PC/모바일 모두 신뢰성 확보):
+  //   1) mount 직후 1회 (모든 환경)
+  //   2) focus      — 다른 탭/앱 → 마이페이지 복귀 시 (PC 주력)
+  //   3) visibility — 백그라운드 → 포그라운드 (모바일 Safari/Chrome 주력)
+  //   4) pageshow   — bfcache 복원 시 (모바일 뒤로가기 후 진입 — focus 안 뜸)
+  //   5) 30s 폴링   — 다른 기기에서 관리자 status 변경 시 자동 반영 (PC/모바일 백그라운드)
   useEffect(() => {
     if (!mounted || !isLoggedIn) return;
-    refreshCart();
-    refreshBookings();
-    const onFocus = () => { refreshCart(); refreshBookings(); };
-    const onVisibility = () => { if (document.visibilityState === "visible") onFocus(); };
+    const refresh = () => { refreshCart(); refreshBookings(); };
+    refresh();
+    const onFocus      = () => refresh();
+    const onVisibility = () => { if (document.visibilityState === "visible") refresh(); };
+    const onPageShow   = () => refresh();   // bfcache 복원 (모바일)
     window.addEventListener("focus", onFocus);
+    window.addEventListener("pageshow", onPageShow);
     document.addEventListener("visibilitychange", onVisibility);
+    const interval = window.setInterval(refresh, 30_000); // 30s 폴링
     return () => {
       window.removeEventListener("focus", onFocus);
+      window.removeEventListener("pageshow", onPageShow);
       document.removeEventListener("visibilitychange", onVisibility);
+      window.clearInterval(interval);
     };
   }, [mounted, isLoggedIn, refreshCart, refreshBookings]);
 
