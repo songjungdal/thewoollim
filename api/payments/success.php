@@ -157,27 +157,50 @@ $STOCK_PER_SIDE = 12;
 $DEFAULT_COUNTS = [];
 
 // 정원 검증 + 차감 (flock atomic)
+// 회복력 강화: counts 파일 fopen 실패 시 결제는 이미 Toss 가 확정한 상태이므로,
+// 결제 취소 대신 booking 만 생성하고 admin 수동 확인 큐에 기록 (사용자 중복 결제 방어).
 $countsFile = "$dataDir/party_counts.json";
 $fp = fopen($countsFile, 'c+');
-if (!$fp) redirectFail('서버 오류 (counts)');
-flock($fp, LOCK_EX);
-$raw = stream_get_contents($fp);
-$counts = $raw ? json_decode($raw, true) : [];
-if (!is_array($counts)) $counts = [];
-
-$reqCounts = [];
-foreach ($partyIds as $pid) $reqCounts[$pid] = ($reqCounts[$pid] ?? 0) + 1;
-
-$soldOut = [];
+$skipCounts = false;
+$counts = [];
 $effective = [];
-foreach ($reqCounts as $pid => $reqQty) {
-    $cur = $counts[$pid] ?? $DEFAULT_COUNTS[$pid] ?? ['male' => 0, 'female' => 0];
-    $effective[$pid] = $cur;
-    if ($cur[$genderKey] + $reqQty > $STOCK_PER_SIDE) $soldOut[] = $pid;
-}
-if (!empty($soldOut)) {
-    flock($fp, LOCK_UN); fclose($fp);
-    redirectFail('잔여 정원을 초과했습니다');
+if (!$fp) {
+    // CRITICAL: 권한/디스크 등 이슈로 counts 파일 열기 실패.
+    // 결제는 이미 Toss 확정 → 사용자에겐 성공 처리 + 관리자 알림 로그.
+    $skipCounts = true;
+    @file_put_contents("$dataDir/_counts_failure_alert.log", sprintf(
+        "[%s] CRITICAL — fopen %s 실패. orderId=%s email=%s parties=%s — 인원 카운트 수동 보정 필요.\n",
+        date('c'), $countsFile, $orderId, $email, implode(',', array_unique($partyIds))
+    ), FILE_APPEND);
+    error_log('[payments/success] CRITICAL counts fopen failed: ' . $countsFile);
+} else {
+    flock($fp, LOCK_EX);
+    $raw = stream_get_contents($fp);
+    $counts = $raw ? json_decode($raw, true) : [];
+    if (!is_array($counts)) $counts = [];
+
+    $reqCounts = [];
+    foreach ($partyIds as $pid) $reqCounts[$pid] = ($reqCounts[$pid] ?? 0) + 1;
+
+    $soldOut = [];
+    foreach ($reqCounts as $pid => $reqQty) {
+        // partyId 가 parties.json 에 실재하는지 추가 검증 (다중 ids 모두)
+        if (!isset($partyMap[$pid])) {
+            flock($fp, LOCK_UN); fclose($fp);
+            @file_put_contents("$dataDir/_counts_failure_alert.log", sprintf(
+                "[%s] INVALID_PARTY orderId=%s email=%s missing_partyId=%s\n",
+                date('c'), $orderId, $email, $pid
+            ), FILE_APPEND);
+            redirectFail("파티를 찾을 수 없습니다: $pid");
+        }
+        $cur = $counts[$pid] ?? $DEFAULT_COUNTS[$pid] ?? ['male' => 0, 'female' => 0];
+        $effective[$pid] = $cur;
+        if ($cur[$genderKey] + $reqQty > $STOCK_PER_SIDE) $soldOut[] = $pid;
+    }
+    if (!empty($soldOut)) {
+        flock($fp, LOCK_UN); fclose($fp);
+        redirectFail('잔여 정원을 초과했습니다');
+    }
 }
 
 // 쿠폰 atomic consume — 사용 이력 기록 + max_count 한도 enforce
@@ -236,12 +259,17 @@ if ($couponCode !== '') {
     fflush($cfp); flock($cfp, LOCK_UN); fclose($cfp);
 }
 
-// 정원 증가 + 저장
-foreach ($partyIds as $pid) { $effective[$pid][$genderKey]++; }
-$merged = $counts;
-foreach ($effective as $pid => $c) $merged[$pid] = $c;
-ftruncate($fp, 0); rewind($fp); fwrite($fp, json_encode($merged));
-fflush($fp); flock($fp, LOCK_UN); fclose($fp);
+// 정원 증가 + 저장 — counts 파일 정상 열린 경우만 (skipCounts 시 booking 만 생성)
+if (!$skipCounts && $fp) {
+    foreach ($partyIds as $pid) {
+        if (!isset($effective[$pid])) $effective[$pid] = ['male' => 0, 'female' => 0];
+        $effective[$pid][$genderKey]++;
+    }
+    $merged = $counts;
+    foreach ($effective as $pid => $c) $merged[$pid] = $c;
+    ftruncate($fp, 0); rewind($fp); fwrite($fp, json_encode($merged));
+    fflush($fp); flock($fp, LOCK_UN); fclose($fp);
+}
 
 // booking row 생성
 $partiesJson = file_exists("$dataDir/parties.json") ? json_decode(file_get_contents("$dataDir/parties.json"), true) : [];

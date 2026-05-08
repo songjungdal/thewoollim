@@ -28,6 +28,9 @@ function PaymentSuccessContent() {
   const total = Number(searchParams.get("total") || 0);
   const isTest = searchParams.get("test") === "1";
   const parties = ids.map(id => PARTIES.find(p => p.id === id)).filter(Boolean) as typeof PARTIES;
+  // useParties 가 DEFAULT_PARTIES 로 초기화되고 서버 fetch 후 갱신 → 페이지 진입 직후엔
+  // 관리자 등록 파티(id 9+) 가 아직 안 들어왔을 수 있음. 일치 개수가 부족하면 로딩 표시.
+  const partiesLoading = ids.length > 0 && parties.length < ids.length;
 
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const pendingHrefRef = useRef<string | null>(null);
@@ -135,8 +138,21 @@ function PaymentSuccessContent() {
             )}
           </motion.div>
 
+          {/* 데이터 로딩 중 — 파티 정보 fetch 완료 전까지 스켈레톤 (관리자 등록 파티 매칭 시간 확보) */}
+          {partiesLoading && (
+            <div className="bg-white rounded-2xl md:rounded-3xl p-5 md:p-7 border border-gray-100 mb-5 md:mb-6 animate-pulse">
+              <div className="h-3 md:h-4 bg-gray-100 rounded w-20 mb-3"></div>
+              <div className="space-y-2.5">
+                <div className="flex justify-between gap-4">
+                  <div className="h-4 md:h-5 bg-gray-100 rounded flex-1 max-w-[60%]"></div>
+                  <div className="h-4 md:h-5 bg-gray-100 rounded w-20"></div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Order summary */}
-          {parties.length > 0 && (
+          {!partiesLoading && parties.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
               className="bg-white rounded-2xl md:rounded-3xl p-5 md:p-7 border border-gray-100 mb-5 md:mb-6"
