@@ -18,6 +18,7 @@
  */
 
 declare(strict_types=1);
+require_once __DIR__ . '/../lib.php';   // priceForGender / calcCouponDiscount / countCouponUsages
 require_once __DIR__ . '/../db.php';
 header('Cache-Control: no-store, no-cache, must-revalidate');
 
