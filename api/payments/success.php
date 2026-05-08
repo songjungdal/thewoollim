@@ -153,6 +153,13 @@ $partyIds  = array_map('strval', $pending['partyIds']);
 $couponCode    = (string)$pending['couponCode'];
 $couponPartyId = (string)$pending['couponPartyId'];
 
+// ── parties.json 로드 → partyMap (counts 검증 / 쿠폰 / booking row 모두에서 사용) ─
+$partiesJson = file_exists("$dataDir/parties.json") ? json_decode(file_get_contents("$dataDir/parties.json"), true) : [];
+$partyMap = [];
+foreach ((array)$partiesJson as $p) {
+    if (isset($p['id'])) $partyMap[(string)$p['id']] = $p;
+}
+
 $STOCK_PER_SIDE = 12;
 $DEFAULT_COUNTS = [];
 
@@ -271,12 +278,7 @@ if (!$skipCounts && $fp) {
     fflush($fp); flock($fp, LOCK_UN); fclose($fp);
 }
 
-// booking row 생성
-$partiesJson = file_exists("$dataDir/parties.json") ? json_decode(file_get_contents("$dataDir/parties.json"), true) : [];
-$partyMap = [];
-foreach ((array)$partiesJson as $p) {
-    if (isset($p['id'])) $partyMap[(string)$p['id']] = $p;
-}
+// booking row 생성 — partyMap 은 위에서 이미 로드됨
 
 // 프로필 자동 분기
 $profileComplete = false;
