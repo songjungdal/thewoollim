@@ -47,6 +47,33 @@ if ((int)$pending['expectedAmount'] !== $amount) {
     redirectFail('결제 금액이 일치하지 않습니다');
 }
 
+// ── 멱등성(idempotency) 체크 — 같은 orderId 의 booking 이 이미 있으면 즉시 redirect.
+//    브라우저 reload / Toss 재콜백 등으로 success.php 가 두 번 실행돼도 중복 처리 방지.
+{
+    $idemEmail    = (string)($pending['email'] ?? '');
+    $idemPartyIds = is_array($pending['partyIds'] ?? null)
+        ? array_values(array_unique(array_map('strval', $pending['partyIds'])))
+        : [];
+    $idemFile = $dataDir . '/bookings_' . md5(strtolower(trim($idemEmail))) . '.json';
+    if ($idemEmail !== '' && file_exists($idemFile)) {
+        $idemBookings = json_decode((string)file_get_contents($idemFile), true);
+        if (is_array($idemBookings)) {
+            foreach ($idemBookings as $eb) {
+                if (is_array($eb) && (string)($eb['tossOrderId'] ?? '') === $orderId) {
+                    @unlink($pendingFile);
+                    @file_put_contents("$dataDir/_toss_success.log", sprintf(
+                        "[%s] IDEMPOTENT_REDIRECT orderId=%s amount=%d email=%s\n",
+                        date('c'), $orderId, $amount, $idemEmail
+                    ), FILE_APPEND);
+                    $ids = implode(',', $idemPartyIds);
+                    header('Location: https://thewoollim.com/payment/success/?ids=' . urlencode($ids) . '&total=' . $amount);
+                    exit;
+                }
+            }
+        }
+    }
+}
+
 // ── Toss confirm API 호출 (Basic auth: SECRET_KEY + ":" → Base64)
 $cfg = require __DIR__ . '/toss-config.php';
 if (empty($cfg['secret_key']) || !str_starts_with((string)$cfg['secret_key'], 'test_') && !str_starts_with((string)$cfg['secret_key'], 'live_')) {
@@ -94,19 +121,28 @@ $tossJson    = is_string($tossBody) ? (json_decode($tossBody, true) ?: []) : [];
 $tossCode    = isset($tossJson['code'])    ? (string)$tossJson['code']    : '';
 $tossMessage = isset($tossJson['message']) ? (string)$tossJson['message'] : '';
 
-if ($tossHttp !== 200) {
+// ALREADY_PROCESSED_PAYMENT — Toss 가 이미 결제를 확정한 상태.
+// V2 widgets + docs sample keys 환경에서는 SDK 가 redirect 전 자동 확정 → 우리 confirm 호출 시
+// 이 코드를 자주 반환. 위의 멱등성 체크에서 booking 미존재 확인됐으므로, 정상적으로 booking 생성.
+$alreadyProcessed = ($tossHttp === 400 && $tossCode === 'ALREADY_PROCESSED_PAYMENT');
+if ($tossHttp !== 200 && !$alreadyProcessed) {
     @file_put_contents($dataDir . '/_toss_failures.log', sprintf(
         "[%s] CONFIRM_FAIL orderId=%s http=%d code=%s msg=%s req=%s\n",
         date('c'), $orderId, $tossHttp, $tossCode, $tossMessage,
-        // request body 도 함께 기록 — 이후 재현 가능
         $confirmBody
     ), FILE_APPEND);
 
-    // 사용자에게 Toss 측 메시지 그대로 노출 (있으면) — '처리 중 오류' 같은 모호한 표현 회피
+    // 사용자에게 Toss 측 메시지 그대로 노출 (있으면)
     $userMsg = $tossMessage !== ''
         ? "결제 승인 실패 [{$tossCode}]: {$tossMessage}"
         : "결제 승인이 거절되었습니다 (HTTP {$tossHttp})";
     redirectFail($userMsg);
+}
+if ($alreadyProcessed) {
+    @file_put_contents($dataDir . '/_toss_failures.log', sprintf(
+        "[%s] ALREADY_PROCESSED orderId=%s — 정상 처리 진행 (booking 미존재)\n",
+        date('c'), $orderId
+    ), FILE_APPEND);
 }
 
 // ── booking 생성
