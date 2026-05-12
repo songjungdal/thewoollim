@@ -106,7 +106,6 @@ $tossBody  = curl_exec($ch);
 $tossHttp  = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
 $curlErrno = curl_errno($ch);
 $curlErr   = curl_error($ch);
-curl_close($ch);
 
 // 네트워크 오류 — Toss 서버에 도달 못 함
 if ($tossHttp === 0 || $curlErrno !== 0) {
