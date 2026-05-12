@@ -29,7 +29,7 @@ if ($method === 'GET') {
                    ideal_type AS idealType, marital_status,
                    DATE_FORMAT(birth_date, '%Y-%m-%d') AS birth_date,
                    sns_provider, role, status,
-                   DATE_FORMAT(created_at, '%Y-%m-%d %H:%i') AS createdAt
+                   DATE_FORMAT(created_at, '%Y-%m-%d %H:%i') AS created_at
             FROM users
             WHERE status = 'active'
             ORDER BY id DESC
