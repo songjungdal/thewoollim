@@ -305,8 +305,7 @@ export default function SmoothOnePage() {
               </h1>
               <p className="text-sm sm:text-lg md:text-2xl text-white/85 font-semibold max-w-3xl leading-relaxed mb-8 md:mb-14 flex flex-col gap-1 md:gap-2 drop-shadow-lg">
                 <span>숫자와 스펙으로 재단되는 관계를 넘어,</span>
-                <span className="hidden sm:inline">진정으로 마음을 울리는 감성적인 오프라인 네트워킹을 경험하세요.</span>
-                <span className="sm:hidden">진심이 통하는 오프라인 네트워킹을 경험하세요.</span>
+                <span>모든 인연과 깊게 마주하는 로테이션 매칭파티를 경험하세요.</span>
               </p>
               <button
                 onClick={(e) => {
@@ -689,7 +688,7 @@ export default function SmoothOnePage() {
                           initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
                           className="bg-brand-lightgray/50 px-5 md:px-8"
                         >
-                          <p className="text-gray-600 font-medium leading-relaxed py-5 md:py-6 border-t border-gray-200/60 px-0 text-sm md:text-base">
+                          <p className="text-gray-600 font-medium leading-relaxed py-5 md:py-6 border-t border-gray-200/60 px-0 text-sm md:text-base whitespace-pre-line">
                             {faq.a}
                           </p>
                         </motion.div>
