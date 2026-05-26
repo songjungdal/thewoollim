@@ -118,7 +118,7 @@ function BookingTable({ label, toneClass, rows, party, onApprove, onCancel }: {
         <table className="w-full text-xs md:text-sm whitespace-nowrap">
           <thead className="bg-gray-50 text-gray-500 font-bold">
             <tr>
-              {["취소", "이름", "연락처", "생년월일", "MBTI", "직업", "결제일", "결제금액", "상태", "관리"].map(h => (
+              {["취소", "이름", "연락처", "생년월일", "이메일", "직업", "결제일", "결제금액", "상태", "관리"].map(h => (
                 <th key={h} className="text-left px-3 py-2.5 first:pl-5 md:first:pl-7">{h}</th>
               ))}
             </tr>
@@ -163,7 +163,8 @@ function BookingTable({ label, toneClass, rows, party, onApprove, onCancel }: {
                   <td className={`px-3 py-2.5 font-bold ${isCancelled ? "line-through" : ""}`}>{b.userName}</td>
                   <td className="px-3 py-2.5 tabular-nums">{formatPhoneKR(b.userPhone)}</td>
                   <td className="px-3 py-2.5 text-gray-600 tabular-nums" title="프로필 카드 기반 (수정 불가)">{birth}</td>
-                  <td className="px-3 py-2.5">{b.userMbti || "-"}</td>
+                  {/* v3.6: MBTI 컬럼만 이메일(로그인 아이디)로 교체. 길이 대응 — font-mono + text-xs (md:text-sm) + max-w + truncate */}
+                  <td className="px-3 py-2.5 font-mono text-xs md:text-sm text-gray-700 max-w-[240px] truncate" title={b.userEmail || ""}>{b.userEmail || "-"}</td>
                   <td className="px-3 py-2.5">{b.userJob || "-"}</td>
                   <td className="px-3 py-2.5 text-gray-500">{b.createdAt?.slice(0, 10)}</td>
                   <td className={`px-3 py-2.5 font-black ${isCancelled ? "text-gray-400 line-through" : "text-brand-point"}`}>₩{(b.total ?? party?.price ?? 0).toLocaleString()}</td>
