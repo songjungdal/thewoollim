@@ -46,8 +46,11 @@ if ($status !== 'finalized') {
     jsonOut(['ok' => true, 'voting_status' => $status, 'matched' => false]);
 }
 
-$userId = currentUserId();
+$userId  = currentUserId();
+$matches = [];
 
+// DB fetch + 매칭 검색을 동일 try 블록 안에 두어 변수 scope 모호성 제거.
+// jsonOut/jsonFail 은 내부에서 exit → 호출 후 코드 도달 불가.
 try {
     $pdo  = getDB();
     // 본인 vote
@@ -74,32 +77,31 @@ try {
     ");
     $stmt->execute([$partyId]);
     $allVotes = $stmt->fetchAll();
+
+    // 상호 매칭 검색 — 이성 + 양방향 picks 일치
+    // 성별 분리 (v4.1): voter_gender 컬럼으로 본인과 동일 성별 레코드를 먼저 제외 → '남자 1번' 이 본인 picks 의 '1'
+    // 을 처리할 때 자동으로 '여자 1번' 만 매칭 후보로 남는다. 동일 숫자 충돌 X.
+    foreach ($allVotes as $v) {
+        if ((int)$v['voter_user_id'] === (int)$userId) continue;
+        if ($v['voter_gender'] === $myGender) continue; // 이성만 (성별 분리 1차 필터)
+        $vNumber = (int)$v['voter_number'];
+        $vPicks  = json_decode((string)$v['picks'], true) ?: [];
+
+        $iPickedThem  = in_array($vNumber, $myPicks, true);
+        $theyPickedMe = in_array($myNumber, $vPicks, true);
+
+        if ($iPickedThem && $theyPickedMe) {
+            $matches[] = [
+                'name'       => (string)$v['name'],
+                'gender'     => (string)$v['voter_gender'],
+                'birth_date' => (string)$v['birth_date'],
+                'phone'      => formatPhone((string)$v['phone']),
+            ];
+        }
+    }
 } catch (Throwable $e) {
     error_log('[matching/results] ' . $e->getMessage());
     jsonFail('서버 오류', 500);
-}
-
-// 상호 매칭 검색 — 이성 + 양방향 picks 일치
-// 성별 분리 (v4.1): voter_gender 컬럼으로 본인과 동일 성별 레코드를 먼저 제외 → '남자 1번' 이 본인 picks 의 '1'
-// 을 처리할 때 자동으로 '여자 1번' 만 매칭 후보로 남는다. 동일 숫자 충돌 X.
-$matches = [];
-foreach ($allVotes as $v) {
-    if ((int)$v['voter_user_id'] === (int)$userId) continue;
-    if ($v['voter_gender'] === $myGender) continue; // 이성만 (성별 분리 1차 필터)
-    $vNumber = (int)$v['voter_number'];
-    $vPicks  = json_decode((string)$v['picks'], true) ?: [];
-
-    $iPickedThem  = in_array($vNumber, $myPicks, true);
-    $theyPickedMe = in_array($myNumber, $vPicks, true);
-
-    if ($iPickedThem && $theyPickedMe) {
-        $matches[] = [
-            'name'       => (string)$v['name'],
-            'gender'     => (string)$v['voter_gender'],
-            'birth_date' => (string)$v['birth_date'],
-            'phone'      => formatPhone((string)$v['phone']),
-        ];
-    }
 }
 
 jsonOut([
