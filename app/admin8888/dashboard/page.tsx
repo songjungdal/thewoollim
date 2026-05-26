@@ -179,6 +179,9 @@ function BookingTable({ label, toneClass, rows, party, onApprove, onCancel }: {
                   <td className="px-3 py-2.5">
                     {isCancelled ? (
                       <span className="text-xs text-gray-400 font-bold">—</span>
+                    ) : b.status === "completed" ? (
+                      // 모임종료(투표 종료 후) 상태 — 변경 불가. 참가확정 버튼 숨김.
+                      <span className="text-xs text-gray-400 font-bold">—</span>
                     ) : confirmed ? (
                       <span className="inline-flex items-center gap-1 text-emerald-600 font-bold text-xs">
                         <CheckCircle2 size={13} /> 확정 완료
