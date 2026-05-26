@@ -163,8 +163,13 @@ function BookingTable({ label, toneClass, rows, party, onApprove, onCancel }: {
                   <td className={`px-3 py-2.5 font-bold ${isCancelled ? "line-through" : ""}`}>{b.userName}</td>
                   <td className="px-3 py-2.5 tabular-nums">{formatPhoneKR(b.userPhone)}</td>
                   <td className="px-3 py-2.5 text-gray-600 tabular-nums" title="프로필 카드 기반 (수정 불가)">{birth}</td>
-                  {/* v3.6: MBTI 컬럼만 이메일(로그인 아이디)로 교체. 길이 대응 — font-mono + text-xs (md:text-sm) + max-w + truncate */}
-                  <td className="px-3 py-2.5 font-mono text-xs md:text-sm text-gray-700 max-w-[240px] truncate" title={b.userEmail || ""}>{b.userEmail || "-"}</td>
+                  {/* v3.6: MBTI 컬럼만 이메일(로그인 아이디)로 교체. 길이 대응 — font-mono + text-xs (md:text-sm) + max-w + truncate.
+                       탈퇴 회원은 시스템 익명화로 이메일이 매우 길어지므로 노출 생략 ("—"). */}
+                  {b.userStatus === "withdrawn" ? (
+                    <td className="px-3 py-2.5 text-xs md:text-sm text-gray-400">—</td>
+                  ) : (
+                    <td className="px-3 py-2.5 font-mono text-xs md:text-sm text-gray-700 max-w-[240px] truncate" title={b.userEmail || ""}>{b.userEmail || "-"}</td>
+                  )}
                   <td className="px-3 py-2.5">{b.userJob || "-"}</td>
                   <td className="px-3 py-2.5 text-gray-500">{b.createdAt?.slice(0, 10)}</td>
                   <td className={`px-3 py-2.5 font-black ${isCancelled ? "text-gray-400 line-through" : "text-brand-point"}`}>₩{(b.total ?? party?.price ?? 0).toLocaleString()}</td>
