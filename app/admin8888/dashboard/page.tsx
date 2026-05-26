@@ -309,6 +309,11 @@ export default function AdminDashboard() {
     const kst = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
     return `${kst.getFullYear()}-${String(kst.getMonth() + 1).padStart(2, "0")}`;
   });
+  // 매칭파티 관리 탭 — 월 필터 (bookings 탭과 동일 패턴, 독립 상태 유지)
+  const [partyMonthFilter, setPartyMonthFilter] = useState<string>(() => {
+    const kst = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+    return `${kst.getFullYear()}-${String(kst.getMonth() + 1).padStart(2, "0")}`;
+  });
   // 신청자 명단 인라인 확장 패널 — 파티 카드 헤더 클릭 시 해당 카드 하단으로 슬라이드 다운.
   // null = 모두 접힘, partyId 문자열 = 해당 파티의 신청자 명단 펼침 (한 번에 하나만 열림)
   const [drawerPartyId, setDrawerPartyId] = useState<string | null>(null);
@@ -1404,17 +1409,58 @@ export default function AdminDashboard() {
           })()}
 
           {/* === 매칭파티 관리 === */}
-          {tab === "parties" && (
+          {tab === "parties" && (() => {
+            // 월 옵션 — PARTIES.calendarDate 에서 unique YYYY-MM 추출 (DESC, 최신 월 먼저)
+            const monthSet = new Set<string>();
+            for (const p of PARTIES) {
+              if (p.calendarDate && /^\d{4}-\d{2}/.test(p.calendarDate)) {
+                monthSet.add(p.calendarDate.slice(0, 7));
+              }
+            }
+            const partyMonthOptions = Array.from(monthSet).sort((a, b) => b.localeCompare(a));
+            const labelMonth = (m: string) => {
+              if (m === "all") return "전체 월";
+              const [y, mm] = m.split("-");
+              return `${y}년 ${parseInt(mm, 10)}월`;
+            };
+            // 월 필터 적용 + calendarDate ASC 정렬 (빈 값은 맨 뒤)
+            const filteredParties = [...PARTIES]
+              .filter(p => partyMonthFilter === "all" || (p.calendarDate || "").startsWith(partyMonthFilter))
+              .sort((a, b) => {
+                const ac = a.calendarDate || "";
+                const bc = b.calendarDate || "";
+                if (!ac && !bc) return 0;
+                if (!ac) return 1;
+                if (!bc) return -1;
+                return ac.localeCompare(bc);
+              });
+            return (
             <section>
               <div className="flex items-end justify-between mb-4 md:mb-5 flex-wrap gap-3">
-                <div>
+                <div className="min-w-0">
                   <h2 className="text-xl md:text-2xl font-black">매칭파티 관리</h2>
-                  <p className="text-sm text-gray-500 font-medium mt-1">전체 {PARTIES.length}건 · 등록/수정/삭제 시 메인페이지·달력 즉시 반영</p>
+                  <p className="text-sm text-gray-500 font-medium mt-1">
+                    <span className="font-bold text-brand-point">{labelMonth(partyMonthFilter)}</span> · 노출 {filteredParties.length}건 · 전체 {PARTIES.length}건 · 등록/수정/삭제 시 메인페이지·달력 즉시 반영
+                  </p>
                 </div>
-                <button onClick={openPartyCreate}
-                  className="inline-flex items-center gap-2 bg-brand-point text-brand-black px-4 py-2.5 rounded-lg text-sm font-black hover:brightness-95 transition-all">
-                  <Plus size={14} /> 신규 등록
-                </button>
+                {/* 우측 컨트롤 — 월 필터(좌) + 신규 등록(우). 모바일에서 자연 wrap, 갭 일정 유지 */}
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                  <select
+                    value={partyMonthFilter}
+                    onChange={e => setPartyMonthFilter(e.target.value)}
+                    aria-label="매칭파티 월 필터"
+                    className="px-3 py-2.5 rounded-lg border border-gray-200 text-sm font-bold bg-white text-brand-black focus:ring-2 focus:ring-brand-point outline-none"
+                  >
+                    <option value="all">전체 월</option>
+                    {partyMonthOptions.map(m => (
+                      <option key={m} value={m}>{labelMonth(m)}</option>
+                    ))}
+                  </select>
+                  <button onClick={openPartyCreate}
+                    className="inline-flex items-center gap-2 bg-brand-point text-brand-black px-4 py-2.5 rounded-lg text-sm font-black hover:brightness-95 transition-all whitespace-nowrap">
+                    <Plus size={14} /> 신규 등록
+                  </button>
+                </div>
               </div>
               <div className="bg-white rounded-2xl border border-gray-200 overflow-x-auto">
                 <table className="w-full text-sm whitespace-nowrap">
@@ -1428,15 +1474,7 @@ export default function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {/* 일자 빠른 순 (calendarDate ASC) 정렬 — 빈 값은 맨 뒤 */}
-                    {[...PARTIES].sort((a, b) => {
-                      const ac = a.calendarDate || "";
-                      const bc = b.calendarDate || "";
-                      if (!ac && !bc) return 0;
-                      if (!ac) return 1;
-                      if (!bc) return -1;
-                      return ac.localeCompare(bc);
-                    }).map(p => (
+                    {filteredParties.map(p => (
                       <tr key={p.id} className="border-t border-gray-100 hover:bg-gray-50">
                         <td className="px-3 py-2.5 font-bold text-gray-400">{p.id}</td>
                         <td className="px-3 py-2.5">
@@ -1462,7 +1500,13 @@ export default function AdminDashboard() {
                         </td>
                       </tr>
                     ))}
-                    {PARTIES.length === 0 && <tr><td colSpan={9} className="text-center text-gray-400 py-8">등록된 매칭파티 없음</td></tr>}
+                    {filteredParties.length === 0 && (
+                      <tr><td colSpan={9} className="text-center text-gray-400 py-8">
+                        {PARTIES.length === 0
+                          ? "등록된 매칭파티 없음"
+                          : `${labelMonth(partyMonthFilter)}에 등록된 매칭파티 없음`}
+                      </td></tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -1679,7 +1723,8 @@ export default function AdminDashboard() {
               )}
 
             </section>
-          )}
+            );
+          })()}
 
           {/* === 쿠폰 관리 (범용 코드 방식) === */}
           {tab === "coupons" && (
