@@ -320,15 +320,15 @@ export default function MatchingResultsPage() {
                 </div>
               </div>
 
-              {/* 파티 선택 */}
+              {/* 파티 선택 — 시인성 강화: 라벨/셀렉트 폰트·패딩 확대 */}
               {data.parties.length > 1 && (
-                <div className="bg-white/95 rounded-3xl shadow-xl p-5 md:p-6">
-                  <label className="block text-xs md:text-sm font-black text-gray-500 mb-2">참가 파티 선택</label>
+                <div className="bg-white/95 rounded-3xl shadow-xl p-6 md:p-8">
+                  <label className="block text-sm md:text-base font-black text-gray-600 mb-3">참가 파티 선택</label>
                   <select
                     value={selectedPartyId ?? ""}
                     onChange={e => setSelectedPartyId(e.target.value)}
                     aria-label="참가 파티 선택"
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm font-bold focus:ring-2 focus:ring-brand-point outline-none"
+                    className="w-full px-5 py-4 md:py-5 rounded-xl border-2 border-gray-200 bg-white text-base md:text-lg font-bold focus:ring-2 focus:ring-brand-point focus:border-brand-point outline-none"
                   >
                     {data.parties.map(p => (
                       <option key={p.id} value={p.id}>
@@ -363,25 +363,25 @@ export default function MatchingResultsPage() {
                           결과 발표 전까지 [수정하기] 로 자유롭게 다시 투표하실 수 있습니다.
                         </p>
                       </div>
-                      {/* 내 투표 요약 — 본인 식별 + 선택한 이성 번호(성별 결합 식별자) */}
-                      <div className="bg-gray-50 rounded-2xl p-5 md:p-6 mb-5 md:mb-6 space-y-3 md:space-y-4">
-                        <div>
-                          <p className="text-[11px] md:text-xs font-black text-gray-400 tracking-[0.15em] mb-1.5">나의 부여 번호</p>
-                          <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-black text-sm md:text-base ${genderBadge.bg} ${genderBadge.text}`}>
+                      {/* 내 투표 요약 — 중앙 정렬 + 시인성 강화 (라벨/배지 폰트·패딩 확대) */}
+                      <div className="bg-gray-50 rounded-2xl p-6 md:p-8 mb-5 md:mb-6 space-y-5 md:space-y-7">
+                        <div className="text-center">
+                          <p className="text-xs md:text-sm font-black text-gray-500 tracking-[0.15em] mb-3">나의 부여 번호</p>
+                          <span className={`inline-flex items-center justify-center gap-2 px-5 py-3 md:px-7 md:py-4 rounded-xl font-black text-lg md:text-2xl ${genderBadge.bg} ${genderBadge.text}`}>
                             {genderKor || "성별 미설정"} {selectedParty.my_vote.voter_number}번
                           </span>
                         </div>
-                        <div>
-                          <p className="text-[11px] md:text-xs font-black text-gray-400 tracking-[0.15em] mb-1.5">내가 선택한 번호</p>
-                          <div className="flex flex-wrap gap-2">
+                        <div className="text-center">
+                          <p className="text-xs md:text-sm font-black text-gray-500 tracking-[0.15em] mb-3">내가 선택한 번호</p>
+                          <div className="flex flex-wrap gap-3 justify-center">
                             {selectedParty.my_vote.picks.map((p, idx) => (
-                              <span key={idx} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border-2 border-brand-point/30 font-black text-sm md:text-base text-brand-black">
-                                <span className="text-gray-400 text-xs">{oppositeKor === "이성" ? "" : oppositeKor}</span>
+                              <span key={idx} className="inline-flex items-center gap-2 px-5 py-3 md:px-7 md:py-4 rounded-xl bg-white border-2 border-brand-point/30 font-black text-lg md:text-2xl text-brand-black">
+                                <span className="text-gray-400 text-xs md:text-sm font-bold">{oppositeKor === "이성" ? "" : oppositeKor}</span>
                                 {p}번
                               </span>
                             ))}
                             {selectedParty.my_vote.picks.length === 0 && (
-                              <span className="text-xs text-gray-400 font-bold">선택 정보 없음</span>
+                              <span className="text-sm text-gray-400 font-bold">선택 정보 없음</span>
                             )}
                           </div>
                         </div>
