@@ -424,13 +424,6 @@ export default function MatchingResultsPage() {
                             required
                           />
                         </div>
-                        {myNumber && genderKor && (
-                          <p className="text-[11px] md:text-xs text-gray-500 mt-2 font-bold break-keep">
-                            내 식별: <span className={genderBadge.text}>{genderKor} {myNumber}번</span>
-                            <span className="text-gray-300 mx-1.5">|</span>
-                            <span className="text-gray-400">'{oppositeKor} {myNumber}번' 과 별도 참가자로 인식됩니다</span>
-                          </p>
-                        )}
                       </div>
 
                       {myNumber && (
