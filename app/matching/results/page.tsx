@@ -53,6 +53,8 @@ export default function MatchingResultsPage() {
   const [pick1, setPick1] = useState<string>("");
   const [pick2, setPick2] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
+  // 투표 완료 후 수정 모드 — true 면 form 노출, false 면 '투표 완료' 안내 + [수정하기] 버튼 노출
+  const [editing, setEditing] = useState(false);
 
   // 결과 state
   const [result, setResult] = useState<ResultResp | null>(null);
@@ -79,7 +81,7 @@ export default function MatchingResultsPage() {
     else setLoading(false);
   }, [mounted, isLoggedIn, loadState]);
 
-  // 선택된 파티 변경 → 본인 vote 가 있으면 input prefill
+  // 선택된 파티 변경 → 본인 vote 가 있으면 input prefill + 편집 모드 초기화
   useEffect(() => {
     if (!data?.parties || !selectedPartyId) return;
     const p = data.parties.find(x => x.id === selectedPartyId);
@@ -92,6 +94,8 @@ export default function MatchingResultsPage() {
       setPick1("");
       setPick2("");
     }
+    // 파티 전환 시 항상 완료 안내 뷰부터 노출 (투표 이력 있는 파티) → 사용자가 [수정하기] 로 진입
+    setEditing(false);
   }, [selectedPartyId, data]);
 
   // 결과 fetch — 'finalized' 일 때만
@@ -140,6 +144,15 @@ export default function MatchingResultsPage() {
       // voter_gender 는 DB match_votes.voter_gender 컬럼과 1:1 매핑. voter_id ("M-3" / "F-3") 는 디버깅/로그용 보조 식별자.
       const voterGender = data?.user?.gender || "";
       const voterPrefix = voterGender === "남성" ? "M" : voterGender === "여성" ? "F" : "?";
+      // picks_detailed — 각 선택 대상에 반대 성별 식별자를 명시. '남자 1번' 이 '1' 을 골랐을 때
+      // 내부적으로 'F-1'(여자 1번) 로 매핑돼 동일 숫자 다른 성별의 엉뚱한 매칭을 사전 차단.
+      const oppositeGender = voterGender === "남성" ? "여성" : voterGender === "여성" ? "남성" : "";
+      const oppositePrefix = voterGender === "남성" ? "F" : voterGender === "여성" ? "M" : "?";
+      const picksDetailed = picks.map(p => ({
+        target_number: p,
+        target_gender: oppositeGender,
+        target_id: `${oppositePrefix}-${p}`,
+      }));
       const res = await fetch("/api/matching/vote.php", {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -149,11 +162,13 @@ export default function MatchingResultsPage() {
           voter_gender: voterGender,
           voter_id: `${voterPrefix}-${n}`,
           picks,
+          picks_detailed: picksDetailed,
         }),
       });
       const d = await res.json();
       if (!d?.ok) { alert(d?.error || "투표 저장 실패"); return; }
       alert("투표가 저장되었습니다!");
+      setEditing(false);            // 저장 성공 → 완료 안내 뷰로 복귀
       await loadState();
     } catch {
       alert("네트워크 오류");
@@ -332,7 +347,52 @@ export default function MatchingResultsPage() {
                     </div>
                   )}
 
-                  {selectedParty.voting_status === "open" && (
+                  {selectedParty.voting_status === "open" && selectedParty.my_vote && !editing && (
+                    // === 투표 완료 안내 뷰 — 결과창과 완전히 분리된 독립 섹션 ===
+                    <div>
+                      <div className="text-center py-5 md:py-7 bg-brand-point/10 border border-brand-point/30 rounded-2xl mb-5 md:mb-6">
+                        <p className="text-xl md:text-3xl font-black text-brand-point mb-2 break-keep">
+                          투표가 완료되었습니다.
+                        </p>
+                        <p className="text-xs md:text-sm font-bold text-gray-600 break-keep">
+                          결과 발표 전까지 [수정하기] 로 자유롭게 다시 투표하실 수 있습니다.
+                        </p>
+                      </div>
+                      {/* 내 투표 요약 — 본인 식별 + 선택한 이성 번호(성별 결합 식별자) */}
+                      <div className="bg-gray-50 rounded-2xl p-5 md:p-6 mb-5 md:mb-6 space-y-3 md:space-y-4">
+                        <div>
+                          <p className="text-[11px] md:text-xs font-black text-gray-400 tracking-[0.15em] uppercase mb-1.5">My Number</p>
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-black text-sm md:text-base ${genderBadge.bg} ${genderBadge.text}`}>
+                            {genderKor || "성별 미설정"} {selectedParty.my_vote.voter_number}번
+                          </span>
+                        </div>
+                        <div>
+                          <p className="text-[11px] md:text-xs font-black text-gray-400 tracking-[0.15em] uppercase mb-1.5">My Picks</p>
+                          <div className="flex flex-wrap gap-2">
+                            {selectedParty.my_vote.picks.map((p, idx) => (
+                              <span key={idx} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border-2 border-brand-point/30 font-black text-sm md:text-base text-brand-black">
+                                <span className="text-gray-400 text-xs">{oppositeKor === "이성" ? "" : oppositeKor}</span>
+                                {p}번
+                              </span>
+                            ))}
+                            {selectedParty.my_vote.picks.length === 0 && (
+                              <span className="text-xs text-gray-400 font-bold">선택 정보 없음</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      {/* [수정하기] — 어울림 포인트 컬러(#008080) 배경 + 흰색 글자 */}
+                      <button
+                        type="button"
+                        onClick={() => setEditing(true)}
+                        className="w-full bg-[#008080] text-white py-4 rounded-xl font-black text-base md:text-lg hover:brightness-110 active:scale-[0.99] transition-all shadow-sm"
+                      >
+                        수정하기
+                      </button>
+                    </div>
+                  )}
+
+                  {selectedParty.voting_status === "open" && (!selectedParty.my_vote || editing) && (
                     <form onSubmit={handleSubmitVote} className="space-y-5">
                       <div>
                         <label className="block text-xs font-black text-gray-500 mb-2">
@@ -401,9 +461,22 @@ export default function MatchingResultsPage() {
                         {submitting ? "저장 중..." : selectedParty.my_vote ? "투표 수정 저장" : "투표 제출"}
                       </button>
                       {selectedParty.my_vote && (
-                        <p className="text-center text-xs text-brand-point font-bold">
-                          ✓ 이전 투표가 저장돼있습니다 — 결과 발표 전까지 자유롭게 수정 가능합니다.
-                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            // 취소 — 저장 전 값으로 되돌리고 완료 안내 뷰로 복귀
+                            const mv = selectedParty.my_vote;
+                            if (mv) {
+                              setMyNumber(String(mv.voter_number));
+                              setPick1(mv.picks[0] ? String(mv.picks[0]) : "");
+                              setPick2(mv.picks[1] ? String(mv.picks[1]) : "");
+                            }
+                            setEditing(false);
+                          }}
+                          className="block mx-auto text-xs md:text-sm text-gray-500 hover:text-brand-black font-bold underline-offset-4 hover:underline transition-colors"
+                        >
+                          수정 취소 — 이전 투표로 돌아가기
+                        </button>
                       )}
                     </form>
                   )}

@@ -34,8 +34,10 @@ $partyId         = trim((string)($body['partyId']      ?? ''));
 $voterNumber     = (int)        ($body['voter_number'] ?? 0);
 $picks           = $body['picks'] ?? null;
 // 클라이언트가 보조로 보내는 성별/식별자 — 서버 측 DB 값과 대조 검증만 수행 (단독 신뢰 X)
-$clientGender    = trim((string)($body['voter_gender'] ?? ''));
-$clientVoterId   = trim((string)($body['voter_id']     ?? ''));
+$clientGender    = trim((string)($body['voter_gender']  ?? ''));
+$clientVoterId   = trim((string)($body['voter_id']      ?? ''));
+// picks_detailed — 각 선택 대상에 반대 성별 식별자 포함 (선택). 검증만 수행, DB 저장 X
+$clientPicksDtl  = is_array($body['picks_detailed'] ?? null) ? $body['picks_detailed'] : null;
 
 if ($partyId === '')                                jsonFail('파티 ID 가 필요합니다.');
 if ($voterNumber < 1 || $voterNumber > 99)          jsonFail('본인 번호를 1~99 사이로 입력해주세요.');
@@ -105,6 +107,29 @@ if ($clientVoterId !== '') {
     $expectVoterId = $expectPrefix . '-' . $voterNumber;
     if ($clientVoterId !== $expectVoterId) {
         jsonFail('식별자(voter_id)가 성별·번호와 일치하지 않습니다.', 400);
+    }
+}
+
+// picks_detailed 검증 (보조) — 클라이언트가 보낸 경우에만, 각 항목이 반대 성별로 매핑돼있는지 점검.
+// 동일 숫자 동성 매칭 차단 — 매칭 알고리즘은 results.php 의 voter_gender 필터로 이미 보장되지만,
+// 클라이언트 단에서도 동일 인식이 유지되는지 한 번 더 대조 (다중 디바이스/구버전 앱 fallback 방어).
+if ($clientPicksDtl !== null) {
+    $expectOppGender = $gender === '남성' ? '여성' : ($gender === '여성' ? '남성' : '');
+    $expectOppPrefix = $gender === '남성' ? 'F'    : ($gender === '여성' ? 'M'    : '?');
+    if (count($clientPicksDtl) !== count($picksClean)) {
+        jsonFail('picks 와 picks_detailed 길이가 일치하지 않습니다.', 400);
+    }
+    foreach ($clientPicksDtl as $i => $row) {
+        $tn = (int)        ($row['target_number'] ?? 0);
+        $tg = trim((string)($row['target_gender'] ?? ''));
+        $tid = trim((string)($row['target_id']    ?? ''));
+        if ($tn !== (int)$picksClean[$i])                   jsonFail('picks_detailed 의 번호가 picks 와 다릅니다.', 400);
+        if ($expectOppGender !== '' && $tg !== $expectOppGender) {
+            jsonFail('picks_detailed 대상 성별이 본인과 같은 성별로 잘못 지정되었습니다.', 400);
+        }
+        if ($tid !== '' && $tid !== ($expectOppPrefix . '-' . $tn)) {
+            jsonFail('picks_detailed 의 식별자(target_id) 형식이 일치하지 않습니다.', 400);
+        }
     }
 }
 
