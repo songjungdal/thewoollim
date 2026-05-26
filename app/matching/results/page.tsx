@@ -366,13 +366,13 @@ export default function MatchingResultsPage() {
                       {/* 내 투표 요약 — 본인 식별 + 선택한 이성 번호(성별 결합 식별자) */}
                       <div className="bg-gray-50 rounded-2xl p-5 md:p-6 mb-5 md:mb-6 space-y-3 md:space-y-4">
                         <div>
-                          <p className="text-[11px] md:text-xs font-black text-gray-400 tracking-[0.15em] uppercase mb-1.5">My Number</p>
+                          <p className="text-[11px] md:text-xs font-black text-gray-400 tracking-[0.15em] mb-1.5">나의 부여 번호</p>
                           <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-black text-sm md:text-base ${genderBadge.bg} ${genderBadge.text}`}>
                             {genderKor || "성별 미설정"} {selectedParty.my_vote.voter_number}번
                           </span>
                         </div>
                         <div>
-                          <p className="text-[11px] md:text-xs font-black text-gray-400 tracking-[0.15em] uppercase mb-1.5">My Picks</p>
+                          <p className="text-[11px] md:text-xs font-black text-gray-400 tracking-[0.15em] mb-1.5">내가 선택한 번호</p>
                           <div className="flex flex-wrap gap-2">
                             {selectedParty.my_vote.picks.map((p, idx) => (
                               <span key={idx} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border-2 border-brand-point/30 font-black text-sm md:text-base text-brand-black">
