@@ -71,6 +71,41 @@ export function partyStockStatus(party: Party) {
   };
 }
 
+/** 메인 노출 종료 기준 — 행사 일시 경과 후 X일이 지나면 카드 리스트에서 자동 제외 */
+export const PARTY_HIDE_AFTER_DAYS = 21;
+
+/**
+ * 파티 행사 일시 → Date 객체.
+ *   - calendarDate (YYYY-MM-DD) + dateString 내부 "HH:MM" 부분을 결합 (로컬 시간대)
+ *   - dateString 에서 시간 추출 실패 시 해당 날짜의 23:59:59 로 폴백 → 당일 자정 직전까지는 "진행 중"
+ */
+export function partyEventDate(party: Pick<Party, "calendarDate" | "dateString">): Date {
+  const m = (party.dateString || "").match(/(\d{1,2}):(\d{2})/);
+  if (party.calendarDate && m) {
+    return new Date(`${party.calendarDate}T${m[1].padStart(2, "0")}:${m[2]}:00`);
+  }
+  if (party.calendarDate) return new Date(`${party.calendarDate}T23:59:59`);
+  return new Date(0);
+}
+
+export type PartyVisibility = "active" | "ended" | "expired";
+
+/**
+ * 메인 페이지 노출 상태:
+ *   - active : 아직 행사가 시작/종료되지 않음
+ *   - ended  : 행사 일시는 지났지만 PARTY_HIDE_AFTER_DAYS 일 이내 (모집 종료 카드로 노출)
+ *   - expired: 종료 후 PARTY_HIDE_AFTER_DAYS 일 초과 (메인 리스트에서 제외)
+ */
+export function partyVisibility(
+  party: Pick<Party, "calendarDate" | "dateString">,
+  now: Date = new Date()
+): PartyVisibility {
+  const event = partyEventDate(party).getTime();
+  if (event > now.getTime()) return "active";
+  const cutoffMs = PARTY_HIDE_AFTER_DAYS * 24 * 60 * 60 * 1000;
+  return now.getTime() - event <= cutoffMs ? "ended" : "expired";
+}
+
 export const CALENDAR_EVENTS = PARTIES.map(p => ({
   id: p.id,
   title: p.title,

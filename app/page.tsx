@@ -11,7 +11,7 @@ import Link from "next/link";
 import Image from "next/image";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
-import { PARTICIPANTS, FAQS, partyStockStatus } from "./lib/data";
+import { PARTICIPANTS, FAQS, partyStockStatus, partyVisibility } from "./lib/data";
 import { useAuth } from "./context/AuthContext";
 import { useParties } from "./lib/useParties";
 
@@ -157,10 +157,6 @@ export default function SmoothOnePage() {
   const [liveMembers, setLiveMembers] = useState<typeof PARTICIPANTS>([]);
   const { partyCounts } = useAuth();
   const PARTIES = useParties();
-  const CALENDAR_EVENTS = PARTIES.map(p => ({
-    id: p.id, title: p.title, date: p.calendarDate,
-    extendedProps: { location: p.location, target: p.target, price: p.price },
-  }));
   const router = useRouter();
 
   // 후기 갤러리 fetch — 관리자 변경 시 BroadcastChannel('woollim_gallery') 으로 즉시 동기화
@@ -258,15 +254,48 @@ export default function SmoothOnePage() {
     }
   };
 
+  // SSR/CSR 시간대 차이로 인한 hydration mismatch 방지 — now 는 mount 후에만 세팅,
+  // 1분마다 갱신해 행사 종료 시점에 카드 UI 가 자연스럽게 전환되게 함
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => {
+    setNow(new Date());
+    const t = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(t);
+  }, []);
+
   const sortedParties = useMemo(() => {
-    return [...PARTIES]
-      .filter(p => {
-        if (!activeAxis || !filterValue) return true;
-        return p[AXIS_FIELD[activeAxis]] === filterValue;
-      })
-      .sort((a, b) => a.calendarDate.localeCompare(b.calendarDate));
+    const filtered = [...PARTIES].filter(p => {
+      if (!activeAxis || !filterValue) return true;
+      return p[AXIS_FIELD[activeAxis]] === filterValue;
+    });
+
+    // mount 전(SSR/초기 hydration) — 시간 의존 필터/정렬 생략, 기존 동작 유지
+    if (!now) return filtered.sort((a, b) => a.calendarDate.localeCompare(b.calendarDate));
+
+    return filtered
+      .filter(p => partyVisibility(p, now) !== "expired")        // 종료 21일 초과 → 노출 제외
+      .sort((a, b) => {
+        const ra = partyVisibility(a, now) === "active" ? 0 : 1; // active 우선, ended 후순위
+        const rb = partyVisibility(b, now) === "active" ? 0 : 1;
+        if (ra !== rb) return ra - rb;
+        return a.calendarDate.localeCompare(b.calendarDate);     // 그룹 내부는 기존 날짜 오름차순 유지
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeAxis, filterValue, PARTIES]);
+  }, [activeAxis, filterValue, PARTIES, now]);
+
+  // 일정 섹션(모바일 리스트 + 데스크탑 캘린더) — 행사 일시 경과한 이벤트에 'fc-event-ended' 클래스
+  // 부여해 파스텔 빨강(#f8d8dd) 톤으로 표시. 다른 카테고리 탭/필터·데이터 쿼리에는 무영향.
+  const CALENDAR_EVENTS = useMemo(() => PARTIES.map(p => {
+    const past = now ? partyVisibility(p, now) !== "active" : false;
+    return {
+      id: p.id,
+      title: p.title,
+      date: p.calendarDate,
+      classNames: past ? ["fc-event-ended"] : [],
+      extendedProps: { location: p.location, target: p.target, price: p.price },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [PARTIES, now]);
 
   void activeTab; // 기존 useState는 호환을 위해 유지 (warning 회피용 reference)
 
@@ -421,6 +450,8 @@ export default function SmoothOnePage() {
                     femaleBooked: live?.female ?? 0,
                   };
                   const stock = partyStockStatus(liveCard);
+                  // 행사 일시 경과 → 모집 종료 카드 UI (배지/버튼 색·문구만 교체, 링크 동작은 유지)
+                  const isEnded = now ? partyVisibility(card, now) === "ended" : false;
                   return (
                   <motion.div
                     key={card.id}
@@ -431,17 +462,25 @@ export default function SmoothOnePage() {
                     transition={{ duration: 0.35, type: "spring", stiffness: 300, damping: 28 }}
                     className="bg-brand-lightgray border border-gray-100 p-5 md:p-8 rounded-2xl md:rounded-3xl hover:border-brand-point transition-all flex flex-col h-full group relative"
                   >
-                    {/* 우측 상단 배지 영역 — 대상별(싱글/돌싱) + 모집마감 세로 스택 */}
+                    {/* 우측 상단 배지 영역 — 종료 시 [모집종료] 단일 배지, 아니면 대상(싱글/돌싱) + 모집마감 스택 */}
                     <div className="absolute top-4 right-4 md:top-5 md:right-5 flex flex-col items-end gap-1.5 z-10">
-                      {(card.targetGroup === "싱글" || card.targetGroup === "돌싱") && (
-                        <span className="bg-brand-point text-black text-[11px] md:text-xs font-black px-2.5 py-1 rounded-full shadow-md whitespace-nowrap">
-                          {card.targetGroup}
+                      {isEnded ? (
+                        <span className="bg-[#f8d8dd] text-[#9a3a47] text-[11px] md:text-xs font-black px-2.5 py-1 rounded-full shadow-md whitespace-nowrap tracking-tight">
+                          모집종료
                         </span>
-                      )}
-                      {stock.allFull && (
-                        <span className="bg-gray-900 text-white text-[11px] md:text-xs font-black px-2.5 py-1 rounded-full shadow-md whitespace-nowrap">
-                          모집 마감
-                        </span>
+                      ) : (
+                        <>
+                          {(card.targetGroup === "싱글" || card.targetGroup === "돌싱") && (
+                            <span className="bg-brand-point text-black text-[11px] md:text-xs font-black px-2.5 py-1 rounded-full shadow-md whitespace-nowrap">
+                              {card.targetGroup}
+                            </span>
+                          )}
+                          {stock.allFull && (
+                            <span className="bg-gray-900 text-white text-[11px] md:text-xs font-black px-2.5 py-1 rounded-full shadow-md whitespace-nowrap">
+                              모집 마감
+                            </span>
+                          )}
+                        </>
                       )}
                     </div>
                     {/* 제목 — 우측 상단 배지가 가리지 않도록 우측 패딩 확보 */}
@@ -475,15 +514,18 @@ export default function SmoothOnePage() {
                       </div>
                     </div>
 
+                    {/* 참여/상세 이동 — 종료 카드는 파스텔 빨강(#f8d8dd) 버튼, disabled/pointer-events 적용 X (링크 정상 동작) */}
                     <Link
                       href={`/party/${card.id}`}
                       className={`w-full text-center font-bold py-3.5 md:py-4 text-sm md:text-base rounded-xl transition-colors duration-300 block ${
-                        stock.allFull
-                          ? "bg-gray-200 text-gray-500 hover:bg-gray-300"
-                          : "bg-brand-black text-white hover:bg-brand-point"
+                        isEnded
+                          ? "bg-[#f8d8dd] text-[#9a3a47] hover:bg-[#f4c5cd]"
+                          : stock.allFull
+                            ? "bg-gray-200 text-gray-500 hover:bg-gray-300"
+                            : "bg-brand-black text-white hover:bg-brand-point"
                       }`}
                     >
-                      {stock.allFull ? "모집 마감 · 상세보기" : "매칭파티 참여하기"}
+                      {isEnded ? "모집 종료된 매칭파티" : stock.allFull ? "모집 마감 · 상세보기" : "매칭파티 참여하기"}
                     </Link>
                   </motion.div>
                   );
@@ -538,23 +580,29 @@ export default function SmoothOnePage() {
                   const month = dateObj.getMonth() + 1;
                   const day = dateObj.getDate();
                   const dayName = ["일", "월", "화", "수", "목", "금", "토"][dateObj.getDay()];
+                  // 행사 일시 경과 → 파스텔 빨강(#f8d8dd) 톤으로 표시 (링크/클릭 동작은 그대로)
+                  const isPast = now && party ? partyVisibility(party, now) !== "active" : false;
                   return (
                     <button
                       key={event.id}
                       onClick={() => router.push(`/party/${event.id}`)}
-                      className="w-full text-left bg-gray-50 border border-gray-100 rounded-2xl p-4 flex items-center gap-4 hover:border-brand-point hover:bg-white transition-all shadow-sm active:scale-[0.98] cursor-pointer"
+                      className={`w-full text-left rounded-2xl p-4 flex items-center gap-4 transition-all shadow-sm active:scale-[0.98] cursor-pointer ${
+                        isPast
+                          ? "bg-[#fdeef0] border border-[#f8d8dd] hover:border-[#e9a8b1] hover:bg-[#fbe3e7]"
+                          : "bg-gray-50 border border-gray-100 hover:border-brand-point hover:bg-white"
+                      }`}
                     >
-                      <div className="flex-shrink-0 w-14 bg-[#40E0D0]/15 rounded-xl py-2 text-center">
-                        <div className="text-[11px] font-bold text-[#008080]">{month}월</div>
-                        <div className="text-2xl font-black text-brand-black leading-none">{day}</div>
-                        <div className="text-[11px] text-gray-400 font-semibold">{dayName}요일</div>
+                      <div className={`flex-shrink-0 w-14 rounded-xl py-2 text-center ${isPast ? "bg-[#f8d8dd]" : "bg-[#40E0D0]/15"}`}>
+                        <div className={`text-[11px] font-bold ${isPast ? "text-[#9a3a47]" : "text-[#008080]"}`}>{month}월</div>
+                        <div className={`text-2xl font-black leading-none ${isPast ? "text-[#7a2c37]" : "text-brand-black"}`}>{day}</div>
+                        <div className={`text-[11px] font-semibold ${isPast ? "text-[#9a3a47]/70" : "text-gray-400"}`}>{dayName}요일</div>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="font-bold text-[15px] text-brand-black mb-1 leading-snug">{event.title}</div>
-                        <div className="text-sm text-gray-500">{party?.dateString}</div>
-                        <div className="text-xs text-gray-400 mt-0.5 truncate">{party?.location} · {party?.target}</div>
+                        <div className={`font-bold text-[15px] mb-1 leading-snug ${isPast ? "text-[#7a2c37]" : "text-brand-black"}`}>{event.title}</div>
+                        <div className={`text-sm ${isPast ? "text-[#9a3a47]/85" : "text-gray-500"}`}>{party?.dateString}</div>
+                        <div className={`text-xs mt-0.5 truncate ${isPast ? "text-[#9a3a47]/70" : "text-gray-400"}`}>{party?.location} · {party?.target}</div>
                       </div>
-                      <ArrowRight size={16} className="flex-shrink-0 text-gray-300" />
+                      <ArrowRight size={16} className={`flex-shrink-0 ${isPast ? "text-[#9a3a47]/50" : "text-gray-300"}`} />
                     </button>
                   );
                 })
@@ -589,6 +637,10 @@ export default function SmoothOnePage() {
                   .fc-col-header-cell { padding: 12px 0 !important; background-color: #fafafa; }
                   .fc-col-header-cell-cushion { color: #666; font-weight: 700; font-size: 0.9rem; }
                   .fc-daygrid-more-link { font-weight: 800; color: #40E0D0 !important; font-size: 0.8rem; margin-top: 2px; padding-left: 4px; }
+                  /* 행사 일시 경과한 이벤트 — 파스텔 빨강(#f8d8dd) 톤. 위쪽 .fc-event/* 색상 규칙보다 specificity 가 높아 안전하게 override 됨 */
+                  .fc-event.fc-event-ended { background-color: #f8d8dd !important; border-left-color: rgba(154, 58, 71, 0.4) !important; }
+                  .fc-event.fc-event-ended, .fc-event.fc-event-ended * { color: #7a2c37 !important; }
+                  .fc-event.fc-event-ended:hover { background-color: #f4c5cd !important; box-shadow: 0 4px 12px rgba(248, 216, 221, 0.55) !important; }
                 `}} />
                 <FullCalendar
                   plugins={[dayGridPlugin, interactionPlugin]}
