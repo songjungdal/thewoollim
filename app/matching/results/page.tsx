@@ -136,10 +136,20 @@ export default function MatchingResultsPage() {
 
     setSubmitting(true);
     try {
+      // 성별 식별자를 함께 전송 → 서버에서 세션 회원의 성별과 대조해 '남자 N번' / '여자 N번' 을 명확히 분리.
+      // voter_gender 는 DB match_votes.voter_gender 컬럼과 1:1 매핑. voter_id ("M-3" / "F-3") 는 디버깅/로그용 보조 식별자.
+      const voterGender = data?.user?.gender || "";
+      const voterPrefix = voterGender === "남성" ? "M" : voterGender === "여성" ? "F" : "?";
       const res = await fetch("/api/matching/vote.php", {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ partyId: selectedPartyId, voter_number: n, picks }),
+        body: JSON.stringify({
+          partyId: selectedPartyId,
+          voter_number: n,
+          voter_gender: voterGender,
+          voter_id: `${voterPrefix}-${n}`,
+          picks,
+        }),
       });
       const d = await res.json();
       if (!d?.ok) { alert(d?.error || "투표 저장 실패"); return; }
@@ -153,6 +163,15 @@ export default function MatchingResultsPage() {
   };
 
   const selectedParty = data?.parties?.find(p => p.id === selectedPartyId);
+  // 성별 표기 헬퍼 — Step 1/2 라벨, placeholder, 배지 색상에 사용
+  const userGender = data?.user?.gender || "";
+  const genderKor    = userGender === "남성" ? "남자" : userGender === "여성" ? "여자" : "";
+  const oppositeKor  = userGender === "남성" ? "여자" : userGender === "여성" ? "남자" : "이성";
+  const genderBadge  = userGender === "남성"
+    ? { bg: "bg-[#E3F2FD]", text: "text-[#3a85d9]",  ring: "ring-[#4facfe]/30" }
+    : userGender === "여성"
+      ? { bg: "bg-rose-100",  text: "text-rose-600",   ring: "ring-rose-300/40" }
+      : { bg: "bg-gray-100",  text: "text-gray-500",   ring: "ring-gray-200" };
 
   return (
     <div className="min-h-screen flex flex-col relative">
@@ -319,22 +338,40 @@ export default function MatchingResultsPage() {
                         <label className="block text-xs font-black text-gray-500 mb-2">
                           STEP 1. 본인의 부여 번호
                         </label>
-                        <input
-                          type="number"
-                          min={1}
-                          max={99}
-                          value={myNumber}
-                          onChange={e => setMyNumber(e.target.value.replace(/\D/g, "").slice(0, 2))}
-                          placeholder="예: 3"
-                          className="w-full px-4 py-3.5 rounded-xl border-2 border-gray-200 focus:border-brand-point outline-none font-bold text-lg tabular-nums text-center"
-                          required
-                        />
+                        {/* 성별 배지 + 번호 입력 — 모바일에서 자연 wrap, 데스크탑은 한 줄 */}
+                        <div className="flex items-stretch flex-wrap gap-2">
+                          {/* 성별 식별 칩 — DB user_gender 기반 상시 노출, 번호와 결합해 '남자 N번' / '여자 N번' 구분 */}
+                          <span
+                            className={`inline-flex items-center justify-center px-3.5 py-2 rounded-xl ring-1 font-black text-sm whitespace-nowrap flex-shrink-0 ${genderBadge.bg} ${genderBadge.text} ${genderBadge.ring}`}
+                            aria-label={`내 성별: ${userGender || "미설정"}`}
+                          >
+                            {genderKor || "성별 미설정"}
+                          </span>
+                          <input
+                            type="number"
+                            min={1}
+                            max={99}
+                            value={myNumber}
+                            onChange={e => setMyNumber(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                            placeholder={genderKor ? `부여받은 ${genderKor} 3번이라면 '3'만 입력` : "예: 3"}
+                            aria-label={`${genderKor || ""} 본인 부여 번호`}
+                            className="flex-1 min-w-[140px] px-4 py-3.5 rounded-xl border-2 border-gray-200 focus:border-brand-point outline-none font-bold text-lg tabular-nums text-center"
+                            required
+                          />
+                        </div>
+                        {myNumber && genderKor && (
+                          <p className="text-[11px] md:text-xs text-gray-500 mt-2 font-bold break-keep">
+                            내 식별: <span className={genderBadge.text}>{genderKor} {myNumber}번</span>
+                            <span className="text-gray-300 mx-1.5">|</span>
+                            <span className="text-gray-400">'{oppositeKor} {myNumber}번' 과 별도 참가자로 인식됩니다</span>
+                          </p>
+                        )}
                       </div>
 
                       {myNumber && (
                         <div>
                           <label className="block text-xs font-black text-gray-500 mb-2">
-                            STEP 2. 마음에 드는 이성 1~2명 선택
+                            STEP 2. 마음에 드는 {oppositeKor === "이성" ? "이성" : `이성 (${oppositeKor})`} 1~2명 선택
                           </label>
                           <div className="grid grid-cols-2 gap-3">
                             <input

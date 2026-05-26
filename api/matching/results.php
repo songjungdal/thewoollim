@@ -80,10 +80,12 @@ try {
 }
 
 // 상호 매칭 검색 — 이성 + 양방향 picks 일치
+// 성별 분리 (v4.1): voter_gender 컬럼으로 본인과 동일 성별 레코드를 먼저 제외 → '남자 1번' 이 본인 picks 의 '1'
+// 을 처리할 때 자동으로 '여자 1번' 만 매칭 후보로 남는다. 동일 숫자 충돌 X.
 $matches = [];
 foreach ($allVotes as $v) {
     if ((int)$v['voter_user_id'] === (int)$userId) continue;
-    if ($v['voter_gender'] === $myGender) continue; // 이성만
+    if ($v['voter_gender'] === $myGender) continue; // 이성만 (성별 분리 1차 필터)
     $vNumber = (int)$v['voter_number'];
     $vPicks  = json_decode((string)$v['picks'], true) ?: [];
 
