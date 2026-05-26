@@ -40,7 +40,10 @@ try {
     jsonFail('서버 오류', 500);
 }
 
-// 본인 booking 중 confirmed 만 추출
+// 본인 booking 중 confirmed + completed 모두 추출.
+// 'completed' 포함 이유: admin 이 [투표 종료] 누르면 booking 이 confirmed → completed 로 자동 마이그레이션됨
+// (api/admin/matching.php). 그 시점부터 voting_status='finalized' 가 되는데 confirmed 만 필터하면
+// finalized 결과 페이지가 사용자에게서 사라지는 회귀가 발생. completed 도 후보에 포함해야 매칭 결과 노출 가능.
 $dir          = dataDir();
 $bookingsFile = $dir . '/bookings_' . md5($email) . '.json';
 $myConfirmedPartyIds = [];
@@ -48,7 +51,8 @@ if (file_exists($bookingsFile)) {
     $b = json_decode((string)file_get_contents($bookingsFile), true);
     if (is_array($b)) {
         foreach ($b as $row) {
-            if (($row['status'] ?? '') === 'confirmed') {
+            $st = (string)($row['status'] ?? '');
+            if ($st === 'confirmed' || $st === 'completed') {
                 $myConfirmedPartyIds[(string)$row['partyId']] = true;
             }
         }
