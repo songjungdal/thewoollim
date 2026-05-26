@@ -136,7 +136,8 @@ export default function MatchingResultsPage() {
     if (p2) picks.push(p2);
     if (picks.length === 0) { alert("최소 1명을 선택해주세요."); return; }
     if (picks.length === 2 && p1 === p2) { alert("두 번호가 같습니다. 다른 번호를 선택해주세요."); return; }
-    if (picks.includes(n)) { alert("본인 번호는 선택할 수 없습니다."); return; }
+    // v4.1 성별 분리 모델: voter 는 본인 성별(M-N), picks 는 반대 성별(F-N) 의 식별자.
+    // 동일 숫자라도 성별 namespace 가 다르므로 '남자 8번 → 여자 8번' 은 본인 선택이 아님 → 자기 번호 차단 검사 삭제.
 
     setSubmitting(true);
     try {

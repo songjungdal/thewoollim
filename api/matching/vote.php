@@ -44,11 +44,13 @@ if ($voterNumber < 1 || $voterNumber > 99)          jsonFail('본인 번호를 1
 if (!is_array($picks))                              jsonFail('투표 대상이 누락되었습니다.');
 
 // picks 정규화
+// v4.1 성별 분리: voter 는 본인 성별(M-N), picks 는 반대 성별(F-N) namespace.
+// 동일 숫자라도 성별이 달라 별개 참가자 → 자기 번호 차단 검사 제거.
+// (results.php 매칭 알고리즘이 voter_gender 1차 필터로 동성 매칭을 차단하므로 안전)
 $picksClean = [];
 foreach ($picks as $p) {
     $n = (int)$p;
     if ($n < 1 || $n > 99)            jsonFail('투표 번호는 1~99 사이여야 합니다.');
-    if ($n === $voterNumber)          jsonFail('본인 번호는 선택할 수 없습니다.');
     if (in_array($n, $picksClean, true)) jsonFail('중복된 번호는 선택할 수 없습니다.');
     $picksClean[] = $n;
 }
