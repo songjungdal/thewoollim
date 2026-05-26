@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import COMPANY_SNAPSHOT from "../lib/company-snapshot.json";
 
-type Company = { name: string; ceo: string; biz_no: string; address: string; telecom: string };
+type Company = { name: string; ceo: string; biz_no: string; address: string; telecom: string; tel?: string };
 
 const STORAGE_KEY = "woollim_company";
 const CHANNEL_NAME = "woollim_company";
@@ -77,11 +77,15 @@ export default function Footer() {
               <div className="mb-5 md:mb-6">
                 <Image src="/images/logo_white.png" alt="어울림 로고" width={129} height={41} />
               </div>
-              <div className="text-gray-400 text-xs md:text-sm space-y-1.5 md:space-y-2 leading-relaxed">
-                 <p>상호명: {company.name}</p>
-                 <p>대표자: {company.ceo} | 사업자등록번호: {company.biz_no}</p>
-                 <p>주소: {company.address}</p>
-                 <p>통신판매업신고: {company.telecom}</p>
+              {/* 모바일에서 "| 구분자" 줄바꿈 시 좌측 정렬 유지 — break-keep 으로 한국어 단어 단위 줄바꿈 */}
+              <div className="text-gray-400 text-xs md:text-sm space-y-1.5 md:space-y-2 leading-relaxed break-keep">
+                 <p>
+                   상호명 : {company.name}
+                   {company.tel ? <> <span className="text-gray-500">|</span> Tel. {company.tel}</> : null}
+                 </p>
+                 <p>대표자 : {company.ceo} <span className="text-gray-500">|</span> 사업자등록번호: {company.biz_no}</p>
+                 <p>주소 : {company.address}</p>
+                 <p>통신판매업신고 : {company.telecom}</p>
               </div>
             </div>
 
