@@ -208,7 +208,10 @@ export default function MatchingResultsPage() {
       */}
       <header className="sticky top-0 z-40 bg-black border-b border-gray-800">
         <div className="max-w-7xl mx-auto px-4 md:px-6 h-[64px] md:h-[88px] flex items-center justify-center md:justify-start">
-          <Link href="/" className="inline-flex items-center" aria-label="어울림 홈으로">
+          {/* 로고 — 투표 흐름 중 이탈 방지를 위해 Link 제거 (단순 노출 only).
+              pointer-events-none + cursor-default 로 호버/클릭 시 인터랙티브 오인 차단.
+              이미지 경로 / 정렬 / 8% 축소 규격(width 110 = 메인 120 대비) 그대로 유지. */}
+          <span className="inline-flex items-center pointer-events-none cursor-default" aria-label="어울림">
             <Image
               src="/images/logo_white.png"
               alt="어울림"
@@ -217,7 +220,7 @@ export default function MatchingResultsPage() {
               priority
               className="h-auto w-[110px] max-w-full object-contain"
             />
-          </Link>
+          </span>
         </div>
       </header>
 
