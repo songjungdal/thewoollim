@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Users, Ticket, Tag, Building2, LogOut, ShieldCheck, CheckCircle2, Clock, AlertTriangle, Calendar, Plus, Pencil, Trash2, ImageIcon, X, FileText, Search, StickyNote, Save } from "lucide-react";
+import { Users, Ticket, Tag, Building2, LogOut, ShieldCheck, CheckCircle2, Clock, AlertTriangle, Calendar, Plus, Pencil, Trash2, ImageIcon, X, FileText, Search, StickyNote, Save, ChevronDown } from "lucide-react";
 import { useParties, broadcastPartiesUpdated } from "../../lib/useParties";
 import { formatPhoneKR } from "../../lib/phone";
 import { formatKST } from "../../lib/datetime";
@@ -194,96 +194,6 @@ function BookingTable({ label, toneClass, rows, party, onApprove, onCancel }: {
   );
 }
 
-/**
- * 신청자 명단 슬라이드 패널 — 파티 카드 클릭 시 우측에서 슬라이드 인.
- * - 데스크톱: w-[640px] / lg:w-[820px] 우측 슬라이드
- * - 모바일(<md): w-full 전체화면
- * - 배경 딤드 클릭 또는 [X] 버튼 → 닫힘 (duration-300 트랜지션)
- * - 본문은 기존 BookingTable 그대로 재사용 → 취소/참가확정 핸들러 무변경
- */
-function BookingsDrawer({ open, onClose, party, hostName, males, females, onApprove, onCancel }: {
-  open: boolean;
-  onClose: () => void;
-  party: { title: string; price: number; dateString?: string; location?: string; target?: string } | undefined;
-  hostName: string;
-  males: BookingRow[];
-  females: BookingRow[];
-  onApprove: (email: string, bookingId: string) => void;
-  onCancel: (email: string, bookingId: string) => void;
-}) {
-  return (
-    <AnimatePresence>
-      {open && (
-        <Fragment>
-          {/* 배경 딤드 */}
-          <motion.div
-            key="drawer-backdrop"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            onClick={onClose}
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[80]"
-            aria-hidden="true"
-          />
-          {/* 슬라이드 패널 */}
-          <motion.aside
-            key="drawer-panel"
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ type: "tween", ease: [0.22, 1, 0.36, 1], duration: 0.3 }}
-            className="fixed top-0 right-0 bottom-0 z-[90] bg-white shadow-2xl w-full md:w-[640px] lg:w-[820px] flex flex-col"
-            role="dialog"
-            aria-modal="true"
-            aria-label={`${party?.title ?? "매칭파티"} 신청자 명단`}
-          >
-            {/* 헤더 — 파티명 / 일시 / 장소 / 호스트 */}
-            <header className="bg-gradient-to-r from-brand-point/10 to-white border-b border-gray-200 px-5 md:px-7 py-4 md:py-5 flex items-start gap-3 flex-shrink-0">
-              <div className="flex-1 min-w-0">
-                <h2 className="text-lg md:text-2xl font-black text-brand-black break-keep">
-                  {party?.title ?? "매칭파티"}
-                </h2>
-                <dl className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-xs md:text-sm">
-                  <div className="flex gap-1.5 min-w-0">
-                    <dt className="text-gray-500 font-bold whitespace-nowrap">일시</dt>
-                    <dd className="font-bold text-brand-black truncate">{party?.dateString ?? "-"}</dd>
-                  </div>
-                  <div className="flex gap-1.5 min-w-0">
-                    <dt className="text-gray-500 font-bold whitespace-nowrap">장소</dt>
-                    <dd className="font-bold text-brand-black truncate">{party?.location ?? "-"}</dd>
-                  </div>
-                  <div className="flex gap-1.5 min-w-0">
-                    <dt className="text-gray-500 font-bold whitespace-nowrap">호스트</dt>
-                    <dd className="font-bold text-brand-black truncate">{hostName || "없음"}</dd>
-                  </div>
-                  <div className="flex gap-1.5 min-w-0">
-                    <dt className="text-gray-500 font-bold whitespace-nowrap">대상</dt>
-                    <dd className="font-bold text-brand-black truncate">{party?.target ?? "-"}</dd>
-                  </div>
-                </dl>
-              </div>
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="닫기"
-                className="flex-shrink-0 p-2 rounded-lg hover:bg-gray-100 active:scale-95 transition-all duration-300 text-gray-500 hover:text-brand-black"
-              >
-                <X size={20} />
-              </button>
-            </header>
-            {/* 본문 — 기존 BookingTable 그대로 (취소/참가확정 핸들러 그대로 작동) */}
-            <div className="flex-1 overflow-y-auto">
-              <BookingTable label="남성 신청자" toneClass="bg-[#4facfe]/10 text-[#3a85d9]" rows={males} party={party} onApprove={onApprove} onCancel={onCancel} />
-              <BookingTable label="여성 신청자" toneClass="bg-rose-100 text-rose-700" rows={females} party={party} onApprove={onApprove} onCancel={onCancel} />
-            </div>
-          </motion.aside>
-        </Fragment>
-      )}
-    </AnimatePresence>
-  );
-}
-
 function FormField({ label, value, onChange, placeholder, textarea }: {
   label: string; value: string; onChange: (v: string) => void;
   placeholder?: string; textarea?: boolean;
@@ -399,22 +309,16 @@ export default function AdminDashboard() {
     const kst = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
     return `${kst.getFullYear()}-${String(kst.getMonth() + 1).padStart(2, "0")}`;
   });
-  // 신청자 명단 슬라이드 패널(Drawer) — 파티 카드 클릭 시 우측에서 슬라이드 인.
-  // null = 닫힘, partyId 문자열 = 해당 파티의 신청자 명단 노출
+  // 신청자 명단 인라인 확장 패널 — 파티 카드 헤더 클릭 시 해당 카드 하단으로 슬라이드 다운.
+  // null = 모두 접힘, partyId 문자열 = 해당 파티의 신청자 명단 펼침 (한 번에 하나만 열림)
   const [drawerPartyId, setDrawerPartyId] = useState<string | null>(null);
-  const closeDrawer = useCallback(() => setDrawerPartyId(null), []);
-  // 드러워 열림 동안 body 스크롤 잠금 + ESC 키로 닫기
+  // ESC 키로 닫기 (인라인 확장이라 body 스크롤 잠금은 불필요)
   useEffect(() => {
     if (!drawerPartyId) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") closeDrawer(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setDrawerPartyId(null); };
     window.addEventListener("keydown", onKey);
-    return () => {
-      document.body.style.overflow = prev;
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [drawerPartyId, closeDrawer]);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [drawerPartyId]);
   // 탭 전환 시 자동 닫힘 — bookings 탭에서만 의미 있는 UI
   useEffect(() => {
     if (tab !== "bookings" && drawerPartyId) setDrawerPartyId(null);
@@ -1276,24 +1180,26 @@ export default function AdminDashboard() {
                     const totalRevenue = partyRows
                       .filter(r => r.status !== "cancelled")
                       .reduce((sum, r) => sum + (r.total ?? party?.price ?? 0), 0);
+                    const expanded = drawerPartyId === pid;
+                    const togglePanel = () => setDrawerPartyId(expanded ? null : pid);
                     return (
-                      // 호스트 편집·투표 제어와 같은 nested interactive 컨트롤이 내부에 존재하므로 role="button" 미부여.
-                      // 카드 클릭으로 드러워를 열되, 내부 컨트롤은 onClick={stopPropagation} 으로 격리.
                       <div
                         key={pid}
-                        tabIndex={0}
-                        onClick={() => setDrawerPartyId(pid)}
-                        onKeyDown={e => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            setDrawerPartyId(pid);
-                          }
-                        }}
-                        aria-label={`${party?.title ?? `파티 #${pid}`} 신청자 명단 열기`}
-                        className="bg-white rounded-2xl border-2 border-brand-point/20 overflow-hidden cursor-pointer hover:border-brand-point hover:shadow-md transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-point focus-visible:ring-offset-2"
+                        className="bg-white rounded-2xl border-2 border-brand-point/20 overflow-hidden transition-all duration-300 hover:border-brand-point hover:shadow-md"
                       >
-                        {/* 파티 헤더 — 클릭 시 우측 슬라이드 패널로 신청자 명단 전환. 호스트 편집·투표 제어는 stopPropagation 으로 격리 */}
-                        <div className="bg-gradient-to-r from-brand-point/10 to-white px-5 md:px-7 py-4 md:py-5">
+                        {/* 파티 헤더 — 클릭 시 카드 하단으로 인라인 확장(슬라이드 다운). 호스트 편집·투표 제어는 stopPropagation 으로 격리 */}
+                        <div
+                          tabIndex={0}
+                          onClick={togglePanel}
+                          onKeyDown={e => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              togglePanel();
+                            }
+                          }}
+                          aria-label={`${party?.title ?? `파티 #${pid}`} 신청자 명단 ${expanded ? "접기" : "펼치기"}`}
+                          className="bg-gradient-to-r from-brand-point/10 to-white px-5 md:px-7 py-4 md:py-5 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-point focus-visible:ring-inset"
+                        >
                           {/*
                             제목 행 — 데스크톱 가로 정렬 / 모바일 세로 적층
                               · 모바일 (< md): flex-col, 우측 그룹이 제목 아래 위치
@@ -1437,39 +1343,62 @@ export default function AdminDashboard() {
                               })()}
                             </div>
                           </div>
-                          <div className="flex gap-3 md:gap-4 mt-2 text-xs md:text-sm">
+                          <div className="flex gap-3 md:gap-4 mt-2 text-xs md:text-sm items-center">
                             {/* 카운트는 cancelled 제외 (실제 참가 인원). 취소자는 아래 테이블에 line-through 로 보존 노출. */}
                             <span className="font-bold text-[#4facfe]">남성 {activeMales}명</span>
                             <span className="font-bold text-rose-500">여성 {activeFemales}명</span>
                             <span className="font-bold text-gray-500">총 {activeTotal}명</span>
+                            <span className="ml-auto inline-flex items-center gap-1 text-[11px] md:text-xs font-bold text-brand-point/85 whitespace-nowrap">
+                              {expanded ? "신청자 명단 접기" : "신청자 명단 펼치기"}
+                              <ChevronDown
+                                size={14}
+                                className={`transition-transform duration-300 ${expanded ? "rotate-180" : ""}`}
+                                aria-hidden="true"
+                              />
+                            </span>
                           </div>
                         </div>
 
-                        {/* 신청자 명단은 우측 슬라이드 패널(BookingsDrawer)에서 노출 — 대시보드 본 화면에서 숨김 처리 */}
+                        {/* 신청자 명단 인라인 확장 패널 — 카드 하단으로 슬라이드 다운 (duration-300, height + opacity) */}
+                        <AnimatePresence initial={false}>
+                          {expanded && (
+                            <motion.div
+                              key="panel"
+                              id={`bookings-panel-${pid}`}
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: "auto", opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                              className="overflow-hidden"
+                            >
+                              {/* 장소·대상 정보 strip + 닫기 버튼 — 헤더 4종 정보 중 본 헤더에서 누락된 항목 보완 */}
+                              <div className="bg-brand-point/5 border-t border-brand-point/15 px-5 md:px-7 py-2.5 flex items-center justify-between gap-3 text-xs md:text-sm flex-wrap">
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 min-w-0">
+                                  <span className="text-gray-500 font-bold whitespace-nowrap">장소</span>
+                                  <span className="font-bold text-brand-black truncate">{party?.location ?? "-"}</span>
+                                  <span className="text-gray-300">|</span>
+                                  <span className="text-gray-500 font-bold whitespace-nowrap">대상</span>
+                                  <span className="font-bold text-brand-black truncate">{party?.target ?? "-"}</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setDrawerPartyId(null)}
+                                  className="inline-flex items-center gap-1 text-gray-500 hover:text-brand-black hover:bg-white px-2 py-1 rounded transition-colors duration-300 font-bold flex-shrink-0"
+                                  aria-label="신청자 명단 닫기"
+                                >
+                                  <X size={13} /> 닫기
+                                </button>
+                              </div>
+                              {/* 본문 — 기존 BookingTable 그대로 (취소/참가확정 핸들러 무변경) */}
+                              <BookingTable label="남성 신청자" toneClass="bg-[#4facfe]/10 text-[#3a85d9]" rows={males} party={party} onApprove={approveBooking} onCancel={cancelBooking} />
+                              <BookingTable label="여성 신청자" toneClass="bg-rose-100 text-rose-700" rows={females} party={party} onApprove={approveBooking} onCancel={cancelBooking} />
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
                     );
                   })}
                 </div>
-
-                {/* === 신청자 명단 슬라이드 패널 === */}
-                {(() => {
-                  const dp = drawerPartyId ? PARTIES.find(p => p.id === drawerPartyId) : undefined;
-                  const dpRows = drawerPartyId ? (byParty[drawerPartyId] || []) : [];
-                  const dpMales = dpRows.filter(r => r.userGender === "남성");
-                  const dpFemales = dpRows.filter(r => r.userGender === "여성");
-                  return (
-                    <BookingsDrawer
-                      open={drawerPartyId !== null}
-                      onClose={closeDrawer}
-                      party={dp}
-                      hostName={drawerPartyId ? (hostMap[drawerPartyId] || "") : ""}
-                      males={dpMales}
-                      females={dpFemales}
-                      onApprove={approveBooking}
-                      onCancel={cancelBooking}
-                    />
-                  );
-                })()}
               </section>
             );
           })()}
