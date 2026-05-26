@@ -92,10 +92,11 @@ try {
 
         if ($iPickedThem && $theyPickedMe) {
             $matches[] = [
-                'name'       => (string)$v['name'],
-                'gender'     => (string)$v['voter_gender'],
-                'birth_date' => (string)$v['birth_date'],
-                'phone'      => formatPhone((string)$v['phone']),
+                'name'         => (string)$v['name'],
+                'gender'       => (string)$v['voter_gender'],
+                'voter_number' => $vNumber,                              // v4.5: 결과 페이지 헤드라인 동적 노출용 ("여성 3번과 매칭")
+                'birth_date'   => (string)$v['birth_date'],
+                'phone'        => formatPhone((string)$v['phone']),
             ];
         }
     }

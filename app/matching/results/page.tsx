@@ -34,7 +34,8 @@ type ResultResp = {
   ok: boolean;
   voting_status: "closed" | "open" | "finalized";
   matched: boolean;
-  matches?: { name: string; gender: string; birth_date: string; phone: string }[];
+  // v4.5: voter_number 추가 — 결과 헤드라인 동적 노출 ("축하합니다! 여성 3번과 매칭이 되었습니다!")
+  matches?: { name: string; gender: string; voter_number: number; birth_date?: string; phone: string }[];
 };
 
 export default function MatchingResultsPage() {
@@ -490,39 +491,42 @@ export default function MatchingResultsPage() {
                       {!result ? (
                         <p className="text-center py-6 text-sm text-gray-500">결과 불러오는 중...</p>
                       ) : result.matched && result.matches && result.matches.length > 0 ? (
-                        <>
-                          <div className="text-center mb-6 md:mb-7 py-4 md:py-5 bg-brand-point/10 border border-brand-point/30 rounded-2xl">
-                            <p className="text-base md:text-lg font-black text-brand-point mb-1">🎉 축하드립니다!</p>
-                            <p className="text-sm md:text-base font-bold text-brand-black">커플 매칭에 성공하셨습니다.</p>
-                          </div>
-                          <div className="space-y-3 md:space-y-4">
-                            {result.matches.map((m, idx) => (
-                              <div key={idx} className="bg-gradient-to-br from-brand-point/5 to-white border-2 border-brand-point/30 rounded-2xl p-5 md:p-6 shadow-md">
-                                <p className="text-[11px] font-black text-brand-point tracking-[0.2em] uppercase mb-2">Matched Partner #{idx + 1}</p>
-                                <h3 className="text-xl md:text-2xl font-black text-brand-black mb-3">{m.name}</h3>
-                                <div className="grid grid-cols-2 gap-3 text-sm">
-                                  <div>
-                                    <p className="text-[11px] text-gray-400 font-bold mb-0.5">성별</p>
-                                    <p className="font-bold text-brand-black">{m.gender}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-[11px] text-gray-400 font-bold mb-0.5">생년월일</p>
-                                    <p className="font-bold text-gray-700 tabular-nums">{m.birth_date || "-"}</p>
-                                  </div>
-                                  <div className="col-span-2">
-                                    <p className="text-[11px] text-gray-400 font-bold mb-0.5">연락처</p>
-                                    <a href={`tel:${m.phone}`} className="font-black text-brand-point text-base tabular-nums hover:underline">{m.phone || "-"}</a>
-                                  </div>
+                        // === 매칭 성공 — 헤드라인 "[성별] [번호]번과 매칭" + 이름·연락처 카드 ===
+                        <div className="space-y-5 md:space-y-6">
+                          {result.matches.map((m, idx) => (
+                            <div key={idx}>
+                              {/* 헤드라인 — 성별/번호 동적 노출 (한 줄 break-keep 으로 모바일 자연 줄바꿈) */}
+                              <div className="text-center mb-3 md:mb-4 py-5 md:py-6 bg-brand-point/10 border border-brand-point/30 rounded-2xl">
+                                <p className="text-base md:text-xl font-black text-brand-black break-keep leading-relaxed">
+                                  <span className="text-brand-point">축하합니다!</span>{" "}
+                                  <span className="text-brand-point font-black">{m.gender} {m.voter_number}번</span>과 매칭이 되었습니다!
+                                </p>
+                              </div>
+                              {/* 상대방 카드 — 이름 + 연락처 (생년월일/성별 등 부가 정보 제외, 시인성 최우선) */}
+                              <div className="bg-gradient-to-br from-brand-point/5 to-white border-2 border-brand-point/30 rounded-2xl p-5 md:p-7 shadow-md">
+                                <p className="text-[11px] font-black text-brand-point tracking-[0.2em] uppercase mb-2">Matched Partner</p>
+                                <h3 className="text-xl md:text-3xl font-black text-brand-black mb-4 md:mb-5 break-keep">{m.name}</h3>
+                                <div className="pt-3 border-t border-gray-200/70">
+                                  <p className="text-[11px] md:text-xs text-gray-400 font-bold mb-1">연락처</p>
+                                  <a
+                                    href={`tel:${m.phone}`}
+                                    className="font-black text-brand-point text-lg md:text-2xl tabular-nums hover:underline break-all"
+                                  >
+                                    {m.phone || "-"}
+                                  </a>
                                 </div>
                               </div>
-                            ))}
-                          </div>
-                        </>
+                            </div>
+                          ))}
+                        </div>
                       ) : (
+                        // === 매칭 실패 — 차분한 안내, 개인정보 카드 절대 노출 X ===
                         <div className="text-center py-6 md:py-8">
-                          <p className="text-base md:text-lg font-black text-brand-black mb-2">이번에는 아쉽게 매칭되지 않았습니다.</p>
-                          <p className="text-xs md:text-sm text-gray-500 mb-7">
-                            소중한 시간을 함께해주셔서 감사합니다. 다음 파티에서 더 좋은 인연을 만나보세요.
+                          <p className="text-base md:text-lg font-black text-brand-black mb-3 leading-relaxed break-keep">
+                            아쉽게도 매칭이 되지 못했네요.
+                          </p>
+                          <p className="text-sm md:text-base text-gray-600 mb-7 leading-relaxed break-keep">
+                            오늘 보낸 즐거운 시간이 조만간 더 좋은 인연으로 이어질 발판이 되기를 바랍니다.
                           </p>
                           <div className="flex flex-col sm:flex-row gap-2.5 justify-center">
                             <Link href="/" className="inline-block bg-brand-black text-white px-7 py-3 rounded-xl font-bold hover:bg-brand-point transition-colors">
