@@ -537,8 +537,13 @@ export default function AdminDashboard() {
 
   // 매칭 투표 상태 변경 (start/end/reset)
   const changeVotingStatus = async (partyId: string, action: "start" | "end" | "reset") => {
-    const labels = { start: "투표를 시작", end: "투표를 종료", reset: "투표 상태를 초기화" } as const;
-    if (!confirm(`이 파티의 ${labels[action]}하시겠습니까?`)) return;
+    // 초기화는 vote 삭제 + 모임종료(completed) booking 의 confirmed 복원이 일어나므로 명시 안내.
+    const promptMsg = action === "reset"
+      ? "해당 파티의 투표 상태와 회원들의 투표 내역이 전부 초기화됩니다. 진행하시겠습니까?"
+      : action === "start"
+        ? "이 파티의 투표를 시작하시겠습니까?"
+        : "이 파티의 투표를 종료하시겠습니까?";
+    if (!confirm(promptMsg)) return;
     const res = await fetch("/api/admin/matching.php", {
       method: "POST", credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -547,6 +552,8 @@ export default function AdminDashboard() {
     const d = await res.json();
     if (!d?.ok) { alert(d?.error || "처리 실패"); return; }
     setVotingStatusMap(prev => ({ ...prev, [partyId]: d.voting_status }));
+    // reset 시 booking 상태가 completed → confirmed 로 역마이그레이션되었으므로 전체 재조회로 UI 동기화.
+    if (action === "reset") await loadAll();
   };
 
   // 매칭 결과 모달 열기 — admin/matching.php GET
@@ -1345,13 +1352,13 @@ export default function AdminDashboard() {
                                         </button>
                                       </>
                                     )}
-                                    {vs !== "closed" && (
-                                      <button type="button" onClick={() => changeVotingStatus(pid, "reset")}
-                                        className="inline-flex items-center px-2 py-1.5 bg-white border border-gray-200 text-gray-500 text-xs font-bold rounded-md hover:bg-gray-100 transition-colors"
-                                        title="투표 상태를 초기화합니다 (기록은 보존)">
-                                        ↺
-                                      </button>
-                                    )}
+                                    {/* v6.8 — 초기화 버튼은 모든 상태에서 인라인 노출 (start/end 우측).
+                                        클릭 시 confirm + match_votes DELETE + completed→confirmed booking 역마이그레이션 + UI 재로드. */}
+                                    <button type="button" onClick={() => changeVotingStatus(pid, "reset")}
+                                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-50 border border-gray-300 text-gray-700 text-xs font-black rounded-md hover:bg-gray-100 hover:border-gray-400 active:scale-95 transition-all"
+                                      title="투표 상태 + 회원 투표 내역 전체 초기화 (재투표 가능)">
+                                      ↺ 초기화
+                                    </button>
                                   </div>
                                 );
                               })()}

@@ -179,15 +179,76 @@ if ($action === 'end') {
     ), FILE_APPEND);
 }
 
+// ── v6.8 투표 초기화 — 해당 party_id 의 모든 vote 레코드 삭제 + completed booking 역방향 마이그레이션 ──
+//    삭제 대상: match_votes WHERE party_id = ? (해당 파티만, 다른 파티 데이터 절대 미접근)
+//    booking 역마이그레이션: completed → confirmed (모임 종료 처리 되돌리기 → 재투표 가능)
+//    절대 미터치: 회원 프로필(users), 결제 내역(payments/total/paymentId/tossOrderId), gender, createdAt, 다른 status(cancelled/pending_*)
+$votesDeleted    = 0;
+$revertedCount   = 0;
+if ($action === 'reset') {
+    // 1) match_votes 삭제 (party_id 단일 스코프)
+    try {
+        $pdo = getDB();
+        $stmt = $pdo->prepare("DELETE FROM match_votes WHERE party_id = ?");
+        $stmt->execute([$partyId]);
+        $votesDeleted = $stmt->rowCount();
+    } catch (Throwable $e) {
+        error_log('[admin/matching reset votes] ' . $e->getMessage());
+    }
+
+    // 2) bookings 역마이그레이션 completed → confirmed (해당 partyId 만)
+    $dataDir = dataDir();
+    $files   = glob($dataDir . '/bookings_*.json') ?: [];
+    foreach ($files as $bf) {
+        $bfp = fopen($bf, 'c+');
+        if (!$bfp) continue;
+        if (!flock($bfp, LOCK_EX)) { fclose($bfp); continue; }
+        $raw = stream_get_contents($bfp);
+        $bookings = $raw ? json_decode($raw, true) : [];
+        if (!is_array($bookings)) { flock($bfp, LOCK_UN); fclose($bfp); continue; }
+
+        $changed = false;
+        $now     = date('c');
+        foreach ($bookings as &$b) {
+            if (!is_array($b)) continue;
+            if ((string)($b['partyId'] ?? '') !== $partyId) continue;
+            if ((string)($b['status']  ?? '') !== 'completed') continue; // completed 만 역대상
+            $b['status']    = 'confirmed';
+            $b['updatedAt'] = $now;
+            $changed = true;
+            $revertedCount++;
+        }
+        unset($b);
+
+        if ($changed) {
+            ftruncate($bfp, 0);
+            rewind($bfp);
+            fwrite($bfp, json_encode($bookings, JSON_UNESCAPED_UNICODE));
+            fflush($bfp);
+        }
+        flock($bfp, LOCK_UN);
+        fclose($bfp);
+    }
+
+    @file_put_contents("$dataDir/_admin_party_changes.log", sprintf(
+        "[%s] adminId=%s party=%s VOTE_RESET (votes_deleted=%d, bookings_reverted=%d)\n",
+        date('c'), $_SESSION['adminId'] ?? '?', $partyId, $votesDeleted, $revertedCount
+    ), FILE_APPEND);
+}
+
 logAdminActivity('update', 'party', $partyId,
     $action === 'end'
         ? "매칭 투표 종료 — 파티 #{$partyId} 모임종료 처리 (참가확정 {$migratedCount}명 → 모임종료)"
-        : "매칭 투표 상태 변경 — 파티 #{$partyId} → {$nextStatus}",
-    null, ['voting_status' => $nextStatus, 'bookings_migrated' => $migratedCount]);
+        : ($action === 'reset'
+            ? "매칭 투표 초기화 — 파티 #{$partyId} (vote 레코드 {$votesDeleted}건 삭제, 모임종료 {$revertedCount}명 → 참가확정 복원)"
+            : "매칭 투표 상태 변경 — 파티 #{$partyId} → {$nextStatus}"),
+    null, ['voting_status' => $nextStatus, 'bookings_migrated' => $migratedCount, 'votes_deleted' => $votesDeleted, 'bookings_reverted' => $revertedCount]);
 
 jsonOut([
     'ok' => true,
     'voting_status' => $nextStatus,
     'party_status'  => $action === 'end' ? 'completed' : null,
     'bookings_migrated' => $migratedCount,
+    'votes_deleted'     => $votesDeleted,
+    'bookings_reverted' => $revertedCount,
 ]);
