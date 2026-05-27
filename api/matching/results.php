@@ -41,8 +41,10 @@ if (!$found) jsonFail('파티를 찾을 수 없습니다.', 404);
 
 $status = (string)($found['voting_status'] ?? 'closed');
 
-// 'finalized' 외에는 결과 미노출
-if ($status !== 'finalized') {
+// 진행 중인 'open' 상태는 결과 미노출 (투표 입력 폼이 표시되어야 함).
+// 'finalized' 와 'closed' 는 통과 — 'closed' 라도 본인 vote 가 보존되어 있다면 매칭 결과를 다시 조회 가능.
+// (pre-v6.8 reset 은 match_votes 를 삭제하지 않고 voting_status 만 closed 로 되돌렸기 때문)
+if ($status === 'open') {
     jsonOut(['ok' => true, 'voting_status' => $status, 'matched' => false]);
 }
 
@@ -58,9 +60,10 @@ try {
     $stmt->execute([$partyId, $userId]);
     $myVote = $stmt->fetch();
     if (!$myVote) {
-        // 투표 안 한 회원 → 매칭 불가
-        jsonOut(['ok' => true, 'voting_status' => 'finalized', 'matched' => false]);
+        // 본인 vote 기록 없음 → 매칭 결과 불가 (finalized / closed 어느 쪽이든 동일)
+        jsonOut(['ok' => true, 'voting_status' => $status, 'matched' => false]);
     }
+    // 여기 도달 = 본인 vote 보유 → 매칭 결과 노출 허용 (closed+vote잔존 케이스 포함)
 
     $myNumber = (int)$myVote['voter_number'];
     $myGender = (string)$myVote['voter_gender'];
@@ -107,7 +110,7 @@ try {
 
 jsonOut([
     'ok'            => true,
-    'voting_status' => 'finalized',
+    'voting_status' => $status,    // 실제 파티 상태 그대로 반환 (finalized 또는 closed+vote잔존)
     'matched'       => !empty($matches),
     'matches'       => $matches,
 ]);

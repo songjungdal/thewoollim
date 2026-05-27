@@ -99,11 +99,15 @@ export default function MatchingResultsPage() {
     setEditing(false);
   }, [selectedPartyId, data]);
 
-  // 결과 fetch — 'finalized' 일 때만
+  // 결과 fetch — 'finalized' 또는 'closed'+본인 vote 보유 (과거 종료 후 reset 으로 voting_status 만
+  // 되돌려진 케이스에서도 결과 조회 가능하도록 보정).
   useEffect(() => {
     if (!selectedPartyId || !data?.parties) return;
     const p = data.parties.find(x => x.id === selectedPartyId);
-    if (p?.voting_status !== "finalized") { setResult(null); return; }
+    const shouldFetchResult =
+      p?.voting_status === "finalized" ||
+      (p?.voting_status === "closed" && !!p?.my_vote);
+    if (!shouldFetchResult) { setResult(null); return; }
     fetch(`/api/matching/results.php?partyId=${encodeURIComponent(selectedPartyId)}`,
       { cache: "no-store", credentials: "include" })
       .then(r => r.json())
@@ -345,7 +349,8 @@ export default function MatchingResultsPage() {
                   <h2 className="text-lg md:text-xl font-black text-brand-black mb-1">{selectedParty.title}</h2>
                   <p className="text-xs md:text-sm text-gray-500 font-medium mb-5">{selectedParty.dateString}</p>
 
-                  {selectedParty.voting_status === "closed" && (
+                  {/* closed + 본인 vote 없음 → 진짜 미시작 안내. vote 보존된 closed 는 아래 결과 UI 로 흘러감 */}
+                  {selectedParty.voting_status === "closed" && !selectedParty.my_vote && (
                     <div className="text-center py-6 md:py-8">
                       <p className="text-base md:text-lg font-black text-brand-black mb-2">투표가 시작되지 않았습니다</p>
                       <p className="text-xs md:text-sm text-gray-500">파티 종료 후 관리자가 투표를 활성화하면 안내드립니다.</p>
@@ -479,7 +484,8 @@ export default function MatchingResultsPage() {
                     </form>
                   )}
 
-                  {selectedParty.voting_status === "finalized" && (
+                  {(selectedParty.voting_status === "finalized" ||
+                    (selectedParty.voting_status === "closed" && !!selectedParty.my_vote)) && (
                     <div>
                       {!result ? (
                         <p className="text-center py-6 text-sm text-gray-500">결과 불러오는 중...</p>
