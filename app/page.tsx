@@ -263,6 +263,18 @@ export default function SmoothOnePage() {
     return () => clearInterval(t);
   }, []);
 
+  // v8.0 하이드레이션 깜빡임 방지 — SSR/초기 hydration 단계에서는 seed(DEFAULT_PARTIES) 가 노출되므로,
+  // 컴포넌트 마운트 후 useParties / gallery / participants 의 1차 라이브 fetch 가 충분히 settle 될 때까지
+  // 동적 콘텐츠를 opacity-0 으로 숨기고 그 후 부드럽게 fade-in.
+  // (정적 컨테이너/레이아웃은 그대로 노출되어 layout shift 없이 스켈레톤 역할 수행)
+  const [contentReady, setContentReady] = useState(false);
+  useEffect(() => {
+    // 250ms 는 useParties.ts no-store fetch 의 평균 응답시간 (LAN/광대역 기준).
+    // 빠르게 finish 한 경우에도 자연스러운 fade-in 을 위해 최소 1프레임 보장.
+    const t = window.setTimeout(() => setContentReady(true), 250);
+    return () => window.clearTimeout(t);
+  }, []);
+
   const sortedParties = useMemo(() => {
     const filtered = [...PARTIES].filter(p => {
       if (!activeAxis || !filterValue) return true;
@@ -358,6 +370,10 @@ export default function SmoothOnePage() {
                 돌싱부터 싱글까지, 원하는 테마와 지역을 선택하여 새로운 연결을 시작해보세요.
               </p>
             </motion.div>
+
+            {/* v8.0 — 카테고리 필터 + 카드 그리드 영역을 mounted 게이트 + opacity 트랜지션으로 감싸서
+                seed → live 데이터 swap 깜빡임 방지. 컨테이너 레이아웃은 유지되어 layout shift 없음. */}
+            <div className={`transition-opacity duration-500 ease-out ${contentReady ? "opacity-100" : "opacity-0"}`}>
 
             {/* 계층형 카테고리 — 중앙 정렬, 상위 축 클릭 → 세부 옵션 전개 */}
             <div className="mb-10 md:mb-16 border-b border-gray-100 pb-6 md:pb-8">
@@ -533,6 +549,8 @@ export default function SmoothOnePage() {
               </AnimatePresence>
             </div>
             )}
+
+            </div>{/* v8.0 mounted gate wrapper close (apply 섹션 동적 콘텐츠) */}
           </div>
         </section>
 
@@ -547,17 +565,20 @@ export default function SmoothOnePage() {
             </motion.div>
             
             {/* 슬라이더 — 페이지당 6장 (PC 2x3 / 모바일 3x2), 마우스 드래그 + 터치 스와이프 */}
-            <GallerySlider
-              source={galleryItems.length > 0 ? galleryItems : [1,2,3,4,5,6,7,8,9].map(i => ({
-                id: -i,
-                image_path: `/images/gallery/g${i}.png`,
-                alt_text: `갤러리 이미지 ${i}`,
-                sort_order: i*10,
-              }))}
-              currentPage={currentGalleryPage}
-              setCurrentPage={setCurrentGalleryPage}
-              onImageClick={setSelectedGalleryImage}
-            />
+            {/* v8.0 — 갤러리 이미지가 fetch 응답 후 swap 되며 발생하는 깜빡임을 mounted gate 로 차단 */}
+            <div className={`transition-opacity duration-500 ease-out ${contentReady ? "opacity-100" : "opacity-0"}`}>
+              <GallerySlider
+                source={galleryItems.length > 0 ? galleryItems : [1,2,3,4,5,6,7,8,9].map(i => ({
+                  id: -i,
+                  image_path: `/images/gallery/g${i}.png`,
+                  alt_text: `갤러리 이미지 ${i}`,
+                  sort_order: i*10,
+                }))}
+                currentPage={currentGalleryPage}
+                setCurrentPage={setCurrentGalleryPage}
+                onImageClick={setSelectedGalleryImage}
+              />
+            </div>
           </div>
         </section>
 
@@ -675,7 +696,8 @@ export default function SmoothOnePage() {
             </motion.div>
           </div>
 
-          <div className="relative flex">
+          {/* v8.0 — 참가자 캐러셀이 /api/participants.php 응답으로 늘어나며 발생하는 깜빡임 차단 */}
+          <div className={`relative flex transition-opacity duration-500 ease-out ${contentReady ? "opacity-100" : "opacity-0"}`}>
             {/* Infinite Scroll Container */}
             <motion.div
               className="flex gap-4 md:gap-6 py-4"
