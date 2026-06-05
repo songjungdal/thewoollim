@@ -908,18 +908,18 @@ export default function PartyClientView({ id }: { id: string }) {
                   </div>
                 </div>
 
-                {/* 필수확인사항 하단 안내 이미지 — 라운드 X, 컨테이너 폭 1:1, 비율 보존 */}
+                {/* 필수 확인 사항 하단 이미지 — page_a05. 컨테이너 폭 1:1, 비율 보존 */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="/images/party_required_notice_bottom.png"
+                  src="/images/page_a05.jpg"
                   alt="필수 확인 사항 안내"
                   className="block w-full h-auto object-contain"
                 />
 
-                {/* 필수 확인 사항 하단 이미지 (추가) — page_a05. 컨테이너 폭 1:1, 비율 보존 */}
+                {/* 필수확인사항 하단 안내 이미지 — 라운드 X, 컨테이너 폭 1:1, 비율 보존 */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="/images/page_a05.jpg"
+                  src="/images/party_required_notice_bottom.png"
                   alt="필수 확인 사항 안내"
                   className="block w-full h-auto object-contain"
                 />
