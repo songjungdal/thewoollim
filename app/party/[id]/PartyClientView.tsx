@@ -669,6 +669,18 @@ export default function PartyClientView({ id }: { id: string }) {
             </div>
           </div>
 
+          {/* 참가 신청 방법 섹션 하단 안내 이미지 — 컨테이너 폭(max-w-4xl) 1:1, 비율 보존 */}
+          <div className="mb-10 md:mb-24">
+            <div className="max-w-4xl mx-auto">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/images/page_a01.jpg"
+                alt="참가 신청 방법 안내"
+                className="block w-full h-auto object-contain"
+              />
+            </div>
+          </div>
+
           {/* BOTTOM SECTION: DETAIL NARRATIVE — 참가 신청 방법의 mb-24 가 이미 충분한 간격을
               제공하므로 border-t/pt-* 제거. 다른 섹션 사이 간격(mb-10 md:mb-24)과 동일 톤. */}
           <div>
@@ -689,15 +701,21 @@ export default function PartyClientView({ id }: { id: string }) {
                   draggable={false}
                 />
 
-                {/* Emotional Image 1 */}
-                <div className="relative group overflow-hidden rounded-2xl md:rounded-3xl shadow-2xl">
-                  <img
-                    src="/images/party_vibe_1.png"
-                    alt="Premium networking vibe"
-                    className="w-full h-auto object-cover transform transition-transform duration-1000 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
-                </div>
+                {/* Party Timeline 상단 이미지 (교체) — page_a02. 컨테이너 폭 1:1, 비율 보존 */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/images/page_a02.jpg"
+                  alt="Party Timeline 안내"
+                  className="block w-full h-auto object-contain"
+                />
+
+                {/* Party Timeline 상단 이미지 (추가) — page_a03. 컨테이너 폭 1:1, 비율 보존 */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/images/page_a03.jpg"
+                  alt="Party Timeline 안내"
+                  className="block w-full h-auto object-contain"
+                />
 
                 {/* Timeline / Schedule Section — STEP 방식 + 인원별 소요시간 표 */}
                 <div className="bg-white p-6 md:p-20 rounded-2xl md:rounded-[3rem] shadow-sm border border-gray-100">
@@ -827,15 +845,13 @@ export default function PartyClientView({ id }: { id: string }) {
                   </div>
                 </div>
 
-                {/* Emotional Image 2 */}
-                <div className="relative group overflow-hidden rounded-2xl md:rounded-3xl shadow-2xl">
-                  <img
-                    src="/images/party_vibe_2.png"
-                    alt="Luxury lounge interior"
-                    className="w-full h-auto object-cover transform transition-transform duration-1000 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
-                </div>
+                {/* 필수 확인 사항 상단 이미지 (교체) — page_a04. 컨테이너 폭 1:1, 비율 보존 */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/images/page_a04.jpg"
+                  alt="필수 확인 사항 안내"
+                  className="block w-full h-auto object-contain"
+                />
 
                 {/* ── 필수 확인 사항 — Final CTA 직전, 참가 신청 방법/Party Timeline 과 동일 톤 ── */}
                 <div className="bg-white p-6 md:p-20 rounded-2xl md:rounded-[3rem] shadow-sm border border-gray-100">
@@ -896,6 +912,14 @@ export default function PartyClientView({ id }: { id: string }) {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="/images/party_required_notice_bottom.png"
+                  alt="필수 확인 사항 안내"
+                  className="block w-full h-auto object-contain"
+                />
+
+                {/* 필수 확인 사항 하단 이미지 (추가) — page_a05. 컨테이너 폭 1:1, 비율 보존 */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/images/page_a05.jpg"
                   alt="필수 확인 사항 안내"
                   className="block w-full h-auto object-contain"
                 />
