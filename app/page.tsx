@@ -666,7 +666,8 @@ export default function SmoothOnePage() {
                 <FullCalendar
                   plugins={[dayGridPlugin, interactionPlugin]}
                   initialView="dayGridMonth"
-                  initialDate={PARTIES[0]?.calendarDate}
+                  // 초기 노출 월 = 접속한 사용자의 현재 날짜. initialDate 생략 시 FullCalendar 가
+                  // init 시점(브라우저)에서 new Date() 를 사용 → 빌드 날짜 고정/하이드레이션 불일치 없음.
                   locale="ko"
                   buttonText={{ today: 'TODAY' }}
                   events={CALENDAR_EVENTS}
