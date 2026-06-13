@@ -9,6 +9,14 @@ export type TargetGroup  = typeof TARGET_GROUPS[number];
 export type Theme        = typeof THEMES[number];
 export type LocationTag  = typeof LOCATION_TAGS[number];
 
+/**
+ * 카테고리 화면 표시용 라벨 매핑. DB/필터에 쓰이는 value(예: "쿠킹클래스")는 그대로 두고
+ * 사용자에게 보이는 텍스트만 교체한다. 매핑에 없는 값은 원문 그대로 노출.
+ * (v6.7 — '쿠킹클래스' value 유지, 라벨만 '세션'으로 표기)
+ */
+export const CATEGORY_LABELS: Record<string, string> = { "쿠킹클래스": "세션" };
+export const categoryLabel = (value: string): string => CATEGORY_LABELS[value] ?? value;
+
 export type Party = {
   id: string;
   title: string;

@@ -1701,7 +1701,8 @@ export default function AdminDashboard() {
                               <option value="티타임">티타임</option>
                               <option value="와인파티">와인파티</option>
                               <option value="사케파티">사케파티</option>
-                              <option value="쿠킹클래스">쿠킹클래스</option>
+                              {/* value 는 DB/필터 값 유지, 표시 라벨만 '세션' (v6.7) */}
+                              <option value="쿠킹클래스">세션</option>
                             </select>
                           </div>
                           <div>

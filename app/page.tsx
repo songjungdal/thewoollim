@@ -11,7 +11,7 @@ import Link from "next/link";
 import Image from "next/image";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
-import { PARTICIPANTS, FAQS, partyStockStatus, partyVisibility } from "./lib/data";
+import { PARTICIPANTS, FAQS, partyStockStatus, partyVisibility, categoryLabel } from "./lib/data";
 import { useAuth } from "./context/AuthContext";
 import { useParties } from "./lib/useParties";
 
@@ -434,14 +434,14 @@ export default function SmoothOnePage() {
                                 : "bg-white text-gray-500 hover:bg-gray-50 border border-gray-200"
                             }`}
                           >
-                            {opt}
+                            {categoryLabel(opt)}
                           </button>
                         );
                       })}
                     </div>
                     {filterValue && (
                       <p className="text-center text-xs md:text-sm text-gray-400 font-medium mt-3">
-                        {activeAxis} · <span className="text-brand-point font-bold">{filterValue}</span> · {sortedParties.length}건
+                        {activeAxis} · <span className="text-brand-point font-bold">{categoryLabel(filterValue)}</span> · {sortedParties.length}건
                       </p>
                     )}
                   </motion.div>
