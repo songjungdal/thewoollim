@@ -763,7 +763,7 @@ export default function SmoothOnePage() {
                           initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
                           className="bg-brand-lightgray/50 px-5 md:px-8"
                         >
-                          <p className="text-gray-600 font-medium leading-relaxed py-5 md:py-6 border-t border-gray-200/60 px-0 text-sm md:text-base whitespace-pre-line">
+                          <p className="text-gray-600 font-medium leading-relaxed md:leading-relaxed py-5 md:py-6 border-t border-gray-200/60 px-0 text-sm md:text-base whitespace-pre-line break-keep">
                             {faq.a}
                           </p>
                         </motion.div>
