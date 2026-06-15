@@ -17,7 +17,7 @@ const STATUS_DISPLAY: Record<BookingStatus, { label: string; tone: string; strip
   vbank_pending: {
     label:  "입금 확인 중",
     sub:    "안내된 계좌로 입금해주시면 확인 후 확정됩니다",
-    tone:   "bg-[#F6B26B] text-[#FF2300]",   // 스펙 지정 — 배경 F6B26B / 글자 FF2300
+    tone:   "bg-[#fce5cd] text-[#FF2300]",   // v7.1 — 배경 FCE5CD(연한 살구) / 글자 FF2300 유지
     stripe: "bg-[#F6B26B]",
     icon:   Clock,
   },

@@ -190,7 +190,7 @@ function BookingTable({ label, toneClass, rows, party, onApprove, onCancel, onCo
                     ) : b.status === "vbank_pending" ? (
                       // 무통장 입금 신청자 — [결제확인] 시 pending_approval 전환 + 인원 +1 (v7.0)
                       <button type="button" onClick={() => onConfirmVBank(b.userEmail, b.id)}
-                        className="inline-flex items-center gap-1 bg-[#F6B26B] text-[#FF2300] px-2.5 md:px-3 py-1.5 rounded-lg text-xs font-black hover:brightness-95 transition-all">
+                        className="inline-flex items-center gap-1 bg-[#fce5cd] text-[#FF2300] px-2.5 md:px-3 py-1.5 rounded-lg text-xs font-black hover:brightness-95 transition-all">
                         <CreditCard size={11} /> 결제확인
                       </button>
                     ) : (
@@ -229,7 +229,7 @@ function FormField({ label, value, onChange, placeholder, textarea }: {
 }
 
 const STATUS_LABEL: Record<string, { label: string; tone: string }> = {
-  vbank_pending: { label: "입금 확인 중", tone: "bg-[#F6B26B] text-[#FF2300]" },
+  vbank_pending: { label: "입금 확인 중", tone: "bg-[#fce5cd] text-[#FF2300]" },
   paid_pending_profile: { label: "결제완료(프로필 대기)", tone: "bg-amber-100 text-amber-800" },
   pending_approval: { label: "확정 대기 중", tone: "bg-[#F5F5DC] text-[#5D4037]" },
   confirmed: { label: "참가 확정 완료", tone: "bg-emerald-100 text-emerald-800" },
