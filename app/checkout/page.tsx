@@ -202,6 +202,7 @@ function CheckoutContent() {
       const pendingRes = await fetch("/api/payments/pending.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include", // 세션 쿠키(WOOLLIM_USER) 전송 — requireUser() 인증에 필요
         body: JSON.stringify({
           email:         userEmail,
           partyIds,
@@ -215,6 +216,14 @@ function CheckoutContent() {
       const pending = await pendingRes.json();
       console.log("[checkout] pending.php 응답:", pending);
       if (!pending?.ok || !pending?.orderId) {
+        // 세션 만료 — 프론트(localStorage)는 로그인으로 보이나 PHP 세션이 사라진 경우.
+        // 모호한 "unauthorized" 대신 재로그인으로 유도해 결제 흐름을 자가 복구.
+        if (pendingRes.status === 401 || pending?.error === "unauthorized") {
+          alert("로그인이 만료되었습니다. 다시 로그인 후 결제를 진행해주세요.");
+          const back = multiIds ? `/checkout/?ids=${multiIds}` : `/checkout/?id=${singleId}`;
+          router.push(`/login?redirect=${encodeURIComponent(back)}`);
+          return;
+        }
         alert(pending?.error || "주문 정보 등록에 실패했습니다.");
         setPaying(false);
         return;

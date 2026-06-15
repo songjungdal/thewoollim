@@ -15,6 +15,9 @@ ini_set('session.use_strict_mode', '1');
 ini_set('session.cookie_httponly', '1');
 ini_set('session.cookie_secure',   '1');
 ini_set('session.cookie_samesite', 'Lax');
+ini_set('session.cookie_lifetime', '2592000'); // 30일 — 브라우저 종료 후에도 세션 쿠키 유지.
+                                               // (미설정 시 기본 0=임시쿠키 → 브라우저 닫으면 세션 소멸,
+                                               //  프론트 localStorage 로그인 상태와 불일치해 결제 시 unauthorized 발생)
 ini_set('session.gc_maxlifetime', '2592000'); // 30일
 
 session_name('WOOLLIM_USER');
