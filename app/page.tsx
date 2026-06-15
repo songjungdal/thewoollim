@@ -703,7 +703,7 @@ export default function SmoothOnePage() {
             <motion.div
               className="flex gap-4 md:gap-6 py-4"
               animate={{ x: ["0%", "-50%"] }}
-              transition={{ repeat: Infinity, duration: 40, ease: "linear" }}
+              transition={{ repeat: Infinity, duration: 75, ease: "linear" }}
               style={{ width: "fit-content" }}
             >
               {/* Combine participants twice for seamless loop */}
