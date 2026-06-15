@@ -311,8 +311,8 @@ export default function MyPage() {
                             <div className="text-[#FF2300] font-black text-sm md:text-base">[ 상태: 입금 확인 중 ]</div>
                             <div className="font-black text-brand-black text-sm md:text-base">무통장 입금 안내</div>
                             <div className="text-sm md:text-base font-bold text-brand-black space-y-1">
-                              <div>입금 계좌: <span className="text-brand-point">{VBANK_ACCOUNT_LINE}</span></div>
-                              <div>참가 비용: <span className="text-brand-point tabular-nums">{(b.total ?? party?.price ?? 0).toLocaleString()}원</span></div>
+                              <div>입금 계좌: <span className="font-bold text-black">{VBANK_ACCOUNT_LINE}</span></div>
+                              <div>참가 비용: <span className="font-bold text-black tabular-nums">{(b.total ?? party?.price ?? 0).toLocaleString()}원</span></div>
                             </div>
                             <p className="text-xs md:text-sm text-gray-600 font-medium leading-relaxed break-keep">
                               현재 회원님의 입금 내역을 확인하고 있습니다. 운영팀에서 입금 확인을 완료하는 대로 ‘참가확정(또는 확정 대기 중)’ 상태로 변경되며, 안내 문자가 발송됩니다. 조금만 기다려 주세요!

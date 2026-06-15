@@ -482,11 +482,11 @@ function CheckoutContent() {
               <div className="text-sm md:text-base font-bold text-brand-black space-y-1.5">
                 <div className="flex justify-between gap-3">
                   <span className="text-gray-500 font-medium">입금 계좌</span>
-                  <span className="text-brand-point text-right">{VBANK_ACCOUNT_LINE}</span>
+                  <span className="font-bold text-black text-right">{VBANK_ACCOUNT_LINE}</span>
                 </div>
                 <div className="flex justify-between gap-3">
                   <span className="text-gray-500 font-medium">입금 금액</span>
-                  <span className="text-brand-point tabular-nums">₩{totalAmount.toLocaleString()}</span>
+                  <span className="font-bold text-black tabular-nums">₩{totalAmount.toLocaleString()}</span>
                 </div>
               </div>
               <p className="text-xs md:text-sm text-gray-500 font-medium leading-relaxed mt-3 break-keep">
