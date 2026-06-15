@@ -71,7 +71,8 @@ function CheckoutContent() {
   const [ready,  setReady]    = useState(false);   // 위젯 렌더 완료 여부
   const widgetsRef            = useRef<TossWidgets | null>(null);
   // 결제 수단: 'toss'(신용카드/간편결제) | 'vbank'(무통장 입금) — v7.0
-  const [payMethod, setPayMethod] = useState<"toss" | "vbank">("toss");
+  // 기본 진입 결제 수단 = 무통장 입금(vbank). (Toss SDK 로드/위젯 초기화 로직은 그대로 — 숨김 상태로 대기)
+  const [payMethod, setPayMethod] = useState<"toss" | "vbank">("vbank");
   // 무통장 입금 접수 완료 안내 모달
   const [vbankModal, setVbankModal] = useState<{ amount: number } | null>(null);
   // 약관 동의는 React 측 게이트 없음 — Toss SDK 가 requestPayment 호출 시점에 자체 enforce
