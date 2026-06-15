@@ -38,13 +38,14 @@ export type Profile = {
   maritalStatus?: string;  // '싱글' | '돌싱' (onboarding 완료자만 채워짐)
 };
 
-export type BookingStatus = "paid_pending_profile" | "pending_approval" | "confirmed" | "completed" | "cancelled";
+export type BookingStatus = "vbank_pending" | "paid_pending_profile" | "pending_approval" | "confirmed" | "completed" | "cancelled";
 
 export type Booking = {
   id: string;
   partyId: string;
   status: BookingStatus;
   paymentId?: string | null;
+  paymentMethod?: string | null; // 'vbank' = 무통장 입금 (v7.0). 미설정/그 외 = 카드/간편결제
   total?: number;
   createdAt: string;
   updatedAt: string;

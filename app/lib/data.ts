@@ -17,6 +17,10 @@ export type LocationTag  = typeof LOCATION_TAGS[number];
 export const CATEGORY_LABELS: Record<string, string> = { "쿠킹클래스": "세션" };
 export const categoryLabel = (value: string): string => CATEGORY_LABELS[value] ?? value;
 
+/** 무통장 입금 계좌 — 결제 페이지 모달 / 마이페이지 안내 가이드 공용 (v7.0) */
+export const VBANK_INFO = { bank: "신협", account: "132-137-790923", holder: "라지성" } as const;
+export const VBANK_ACCOUNT_LINE = `${VBANK_INFO.bank} ${VBANK_INFO.account} ${VBANK_INFO.holder}`;
+
 export type Party = {
   id: string;
   title: string;

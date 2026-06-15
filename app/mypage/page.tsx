@@ -9,10 +9,18 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useAuth, calcCouponDiscount, type BookingStatus } from "../context/AuthContext";
 import { useParties } from "../lib/useParties";
-import { partyStockStatus, priceForGender } from "../lib/data";
+import { partyStockStatus, priceForGender, VBANK_ACCOUNT_LINE } from "../lib/data";
 
 // 관리자 페이지의 신청자 상태 배지 규격과 동일한 색상 조합 사용 (admin8888/dashboard STATUS_LABEL)
 const STATUS_DISPLAY: Record<BookingStatus, { label: string; tone: string; stripe: string; icon: typeof Clock; sub?: string }> = {
+  // 입금 확인 중: 무통장 입금 접수 — 운영팀 입금 확인 대기 (v7.0)
+  vbank_pending: {
+    label:  "입금 확인 중",
+    sub:    "안내된 계좌로 입금해주시면 확인 후 확정됩니다",
+    tone:   "bg-[#F6B26B] text-[#FF2300]",   // 스펙 지정 — 배경 F6B26B / 글자 FF2300
+    stripe: "bg-[#F6B26B]",
+    icon:   Clock,
+  },
   // 결제완료: 결제됨 + 프로필 미완성
   paid_pending_profile: {
     label:  "결제완료",
@@ -294,6 +302,24 @@ export default function MyPage() {
                               <MapPin size={15} className="text-brand-point flex-shrink-0" />
                               {party.location}
                             </span>
+                          </div>
+                        )}
+
+                        {/* 무통장 입금 안내 가이드 — '입금 확인 중' 상태일 때만 (v7.0) */}
+                        {b.status === "vbank_pending" && (
+                          <div className="mt-3 rounded-xl border-2 border-[#F6B26B] bg-[#F6B26B]/10 p-4 md:p-5 space-y-2.5">
+                            <div className="text-[#FF2300] font-black text-sm md:text-base">[ 상태: 입금 확인 중 ]</div>
+                            <div className="font-black text-brand-black text-sm md:text-base">무통장 입금 안내</div>
+                            <div className="text-sm md:text-base font-bold text-brand-black space-y-1">
+                              <div>입금 계좌: <span className="text-brand-point">{VBANK_ACCOUNT_LINE}</span></div>
+                              <div>참가 비용: <span className="text-brand-point tabular-nums">{(b.total ?? party?.price ?? 0).toLocaleString()}원</span></div>
+                            </div>
+                            <p className="text-xs md:text-sm text-gray-600 font-medium leading-relaxed break-keep">
+                              현재 회원님의 입금 내역을 확인하고 있습니다. 운영팀에서 입금 확인을 완료하는 대로 ‘참가확정(또는 확정 대기 중)’ 상태로 변경되며, 안내 문자가 발송됩니다. 조금만 기다려 주세요!
+                            </p>
+                            <p className="text-[11px] md:text-xs text-[#FF2300] font-bold leading-relaxed break-keep">
+                              ※ 신청자명과 실제 입금자명이 다를 경우 확인이 늦어질 수 있으니, 다를 경우 고객센터나 1:1 문의로 꼭 말씀해 주세요.
+                            </p>
                           </div>
                         )}
                       </div>

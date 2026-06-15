@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Users, Ticket, Tag, Building2, LogOut, ShieldCheck, CheckCircle2, Clock, AlertTriangle, Calendar, Plus, Pencil, Trash2, ImageIcon, X, FileText, Search, StickyNote, Save, ChevronDown } from "lucide-react";
+import { Users, Ticket, Tag, Building2, LogOut, ShieldCheck, CheckCircle2, Clock, AlertTriangle, Calendar, Plus, Pencil, Trash2, ImageIcon, X, FileText, Search, StickyNote, Save, ChevronDown, CreditCard } from "lucide-react";
 import { useParties, broadcastPartiesUpdated } from "../../lib/useParties";
 import { formatPhoneKR } from "../../lib/phone";
 import { formatKST } from "../../lib/datetime";
@@ -99,13 +99,14 @@ const EMPTY_PARTY: PartyForm = {
   targetGroup: "", theme: "", locationTag: "",
 };
 
-function BookingTable({ label, toneClass, rows, party, onApprove, onCancel }: {
+function BookingTable({ label, toneClass, rows, party, onApprove, onCancel, onConfirmVBank }: {
   label: string;
   toneClass: string;
   rows: BookingRow[];
   party: { title: string; price: number } | undefined;
   onApprove: (email: string, bookingId: string) => void;
   onCancel: (email: string, bookingId: string) => void;
+  onConfirmVBank: (email: string, bookingId: string) => void;
 }) {
   // 카운트는 cancelled 제외 — 취소자는 아래 테이블 행에 line-through 로 보존만 됨.
   const activeCount = rows.filter(r => r.status !== "cancelled").length;
@@ -186,6 +187,12 @@ function BookingTable({ label, toneClass, rows, party, onApprove, onCancel }: {
                       <span className="inline-flex items-center gap-1 text-emerald-600 font-bold text-xs">
                         <CheckCircle2 size={13} /> 확정 완료
                       </span>
+                    ) : b.status === "vbank_pending" ? (
+                      // 무통장 입금 신청자 — [결제확인] 시 pending_approval 전환 + 인원 +1 (v7.0)
+                      <button type="button" onClick={() => onConfirmVBank(b.userEmail, b.id)}
+                        className="inline-flex items-center gap-1 bg-[#F6B26B] text-[#FF2300] px-2.5 md:px-3 py-1.5 rounded-lg text-xs font-black hover:brightness-95 transition-all">
+                        <CreditCard size={11} /> 결제확인
+                      </button>
                     ) : (
                       <button onClick={() => onApprove(b.userEmail, b.id)}
                         className="inline-flex items-center gap-1 bg-brand-point text-brand-black px-2.5 md:px-3 py-1.5 rounded-lg text-xs font-black hover:brightness-95 transition-all">
@@ -222,6 +229,7 @@ function FormField({ label, value, onChange, placeholder, textarea }: {
 }
 
 const STATUS_LABEL: Record<string, { label: string; tone: string }> = {
+  vbank_pending: { label: "입금 확인 중", tone: "bg-[#F6B26B] text-[#FF2300]" },
   paid_pending_profile: { label: "결제완료(프로필 대기)", tone: "bg-amber-100 text-amber-800" },
   pending_approval: { label: "확정 대기 중", tone: "bg-[#F5F5DC] text-[#5D4037]" },
   confirmed: { label: "참가 확정 완료", tone: "bg-emerald-100 text-emerald-800" },
@@ -790,6 +798,24 @@ export default function AdminDashboard() {
     const d = await res.json();
     if (d?.ok) { alert("확정 처리 완료"); await loadAll(); }
     else alert(d?.error || "처리 실패");
+  };
+
+  // 무통장 입금 확인 — vbank_pending → pending_approval 전환 + 인원 +1 (v7.0)
+  const confirmVBankBooking = async (email: string, bookingId: string) => {
+    if (!confirm("입금을 확인하셨습니까?\n\n[결제확인] 시 해당 회원이 '확정 대기 중'으로 전환되고,\n파티의 성별 인원수에 즉시 +1 반영됩니다.")) return;
+    const res = await fetch("/api/admin/bookings.php", {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "confirm_vbank", email, bookingId }),
+    });
+    const d = await res.json();
+    if (d?.ok) {
+      try { new BroadcastChannel("woollim_party_counts").postMessage({ at: Date.now() }); } catch { }
+      alert("입금 확인 완료 — '확정 대기 중'으로 전환되었습니다.");
+      await loadAll();
+    } else {
+      alert(d?.error || "입금 확인 처리 실패");
+    }
   };
 
   const cancelBooking = async (email: string, bookingId: string) => {
@@ -1411,8 +1437,8 @@ export default function AdminDashboard() {
                                 </button>
                               </div>
                               {/* 본문 — 기존 BookingTable 그대로 (취소/참가확정 핸들러 무변경) */}
-                              <BookingTable label="남성 신청자" toneClass="bg-[#4facfe]/10 text-[#3a85d9]" rows={males} party={party} onApprove={approveBooking} onCancel={cancelBooking} />
-                              <BookingTable label="여성 신청자" toneClass="bg-rose-100 text-rose-700" rows={females} party={party} onApprove={approveBooking} onCancel={cancelBooking} />
+                              <BookingTable label="남성 신청자" toneClass="bg-[#4facfe]/10 text-[#3a85d9]" rows={males} party={party} onApprove={approveBooking} onCancel={cancelBooking} onConfirmVBank={confirmVBankBooking} />
+                              <BookingTable label="여성 신청자" toneClass="bg-rose-100 text-rose-700" rows={females} party={party} onApprove={approveBooking} onCancel={cancelBooking} onConfirmVBank={confirmVBankBooking} />
                             </motion.div>
                           )}
                         </AnimatePresence>

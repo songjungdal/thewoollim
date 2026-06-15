@@ -82,12 +82,82 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email  = (string)($body['email']     ?? '');
     $bid    = (string)($body['bookingId'] ?? '');
 
-    if (!in_array($action, ['approve', 'cancel'], true)) {
+    if (!in_array($action, ['approve', 'cancel', 'confirm_vbank'], true)) {
         http_response_code(400);
         echo json_encode(['ok' => false, 'error' => 'unknown action']);
         exit;
     }
     $bookings = loadBookings($email);
+
+    // ─── action === 'confirm_vbank' — 무통장 입금 확인 (v7.0) ──────────────
+    //  vbank_pending → pending_approval(확정 대기 중) 전환 + 이 시점에 party_counts +1.
+    //  (카드결제는 success.php 에서 결제 즉시 +1 하지만, 무통장은 입금 확인된 지금 +1)
+    if ($action === 'confirm_vbank') {
+        $found = false; $target = null;
+        foreach ($bookings as &$b) {
+            if (($b['id'] ?? '') === $bid) {
+                if (($b['status'] ?? '') !== 'vbank_pending') {
+                    echo json_encode(['ok' => false, 'error' => '입금 확인 대상이 아닙니다. (현재 상태: ' . ($b['status'] ?? '?') . ')']); exit;
+                }
+                $target = $b;  // 전환 전 정보 (gender/partyId)
+                $found = true; break;
+            }
+        }
+        unset($b);
+        if (!$found) { echo json_encode(['ok' => false, 'error' => 'booking not found']); exit; }
+
+        $partyId   = (string)($target['partyId'] ?? '');
+        $gender    = (string)($target['gender']  ?? '');
+        $genderKey = $gender === '남성' ? 'male' : 'female';
+
+        // party_counts +1 (atomic) + 정원(12/성별) 초과 검증 — 카드결제 success.php 와 동일 상한.
+        $STOCK_PER_SIDE = 12;
+        $countsFile = "$dataDir/party_counts.json";
+        $fp = fopen($countsFile, 'c+');
+        if ($fp) {
+            flock($fp, LOCK_EX);
+            $raw = stream_get_contents($fp);
+            $counts = $raw ? json_decode($raw, true) : [];
+            if (!is_array($counts)) $counts = [];
+            if (!isset($counts[$partyId]) || !is_array($counts[$partyId])) {
+                $counts[$partyId] = ['male' => 0, 'female' => 0];
+            }
+            if ((int)($counts[$partyId][$genderKey] ?? 0) + 1 > $STOCK_PER_SIDE) {
+                flock($fp, LOCK_UN); fclose($fp);
+                echo json_encode(['ok' => false, 'error' => '잔여 정원을 초과하여 입금 확인을 진행할 수 없습니다.']); exit;
+            }
+            $counts[$partyId][$genderKey] = (int)($counts[$partyId][$genderKey] ?? 0) + 1;
+            ftruncate($fp, 0); rewind($fp); fwrite($fp, json_encode($counts));
+            fflush($fp); flock($fp, LOCK_UN); fclose($fp);
+        }
+
+        // 상태 전환 → pending_approval (이후 [참가확정] 으로 confirmed 가능 — 카드와 동일 흐름)
+        foreach ($bookings as &$b) {
+            if (($b['id'] ?? '') === $bid) {
+                $b['status']      = 'pending_approval';
+                $b['updatedAt']   = date('c');
+                $b['vbankPaidAt'] = date('c');
+                break;
+            }
+        }
+        unset($b);
+        saveBookings($email, $bookings);
+
+        @file_put_contents($dataDir . '/_vbank_confirm.log', sprintf(
+            "[%s] CONFIRM_VBANK email=%s bid=%s partyId=%s gender=%s\n",
+            date('c'), $email, $bid, $partyId, $gender
+        ), FILE_APPEND);
+
+        logAdminActivity(
+            'update', 'booking', $bid,
+            "무통장 입금 확인 — 회원 {$email}, 파티 #{$partyId}, 성별 {$gender} (+1 인원 반영)",
+            ['status' => 'vbank_pending'],
+            ['status' => 'pending_approval']
+        );
+
+        echo json_encode(['ok' => true, 'partyId' => $partyId, 'gender' => $gender]);
+        exit;
+    }
 
     if ($action === 'approve') {
         $found = false;

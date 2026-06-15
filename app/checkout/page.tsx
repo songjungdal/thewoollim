@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, CreditCard, ShieldCheck, Tag, Check, FileText, ExternalLink } from "lucide-react";
@@ -8,7 +9,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useAuth, calcCouponDiscount } from "../context/AuthContext";
 import { useParties } from "../lib/useParties";
-import { priceForGender } from "../lib/data";
+import { priceForGender, VBANK_ACCOUNT_LINE } from "../lib/data";
 
 declare global {
   interface Window {
@@ -45,7 +46,7 @@ function emailToCustomerKey(email: string): string {
 function CheckoutContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { mounted, isLoggedIn, userEmail, profile, appliedCoupon, bookings } = useAuth();
+  const { mounted, isLoggedIn, userEmail, profile, appliedCoupon, bookings, refreshBookings } = useAuth();
   const PARTIES = useParties();
 
   // Toss redirect 실패 시 ?error=... 로 돌아옴 — 사용자에게 안내
@@ -69,6 +70,10 @@ function CheckoutContent() {
   const [paying, setPaying]   = useState(false);
   const [ready,  setReady]    = useState(false);   // 위젯 렌더 완료 여부
   const widgetsRef            = useRef<TossWidgets | null>(null);
+  // 결제 수단: 'toss'(신용카드/간편결제) | 'vbank'(무통장 입금) — v7.0
+  const [payMethod, setPayMethod] = useState<"toss" | "vbank">("toss");
+  // 무통장 입금 접수 완료 안내 모달
+  const [vbankModal, setVbankModal] = useState<{ amount: number } | null>(null);
   // 약관 동의는 React 측 게이트 없음 — Toss SDK 가 requestPayment 호출 시점에 자체 enforce
   // (이전 다중 소스 sync 가 race/iframe/SDK 호환성 이슈로 false-positive 빈발 → 단순화)
 
@@ -177,7 +182,8 @@ function CheckoutContent() {
   const handlePayment = async () => {
     console.log("[checkout] handlePayment 호출", { paying, ready, userEmail, gender: profile?.gender, totalAmount, partyCount: partyIds.length });
     if (paying)                          { console.warn("[checkout] paying=true 이미 진행 중 — 중단"); return; }
-    if (!ready || !widgetsRef.current)   { console.warn("[checkout] 위젯 미준비 — 중단");     alert("결제 모듈이 아직 준비되지 않았습니다. 잠시 후 다시 시도해주세요."); return; }
+    // Toss 위젯은 토스 결제 시에만 필요 — 무통장 입금은 위젯 없이 진행
+    if (payMethod === "toss" && (!ready || !widgetsRef.current)) { console.warn("[checkout] 위젯 미준비 — 중단"); alert("결제 모듈이 아직 준비되지 않았습니다. 잠시 후 다시 시도해주세요."); return; }
     if (!userEmail)                      { console.warn("[checkout] userEmail 없음 — 중단"); alert("로그인이 필요합니다."); router.push("/login"); return; }
     if (!profile?.gender)                { console.warn("[checkout] 프로필 성별 미설정 — 중단"); alert("프로필 카드에서 성별을 먼저 등록해주세요."); router.push("/profile-setup/"); return; }
     if (totalAmount <= 0)                { console.error("[checkout] totalAmount=0 — 결제 금액 비정상", { partyIds, totalAmount }); alert("결제 금액이 비정상입니다. 장바구니를 다시 확인해주세요."); return; }
@@ -192,6 +198,45 @@ function CheckoutContent() {
       )).join(", ");
       console.warn("[checkout] 중복 신청 차단:", duplicateBookings);
       alert(`이미 신청이 완료된 파티입니다.\n마이페이지에서 예약 현황을 확인해주세요.\n\n· ${dupTitles}`);
+      return;
+    }
+
+    // ── 무통장 입금: Toss SDK 대신 vbank-submit 호출 → 접수 + 안내 모달 (v7.0) ──
+    //    예약은 'vbank_pending'(입금 확인 중)으로 생성되며, 인원 카운트는 미반영.
+    //    (관리자 [결제확인] 시점에 +1) — 중복 차단/장바구니 정리는 서버에서 동일 처리.
+    if (payMethod === "vbank") {
+      setPaying(true);
+      console.log("[checkout] vbank-submit 호출 시작");
+      try {
+        const res = await fetch("/api/payments/vbank-submit.php", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            partyIds,
+            couponCode:    effectiveCoupon?.code ?? "",
+            couponPartyId: effectiveCoupon?.partyId ?? "",
+          }),
+        });
+        const data = await res.json();
+        console.log("[checkout] vbank-submit 응답:", data);
+        if (res.status === 401 || data?.error === "unauthorized") {
+          alert("로그인이 만료되었습니다. 다시 로그인 후 진행해주세요.");
+          const back = multiIds ? `/checkout/?ids=${multiIds}` : `/checkout/?id=${singleId}`;
+          router.push(`/login?redirect=${encodeURIComponent(back)}`);
+          return;
+        }
+        if (!data?.ok) {
+          alert(data?.error || "무통장 입금 신청에 실패했습니다.");
+          setPaying(false);
+          return;
+        }
+        await refreshBookings();           // 마이페이지에 '입금 확인 중' 즉시 반영
+        setVbankModal({ amount: data.amount ?? totalAmount });
+      } catch {
+        alert("네트워크 오류로 신청에 실패했습니다. 잠시 후 다시 시도해주세요.");
+        setPaying(false);
+      }
       return;
     }
 
@@ -232,7 +277,7 @@ function CheckoutContent() {
       // 2) Toss v2 위젯 — 결제 인증창 호출 (성공/실패 시 redirect)
       const origin = window.location.origin;
       console.log("[checkout] requestPayment 호출", { orderId: pending.orderId, orderName, totalAmount });
-      await widgetsRef.current.requestPayment({
+      await widgetsRef.current!.requestPayment({
         orderId:       pending.orderId,
         orderName,
         successUrl:    `${origin}/api/payments/success.php`,
@@ -386,16 +431,69 @@ function CheckoutContent() {
             </div>
           </div>
 
-          {/* ── Toss v2 결제수단 위젯 ───────────────────────────────────────── */}
-          <div className="bg-white rounded-2xl md:rounded-3xl p-2 md:p-3 border border-gray-100 mb-3">
-            <div id="payment-method" />
+          {/* ── 결제 수단 선택 (v7.0) — 토스 결제 / 무통장 입금 ──────────────── */}
+          <div className="grid grid-cols-2 gap-2.5 md:gap-3 mb-3">
+            {([
+              { key: "toss",  title: "신용카드/간편결제", desc: "토스로 즉시 결제" },
+              { key: "vbank", title: "무통장 입금",       desc: "계좌이체 후 입금 확인" },
+            ] as const).map(opt => {
+              const active = payMethod === opt.key;
+              return (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => setPayMethod(opt.key)}
+                  className={`text-left rounded-2xl border-2 p-4 md:p-5 transition-all ${
+                    active
+                      ? "border-brand-point bg-brand-point/5 shadow-md"
+                      : "border-gray-200 bg-white hover:border-gray-300"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${active ? "border-brand-point" : "border-gray-300"}`}>
+                      {active && <span className="w-2 h-2 rounded-full bg-brand-point" />}
+                    </span>
+                    <span className="font-black text-sm md:text-base text-brand-black">{opt.title}</span>
+                  </div>
+                  <p className="text-[11px] md:text-xs text-gray-500 font-medium pl-6">{opt.desc}</p>
+                </button>
+              );
+            })}
           </div>
 
-          {/* ── Toss v2 약관 위젯 — 컨테이너 분리 + overflow 제한 없음
-                 (각 항목별 [보기] 버튼이 Toss 측 portal 로 상세 약관 표시) ──── */}
-          <div className="bg-white rounded-2xl md:rounded-3xl p-2 md:p-3 border border-gray-100 mb-3 relative">
-            <div id="agreement" />
+          {/* ── Toss v2 결제수단 + 약관 위젯 — 무통장 선택 시 숨김(언마운트 X, ready 유지) ── */}
+          <div className={payMethod === "vbank" ? "hidden" : ""}>
+            <div className="bg-white rounded-2xl md:rounded-3xl p-2 md:p-3 border border-gray-100 mb-3">
+              <div id="payment-method" />
+            </div>
+            <div className="bg-white rounded-2xl md:rounded-3xl p-2 md:p-3 border border-gray-100 mb-3 relative">
+              <div id="agreement" />
+            </div>
           </div>
+
+          {/* ── 무통장 입금 안내 패널 — 무통장 선택 시 노출 ───────────────────── */}
+          {payMethod === "vbank" && (
+            <div className="bg-white rounded-2xl md:rounded-3xl p-5 md:p-6 border-2 border-[#F6B26B]/60 mb-3">
+              <div className="flex items-center gap-2 mb-3">
+                <CreditCard size={18} className="text-[#FF2300]" />
+                <span className="font-black text-base md:text-lg text-brand-black">무통장 입금 안내</span>
+              </div>
+              <div className="text-sm md:text-base font-bold text-brand-black space-y-1.5">
+                <div className="flex justify-between gap-3">
+                  <span className="text-gray-500 font-medium">입금 계좌</span>
+                  <span className="text-brand-point text-right">{VBANK_ACCOUNT_LINE}</span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-gray-500 font-medium">입금 금액</span>
+                  <span className="text-brand-point tabular-nums">₩{totalAmount.toLocaleString()}</span>
+                </div>
+              </div>
+              <p className="text-xs md:text-sm text-gray-500 font-medium leading-relaxed mt-3 break-keep">
+                ‘입금 신청하기’를 누르면 참가 신청이 접수되며, 위 계좌로 입금해 주시면 운영팀 확인 후 확정됩니다.
+                신청 후 2시간 이내 미입금 시 자동 취소될 수 있습니다.
+              </p>
+            </div>
+          )}
 
           {/* ── 어울림 자체 환불 규정 — 결제 전 명확한 정책 고지 ──────────── */}
           <Link
@@ -411,17 +509,25 @@ function CheckoutContent() {
             <ExternalLink size={13} className="text-gray-400 flex-shrink-0" />
           </Link>
 
-          {/* 결제 가능 조건 — 약관 동의는 Toss 결제창에서 자체 처리 */}
+          {/* 결제 가능 조건 — 약관 동의는 Toss 결제창에서 자체 처리.
+              무통장 입금은 Toss 위젯(ready) 불필요 → vbank 일 땐 ready 게이트 제외 (v7.0) */}
           {(() => {
             const amountValid    = totalAmount > 0;
             const partyIdsValid  = partyIds.length > 0;
-            const canPay         = ready && amountValid && partyIdsValid && !paying;
+            const isVbank        = payMethod === "vbank";
+            const readyOk        = isVbank ? true : ready;
+            const canPay         = readyOk && amountValid && partyIdsValid && !paying;
 
             const reason =
-              !ready          ? "결제 모듈 로딩 중..." :
+              !readyOk        ? "결제 모듈 로딩 중..." :
               !amountValid    ? "결제 금액이 비정상입니다." :
               !partyIdsValid  ? "주문 항목이 비어있습니다." :
               "";
+
+            const payingLabel = isVbank ? "신청 처리 중..." : "결제창으로 이동 중...";
+            const idleLabel   = isVbank
+              ? <>₩{totalAmount.toLocaleString()} 입금 신청하기</>
+              : <>₩{totalAmount.toLocaleString()} 결제하기</>;
 
             return (
               <>
@@ -438,7 +544,7 @@ function CheckoutContent() {
                   className="w-full bg-brand-black text-white py-5 rounded-2xl font-black text-base md:text-xl hover:bg-brand-point transition-all shadow-xl hover:shadow-brand-point/30 flex items-center justify-center gap-3 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none"
                 >
                   <CreditCard size={22} />
-                  {paying ? "결제창으로 이동 중..." : !ready ? "결제 모듈 로딩 중..." : <>₩{totalAmount.toLocaleString()} 결제하기</>}
+                  {paying ? payingLabel : !readyOk ? "결제 모듈 로딩 중..." : idleLabel}
                 </button>
               </>
             );
@@ -451,6 +557,56 @@ function CheckoutContent() {
         </div>
       </main>
       <Footer />
+
+      {/* ── 무통장 입금 접수 완료 안내 모달 (v7.0) ─────────────────────────── */}
+      <AnimatePresence>
+        {vbankModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 20 }}
+              transition={{ type: "spring", stiffness: 260, damping: 22 }}
+              className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl"
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <Check size={22} className="text-brand-point" />
+                <h3 className="font-black text-lg md:text-xl text-brand-black">참가 신청이 접수되었습니다</h3>
+              </div>
+              <p className="text-sm md:text-base text-gray-700 font-medium leading-relaxed break-keep mb-4">
+                매칭파티 참가 신청이 정상적으로 접수되었습니다. 아래 안내해 드리는 계좌로 입금해 주시면 확인 후 최종 확정해 드립니다.
+              </p>
+              <div className="rounded-2xl border-2 border-[#F6B26B] bg-[#F6B26B]/10 p-4 md:p-5 space-y-1.5 mb-4">
+                <div className="flex justify-between gap-3 text-sm md:text-base font-bold text-brand-black">
+                  <span className="text-gray-500 font-medium">입금 계좌</span>
+                  <span className="text-[#FF2300] text-right">{VBANK_ACCOUNT_LINE}</span>
+                </div>
+                <div className="flex justify-between gap-3 text-sm md:text-base font-bold text-brand-black">
+                  <span className="text-gray-500 font-medium">입금 금액</span>
+                  <span className="text-[#FF2300] tabular-nums">{vbankModal.amount.toLocaleString()}원</span>
+                </div>
+              </div>
+              <ul className="text-xs md:text-sm text-gray-600 font-medium leading-relaxed break-keep space-y-2 mb-6 list-disc pl-4">
+                <li>마감 임박인 파티의 경우, 입금 순으로 선착순 마감될 수 있는 점 양해 부탁드립니다.</li>
+                <li>입금 확인 완료 시 마이페이지의 내 예약 현황에서 참가확정 상태를 확인하실 수 있으며, 카카오톡 또는 문자로 알림을 드립니다.</li>
+                <li>원활한 파티 진행(성비 조율 및 좌석 확정)을 위해 신청 후 2시간 이내 미입금 시 신청이 자동 취소될 수 있습니다.</li>
+              </ul>
+              <button
+                type="button"
+                onClick={() => { setVbankModal(null); router.push("/mypage"); }}
+                className="w-full bg-brand-black text-white py-4 rounded-2xl font-black text-base hover:bg-brand-point transition-all"
+              >
+                내 예약 현황 보기
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
