@@ -51,28 +51,32 @@ export default function CancelRequestPage() {
       `파티 일정: ${selectedParty.dateString}\n` +
       `결제 금액: ₩${(selected.total ?? selectedParty.price).toLocaleString()}\n` +
       `환불 예정: ₩${refund.refund.toLocaleString()} (${refund.label})\n\n` +
-      `취소 시 결제 카드사로 즉시 환불 처리됩니다.\n` +
-      `이 작업은 되돌릴 수 없습니다.`
+      `취소를 진행하시면 운영팀으로 환불 요청이 접수됩니다.\n` +
+      `※원활한 성비 조율 및 좌석 배치 재조율을 위해, 실시간 취소가 어려울 수 있는 점 양해 부탁드립니다.\n\n` +
+      `카드 결제 : 확인 즉시 결제하신 카드사를 통해 취소 처리를 진행합니다. (카드사에 따라 영업일 기준 3~5일 소요)\n` +
+      `무통장 입금 : 운영팀에서 확인 후, 환불받으실 계좌번호로 직접 송금해 드립니다.`
     );
     if (!ok) return;
     setSubmitting(true);
     try {
-      const res = await fetch("/api/payments/refund.php", {
+      // 승인제 전환 — 즉시 결제 취소(refund.php) 대신 'cancel_requested'(취소 요청 중)로 접수.
+      const res = await fetch("/api/payments/cancel-request.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ email: userEmail, bookingId: selected.id }),
       });
       const d = await res.json();
       if (d?.ok) {
-        alert(`취소 완료 — ₩${(d.refundAmount ?? refund.refund).toLocaleString()}이 카드사로 환불 처리되었습니다.`);
+        alert(`어울림 운영팀으로 취소 요청이 정상적으로 접수되었습니다.\n운영팀에서 확인 후 빠르게 처리해 드리겠습니다. 감사합니다.`);
         await refreshBookings();
         router.push("/mypage");
       } else {
-        alert(d?.error || "취소 처리에 실패했습니다.");
+        alert(d?.error || "취소 요청에 실패했습니다.");
         setSubmitting(false);
       }
     } catch {
-      alert("네트워크 오류로 취소가 실패했습니다.");
+      alert("네트워크 오류로 취소 요청이 실패했습니다.");
       setSubmitting(false);
     }
   };

@@ -38,7 +38,7 @@ export type Profile = {
   maritalStatus?: string;  // '싱글' | '돌싱' (onboarding 완료자만 채워짐)
 };
 
-export type BookingStatus = "vbank_pending" | "paid_pending_profile" | "pending_approval" | "confirmed" | "completed" | "cancelled";
+export type BookingStatus = "vbank_pending" | "paid_pending_profile" | "pending_approval" | "confirmed" | "completed" | "cancel_requested" | "refund_completed" | "cancelled";
 
 export type Booking = {
   id: string;

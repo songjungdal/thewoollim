@@ -3,9 +3,10 @@
 import { useEffect, useState, useCallback, useRef, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Users, Ticket, Tag, Building2, LogOut, ShieldCheck, CheckCircle2, Clock, AlertTriangle, Calendar, Plus, Pencil, Trash2, ImageIcon, X, FileText, Search, StickyNote, Save, ChevronDown, CreditCard } from "lucide-react";
+import { Users, Ticket, Tag, Building2, LogOut, ShieldCheck, CheckCircle2, Clock, AlertTriangle, Calendar, Plus, Pencil, Trash2, ImageIcon, X, FileText, Search, StickyNote, Save, ChevronDown, CreditCard, RotateCcw } from "lucide-react";
 import { useParties, broadcastPartiesUpdated } from "../../lib/useParties";
 import { formatPhoneKR } from "../../lib/phone";
+import { calculateRefund } from "../../lib/refund";
 import { formatKST } from "../../lib/datetime";
 
 type AdminUser = {
@@ -18,12 +19,13 @@ type AdminUser = {
 };
 type BookingRow = {
   id: string; partyId: string; status: string; createdAt: string; total?: number;
+  paymentMethod?: string | null; // 'vbank' = 무통장 입금 (v7.0)
   userEmail: string; userName: string; userGender: string; userPhone: string;
   userMbti?: string; userJob?: string; userBirthDate?: string;
   userStatus?: string;       // 'active' | 'withdrawn' — 회원 탈퇴 여부
   userInterests?: string; userIdealType?: string;
 };
-type TabKey = "members" | "bookings" | "parties" | "coupons" | "company" | "gallery" | "logs" | "memos";
+type TabKey = "members" | "bookings" | "parties" | "coupons" | "company" | "gallery" | "logs" | "cancel_requests" | "memos";
 
 type MemoItem = {
   id: number;
@@ -187,6 +189,9 @@ function BookingTable({ label, toneClass, rows, party, onApprove, onCancel, onCo
                       <span className="inline-flex items-center gap-1 text-emerald-600 font-bold text-xs">
                         <CheckCircle2 size={13} /> 확정 완료
                       </span>
+                    ) : (b.status === "cancel_requested" || b.status === "refund_completed") ? (
+                      // 취소요청/환불완료 — [취소요청] 탭에서 처리. 여기선 참가확정 버튼 숨김(좌측 [취소]는 유지).
+                      <span className="text-xs text-gray-400 font-bold">—</span>
                     ) : b.status === "vbank_pending" ? (
                       // 무통장 입금 신청자 — [결제확인] 시 pending_approval 전환 + 인원 +1 (v7.0)
                       <button type="button" onClick={() => onConfirmVBank(b.userEmail, b.id)}
@@ -235,6 +240,8 @@ const STATUS_LABEL: Record<string, { label: string; tone: string }> = {
   confirmed: { label: "참가 확정 완료", tone: "bg-emerald-100 text-emerald-800" },
   // 모임종료 — 투표 종료 시 confirmed → completed 일괄 전환
   completed: { label: "모임종료", tone: "bg-gray-200 text-black font-bold" },
+  cancel_requested: { label: "취소요청", tone: "bg-[#f4cccc] text-[#CC0000]" },
+  refund_completed: { label: "환불 완료", tone: "bg-gray-200 text-gray-600" },
   cancelled: { label: "취소됨", tone: "bg-gray-200 text-gray-600" },
 };
 
@@ -321,6 +328,7 @@ export default function AdminDashboard() {
   }, [tab, authChecked, loadLogs]);
   const [genderFilter, setGenderFilter] = useState<"all" | "남성" | "여성">("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "paid_pending_profile" | "pending_approval" | "confirmed" | "completed">("all");
+  const [cancelSearch, setCancelSearch] = useState(""); // [취소요청] 탭 검색어 (v7.0)
   // 월 필터 — 기본값: 현재 KST 월 (Asia/Seoul). 'all' = 모든 월 노출
   const [monthFilter, setMonthFilter] = useState<string>(() => {
     const kst = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
@@ -836,6 +844,25 @@ export default function AdminDashboard() {
     }
   };
 
+  // 취소요청 승인(환불 처리) — 카드: Toss 취소 API / 무통장: 상태만 변경. 인원 카운트는 미변경 (v7.0)
+  const approveCancelRequest = async (email: string, bookingId: string, isVbank: boolean) => {
+    if (!confirm("환불을 진행하겠습니까?")) return;
+    const res = await fetch("/api/admin/bookings.php", {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "approve_refund", email, bookingId }),
+    });
+    const d = await res.json();
+    if (d?.ok) {
+      alert(isVbank
+        ? `무통장 환불 완료 처리되었습니다. (환불 ₩${(d.refundAmount ?? 0).toLocaleString()})\n※ 인원 차감은 [예약/신청 현황]에서 [취소] 버튼으로 별도 처리해주세요.`
+        : `카드 결제 취소(환불)가 완료되었습니다. (환불 ₩${(d.refundAmount ?? 0).toLocaleString()})\n※ 인원 차감은 [예약/신청 현황]에서 [취소] 버튼으로 별도 처리해주세요.`);
+      await loadAll();
+    } else {
+      alert(d?.error || "환불 처리 실패");
+    }
+  };
+
   const deleteUser = async (email: string, name?: string) => {
     const who = name ? `${name} (${email})` : email;
     if (!confirm(`정말로 이 회원을 삭제하시겠습니까?\n\n대상: ${who}\n\n관련 데이터(예약, 프로필, 카트 등)가 모두 삭제됩니다.\n이 작업은 되돌릴 수 없습니다.`)) return;
@@ -932,6 +959,7 @@ export default function AdminDashboard() {
     { key: "company", label: "기업 정보", icon: Building2 },
     { key: "gallery", label: "후기 갤러리 관리", icon: ImageIcon },
     { key: "logs", label: "로그 관리", icon: FileText },
+    { key: "cancel_requests", label: "취소요청", icon: RotateCcw },
     { key: "memos", label: "업무 메모", icon: StickyNote },
   ];
 
@@ -2198,6 +2226,101 @@ export default function AdminDashboard() {
               </p>
             </section>
           )}
+
+          {/* === 취소요청 (승인제 환불 관리) v7.0 === */}
+          {tab === "cancel_requests" && (() => {
+            const reqRows  = bookings.filter(b => b.status === "cancel_requested");
+            const doneRows = bookings.filter(b => b.status === "refund_completed");
+            const q = cancelSearch.trim().toLowerCase();
+            const matchQ = (b: BookingRow) => !q || [b.userName, b.userEmail, b.userPhone].some(v => (v || "").toLowerCase().includes(q));
+            const rows = [...reqRows, ...doneRows]
+              .filter(matchQ)
+              .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+            return (
+              <section>
+                {/* 상단 고정 강조 문구 */}
+                <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 md:p-5 mb-5">
+                  <p className="text-sm md:text-base font-black text-[#CC0000] leading-relaxed break-keep">
+                    취소요청은 카드결제의 취소만 즉시 이루어지며, 무통장 환불의 경우 고객에게 연락해서 환불계좌를 받고 별도로 송금처리해야 합니다. (중요!) 반드시 취소완료 후 예약 / 신청 현황에서 취소완료 된 참가자를 취소처리를 해야합니다.
+                  </p>
+                </div>
+
+                {/* 헤더 + 카운트 + 검색 */}
+                <div className="flex items-end justify-between mb-4 md:mb-5 flex-wrap gap-3">
+                  <div>
+                    <h2 className="text-xl md:text-2xl font-black flex items-center gap-2"><RotateCcw size={20} /> 취소요청</h2>
+                    <p className="text-sm text-gray-500 font-medium mt-1">
+                      취소요청 <span className="font-bold text-[#CC0000]">{reqRows.length}</span>명 · 환불 완료 <span className="font-bold text-brand-point">{doneRows.length}</span>명
+                    </p>
+                  </div>
+                  <div className="relative">
+                    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input value={cancelSearch} onChange={e => setCancelSearch(e.target.value)} placeholder="이름·이메일·연락처 검색"
+                      className="pl-9 pr-3 py-2 rounded-lg border border-gray-200 text-sm font-medium bg-white w-full sm:w-56 md:w-64" aria-label="취소요청 검색" />
+                  </div>
+                </div>
+
+                {/* 테이블 */}
+                <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs md:text-sm whitespace-nowrap">
+                      <thead className="bg-gray-50 text-gray-500 font-bold">
+                        <tr>
+                          {["파티 정보", "결제일", "결제 금액", "환불받을 금액", "이메일", "이름", "연락처", "결제 방식", "상태", "관리"].map(h => (
+                            <th key={h} className="text-left px-3 py-2.5 first:pl-5 md:first:pl-7">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rows.length === 0 && (
+                          <tr><td colSpan={10} className="text-center text-gray-300 py-8 text-xs">취소요청 내역이 없습니다.</td></tr>
+                        )}
+                        {rows.map(b => {
+                          const party   = PARTIES.find(p => p.id === b.partyId);
+                          const isVbank = b.paymentMethod === "vbank";
+                          const refund  = party ? calculateRefund(b.total ?? party.price ?? 0, party.calendarDate) : null;
+                          const done    = b.status === "refund_completed";
+                          return (
+                            <tr key={b.id} className="border-t border-gray-100 hover:bg-gray-50">
+                              <td className="px-3 py-2.5 first:pl-5 md:first:pl-7">
+                                <div className="font-bold">{party?.title ?? `파티 #${b.partyId}`}</div>
+                                <div className="text-gray-400 text-[11px]">{party?.dateString ?? "-"}</div>
+                              </td>
+                              <td className="px-3 py-2.5 text-gray-500">{b.createdAt?.slice(0, 10)}</td>
+                              <td className="px-3 py-2.5 tabular-nums">₩{(b.total ?? party?.price ?? 0).toLocaleString()}</td>
+                              <td className="px-3 py-2.5 tabular-nums font-black text-brand-point">
+                                ₩{(refund?.refund ?? 0).toLocaleString()}
+                                {refund && <span className="text-gray-400 font-medium text-[11px]"> ({refund.label})</span>}
+                              </td>
+                              <td className="px-3 py-2.5 font-mono text-xs max-w-[200px] truncate" title={b.userEmail}>{b.userEmail}</td>
+                              <td className="px-3 py-2.5 font-bold">{b.userName}</td>
+                              <td className="px-3 py-2.5 tabular-nums">{formatPhoneKR(b.userPhone)}</td>
+                              <td className="px-3 py-2.5 font-bold">{isVbank ? "무통장 입금" : "카드"}</td>
+                              <td className="px-3 py-2.5">
+                                <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] md:text-xs font-black ${done ? "bg-gray-200 text-gray-600" : "bg-[#f4cccc] text-[#CC0000]"}`}>
+                                  {done ? "환불 완료" : "취소요청"}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2.5">
+                                {done ? (
+                                  <span className="inline-flex items-center gap-1 text-gray-500 font-bold text-xs"><CheckCircle2 size={13} /> 환불 완료</span>
+                                ) : (
+                                  <button type="button" onClick={() => approveCancelRequest(b.userEmail, b.id, isVbank)}
+                                    className="inline-flex items-center gap-1 bg-[#CC0000] text-white px-2.5 md:px-3 py-1.5 rounded-lg text-xs font-black hover:brightness-110 transition-all">
+                                    <RotateCcw size={11} /> 취소승인처리
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </section>
+            );
+          })()}
 
           {/* === 업무 메모 (포스트잇) === */}
           {tab === "memos" && (

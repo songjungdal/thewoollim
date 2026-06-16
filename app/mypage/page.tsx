@@ -53,6 +53,22 @@ const STATUS_DISPLAY: Record<BookingStatus, { label: string; tone: string; strip
     stripe: "bg-gray-400",
     icon:   CheckCircle2,
   },
+  // 취소 요청 중: 승인제 — 운영팀 환불 처리 대기 (v7.0)
+  cancel_requested: {
+    label:  "취소 요청 중",
+    sub:    "운영팀에서 환불 요청을 확인 중입니다",
+    tone:   "bg-[#f4cccc] text-[#CC0000] font-bold",   // 파스텔 붉은 배경 / 붉은 글자
+    stripe: "bg-[#CC0000]",
+    icon:   Clock,
+  },
+  // 환불 완료: 운영팀 환불 처리 완료 (v7.0)
+  refund_completed: {
+    label:  "환불 완료",
+    sub:    "환불이 완료되었습니다",
+    tone:   "bg-gray-200 text-gray-600",
+    stripe: "bg-gray-300",
+    icon:   CheckCircle2,
+  },
   cancelled: {
     label:  "취소됨",
     tone:   "bg-gray-200 text-gray-600",

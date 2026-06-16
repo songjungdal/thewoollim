@@ -82,7 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email  = (string)($body['email']     ?? '');
     $bid    = (string)($body['bookingId'] ?? '');
 
-    if (!in_array($action, ['approve', 'cancel', 'confirm_vbank'], true)) {
+    if (!in_array($action, ['approve', 'cancel', 'confirm_vbank', 'approve_refund'], true)) {
         http_response_code(400);
         echo json_encode(['ok' => false, 'error' => 'unknown action']);
         exit;
@@ -156,6 +156,107 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         );
 
         echo json_encode(['ok' => true, 'partyId' => $partyId, 'gender' => $gender]);
+        exit;
+    }
+
+    // ─── action === 'approve_refund' — 취소요청 승인(환불 처리) v7.0 ──────────
+    //  cancel_requested → refund_completed. 카드는 Toss 결제취소 API 호출, 무통장은 상태만 변경.
+    //  ⚠ party_counts(인원) 는 절대 건드리지 않음 — 인원 -1 은 관리자가 [예약/신청 현황]의
+    //    [취소] 버튼으로 별도 처리하는 기존 흐름 유지 (사장님 운영 지침).
+    if ($action === 'approve_refund') {
+        $found = false; $target = null; $idx = -1;
+        foreach ($bookings as $i => $b) {
+            if (is_array($b) && (string)($b['id'] ?? '') === $bid) {
+                if ((string)($b['status'] ?? '') !== 'cancel_requested') {
+                    echo json_encode(['ok' => false, 'error' => '취소 요청 상태가 아닙니다. (현재: ' . ($b['status'] ?? '?') . ')']); exit;
+                }
+                $target = $b; $idx = $i; $found = true; break;
+            }
+        }
+        if (!$found) { echo json_encode(['ok' => false, 'error' => 'booking not found']); exit; }
+
+        // 환불 금액 — 프론트(refund.ts)와 동일한 날짜 대조 tier 산정 (서버 권위):
+        //   파티까지 5일+ → 100% / 4일 → 80% / 3일 → 50% / 그 외 → 0%
+        $partiesJson = file_exists("$dataDir/parties.json") ? json_decode((string)file_get_contents("$dataDir/parties.json"), true) : [];
+        $calDate = '';
+        foreach ((array)$partiesJson as $p) {
+            if (isset($p['id']) && (string)$p['id'] === (string)($target['partyId'] ?? '')) { $calDate = (string)($p['calendarDate'] ?? ''); break; }
+        }
+        $paidAmount = (int)($target['total'] ?? 0);
+        $refundAmount = 0;
+        if ($calDate !== '' && preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $calDate, $m)) {
+            $partyMid = mktime(0, 0, 0, (int)$m[2], (int)$m[3], (int)$m[1]);
+            $todayMid = mktime(0, 0, 0, (int)date('n'), (int)date('j'), (int)date('Y'));
+            $days = (int)floor(($partyMid - $todayMid) / 86400);
+            $rate = $days >= 5 ? 1.0 : ($days === 4 ? 0.8 : ($days === 3 ? 0.5 : 0.0));
+            $refundAmount = (int)floor(max(0, $paidAmount) * $rate);
+        }
+
+        $method = (string)($target['paymentMethod'] ?? '');
+        $isVbank = ($method === 'vbank');
+
+        // 카드 결제 — Toss 결제취소 API 호출 (서버-서버). 무통장은 미호출(관리자 직접 송금 전제).
+        if (!$isVbank) {
+            $paymentKey = (string)($target['paymentId'] ?? '');
+            if ($paymentKey === '') {
+                echo json_encode(['ok' => false, 'error' => '결제 키(paymentId)가 없어 카드 취소를 진행할 수 없습니다.']); exit;
+            }
+            if ($refundAmount > 0) {
+                try {
+                    $cfg = require __DIR__ . '/../payments/toss-config.php';
+                    $ch  = curl_init('https://api.tosspayments.com/v1/payments/' . urlencode($paymentKey) . '/cancel');
+                    curl_setopt_array($ch, [
+                        CURLOPT_POST           => true,
+                        CURLOPT_POSTFIELDS     => json_encode(['cancelReason' => '취소요청 승인(관리자)', 'cancelAmount' => $refundAmount]),
+                        CURLOPT_HTTPHEADER     => [
+                            'Authorization: Basic ' . base64_encode($cfg['secret_key'] . ':'),
+                            'Content-Type: application/json',
+                        ],
+                        CURLOPT_RETURNTRANSFER => true,
+                        CURLOPT_TIMEOUT        => 20,
+                    ]);
+                    $tossBody = curl_exec($ch);
+                    $tossHttp = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                    $tossJson = is_string($tossBody) ? (json_decode($tossBody, true) ?: []) : [];
+                    curl_close($ch);
+                    @file_put_contents("$dataDir/_toss_refund.log", sprintf(
+                        "[%s] APPROVE_REFUND paymentKey=%s amount=%d http=%d body=%s\n",
+                        date('c'), $paymentKey, $refundAmount, $tossHttp, substr((string)$tossBody, 0, 400)
+                    ), FILE_APPEND);
+                    // 이미 취소된 결제(ALREADY_CANCELED)는 성공으로 간주
+                    $alreadyCanceled = ($tossHttp === 400 && (string)($tossJson['code'] ?? '') === 'ALREADY_CANCELED_PAYMENT');
+                    if ($tossHttp !== 200 && !$alreadyCanceled) {
+                        echo json_encode(['ok' => false, 'error' => 'Toss 결제 취소 실패: ' . (string)($tossJson['message'] ?? "HTTP $tossHttp")]); exit;
+                    }
+                } catch (Throwable $e) {
+                    error_log('[approve_refund toss] ' . $e->getMessage());
+                    echo json_encode(['ok' => false, 'error' => '결제 취소 처리 중 오류가 발생했습니다.']); exit;
+                }
+            }
+        }
+
+        // 상태 전환 → refund_completed (인원 카운트 미변경)
+        $bookings[$idx]['status']         = 'refund_completed';
+        $bookings[$idx]['updatedAt']      = date('c');
+        $bookings[$idx]['refundedAt']     = date('c');
+        $bookings[$idx]['refundAmount']   = $refundAmount;
+        $bookings[$idx]['refundedBy']     = 'admin';
+        $bookings[$idx]['refundMethod']   = $isVbank ? 'vbank' : 'card';
+        saveBookings($email, $bookings);
+
+        @file_put_contents($dataDir . '/_admin_refunds.log', sprintf(
+            "[%s] REFUND_APPROVED email=%s bid=%s method=%s amount=%d\n",
+            date('c'), $email, $bid, $isVbank ? 'vbank' : 'card', $refundAmount
+        ), FILE_APPEND);
+
+        logAdminActivity(
+            'update', 'booking', $bid,
+            "취소요청 승인(환불) — 회원 {$email}, 방식 " . ($isVbank ? '무통장' : '카드') . ", 환불 {$refundAmount}원",
+            ['status' => 'cancel_requested'],
+            ['status' => 'refund_completed']
+        );
+
+        echo json_encode(['ok' => true, 'refundAmount' => $refundAmount, 'method' => $isVbank ? 'vbank' : 'card']);
         exit;
     }
 
