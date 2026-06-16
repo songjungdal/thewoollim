@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Calendar, MapPin, AlertTriangle, CheckCircle2, XCircle, Info } from "lucide-react";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
@@ -18,6 +18,7 @@ export default function CancelRequestPage() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false); // 커스텀 확인 모달 (네이티브 confirm 대체)
 
   useEffect(() => {
     if (mounted && !isLoggedIn) router.push("/login?redirect=/mypage/cancel");
@@ -40,7 +41,8 @@ export default function CancelRequestPage() {
     ? calculateRefund(selected.total ?? selectedParty.price, selectedParty.calendarDate)
     : null;
 
-  const handleCancel = async () => {
+  // 취소 요청하기 버튼 → 환불 가능 기간 체크 후 커스텀 확인 모달 오픈 (네이티브 confirm 대체)
+  const handleCancel = () => {
     if (!selected || !selectedParty || !refund) return;
     if (refund.rate === 0) {
       alert(
@@ -50,18 +52,13 @@ export default function CancelRequestPage() {
       );
       return;
     }
-    const ok = confirm(
-      `정말로 취소하시겠습니까?\n\n` +
-      `대상: ${selectedParty.title}\n` +
-      `파티 일정: ${selectedParty.dateString}\n` +
-      `결제 금액: ₩${(selected.total ?? selectedParty.price).toLocaleString()}\n` +
-      `환불 예정: ₩${refund.refund.toLocaleString()} (${refund.label})\n\n` +
-      `취소를 진행하시면 운영팀으로 환불 요청이 접수됩니다.\n` +
-      `※원활한 성비 조율 및 좌석 배치 재조율을 위해, 실시간 취소가 어려울 수 있는 점 양해 부탁드립니다.\n\n` +
-      `카드 결제 : 확인 즉시 결제하신 카드사를 통해 취소 처리를 진행합니다. (카드사에 따라 영업일 기준 3~5일 소요)\n` +
-      `무통장 입금 : 운영팀에서 확인 후, 환불받으실 계좌번호로 직접 송금해 드립니다.`
-    );
-    if (!ok) return;
+    setShowConfirm(true);
+  };
+
+  // 모달 [확인] → 실제 취소 요청 접수 (로직 동일, 연동 무변경)
+  const submitCancel = async () => {
+    if (!selected) return;
+    setShowConfirm(false);
     setSubmitting(true);
     try {
       // 승인제 전환 — 즉시 결제 취소(refund.php) 대신 'cancel_requested'(취소 요청 중)로 접수.
@@ -264,6 +261,66 @@ export default function CancelRequestPage() {
         </div>
       </main>
       <Footer />
+
+      {/* 취소 확인 모달 — 네이티브 confirm 대체 (브라우저 'thewoollim.com 내용:' 표기 제거,
+          스크롤 없이 한 화면에, 핵심 정보 폰트 강조). 제출 로직/연동은 동일. */}
+      <AnimatePresence>
+        {showConfirm && selected && selectedParty && refund && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={() => setShowConfirm(false)}
+            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.92, y: 20 }}
+              transition={{ type: "spring", stiffness: 260, damping: 22 }}
+              onClick={e => e.stopPropagation()}
+              className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl max-h-[90vh] overflow-y-auto"
+            >
+              <h3 className="font-black text-xl md:text-2xl text-brand-black mb-5">정말로 취소하시겠습니까?</h3>
+
+              {/* 핵심 정보 — 폰트 강조 */}
+              <dl className="rounded-2xl bg-brand-lightgray/60 border border-gray-100 p-4 md:p-5 space-y-2.5 mb-4">
+                {[
+                  { l: "대상", v: selectedParty.title },
+                  { l: "파티 일정", v: selectedParty.dateString },
+                  { l: "결제 금액", v: `₩${(selected.total ?? selectedParty.price).toLocaleString()}` },
+                ].map(r => (
+                  <div key={r.l} className="flex justify-between gap-3 items-baseline">
+                    <dt className="text-gray-500 font-bold text-sm md:text-base flex-shrink-0">{r.l}</dt>
+                    <dd className="font-black text-base md:text-lg text-brand-black text-right break-keep">{r.v}</dd>
+                  </div>
+                ))}
+                <div className="flex justify-between gap-3 items-baseline pt-2.5 border-t border-gray-200/70">
+                  <dt className="text-gray-500 font-bold text-sm md:text-base flex-shrink-0">환불 예정</dt>
+                  <dd className="font-black text-lg md:text-xl text-brand-point text-right">
+                    ₩{refund.refund.toLocaleString()} <span className="text-xs md:text-sm font-bold text-gray-400">({refund.label})</span>
+                  </dd>
+                </div>
+              </dl>
+
+              {/* 안내 문구 — 보조 폰트 */}
+              <div className="text-xs md:text-sm text-gray-600 font-medium leading-relaxed break-keep space-y-2 mb-6">
+                <p>취소를 진행하시면 운영팀으로 환불 요청이 접수됩니다.</p>
+                <p className="text-gray-400">※ 원활한 성비 조율 및 좌석 배치 재조율을 위해, 실시간 취소가 어려울 수 있는 점 양해 부탁드립니다.</p>
+                <p><span className="font-bold text-brand-black">카드 결제 :</span> 확인 즉시 결제하신 카드사를 통해 취소 처리를 진행합니다. (카드사에 따라 영업일 기준 3~5일 소요)</p>
+                <p><span className="font-bold text-brand-black">무통장 입금 :</span> 운영팀에서 확인 후, 환불받으실 계좌번호로 직접 송금해 드립니다.</p>
+              </div>
+
+              <div className="flex gap-3">
+                <button type="button" onClick={() => setShowConfirm(false)}
+                  className="flex-1 py-3.5 rounded-2xl font-black text-base bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
+                  돌아가기
+                </button>
+                <button type="button" onClick={submitCancel} disabled={submitting}
+                  className="flex-1 py-3.5 rounded-2xl font-black text-base bg-brand-black text-white hover:bg-brand-point transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
+                  확인
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
