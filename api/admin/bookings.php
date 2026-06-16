@@ -313,7 +313,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $partyId   = (string)($beforeBooking['partyId'] ?? '');
     $gender    = (string)($beforeBooking['gender']  ?? '');
     $genderKey = $gender === '남성' ? 'male' : 'female';
-    if ($partyId !== '') {
+
+    // ⚠ 무통장 미입금 건은 애초에 인원 카운트(+1)가 안 된 상태이므로 -1 차감에서 제외 (v7.0).
+    //   카운트 시점: 카드=success.php 즉시 / 무통장=관리자 [결제확인](confirm_vbank, vbankPaidAt 기록).
+    //   따라서 'vbank 인데 vbankPaidAt 이 없으면' 한 번도 카운트 안 된 건 → 차감 스킵.
+    $wasCounted = !(($beforeBooking['paymentMethod'] ?? '') === 'vbank' && empty($beforeBooking['vbankPaidAt']));
+    if ($partyId !== '' && $wasCounted) {
         $countsFile = "$dataDir/party_counts.json";
         $fp = fopen($countsFile, 'c+');
         if ($fp) {

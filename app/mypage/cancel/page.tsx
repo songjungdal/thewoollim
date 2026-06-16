@@ -24,8 +24,13 @@ export default function CancelRequestPage() {
   }, [mounted, isLoggedIn, router]);
 
   // cancelled 외 모든 booking이 취소 대상 (status = paid_pending_profile / pending_approval / confirmed)
+  // 이미 취소요청('cancel_requested')/환불완료('refund_completed')/취소된 건은 목록에서 숨김 (v7.0)
   const cancellable = useMemo(
-    () => bookings.filter(b => b.status !== "cancelled"),
+    () => bookings.filter(b =>
+      b.status !== "cancelled" &&
+      b.status !== "cancel_requested" &&
+      b.status !== "refund_completed"
+    ),
     [bookings]
   );
 
