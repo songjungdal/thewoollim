@@ -249,6 +249,11 @@ export default function AdminDashboard() {
   const router = useRouter();
   const [authChecked, setAuthChecked] = useState(false);
   const [tab, setTab] = useState<TabKey>("members");
+  // 운영 현황 팝업 (v7.0) — 진입 시 1회 노출, '오늘 하루 열지 않기' 시 당일 숨김
+  const [showOpsPopup, setShowOpsPopup] = useState(false);
+  const [opsHideToday, setOpsHideToday] = useState(false);
+  const [opsNow, setOpsNow] = useState("");
+  const [opsErrorCount, setOpsErrorCount] = useState(0);
   const PARTIES = useParties();
 
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -773,6 +778,27 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => { if (authChecked) loadAll(); }, [authChecked, loadAll]);
+
+  // 운영 현황 팝업 — 진입(authChecked) 시 1회. 당일 '열지 않기' 했으면 스킵. (v7.0)
+  const opsTodayKey = () => {
+    const d = new Date(); const z = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`;
+  };
+  useEffect(() => {
+    if (!authChecked) return;
+    try { if (localStorage.getItem("hide_admin_popup") === opsTodayKey()) return; } catch {}
+    const d = new Date(); const z = (n: number) => String(n).padStart(2, "0");
+    setOpsNow(`${opsTodayKey()} ${z(d.getHours())}:${z(d.getMinutes())}`);
+    setShowOpsPopup(true);
+    fetch("/api/admin/error-count.php", { cache: "no-store", credentials: "include" })
+      .then(r => r.json()).then(j => { if (j?.ok) setOpsErrorCount(Number(j.count) || 0); }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authChecked]);
+
+  const closeOpsPopup = () => {
+    if (opsHideToday) { try { localStorage.setItem("hide_admin_popup", opsTodayKey()); } catch {} }
+    setShowOpsPopup(false);
+  };
 
   // 실시간 동기화: 사용자가 마이페이지에서 프로필을 수정하면 관리자 화면도 새로고침 없이 즉시 반영
   // - focus / visibilitychange: 탭 활성화 시 즉시 갱신
@@ -2517,6 +2543,92 @@ export default function AdminDashboard() {
 
         </motion.div>
       </main>
+
+      {/* === 운영 현황 팝업 (v7.0) — 진입 시 실시간 집계. 데이터는 이미 로드된 상태에서 클라 계산 === */}
+      <AnimatePresence>
+        {showOpsPopup && (() => {
+          const today = opsTodayKey();
+          const ym = today.slice(0, 7);
+          const newMembers = users.filter(u => (u.created_at || "").startsWith(today)).length;
+          const monthParties = PARTIES.filter(p => (p.calendarDate || "").startsWith(ym)).length;
+          const byStatusGender = (st: string, g: string) => bookings.filter(b => b.status === st && b.userGender === g).length;
+          const cancelReq = bookings.filter(b => b.status === "cancel_requested").length;
+          const newMemos = memos.filter(m => (m.created_at || "").slice(0, 10) === today).length;
+          const Num = ({ v }: { v: number }) => <span className="font-black text-brand-point text-2xl md:text-3xl align-middle mx-0.5">{v}</span>;
+          const GenderLine = ({ st }: { st: string }) => (
+            <>남 <Num v={byStatusGender(st, "남성")} />명 <span className="text-gray-300 mx-1">|</span> 여 <Num v={byStatusGender(st, "여성")} />명</>
+          );
+          return (
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={closeOpsPopup}
+              className="fixed inset-0 z-[220] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+            >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.94, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.94, y: 16 }}
+                transition={{ type: "spring", stiffness: 260, damping: 24 }}
+                onClick={e => e.stopPropagation()}
+                className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 md:p-8"
+              >
+                <h3 className="font-black text-lg md:text-xl text-brand-black">현재 운영 현황입니다.</h3>
+                <p className="text-xs md:text-sm text-gray-400 font-bold mb-5">({opsNow} 기준)</p>
+
+                <div className="space-y-5 text-sm md:text-base text-gray-700 font-medium">
+                  {/* 오늘자 기본 현황 */}
+                  <div>
+                    <p className="font-black text-brand-black mb-2">[오늘자 기본 현황]</p>
+                    <ul className="space-y-1.5 pl-1">
+                      <li>• 신규 가입 회원 : <Num v={newMembers} />명</li>
+                      <li>• 이번달 진행 중인 파티 : <Num v={monthParties} />개</li>
+                    </ul>
+                  </div>
+                  {/* 파티 신청 현황 */}
+                  <div>
+                    <p className="font-black text-brand-black mb-2">[파티 신청 현황]</p>
+                    <ul className="space-y-1.5 pl-1">
+                      <li>• 입금 확인 중 : <GenderLine st="vbank_pending" /></li>
+                      <li>• 결제 완료 : <GenderLine st="paid_pending_profile" /></li>
+                      <li>• 확정 대기 중 : <GenderLine st="pending_approval" /></li>
+                    </ul>
+                  </div>
+                  {/* 업무 확인 필요 */}
+                  <div>
+                    <p className="font-black text-brand-black mb-2">[업무 확인 필요]</p>
+                    <ul className="space-y-1.5 pl-1">
+                      <li>• 취소 요청 : <Num v={cancelReq} />건</li>
+                      <li>• 신규 업무 메모 : <Num v={newMemos} />건</li>
+                      <li>• 시스템 에러 : <Num v={opsErrorCount} />건 {opsErrorCount === 0 && <span className="text-emerald-600 font-bold">(정상)</span>}</li>
+                    </ul>
+                  </div>
+                </div>
+
+                {/* 하단 컨트롤 */}
+                <div className="flex items-center justify-end gap-3 mt-7 pt-5 border-t border-gray-100">
+                  <label className="flex items-center gap-2 text-xs md:text-sm font-bold text-gray-500 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={opsHideToday}
+                      onChange={e => {
+                        setOpsHideToday(e.target.checked);
+                        if (e.target.checked) {
+                          try { localStorage.setItem("hide_admin_popup", opsTodayKey()); } catch {}
+                          setShowOpsPopup(false);
+                        }
+                      }}
+                      className="w-4 h-4 accent-brand-point"
+                    />
+                    오늘 하루 열지 않기
+                  </label>
+                  <button type="button" onClick={closeOpsPopup}
+                    className="px-5 py-2.5 rounded-xl font-black text-sm bg-brand-black text-white hover:bg-brand-point transition-colors">
+                    닫기
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          );
+        })()}
+      </AnimatePresence>
 
       {/* === 매칭 결과 모달 (관리자 전용 — bookings 탭의 [결과 보기] 버튼에서 트리거)
             전역 렌더 — 어떤 탭에 있든 동작 */}
