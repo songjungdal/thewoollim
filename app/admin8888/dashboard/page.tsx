@@ -2554,7 +2554,8 @@ export default function AdminDashboard() {
           const byStatusGender = (st: string, g: string) => bookings.filter(b => b.status === st && b.userGender === g).length;
           const cancelReq = bookings.filter(b => b.status === "cancel_requested").length;
           const newMemos = memos.filter(m => (m.created_at || "").slice(0, 10) === today).length;
-          const Num = ({ v }: { v: number }) => <span className="font-black text-brand-point text-2xl md:text-3xl align-middle mx-0.5">{v}</span>;
+          // 변동 없음(0) → 검정 / 변동 있음(0 초과) → 빨강 (청록 포인트색은 시인성 낮아 교체)
+          const Num = ({ v }: { v: number }) => <span className={`font-black ${v === 0 ? "text-black" : "text-red-600"} text-2xl md:text-3xl align-middle mx-0.5`}>{v}</span>;
           const GenderLine = ({ st }: { st: string }) => (
             <>남 <Num v={byStatusGender(st, "남성")} />명 <span className="text-gray-300 mx-1">|</span> 여 <Num v={byStatusGender(st, "여성")} />명</>
           );
