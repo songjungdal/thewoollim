@@ -113,7 +113,7 @@ export default function PartyClientView({ id }: { id: string }) {
   const PARTIES = useParties();
   const baseItem = PARTIES.find(p => p.id === id);
   const router = useRouter();
-  const { isLoggedIn, addToCart, profile, partyCounts, cart, bookings } = useAuth();
+  const { isLoggedIn, addToCart, profile, partyCounts, cart, bookings, verifySession } = useAuth();
   // 이미 신청한 파티 — cancelled 가 아닌 모든 booking 상태(결제완료/확정대기/참가확정)를 차단 사유로 간주
   const alreadyBooked = bookings.some(b => b.partyId === id && b.status !== "cancelled");
 
@@ -215,12 +215,18 @@ export default function PartyClientView({ id }: { id: string }) {
   };
 
   // 참가신청 — 카트에 담고 마이페이지로 이동 (중복 신청/카트 시 차단)
-  const handleCheckout = () => {
-    if (handleAlreadyBookedPrompt()) return;
+  const handleCheckout = async () => {
+    // 세션 만료 방어 (v5.1) — 미로그인/만료 시 이후 로직(중복체크·카트·결제) 전부 차단
     if (!isLoggedIn) {
       router.push(`/login?redirect=${encodeURIComponent(`/party/${id}/`)}`);
       return;
     }
+    if (!(await verifySession())) {
+      alert("로그인 세션이 만료되었습니다. 다시 로그인해 주세요.");
+      router.push(`/login?redirect=${encodeURIComponent(`/party/${id}/`)}`);
+      return;
+    }
+    if (handleAlreadyBookedPrompt()) return;
     if (!profile?.gender) {
       alert("프로필 정보(성별)가 필요합니다. 프로필을 먼저 완성해주세요.");
       router.push("/profile-setup/");
@@ -239,12 +245,18 @@ export default function PartyClientView({ id }: { id: string }) {
   };
 
   // 장바구니 — 한 사용자는 같은 파티에 1회만 담을 수 있음 + 이미 신청한 파티 confirm 안내
-  const handleAddToCart = () => {
-    if (handleAlreadyBookedPrompt()) return;
+  const handleAddToCart = async () => {
+    // 세션 만료 방어 (v5.1) — 미로그인/만료 시 이후 로직 전부 차단
     if (!isLoggedIn) {
-      router.push("/login");
+      router.push(`/login?redirect=${encodeURIComponent(`/party/${id}/`)}`);
       return;
     }
+    if (!(await verifySession())) {
+      alert("로그인 세션이 만료되었습니다. 다시 로그인해 주세요.");
+      router.push(`/login?redirect=${encodeURIComponent(`/party/${id}/`)}`);
+      return;
+    }
+    if (handleAlreadyBookedPrompt()) return;
     if (!profile?.gender) {
       alert("프로필 정보(성별)가 필요합니다. 프로필을 먼저 완성해주세요.");
       router.push("/profile-setup/");

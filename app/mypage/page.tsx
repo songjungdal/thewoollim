@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -78,7 +78,7 @@ const STATUS_DISPLAY: Record<BookingStatus, { label: string; tone: string; strip
 };
 
 export default function MyPage() {
-  const { mounted, isLoggedIn, userEmail, userRole, logout, cart, removeFromCart, profile, deleteAccount, bookings, appliedCoupon, applyCoupon, clearCoupon, partyCounts, refreshCart, refreshBookings } = useAuth();
+  const { mounted, isLoggedIn, userEmail, userRole, logout, verifySession, cart, removeFromCart, profile, deleteAccount, bookings, appliedCoupon, applyCoupon, clearCoupon, partyCounts, refreshCart, refreshBookings } = useAuth();
   const PARTIES = useParties();
   const router = useRouter();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -138,6 +138,22 @@ export default function MyPage() {
       router.push("/login?redirect=/mypage");
     }
   }, [mounted, isLoggedIn, router]);
+
+  // 세션 만료 방어 (v5.1) — localStorage 로 로그인 상태로 보여도 실제 서버 세션(me.php)이
+  // 만료됐으면 알림 후 로그아웃 + 로그인 페이지로. 진입 시 1회만 검사.
+  const sessionCheckedRef = useRef(false);
+  useEffect(() => {
+    if (!mounted || !isLoggedIn || sessionCheckedRef.current) return;
+    sessionCheckedRef.current = true;
+    (async () => {
+      const ok = await verifySession();
+      if (!ok) {
+        alert("로그인 세션이 만료되었습니다. 다시 로그인해 주세요.");
+        logout();
+        router.push("/login?redirect=/mypage");
+      }
+    })();
+  }, [mounted, isLoggedIn, verifySession, logout, router]);
 
   useEffect(() => {
     setSelectedIds(new Set(cart.map(c => c.partyId)));

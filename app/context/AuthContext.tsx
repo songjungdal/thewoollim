@@ -206,6 +206,7 @@ type AuthContextType = {
   userRole: "user" | "admin" | null;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
+  verifySession: () => Promise<boolean>; // 서버 세션(me.php) 실시간 유효성 검사 (v5.1)
   cart: CartItem[];
   addToCart: (partyId: string) => void;
   removeFromCart: (partyId: string) => void;
@@ -232,6 +233,7 @@ const AuthContext = createContext<AuthContextType>({
   userRole: null,
   login: async () => false,
   logout: () => {},
+  verifySession: async () => false,
   cart: [],
   addToCart: () => {},
   removeFromCart: () => {},
@@ -557,6 +559,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return true;
   }, []);
 
+  // 서버 세션(me.php) 실시간 유효성 검사 — localStorage 폴백과 무관하게 실제 세션 여부 확인 (v5.1)
+  const verifySession = useCallback(async (): Promise<boolean> => {
+    const info = await fetchSessionInfo();
+    return !!info;
+  }, []);
+
   const logout = useCallback(() => {
     const prevEmail = userEmailRef.current;
     // 1) 로컬 세션/캐시 즉시 정리 (서버 응답 기다리지 않음)
@@ -766,7 +774,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={{
       mounted, isLoggedIn, userEmail, userRole,
-      login, logout,
+      login, logout, verifySession,
       cart, addToCart, removeFromCart, setItemQuantity, refreshCart,
       profile, updateProfile, refreshProfile,
       deleteAccount,
