@@ -2266,8 +2266,9 @@ export default function AdminDashboard() {
               <section>
                 {/* 상단 고정 강조 문구 */}
                 <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 md:p-5 mb-5">
-                  <p className="text-sm md:text-base font-black text-[#CC0000] leading-relaxed break-keep">
-                    취소요청은 카드결제의 취소만 즉시 이루어지며, 무통장 환불의 경우 고객에게 연락해서 환불계좌를 받고 별도로 송금처리해야 합니다. (중요!) 반드시 취소완료 후 예약 / 신청 현황에서 취소완료 된 참가자를 취소처리를 해야합니다.
+                  <p className="text-sm md:text-base font-medium text-brand-black leading-relaxed break-keep">
+                    취소요청은 카드결제의 취소만 즉시 이루어지며, 무통장 환불의 경우 고객에게 연락해서 환불계좌를 받고 별도로 송금처리해야 합니다.{" "}
+                    <span className="text-red-600 font-bold">반드시 취소완료 후 예약 / 신청 현황에서 취소완료 된 참가자를 취소처리</span>를 해야합니다. 예약 / 신청 현황에서 취소처리를 해야지만 인원 차감(-1) 카운트가 됩니다.
                   </p>
                 </div>
 
