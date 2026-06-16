@@ -1151,6 +1151,10 @@ export default function AdminDashboard() {
               .sort((a, b) => a.calendarDate.localeCompare(b.calendarDate));
             const orderedPartyIds = filteredParties.map(p => p.id);
 
+            // 월별 필터 기준 집계 — 선택된 월의 매칭파티에 속한 예약만 합산 (v8.2)
+            const orderedPartyIdSet = new Set(orderedPartyIds);
+            const monthBookings = bookings.filter(b => orderedPartyIdSet.has(b.partyId));
+
             // 월 라벨 헬퍼
             const labelMonth = (m: string) => {
               if (m === "all") return "전체 월";
@@ -1164,7 +1168,7 @@ export default function AdminDashboard() {
                   <div>
                     <h2 className="text-xl md:text-2xl font-black">예약 / 신청 현황</h2>
                     <p className="text-sm text-gray-500 font-medium mt-1">
-                      <span className="font-bold text-brand-point">{labelMonth(monthFilter)}</span> · 매칭파티 {orderedPartyIds.length}개 · 전체 {bookings.length}건
+                      <span className="font-bold text-brand-point">{labelMonth(monthFilter)}</span> · 매칭파티 {orderedPartyIds.length}개 · 전체 {monthBookings.length}건
                     </p>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
@@ -1187,15 +1191,16 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                {/* 통계 요약 */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-5 md:mb-6">
+                {/* 통계 요약 — 월별 필터 기준 집계. 순서: 입금 확인 중 → 결제완료 → 확정 대기중 → 참가 확정 완료 → 전체 (v8.2) */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 md:gap-4 mb-5 md:mb-6">
                   {[
-                    { key: "paid_pending_profile", label: "결제완료(프로필 대기)", icon: AlertTriangle },
-                    { key: "pending_approval", label: "확정 대기 중", icon: Clock },
+                    { key: "vbank_pending", label: "입금 확인 중(무통장)", icon: CreditCard },
+                    { key: "paid_pending_profile", label: "결제완료", icon: AlertTriangle },
+                    { key: "pending_approval", label: "확정 대기중", icon: Clock },
                     { key: "confirmed", label: "참가 확정 완료", icon: CheckCircle2 },
                     { key: "all", label: "전체", icon: Ticket },
                   ].map(s => {
-                    const count = s.key === "all" ? bookings.length : bookings.filter(b => b.status === s.key).length;
+                    const count = s.key === "all" ? monthBookings.length : monthBookings.filter(b => b.status === s.key).length;
                     const Icon = s.icon;
                     return (
                       <div key={s.key} className="bg-white rounded-xl border border-gray-200 p-3 md:p-4">
