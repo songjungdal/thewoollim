@@ -37,7 +37,7 @@ try {
           AND marital_status IN ('싱글','돌싱')
           AND job  IS NOT NULL    AND job  != ''
           AND mbti IS NOT NULL    AND mbti != ''
-        ORDER BY id DESC
+        ORDER BY COALESCE(updated_at, created_at) DESC, id DESC
         LIMIT 50
     ");
     $rows = $stmt->fetchAll();
