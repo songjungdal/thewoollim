@@ -36,6 +36,18 @@ if (file_exists($bookingsFile)) {
         foreach ((array)$parties as $p) {
             if (isset($p['id'])) $partyMap[(string)$p['id']] = $p;
         }
+        // 취소 요청 중 차단 (v6.3) — 결제수단 무관, 'cancel_requested' 1건이라도 있으면 탈퇴 불가.
+        foreach ($bookings as $b) {
+            if (is_array($b) && (string)($b['status'] ?? '') === 'cancel_requested') {
+                jsonFail(
+                    "잠시만요! 현재 진행 중인 취소 요청 건이 있습니다. " .
+                    "운영팀에서 내역 확인 및 취소/환불 처리가 최종 완료된 이후에 회원 탈퇴가 가능합니다. " .
+                    "원활한 정산을 위해 조금만 기다려 주시기 바랍니다.",
+                    409
+                );
+            }
+        }
+
         $today    = date('Y-m-d');
         $blocking = ['paid_pending_profile', 'pending_approval', 'confirmed'];
         foreach ($bookings as $b) {

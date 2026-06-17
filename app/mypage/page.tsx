@@ -614,6 +614,15 @@ export default function MyPage() {
             <button
               type="button"
               onClick={() => {
+                // 취소 요청 중 차단 (v6.3) — 결제수단 무관, 'cancel_requested' 1건이라도 있으면 탈퇴 불가.
+                if (bookings.some(b => b.status === "cancel_requested")) {
+                  alert(
+                    "잠시만요! 현재 진행 중인 취소 요청 건이 있습니다. " +
+                    "운영팀에서 내역 확인 및 취소/환불 처리가 최종 완료된 이후에 회원 탈퇴가 가능합니다. " +
+                    "원활한 정산을 위해 조금만 기다려 주시기 바랍니다."
+                  );
+                  return;
+                }
                 // 진행 중인 매칭 파티 차단 (v6.2 정밀 보정) — status ∈ {paid_pending_profile,
                 // pending_approval, confirmed} AND 행사일(calendarDate)이 아직 안 지난 경우만 차단.
                 // cancelled/completed, 과거 파티, 삭제된 파티는 '정리 완료'로 간주해 제외.
