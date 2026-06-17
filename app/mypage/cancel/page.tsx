@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Calendar, MapPin, AlertTriangle, CheckCircle2, XCircle, Info } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, AlertTriangle, CheckCircle2, Info } from "lucide-react";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import { useAuth } from "../../context/AuthContext";
@@ -26,14 +26,19 @@ export default function CancelRequestPage() {
 
   // cancelled 외 모든 booking이 취소 대상 (status = paid_pending_profile / pending_approval / confirmed)
   // 이미 취소요청('cancel_requested')/환불완료('refund_completed')/취소된 건은 목록에서 숨김 (v7.0)
-  const cancellable = useMemo(
-    () => bookings.filter(b =>
-      b.status !== "cancelled" &&
-      b.status !== "cancel_requested" &&
-      b.status !== "refund_completed"
-    ),
-    [bookings]
-  );
+  // 행사일이 '완전히 지난(오늘 이전)' 파티는 목록에서 제외. 단, 2일 전 ~ 당일(오늘 포함)은 노출 유지 (v5.x)
+  const cancellable = useMemo(() => {
+    const d = new Date();
+    const z = (n: number) => String(n).padStart(2, "0");
+    const todayStr = `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`;
+    return bookings.filter(b => {
+      if (b.status === "cancelled" || b.status === "cancel_requested" || b.status === "refund_completed") return false;
+      const party = PARTIES.find(p => p.id === b.partyId);
+      // calendarDate(YYYY-MM-DD) 가 오늘보다 이전이면(=완전히 과거) 제외. 오늘/미래는 유지.
+      if (party && party.calendarDate && party.calendarDate < todayStr) return false;
+      return true;
+    });
+  }, [bookings, PARTIES]);
 
   const selected = selectedId ? cancellable.find(b => b.id === selectedId) ?? null : null;
   const selectedParty = selected ? PARTIES.find(p => p.id === selected.partyId) : null;
@@ -44,12 +49,9 @@ export default function CancelRequestPage() {
   // 취소 요청하기 버튼 → 환불 가능 기간 체크 후 커스텀 확인 모달 오픈 (네이티브 confirm 대체)
   const handleCancel = () => {
     if (!selected || !selectedParty || !refund) return;
+    // 환불 불가(파티 2일 전 ~ 당일) — 버튼은 활성 유지하되, 클릭 시 경고 후 접수 차단(return).
     if (refund.rate === 0) {
-      alert(
-        `환불 가능 기간이 지났습니다.\n` +
-        `(파티까지 ${refund.days < 0 ? "이미 종료" : `${refund.days}일`} — 2일 전 이후는 환불 불가)\n\n` +
-        `취소가 불가능합니다.`
-      );
+      alert("파티 시작 2일 전부터는 환불 및 취소가 불가능합니다. 자세한 사항은 고객센터로 문의 바랍니다.");
       return;
     }
     setShowConfirm(true);
@@ -196,23 +198,21 @@ export default function CancelRequestPage() {
                   </dd>
                 </div>
               </dl>
+              {/* 환불 불가(rate 0)여도 버튼은 비활성화하지 않음 — 클릭 시 handleCancel 내부에서
+                  경고 alert 후 return 으로 접수 차단 (v5.x). disabled 는 제출 중에만. */}
               <button
                 type="button"
                 onClick={handleCancel}
-                disabled={submitting || refund.rate === 0}
+                disabled={submitting}
                 className={`w-full py-4 md:py-5 rounded-xl md:rounded-2xl font-black text-base md:text-lg transition-all flex items-center justify-center gap-2.5 ${
-                  refund.rate === 0
-                    ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                    : submitting
-                      ? "bg-gray-300 text-white cursor-wait"
-                      : "bg-brand-black text-white hover:bg-brand-point shadow-xl hover:shadow-brand-point/30"
+                  submitting
+                    ? "bg-gray-300 text-white cursor-wait"
+                    : "bg-brand-black text-white hover:bg-brand-point shadow-xl hover:shadow-brand-point/30"
                 }`}
               >
-                {refund.rate === 0
-                  ? <><XCircle size={20} /> 환불 가능 기간 경과</>
-                  : submitting
-                    ? "취소 처리 중..."
-                    : <><AlertTriangle size={20} /> 취소 요청하기</>}
+                {submitting
+                  ? "취소 처리 중..."
+                  : <><AlertTriangle size={20} /> 취소 요청하기</>}
               </button>
               {refund.rate === 0 && (
                 <p className="text-xs md:text-sm text-red-500 font-medium mt-3 text-center">
