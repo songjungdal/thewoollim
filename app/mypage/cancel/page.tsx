@@ -34,8 +34,10 @@ export default function CancelRequestPage() {
     return bookings.filter(b => {
       if (b.status === "cancelled" || b.status === "cancel_requested" || b.status === "refund_completed") return false;
       const party = PARTIES.find(p => p.id === b.partyId);
+      // 관리자가 삭제한 파티(PARTIES 에 없음 → '파티 #N' 폴백) 건은 목록에서 제외.
+      if (!party) return false;
       // calendarDate(YYYY-MM-DD) 가 오늘보다 이전이면(=완전히 과거) 제외. 오늘/미래는 유지.
-      if (party && party.calendarDate && party.calendarDate < todayStr) return false;
+      if (party.calendarDate && party.calendarDate < todayStr) return false;
       return true;
     });
   }, [bookings, PARTIES]);
