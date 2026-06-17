@@ -122,7 +122,42 @@ if ($method === 'POST') {
         jsonFail('저장 중 오류', 500);
     }
 
-    jsonOut(['ok' => true]);
+    // ── 프로필 필수 항목 전수 검증 → 예약 자동 상태 전환 (paid → pending) ─────────
+    //  필수: 이름·성별·연락처·생년월일·혼인여부·직업·MBTI·관심사 가 모두 채워졌는지 확인.
+    //  (DB에 nickname 컬럼은 없음 — 프로필 카드 완성 필드 전체를 기준으로 검사)
+    //  모두 충족 시: 'paid_pending_profile'(결제완료/프로필대기) booking 을 'pending_approval'(확정 대기 중)로 일괄 전환.
+    //  하나라도 미입력이면 기존 'paid_pending_profile' 유지. party_counts(인원)는 변경하지 않음.
+    $profileComplete =
+        trim((string)$applyName)    !== '' &&
+        ($applyGender === '남성' || $applyGender === '여성') &&
+        trim((string)$applyPhone)   !== '' &&
+        !empty($applyBirth) &&
+        ($applyMarital === '싱글' || $applyMarital === '돌싱') &&
+        trim($job)        !== '' &&
+        $mbti             !== '' &&
+        trim((string)$interests) !== '';
+
+    $advanced = false;
+    if ($profileComplete) {
+        $bf = dataDir() . '/bookings_' . md5(strtolower(trim($email))) . '.json';
+        if (file_exists($bf)) {
+            $bk = json_decode((string)file_get_contents($bf), true);
+            if (is_array($bk)) {
+                $changed = false;
+                foreach ($bk as &$b) {
+                    if (is_array($b) && (string)($b['status'] ?? '') === 'paid_pending_profile') {
+                        $b['status']    = 'pending_approval';
+                        $b['updatedAt'] = date('c');
+                        $changed = true; $advanced = true;
+                    }
+                }
+                unset($b);
+                if ($changed) file_put_contents($bf, json_encode($bk, JSON_UNESCAPED_UNICODE));
+            }
+        }
+    }
+
+    jsonOut(['ok' => true, 'profileComplete' => $profileComplete, 'advanced' => $advanced]);
 }
 
 jsonFail('method not allowed', 405);

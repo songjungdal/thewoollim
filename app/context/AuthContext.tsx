@@ -634,13 +634,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("woollim_profile", JSON.stringify(p));
     if (userEmailRef.current) {
       await saveServerProfile(userEmailRef.current, p);
-      // 프로필이 완전해지면 paid_pending_profile → pending_approval로 자동 전환
-      if (isProfileComplete(p)) {
-        const updated = await postBookings(userEmailRef.current, { action: "advance" });
-        if (updated) {
-          setBookings(updated);
-          writeBookingsCache(userEmailRef.current, updated);
-        }
+      // 프로필 저장 시 서버(profile.php POST)가 필수항목 전수검증 후 paid_pending_profile → pending_approval
+      // 자동 전환. 최신 예약 상태를 no-store 로 즉시 동기화 → 마이페이지 배지/메인 참여자 명단 반영.
+      const updated = await fetchServerBookings(userEmailRef.current);
+      if (updated) {
+        setBookings(updated);
+        writeBookingsCache(userEmailRef.current, updated);
       }
     }
   }, []);
