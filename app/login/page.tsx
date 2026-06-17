@@ -260,6 +260,9 @@ function LoginContent() {
 
   // (이전 시뮬레이션 모달은 실제 OAuth 도입으로 더 이상 사용하지 않음 — completeSnsSignup 제거)
 
+  // SNS 간편 로그인 UI 노출 토글 — 임시 숨김. true 로만 바꾸면 1초 복구 (백엔드/콜백/.env 무관).
+  const showSocial = false;
+
   const socialButtons = [
     { name: "카카오", color: "bg-[#FEE500] text-[#3c1e1e] hover:brightness-95",                      logo: "/images/sns/kakao.jpg",  blendClass: "mix-blend-multiply" },
     { name: "네이버", color: "bg-[#03C75A] text-white hover:brightness-95",                          logo: "/images/sns/naver.jpg",  blendClass: "mix-blend-multiply" },
@@ -350,28 +353,33 @@ function LoginContent() {
                       </button>
                     </div>
 
-                    <div className="relative my-10">
-                      <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-100"></div></div>
-                      <div className="relative flex justify-center text-sm uppercase"><span className="bg-white px-4 text-gray-400 font-bold tracking-widest">SNS 간편 로그인</span></div>
-                    </div>
+                    {/* SNS 간편 로그인 — 임시 숨김 (showSocial=false). 코드 보존, true 로 복구. */}
+                    {showSocial && (
+                      <>
+                        <div className="relative my-10">
+                          <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-100"></div></div>
+                          <div className="relative flex justify-center text-sm uppercase"><span className="bg-white px-4 text-gray-400 font-bold tracking-widest">SNS 간편 로그인</span></div>
+                        </div>
 
-                    <div className="space-y-3">
-                      {socialButtons.map((btn) => (
-                        <button
-                          key={btn.name}
-                          type="button"
-                          onClick={() => handleSnsLogin(btn.name)}
-                          className={`w-full py-3 md:py-3.5 px-4 md:px-5 rounded-xl font-bold flex items-center justify-center gap-3 md:gap-3.5 transition-all hover:scale-[1.02] text-sm md:text-base ${btn.color}`}
-                        >
-                          <img
-                            src={btn.logo}
-                            alt={`${btn.name} 로고`}
-                            className={`w-9 h-9 md:w-10 md:h-10 object-contain flex-shrink-0 ${btn.blendClass}`}
-                          />
-                          <span className="leading-none">{btn.name}로 로그인</span>
-                        </button>
-                      ))}
-                    </div>
+                        <div className="space-y-3">
+                          {socialButtons.map((btn) => (
+                            <button
+                              key={btn.name}
+                              type="button"
+                              onClick={() => handleSnsLogin(btn.name)}
+                              className={`w-full py-3 md:py-3.5 px-4 md:px-5 rounded-xl font-bold flex items-center justify-center gap-3 md:gap-3.5 transition-all hover:scale-[1.02] text-sm md:text-base ${btn.color}`}
+                            >
+                              <img
+                                src={btn.logo}
+                                alt={`${btn.name} 로고`}
+                                className={`w-9 h-9 md:w-10 md:h-10 object-contain flex-shrink-0 ${btn.blendClass}`}
+                              />
+                              <span className="leading-none">{btn.name}로 로그인</span>
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </motion.div>
                 ) : (
                   <motion.div 
