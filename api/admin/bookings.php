@@ -89,9 +89,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     $bookings = loadBookings($email);
 
-    // ─── action === 'confirm_vbank' — 무통장 입금 확인 (v7.0) ──────────────
-    //  vbank_pending → pending_approval(확정 대기 중) 전환 + 이 시점에 party_counts +1.
-    //  (카드결제는 success.php 에서 결제 즉시 +1 하지만, 무통장은 입금 확인된 지금 +1)
+    // ─── action === 'confirm_vbank' — 무통장 입금 확인 (v7.0 / v5.9) ──────────────
+    //  vbank_pending → (프로필 완성 여부에 따라) paid_pending_profile/pending_approval 전환 + party_counts +1.
+    //  카드결제 success.php 와 동일 분기 — 결제완료 후 프로필 작성/자동전환 흐름을 그대로 탄다.
+    //  (카드는 결제 즉시 +1, 무통장은 입금 확인된 지금 +1)
     if ($action === 'confirm_vbank') {
         $found = false; $target = null;
         foreach ($bookings as &$b) {
@@ -131,10 +132,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             fflush($fp); flock($fp, LOCK_UN); fclose($fp);
         }
 
-        // 상태 전환 → pending_approval (이후 [참가확정] 으로 confirmed 가능 — 카드와 동일 흐름)
+        // 카드 결제 성공(success.php)과 동일한 분기로 상태 전환 (v5.9):
+        //   프로필(이름·성별·MBTI·직업) 완성 → 'pending_approval'(확정 대기 중) 즉시 전환
+        //   미완성 → 'paid_pending_profile'(결제완료) — 마이페이지에서 프로필 작성 유도, 완료 시 기존 advance 로직이 자동 전환.
+        $profileComplete = false;
+        try {
+            $pdo  = getDB();
+            $stmt = $pdo->prepare("SELECT name, gender, mbti, job FROM users WHERE LOWER(email) = LOWER(?) AND status='active' LIMIT 1");
+            $stmt->execute([$email]);
+            $pu = $stmt->fetch();
+            if ($pu && trim((string)$pu['name']) !== '' && trim((string)$pu['gender']) !== ''
+                  && trim((string)$pu['job']) !== '' && trim((string)$pu['mbti']) !== '') {
+                $profileComplete = true;
+            }
+        } catch (Throwable $e) {}
+        $newStatus = $profileComplete ? 'pending_approval' : 'paid_pending_profile';
+
         foreach ($bookings as &$b) {
             if (($b['id'] ?? '') === $bid) {
-                $b['status']      = 'pending_approval';
+                $b['status']      = $newStatus;
                 $b['updatedAt']   = date('c');
                 $b['vbankPaidAt'] = date('c');
                 break;
@@ -144,18 +160,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         saveBookings($email, $bookings);
 
         @file_put_contents($dataDir . '/_vbank_confirm.log', sprintf(
-            "[%s] CONFIRM_VBANK email=%s bid=%s partyId=%s gender=%s\n",
-            date('c'), $email, $bid, $partyId, $gender
+            "[%s] CONFIRM_VBANK email=%s bid=%s partyId=%s gender=%s newStatus=%s\n",
+            date('c'), $email, $bid, $partyId, $gender, $newStatus
         ), FILE_APPEND);
 
         logAdminActivity(
             'update', 'booking', $bid,
-            "무통장 입금 확인 — 회원 {$email}, 파티 #{$partyId}, 성별 {$gender} (+1 인원 반영)",
+            "무통장 입금 확인 — 회원 {$email}, 파티 #{$partyId}, 성별 {$gender} (+1 인원 반영, → {$newStatus})",
             ['status' => 'vbank_pending'],
-            ['status' => 'pending_approval']
+            ['status' => $newStatus]
         );
 
-        echo json_encode(['ok' => true, 'partyId' => $partyId, 'gender' => $gender]);
+        echo json_encode(['ok' => true, 'partyId' => $partyId, 'gender' => $gender, 'status' => $newStatus]);
         exit;
     }
 

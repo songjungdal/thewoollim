@@ -845,7 +845,9 @@ export default function AdminDashboard() {
     const d = await res.json();
     if (d?.ok) {
       try { new BroadcastChannel("woollim_party_counts").postMessage({ at: Date.now() }); } catch { }
-      alert("입금 확인 완료 — '확정 대기 중'으로 전환되었습니다.");
+      // 카드결제와 동일 분기 — 프로필 미완성=결제완료(프로필 대기) / 완성=확정 대기 중 (v5.9)
+      const label = d.status === "pending_approval" ? "확정 대기 중" : "결제완료(프로필 작성 대기)";
+      alert(`입금 확인 완료 — '${label}'으로 전환되었습니다. (인원 +1 반영)`);
       await loadAll();
     } else {
       alert(d?.error || "입금 확인 처리 실패");
