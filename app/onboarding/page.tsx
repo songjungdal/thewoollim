@@ -233,8 +233,10 @@ export default function OnboardingPage() {
           <button
             type="button"
             onClick={() => {
+              // 알림 최우선 → [확인] 후 마이페이지로 이동 (목적지 / → /mypage 변경)
+              alert("프로필 정보를 입력하셔야 어울림 매칭파티에 참가하실 수 있습니다. 마이페이지 [정보수정]을 통해 프로필 정보를 완성해 주세요.");
               snoozeOnboarding();
-              router.push("/");
+              router.push("/mypage");
             }}
             disabled={submitting}
             className="w-full bg-white text-gray-500 py-3.5 md:py-4 rounded-xl font-bold text-sm md:text-base border border-gray-200 hover:border-gray-400 hover:text-gray-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
