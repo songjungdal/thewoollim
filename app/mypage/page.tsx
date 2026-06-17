@@ -614,12 +614,19 @@ export default function MyPage() {
             <button
               type="button"
               onClick={() => {
-                // 진행 중인 매칭 파티 차단 — paid_pending_profile / pending_approval / confirmed
-                const blocking = bookings.some(b =>
-                  b.status === "paid_pending_profile" ||
-                  b.status === "pending_approval" ||
-                  b.status === "confirmed"
-                );
+                // 진행 중인 매칭 파티 차단 (v6.2 정밀 보정) — status ∈ {paid_pending_profile,
+                // pending_approval, confirmed} AND 행사일(calendarDate)이 아직 안 지난 경우만 차단.
+                // cancelled/completed, 과거 파티, 삭제된 파티는 '정리 완료'로 간주해 제외.
+                const today = (() => {
+                  const d = new Date(); const z = (n: number) => String(n).padStart(2, "0");
+                  return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`;
+                })();
+                const blocking = bookings.some(b => {
+                  if (!(b.status === "paid_pending_profile" || b.status === "pending_approval" || b.status === "confirmed")) return false;
+                  const party = PARTIES.find(p => p.id === b.partyId);
+                  if (!party || !party.calendarDate) return false; // 삭제/날짜없음 → 차단 안 함
+                  return party.calendarDate >= today;              // 오늘 이상(진행 중)만 차단
+                });
                 if (blocking) {
                   alert(
                     "잠시만요! 아직 진행 중인 매칭 파티가 남아있어요.\n" +

@@ -23,25 +23,34 @@ $body  = jsonBody();
 $email = normalizeEmail((string)($body['email'] ?? ''));
 requireUser($email);
 
-// ── 사전 검증 — 진행 중인 booking 이 있으면 탈퇴 차단 ─────────────────────
-//    paid_pending_profile / pending_approval / confirmed = '진행 중'.
-//    completed (모임종료) / cancelled (취소됨) 만 있으면 탈퇴 허용.
+// ── 사전 검증 — '진행 중인 매칭 파티'가 있으면 탈퇴 차단 (v6.2 정밀 보정) ─────────
+//    진행 중 = status ∈ {paid_pending_profile, pending_approval, confirmed} AND 행사일이 아직 안 지남.
+//    completed(모임종료)/cancelled(취소됨), 또는 행사일이 지난 과거 파티는 '정리 완료'로 보고 제외.
 $bookingsFile = dataDir() . '/bookings_' . md5(strtolower(trim($email))) . '.json';
 if (file_exists($bookingsFile)) {
     $bookings = json_decode((string)file_get_contents($bookingsFile), true);
     if (is_array($bookings)) {
+        // parties.json → calendarDate 조회용 맵
+        $partyMap = [];
+        $parties = json_decode((string)@file_get_contents(dataDir() . '/parties.json'), true);
+        foreach ((array)$parties as $p) {
+            if (isset($p['id'])) $partyMap[(string)$p['id']] = $p;
+        }
+        $today    = date('Y-m-d');
         $blocking = ['paid_pending_profile', 'pending_approval', 'confirmed'];
         foreach ($bookings as $b) {
             if (!is_array($b)) continue;
-            if (in_array((string)($b['status'] ?? ''), $blocking, true)) {
-                jsonFail(
-                    "잠시만요! 아직 진행 중인 매칭 파티가 남아있어요.\n" .
-                    "현재 진행 대기 중인 매칭 파티가 있습니다.\n" .
-                    "탈퇴 버튼 바로 옆에 있는 [취소요청] 버튼을 눌러 먼저 정리를 마쳐주세요.\n" .
-                    "모든 신청 내역이 취소된 후에 회원 탈퇴가 가능합니다.",
-                    409
-                );
-            }
+            if (!in_array((string)($b['status'] ?? ''), $blocking, true)) continue;
+            // 행사일(calendarDate) 이 오늘 이전(=과거)이면 차단 대상에서 제외. 파티 없으면(삭제) 제외.
+            $cal = (string)($partyMap[(string)($b['partyId'] ?? '')]['calendarDate'] ?? '');
+            if ($cal === '' || $cal < $today) continue;
+            jsonFail(
+                "잠시만요! 아직 진행 중인 매칭 파티가 남아있어요.\n" .
+                "현재 진행 대기 중인 매칭 파티가 있습니다.\n" .
+                "탈퇴 버튼 바로 옆에 있는 [취소요청] 버튼을 눌러 먼저 정리를 마쳐주세요.\n" .
+                "모든 신청 내역이 취소된 후에 회원 탈퇴가 가능합니다.",
+                409
+            );
         }
     }
 }
