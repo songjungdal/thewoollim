@@ -35,6 +35,10 @@ type TossWidgets = {
 
 const TOSS_CLIENT_KEY = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY || "";
 
+// 카드/간편결제(토스) 노출 토글 — 최종 승인 단계 동안 임시 비활성.
+// 재활성화: 이 값을 true 로만 바꾸면 위젯/결제버튼 원상복구 (1초 복구). 관련 코드는 삭제 X.
+const CARD_ENABLED = false;
+
 // 이메일 → customerKey (Toss v2 위젯이 요구하는 안정적 식별자, 50자 이하 영숫자)
 function emailToCustomerKey(email: string): string {
   if (!email) return "ANONYMOUS";
@@ -462,8 +466,9 @@ function CheckoutContent() {
             })}
           </div>
 
-          {/* ── Toss v2 결제수단 + 약관 위젯 — 무통장 선택 시 숨김(언마운트 X, ready 유지) ── */}
-          <div className={payMethod === "vbank" ? "hidden" : ""}>
+          {/* ── Toss v2 결제수단 + 약관 위젯 — 카드 선택 + CARD_ENABLED 일 때만 노출.
+                 무통장 선택 또는 카드 비활성(CARD_ENABLED=false) 시 숨김 (언마운트 X, ready 유지) ── */}
+          <div className={(payMethod === "toss" && CARD_ENABLED) ? "" : "hidden"}>
             <div className="bg-white rounded-2xl md:rounded-3xl p-2 md:p-3 border border-gray-100 mb-3">
               <div id="payment-method" />
             </div>
@@ -471,6 +476,21 @@ function CheckoutContent() {
               <div id="agreement" />
             </div>
           </div>
+
+          {/* ── 카드/간편결제 임시 비활성 안내 — 카드 선택 시(위젯 자리)에 노출.
+                 우측 '무통장 입금 안내' 패널과 동일한 스타일 클래스 1:1 적용 ── */}
+          {payMethod === "toss" && !CARD_ENABLED && (
+            <div className="bg-white rounded-2xl md:rounded-3xl p-5 md:p-6 border-2 border-[#F6B26B]/60 mb-3">
+              <div className="flex items-center gap-2 mb-3">
+                <CreditCard size={18} className="text-[#FF2300]" />
+                <span className="font-black text-base md:text-lg text-brand-black">신용카드 / 간편결제 안내</span>
+              </div>
+              <p className="text-xs md:text-sm text-gray-500 font-medium leading-relaxed break-keep">
+                현재 더욱 안전한 결제 환경을 구축하기 위해 신용카드 및 간편결제 시스템 최종 승인 단계를 거치고 있습니다.
+                시스템 오픈 전까지는 우측의 [무통장 입금] 을 통해 바로 결제 및 예약 진행이 가능합니다. 불편을 드려 죄송합니다.
+              </p>
+            </div>
+          )}
 
           {/* ── 무통장 입금 안내 패널 — 무통장 선택 시 노출 ───────────────────── */}
           {payMethod === "vbank" && (
@@ -511,8 +531,9 @@ function CheckoutContent() {
           </Link>
 
           {/* 결제 가능 조건 — 약관 동의는 Toss 결제창에서 자체 처리.
-              무통장 입금은 Toss 위젯(ready) 불필요 → vbank 일 땐 ready 게이트 제외 (v7.0) */}
-          {(() => {
+              무통장 입금은 Toss 위젯(ready) 불필요 → vbank 일 땐 ready 게이트 제외 (v7.0).
+              카드 선택 + 카드 비활성(CARD_ENABLED=false) 시에는 결제 버튼 영역 전체 숨김. */}
+          {!(payMethod === "toss" && !CARD_ENABLED) && (() => {
             const amountValid    = totalAmount > 0;
             const partyIdsValid  = partyIds.length > 0;
             const isVbank        = payMethod === "vbank";
