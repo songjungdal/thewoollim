@@ -294,6 +294,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             "[%s] APPROVED email=%s bid=%s\n", date('c'), $email, $bid
         ), FILE_APPEND);
 
+        // 참가확정 DB 반영 성공 직후 → 알리고 알림 문자 발송 (테스트/관리자 계정 제외, 실패해도 무중단)
+        try {
+            require_once __DIR__ . '/_confirm_sms.php';
+            notifyConfirmSms($email, is_array($approvedBooking) ? $approvedBooking : []);
+        } catch (Throwable $e) {
+            error_log('[admin/bookings approve sms] ' . $e->getMessage());
+        }
+
         logAdminActivity(
             'update', 'booking', $bid,
             "예약 참가확정 — 회원 {$email}, 파티 #" . ($approvedBooking['partyId'] ?? '?'),
