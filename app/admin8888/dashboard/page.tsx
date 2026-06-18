@@ -284,18 +284,8 @@ export default function AdminDashboard() {
   const [hostMap, setHostMap] = useState<Record<string, string>>({});
   const [hostEditingId, setHostEditingId] = useState<string | null>(null);
   const [hostDraft, setHostDraft] = useState("");
-  // 매칭 투표 상태 매핑 (partyId → 'closed'|'open'|'finalized')
-  const [votingStatusMap, setVotingStatusMap] = useState<Record<string, "closed" | "open" | "finalized">>({});
-  // 매칭 결과 모달
-  type MatchVote = { voter_number: number; gender: string; name: string; email: string; picks: number[]; updated_at: string };
-  type MatchPair = { a: { number: number; name: string; gender: string }; b: { number: number; name: string; gender: string } };
-  const [matchingModalPartyId, setMatchingModalPartyId] = useState<string | null>(null);
-  const [matchingModalData, setMatchingModalData] = useState<{
-    partyTitle: string;
-    voting_status: string;
-    votes: MatchVote[];
-    matches: MatchPair[];
-  } | null>(null);
+  // 매칭 투표 제어/결과 UI 는 전용 투표관리페이지(/matching/results/admin8888)로 이관됨.
+  // 본 대시보드는 host_name(담당자) 노출과 booking 상태 배지(모임종료 등) 동기화만 담당.
 
   // 로그 관리 상태
   const [logs, setLogs] = useState<AdminLogRow[]>([]);
@@ -539,65 +529,19 @@ export default function AdminDashboard() {
     if (co?.company) setCompany(co.company);
     if (g?.items) setGallery(Array.isArray(g.items) ? g.items : []);
     if (m?.items) setMemos(Array.isArray(m.items) ? m.items : []);
-    // 호스트 + 투표 상태 매핑 — 관리자 전용 GET 응답에서만 노출
+    // 호스트(담당자) 매핑 — 관리자 전용 GET 응답에서만 노출.
+    // host_name 은 전용 투표관리페이지에서 [투표시작] 시 관리자 아이디로 자동 기록됨 → 여기 표시.
     if (Array.isArray(p?.items)) {
       const hMap: Record<string, string> = {};
-      const vMap: Record<string, "closed" | "open" | "finalized"> = {};
       for (const it of p.items) {
         if (it && it.id != null) {
-          const id = String(it.id);
-          hMap[id] = String(it.host_name ?? "");
-          const vs = String(it.voting_status ?? "closed");
-          vMap[id] = (vs === "open" || vs === "finalized") ? vs : "closed";
+          hMap[String(it.id)] = String(it.host_name ?? "");
         }
       }
       setHostMap(hMap);
-      setVotingStatusMap(vMap);
     }
   }, []);
 
-  // 매칭 투표 상태 변경 (start/end/reset)
-  const changeVotingStatus = async (partyId: string, action: "start" | "end" | "reset") => {
-    // 초기화는 vote 삭제 + 모임종료(completed) booking 의 confirmed 복원이 일어나므로 명시 안내.
-    const promptMsg = action === "reset"
-      ? "해당 파티의 투표 상태와 회원들의 투표 내역이 전부 초기화됩니다. 진행하시겠습니까?"
-      : action === "start"
-        ? "이 파티의 투표를 시작하시겠습니까?"
-        : "이 파티의 투표를 종료하시겠습니까?";
-    if (!confirm(promptMsg)) return;
-    const res = await fetch("/api/admin/matching.php", {
-      method: "POST", credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, partyId }),
-    });
-    const d = await res.json();
-    if (!d?.ok) { alert(d?.error || "처리 실패"); return; }
-    setVotingStatusMap(prev => ({ ...prev, [partyId]: d.voting_status }));
-    // reset 시 booking 상태가 completed → confirmed 로 역마이그레이션되었으므로 전체 재조회로 UI 동기화.
-    if (action === "reset") await loadAll();
-  };
-
-  // 매칭 결과 모달 열기 — admin/matching.php GET
-  const openMatchingResults = async (partyId: string) => {
-    setMatchingModalPartyId(partyId);
-    setMatchingModalData(null);
-    try {
-      const res = await fetch(`/api/admin/matching.php?partyId=${encodeURIComponent(partyId)}`,
-        { cache: "no-store", credentials: "include" });
-      const d = await res.json();
-      if (!d?.ok) { alert(d?.error || "조회 실패"); setMatchingModalPartyId(null); return; }
-      setMatchingModalData({
-        partyTitle: d.partyTitle ?? `파티 #${partyId}`,
-        voting_status: d.voting_status ?? "closed",
-        votes: d.votes ?? [],
-        matches: d.matches ?? [],
-      });
-    } catch {
-      alert("네트워크 오류");
-      setMatchingModalPartyId(null);
-    }
-  };
-  const closeMatchingModal = () => { setMatchingModalPartyId(null); setMatchingModalData(null); };
 
   // 호스트 이름 인라인 편집 — 즉시 DB 반영
   const startEditHost = (partyId: string) => {
@@ -1328,14 +1272,8 @@ export default function AdminDashboard() {
                                 (총 결제 금액: {totalRevenue.toLocaleString()}원)
                               </span>
                             </div>
-                            {/*
-                              우측 그룹 — 호스트 정보 + 매칭 투표 제어 (가로 한 행)
-                              · flex flex-row items-center  : 호스트와 투표 버튼이 같은 높이로 마주봄
-                              · flex-shrink-0               : 절대 줄어들지 않음
-                              · gap-2                       : 두 요소 간 일정 간격
-                              · flex-wrap                   : 매우 좁은 화면에서 안전 wrap
-                            */}
-                            {/* 호스트 편집 + 투표 제어 그룹 — 카드 클릭(드러워 열기)로 이벤트 버블링 차단해 내부 컨트롤이 독립적으로 동작 */}
+                            {/* 우측 그룹 — 호스트(담당자) 정보. 투표 제어 UI 는 전용 투표관리페이지로 이관됨.
+                                카드 클릭(드로어 열기) 버블링을 stopPropagation 으로 차단해 호스트 편집이 독립 동작. */}
                             <div
                               onClick={e => e.stopPropagation()}
                               onKeyDown={e => e.stopPropagation()}
@@ -1382,73 +1320,6 @@ export default function AdminDashboard() {
                                   <Pencil size={10} className="text-gray-300 group-hover:text-brand-point transition-colors" />
                                 </button>
                               )}
-
-                              {/* === 매칭 투표 제어 — 콤팩트 인라인 (host 정보 바로 아래) ===
-                                    관리자 전용: dashboard 진입 시 admin/me.php 검증 게이트 통과 필수
-                                    투표 시작 가드: 취소자(cancelled) 제외 후 모두 'confirmed' 일 때만 허용
-                                                     pending_approval / paid_pending_profile 1명이라도 → 차단 */}
-                              {(() => {
-                                const vs = votingStatusMap[pid] ?? "closed";
-                                // 취소자 제외 후 미확정 상태 검사
-                                const nonCancelled = partyRows.filter(r => r.status !== "cancelled");
-                                const hasUnconfirmed = nonCancelled.some(r => r.status !== "confirmed");
-                                const canStart = !hasUnconfirmed; // empty 파티(0명) 도 허용
-                                const startDisabledClass = canStart ? "" : "opacity-50 cursor-not-allowed hover:brightness-100 active:scale-100";
-                                const handleStartClick = () => {
-                                  if (!canStart) {
-                                    alert("현재 투표를 진행할 수 없습니다. 취소 완료 상태인 참여자를 제외한 모든 참여자를 '참가 확정 완료' 상태로 변경한 후 다시 시도해 주세요.");
-                                    return;
-                                  }
-                                  changeVotingStatus(pid, "start");
-                                };
-                                return (
-                                  <div className="inline-flex items-center gap-1.5 flex-wrap justify-end">
-                                    {vs === "closed" && (
-                                      <button type="button" onClick={handleStartClick}
-                                        className={`inline-flex items-center gap-1 px-3 py-1.5 bg-brand-point text-white text-xs font-black rounded-md hover:brightness-110 active:scale-95 transition-all shadow-sm ${startDisabledClass}`}
-                                        title={canStart ? "투표를 시작합니다" : "확정 대기 중인 참여자가 있어 시작할 수 없습니다"}>
-                                        ▶ 투표 시작
-                                      </button>
-                                    )}
-                                    {vs === "open" && (
-                                      <>
-                                        {/* 진행 중 인디케이터 — 콤팩트 */}
-                                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">
-                                          <span className="relative flex h-1.5 w-1.5">
-                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
-                                          </span>
-                                          진행 중
-                                        </span>
-                                        <button type="button" onClick={() => changeVotingStatus(pid, "end")}
-                                          className="inline-flex items-center gap-1 px-3 py-1.5 bg-orange-500 text-white text-xs font-black rounded-md hover:bg-orange-600 active:scale-95 transition-all shadow-sm"
-                                          title="투표를 종료하고 결과를 공개합니다">
-                                          ■ 투표 종료
-                                        </button>
-                                      </>
-                                    )}
-                                    {vs === "finalized" && (
-                                      <>
-                                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-700 bg-purple-100 px-2 py-1 rounded-md">
-                                          종료
-                                        </span>
-                                        <button type="button" onClick={() => openMatchingResults(pid)}
-                                          className="inline-flex items-center gap-1 px-3 py-1.5 bg-purple-600 text-white text-xs font-black rounded-md hover:bg-purple-700 active:scale-95 transition-all shadow-sm"
-                                          title="매칭 결과를 확인합니다">
-                                          📊 결과 보기
-                                        </button>
-                                      </>
-                                    )}
-                                    {/* v6.8 — 초기화 버튼은 모든 상태에서 인라인 노출 (start/end 우측).
-                                        클릭 시 confirm + match_votes DELETE + completed→confirmed booking 역마이그레이션 + UI 재로드. */}
-                                    <button type="button" onClick={() => changeVotingStatus(pid, "reset")}
-                                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-50 border border-gray-300 text-gray-700 text-xs font-black rounded-md hover:bg-gray-100 hover:border-gray-400 active:scale-95 transition-all"
-                                      title="투표 상태 + 회원 투표 내역 전체 초기화 (재투표 가능)">
-                                      ↺ 초기화
-                                    </button>
-                                  </div>
-                                );
-                              })()}
                             </div>
                           </div>
                           <div className="flex gap-3 md:gap-4 mt-2 text-xs md:text-sm items-center">
@@ -2634,95 +2505,6 @@ export default function AdminDashboard() {
         })()}
       </AnimatePresence>
 
-      {/* === 매칭 결과 모달 (관리자 전용 — bookings 탭의 [결과 보기] 버튼에서 트리거)
-            전역 렌더 — 어떤 탭에 있든 동작 */}
-      {matchingModalPartyId && (
-        <div className="fixed inset-0 z-[210] bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 md:p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden">
-            <div className="bg-white border-b border-gray-200 px-5 md:px-7 py-4 flex items-center justify-between flex-shrink-0">
-              <div>
-                <p className="text-[11px] font-black tracking-[0.2em] text-brand-point uppercase">Matching Results</p>
-                <h3 className="font-black text-base md:text-lg mt-0.5">{matchingModalData?.partyTitle ?? "..."}</h3>
-              </div>
-              <button type="button" onClick={closeMatchingModal} className="text-gray-400 hover:text-gray-700 p-1 -mr-1" aria-label="닫기"><X size={20} /></button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-5 md:p-7 space-y-6">
-              {!matchingModalData ? (
-                <p className="text-center text-gray-400 py-8">불러오는 중...</p>
-              ) : (
-                <>
-                  {/* 상호 매칭 쌍 */}
-                  <div>
-                    <h4 className="text-sm font-black text-brand-black mb-3 flex items-center gap-2">
-                      <span className="w-1 h-4 bg-brand-point rounded-full" />
-                      상호 매칭 ({matchingModalData.matches.length}쌍)
-                    </h4>
-                    {matchingModalData.matches.length === 0 ? (
-                      <p className="text-sm text-gray-400 bg-gray-50 rounded-xl p-4 text-center">매칭된 쌍이 없습니다.</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {matchingModalData.matches.map((m, i) => (
-                          <div key={i} className="flex items-center gap-3 bg-brand-point/5 border border-brand-point/20 rounded-xl px-4 py-3">
-                            <span className="text-2xl">💕</span>
-                            <div className="flex-1 grid grid-cols-2 gap-3 text-sm">
-                              <div>
-                                <p className="text-[10px] text-gray-400 font-bold">{m.a.gender} #{m.a.number}</p>
-                                <p className="font-black text-brand-black">{m.a.name || "-"}</p>
-                              </div>
-                              <div>
-                                <p className="text-[10px] text-gray-400 font-bold">{m.b.gender} #{m.b.number}</p>
-                                <p className="font-black text-brand-black">{m.b.name || "-"}</p>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 전체 투표 현황 */}
-                  <div>
-                    <h4 className="text-sm font-black text-brand-black mb-3 flex items-center gap-2">
-                      <span className="w-1 h-4 bg-brand-point rounded-full" />
-                      전체 투표 현황 ({matchingModalData.votes.length}건)
-                    </h4>
-                    {matchingModalData.votes.length === 0 ? (
-                      <p className="text-sm text-gray-400 bg-gray-50 rounded-xl p-4 text-center">아직 투표가 없습니다.</p>
-                    ) : (
-                      <div className="overflow-x-auto rounded-xl border border-gray-100">
-                        <table className="w-full text-xs whitespace-nowrap">
-                          <thead className="bg-gray-50 text-gray-500 font-bold">
-                            <tr>
-                              <th className="text-left px-3 py-2.5">번호</th>
-                              <th className="text-left px-3 py-2.5">성별</th>
-                              <th className="text-left px-3 py-2.5">이름</th>
-                              <th className="text-left px-3 py-2.5">이메일</th>
-                              <th className="text-left px-3 py-2.5">선택한 번호</th>
-                              <th className="text-left px-3 py-2.5">최종 수정</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {matchingModalData.votes.map((v, i) => (
-                              <tr key={i} className="border-t border-gray-100">
-                                <td className="px-3 py-2.5 font-black text-brand-black tabular-nums">#{v.voter_number}</td>
-                                <td className="px-3 py-2.5">{v.gender}</td>
-                                <td className="px-3 py-2.5 font-bold">{v.name || "-"}</td>
-                                <td className="px-3 py-2.5 text-gray-500">{v.email}</td>
-                                <td className="px-3 py-2.5 font-bold text-brand-point tabular-nums">{v.picks.join(", ")}</td>
-                                <td className="px-3 py-2.5 text-gray-400 tabular-nums">{v.updated_at}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

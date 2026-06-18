@@ -37,9 +37,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
     try {
         $pdo  = getDB();
+        // v6.4 매칭투표 관리페이지 — 상세 테이블에 연락처(phone) 노출 위해 u.phone 추가.
         $stmt = $pdo->prepare("
             SELECT v.voter_number, v.voter_gender, v.voter_email, v.picks,
-                   u.name, DATE_FORMAT(v.updated_at, '%Y-%m-%d %H:%i') AS updated_at
+                   u.name, u.phone, DATE_FORMAT(v.updated_at, '%Y-%m-%d %H:%i') AS updated_at
             FROM match_votes v
             LEFT JOIN users u ON u.id = v.voter_user_id
             WHERE v.party_id = ?
@@ -59,12 +60,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             'gender'       => (string)$v['voter_gender'],
             'name'         => (string)($v['name'] ?? ''),
             'email'        => (string)$v['voter_email'],
+            'phone'        => formatPhone((string)($v['phone'] ?? '')),
             'picks'        => json_decode((string)$v['picks'], true) ?: [],
             'updated_at'   => (string)$v['updated_at'],
         ];
     }
 
-    // 상호 매칭 쌍 검색
+    // ── 참가자 총원 집계 (남/여) + 투표시작 차단 카운트 ─────────────────────
+    //    투표 완료 현황 배지 분모(participants) + 투표시작 가드(start_blocking).
+    //    start_blocking = 'cancelled'/'confirmed' 이외(취소요청·확정대기·결제완료 등) 참가자 수.
+    //      → 1명이라도 있으면 프런트에서 [투표시작] 차단. (read-only 스캔, 쓰기 X)
+    $participants  = ['male' => 0, 'female' => 0];
+    $startBlocking = 0;
+    foreach (glob(dataDir() . '/bookings_*.json') ?: [] as $bf) {
+        $raw = @file_get_contents($bf);
+        if ($raw === false) continue;
+        $rows = json_decode($raw, true);
+        if (!is_array($rows)) continue;
+        foreach ($rows as $b) {
+            if (!is_array($b)) continue;
+            if ((string)($b['partyId'] ?? '') !== $partyId) continue;
+            $st = (string)($b['status'] ?? '');
+            // 차단 카운트 — cancelled/confirmed 만 통과, 그 외 미완료 상태는 차단 대상
+            if ($st !== 'cancelled' && $st !== 'confirmed') $startBlocking++;
+            // 참가자 총원 — confirmed + completed 만 합산
+            if ($st !== 'confirmed' && $st !== 'completed') continue;
+            $g = (string)($b['gender'] ?? '');
+            if     ($g === '남성') $participants['male']++;
+            elseif ($g === '여성') $participants['female']++;
+        }
+    }
+
+    // ── 상호 매칭 쌍 검색 ────────────────────────────────────────────────
+    //    커플 1쌍 = (남성번호, 여성번호) 단일 식별. 기존 dedup 키는 성별 perspective
+    //    (M/F) 를 키에 포함시켜 동일 커플이 남관점·여관점으로 2번 집계되는 버그가 있었음.
+    //    → 키를 '남성번호-여성번호' 로 canonical 화하여 1쌍으로 고정 집계. (a/b 출력 shape 은 유지)
     $matches = [];
     $seen = [];
     foreach ($votes as $a) {
@@ -72,9 +102,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             if ($a['gender'] === $b['gender']) continue;
             if (!in_array($b['voter_number'], $a['picks'], true)) continue;
             if (!in_array($a['voter_number'], $b['picks'], true)) continue;
-            $key = min($a['voter_number'], $b['voter_number']) . '-' .
-                   max($a['voter_number'], $b['voter_number']) . '-' .
-                   ($a['gender'] === '남성' ? 'M' : 'F');
+            $male   = $a['gender'] === '남성' ? $a : $b;
+            $female = $a['gender'] === '남성' ? $b : $a;
+            $key = $male['voter_number'] . '-' . $female['voter_number'];
             if (isset($seen[$key])) continue;
             $seen[$key] = true;
             $matches[] = [
@@ -89,6 +119,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         'partyId'       => $partyId,
         'partyTitle'    => (string)($found['title'] ?? ''),
         'voting_status' => (string)($found['voting_status'] ?? 'closed'),
+        'participants'  => $participants,
+        'start_blocking'=> $startBlocking,
         'votes'         => $votes,
         'matches'       => $matches,
     ]);
@@ -110,7 +142,8 @@ $nextStatus = match ($action) {
 };
 
 try {
-    withFileLock($file, function (array $parties) use ($partyId, $nextStatus, $action): array {
+    $adminId = (string)($_SESSION['adminId'] ?? '?');
+    withFileLock($file, function (array $parties) use ($partyId, $nextStatus, $action, $adminId): array {
         $found = false;
         foreach ($parties as &$p) {
             if ((string)($p['id'] ?? '') === $partyId) {
@@ -121,6 +154,11 @@ try {
                     $p['status'] = 'completed';
                 } else {
                     unset($p['status']);
+                }
+                // [투표시작] → 호스트(담당자) 컬럼에 버튼을 누른 관리자 아이디를 로그 형태로 자동 기록.
+                //   현장에서 투표를 오픈한 담당자를 추적하기 위함. (host_name = '관리자아이디')
+                if ($action === 'start') {
+                    $p['host_name'] = $adminId;
                 }
                 $found = true;
                 break;

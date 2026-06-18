@@ -25,6 +25,7 @@ const ALLOW = (path: string): boolean =>
   || path === "/login"
   || path.startsWith("/login/")
   || path.startsWith("/admin8888")
+  || path.startsWith("/matching")   // 독립 매칭 투표/결과 흐름 — 세션 격리, 메인으로 튕기지 않음
   || path.startsWith("/api/");
 
 export default function OnboardingGuard() {
