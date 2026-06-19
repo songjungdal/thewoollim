@@ -49,7 +49,7 @@ export default function PartnershipPage() {
                   </a>
                   <div className="flex items-center gap-3 bg-white w-full md:w-auto px-5 md:px-8 py-3.5 md:py-4 rounded-2xl shadow-sm border border-gray-200 justify-center">
                     <MessageSquare className="text-brand-point flex-shrink-0" size={18} />
-                    <span className="font-bold text-gray-900 text-sm md:text-base">카카오톡 @어울림비즈니스</span>
+                    <span className="font-bold text-gray-900 text-sm md:text-base">카카오톡 @어울림톡</span>
                   </div>
                 </div>
               </div>

@@ -51,9 +51,9 @@ export default function ReportPage() {
                   <li><strong>소명 기회 제공:</strong> 필요 시 피신고자에게 소명 기회를 부여합니다.</li>
                   <li><strong>최종 결정:</strong> 운영 원칙에 따라 최종 징계 여부를 결정합니다.</li>
                 </ol>
-                <button className="mt-8 md:mt-12 w-full md:w-auto bg-brand-point text-white px-8 md:px-10 py-4 rounded-xl font-bold hover:brightness-110 transition-all">
+                <a href="https://pf.kakao.com/_racXX" target="_blank" rel="noopener noreferrer" className="inline-block mt-8 md:mt-12 w-full md:w-auto text-center bg-brand-point text-white px-8 md:px-10 py-4 rounded-xl font-bold hover:brightness-110 transition-all">
                   신고 접수하기 (카카오톡 연동)
-                </button>
+                </a>
               </div>
             </div>
           </div>

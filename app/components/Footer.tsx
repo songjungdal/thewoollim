@@ -111,8 +111,8 @@ export default function Footer() {
           <div className="flex flex-col md:flex-row justify-between items-center text-gray-500 text-sm font-medium">
             <p>Copyright © {company.name} All rights reserved.</p>
             <div className="flex gap-4 mt-6 md:mt-0">
-              <a href="#" className="hover:text-white transition-colors">Instagram</a>
-              <a href="#" className="hover:text-white transition-colors">Kakao Channel</a>
+              <a href="https://www.instagram.com/thewoollim_official/" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Instagram</a>
+              <a href="https://pf.kakao.com/_racXX" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Kakao Channel</a>
             </div>
           </div>
        </div>
