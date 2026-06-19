@@ -275,6 +275,29 @@ export default function SmoothOnePage() {
     return () => window.clearTimeout(t);
   }, []);
 
+  // v9.2 — [더보기] 페이징. 기존 필터/정렬/재고/배지/실시간 카운트 로직은 불변,
+  //         "최종 정렬·필터 완료 배열"을 렌더 직전 slice 하는 영역에만 결합한다.
+  const APPLY_LIMIT_DESKTOP   = 12; // 신청 섹션 PC(lg 이상) 초기 노출
+  const APPLY_LIMIT_MOBILE    = 10; // 신청 섹션 모바일(lg 미만) 초기 노출
+  const SCHEDULE_LIMIT_MOBILE = 10; // 일정 섹션 모바일 초기 노출
+  const [isDesktop, setIsDesktop] = useState(false);               // lg(1024px) 이상 여부
+  const [applyMoreOpen, setApplyMoreOpen] = useState(false);       // 신청 섹션 더보기 펼침
+  const [scheduleMoreOpen, setScheduleMoreOpen] = useState(false); // 일정(모바일) 더보기 펼침
+
+  // 해상도 → 초기 노출 개수(12/10) 실시간 동기화
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const update = () => setIsDesktop(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
+  // 카테고리 탭(상위 축/세부 값) 전환 시 더보기 상태 초기화 → 새 탭은 항상 접힌 채 처음부터 노출
+  useEffect(() => {
+    setApplyMoreOpen(false);
+  }, [activeAxis, filterValue]);
+
   const sortedParties = useMemo(() => {
     const filtered = [...PARTIES].filter(p => {
       if (!activeAxis || !filterValue) return true;
@@ -295,6 +318,11 @@ export default function SmoothOnePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeAxis, filterValue, PARTIES, now]);
 
+  // 신청 섹션 렌더용 slice — 위 sortedParties(필터/정렬 완료)를 가로채 노출 개수만 제한
+  const applyLimit = isDesktop ? APPLY_LIMIT_DESKTOP : APPLY_LIMIT_MOBILE;
+  const visibleParties = applyMoreOpen ? sortedParties : sortedParties.slice(0, applyLimit);
+  const showApplyMore = !applyMoreOpen && sortedParties.length > applyLimit;
+
   // 일정 섹션(모바일 리스트 + 데스크탑 캘린더) — 행사 일시 경과한 이벤트에 'fc-event-ended' 클래스
   // 부여해 파스텔 빨강(#f8d8dd) 톤으로 표시. 다른 카테고리 탭/필터·데이터 쿼리에는 무영향.
   const CALENDAR_EVENTS = useMemo(() => PARTIES.map(p => {
@@ -308,6 +336,13 @@ export default function SmoothOnePage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [PARTIES, now]);
+
+  // 일정 섹션 모바일 리스트용 정렬 배열 (PC 캘린더는 CALENDAR_EVENTS 를 그대로 사용 — 무영향)
+  const sortedSchedule = useMemo(
+    () => [...CALENDAR_EVENTS].sort((a, b) => a.date.localeCompare(b.date)),
+    [CALENDAR_EVENTS]
+  );
+  const showScheduleMore = !scheduleMoreOpen && sortedSchedule.length > SCHEDULE_LIMIT_MOBILE;
 
   void activeTab; // 기존 useState는 호환을 위해 유지 (warning 회피용 reference)
 
@@ -457,7 +492,7 @@ export default function SmoothOnePage() {
             ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
               <AnimatePresence mode="popLayout">
-                {sortedParties.map(card => {
+                {visibleParties.map(card => {
                   // 실시간 결제완료 인원만 노출 — 카운트 없으면 0으로 강제 (시드/테스트 데이터 무시)
                   const live = partyCounts[card.id];
                   const liveCard = {
@@ -550,6 +585,19 @@ export default function SmoothOnePage() {
             </div>
             )}
 
+            {/* v9.2 — [더보기] 버튼: 필터된 개수가 제한치(PC 12 / 모바일 10) 초과 + 아직 안 펼쳤을 때만 노출 */}
+            {showApplyMore && (
+              <div className="mt-8 md:mt-12 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => setApplyMoreOpen(true)}
+                  className="inline-flex items-center justify-center gap-2 h-12 px-8 md:px-10 rounded-full border border-gray-300 text-gray-700 font-bold text-sm md:text-base hover:border-brand-point hover:text-brand-point transition-colors"
+                >
+                  더보기 <ChevronDown size={18} />
+                </button>
+              </div>
+            )}
+
             </div>{/* v8.0 mounted gate wrapper close (apply 섹션 동적 콘텐츠) */}
           </div>
         </section>
@@ -595,7 +643,7 @@ export default function SmoothOnePage() {
               {CALENDAR_EVENTS.length === 0 ? (
                 <p className="text-center text-gray-400 py-12">등록된 일정이 없습니다.</p>
               ) : (
-                [...CALENDAR_EVENTS].sort((a, b) => a.date.localeCompare(b.date)).map((event) => {
+                (scheduleMoreOpen ? sortedSchedule : sortedSchedule.slice(0, SCHEDULE_LIMIT_MOBILE)).map((event) => {
                   const party = PARTIES.find(p => p.id === event.id);
                   const dateObj = new Date(event.date + "T00:00:00");
                   const month = dateObj.getMonth() + 1;
@@ -627,6 +675,17 @@ export default function SmoothOnePage() {
                     </button>
                   );
                 })
+              )}
+
+              {/* v9.2 — 모바일 전용 [더보기]: 일정이 10개 초과 + 미펼침일 때만. (PC 캘린더는 영향 없음) */}
+              {showScheduleMore && (
+                <button
+                  type="button"
+                  onClick={() => setScheduleMoreOpen(true)}
+                  className="mt-2 w-full h-12 inline-flex items-center justify-center gap-2 rounded-full border border-gray-300 text-gray-700 font-bold text-sm hover:border-brand-point hover:text-brand-point transition-colors"
+                >
+                  더보기 <ChevronDown size={18} />
+                </button>
               )}
             </div>
 
