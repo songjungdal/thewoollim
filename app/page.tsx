@@ -326,7 +326,7 @@ export default function SmoothOnePage() {
 
           {/* 풀블리드 배경 이미지 — 모바일/PC 공통, object-cover 로 잘림 허용 */}
           <Image
-            src="/images/hero-bg.jpg"
+            src="/images/hero-bg.webp"
             alt=""
             fill
             priority

@@ -10,7 +10,7 @@ export default function AboutPage() {
       <main className="flex-1">
         {/* Hero Section */}
         <section className="relative overflow-hidden py-14 md:py-24 px-4 md:px-6 border-b border-gray-100">
-          <Image src="/images/sub-hero-bg.jpg" alt="" fill className="object-cover object-center" />
+          <Image src="/images/sub-hero-bg.webp" alt="" fill className="object-cover object-center" />
           <div className="absolute inset-0 bg-white/75" />
           <div className="relative z-10 max-w-4xl mx-auto pt-6 md:pt-10">
             <h1 className="text-4xl md:text-6xl font-black tracking-tighter mb-5 md:mb-8">회사소개</h1>

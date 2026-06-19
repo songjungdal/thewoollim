@@ -686,7 +686,7 @@ export default function PartyClientView({ id }: { id: string }) {
             <div className="max-w-4xl mx-auto">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/images/page_a01.jpg"
+                src="/images/page_a01.webp"
                 alt="참가 신청 방법 안내"
                 className="block w-full h-auto object-contain"
               />
@@ -707,7 +707,7 @@ export default function PartyClientView({ id }: { id: string }) {
                 {/* OUR EXPERIENCE — 이미지로 교체 (라운드 X, 1:1 컨테이너 폭, 비율 보존) */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="/images/party_our_experience.png"
+                  src="/images/party_our_experience.webp"
                   alt="OUR EXPERIENCE"
                   className="block w-full h-auto rounded-none select-none pointer-events-none"
                   draggable={false}
@@ -716,7 +716,7 @@ export default function PartyClientView({ id }: { id: string }) {
                 {/* Party Timeline 상단 이미지 (교체) — page_a02. 컨테이너 폭 1:1, 비율 보존 */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="/images/page_a02.jpg"
+                  src="/images/page_a02.webp"
                   alt="Party Timeline 안내"
                   className="block w-full h-auto object-contain"
                 />
@@ -724,7 +724,7 @@ export default function PartyClientView({ id }: { id: string }) {
                 {/* Party Timeline 상단 이미지 (추가) — page_a03. 컨테이너 폭 1:1, 비율 보존 */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="/images/page_a03.jpg"
+                  src="/images/page_a03.webp"
                   alt="Party Timeline 안내"
                   className="block w-full h-auto object-contain"
                 />
@@ -860,7 +860,7 @@ export default function PartyClientView({ id }: { id: string }) {
                 {/* 필수 확인 사항 상단 이미지 (교체) — page_a04. 컨테이너 폭 1:1, 비율 보존 */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="/images/page_a04.jpg"
+                  src="/images/page_a04.webp"
                   alt="필수 확인 사항 안내"
                   className="block w-full h-auto object-contain"
                 />
@@ -923,7 +923,7 @@ export default function PartyClientView({ id }: { id: string }) {
                 {/* 필수 확인 사항 하단 이미지 — page_a05. 컨테이너 폭 1:1, 비율 보존 */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="/images/page_a05.jpg"
+                  src="/images/page_a05.webp"
                   alt="필수 확인 사항 안내"
                   className="block w-full h-auto object-contain"
                 />
