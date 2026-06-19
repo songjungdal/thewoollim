@@ -487,7 +487,7 @@ export default function SmoothOnePage() {
                       ) : (
                         <>
                           {(card.targetGroup === "싱글" || card.targetGroup === "돌싱") && (
-                            <span className="bg-brand-point text-black text-[11px] md:text-xs font-black px-2.5 py-1 rounded-full shadow-md whitespace-nowrap">
+                            <span className={`${card.targetGroup === "돌싱" ? "bg-[#b4a7d6]" : "bg-brand-point"} text-black text-[11px] md:text-xs font-black px-2.5 py-1 rounded-full shadow-md whitespace-nowrap`}>
                               {card.targetGroup}
                             </span>
                           )}
