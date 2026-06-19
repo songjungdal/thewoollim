@@ -5,8 +5,8 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://thewoollim.com"),
   title: "세상을 울리는 새로운 연결, 어울림",
   description: "과도한 소통 속에 잃어버린 진짜 관계. 어울림에서 감성적이고 깊이 있는 네트워킹을 경험하세요.",
-  // ⚠️ 정식 오픈 시 아래 robots 줄을 삭제하세요
-  robots: { index: false, follow: false },
+  // 정식 오픈 — 검색 색인 허용 (index/follow). robots.txt 와 일관.
+  robots: { index: true, follow: true },
   // 네이버 서치어드바이저 사이트 소유확인
   verification: {
     other: {
