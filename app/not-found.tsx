@@ -18,7 +18,7 @@ export default function NotFound() {
           className="text-center max-w-xl"
         >
           <h1 className="text-8xl md:text-9xl font-black tracking-tighter text-gray-200 mb-4">404</h1>
-          <h2 className="text-3xl md:text-4xl font-bold mb-6 tracking-tight">페이지를 찾을 수 없습니다</h2>
+          <h2 className="text-3xl md:text-4xl font-bold mb-6 tracking-tight">원하시는 페이지를 찾을 수 없습니다.</h2>
           <p className="text-lg text-gray-500 mb-12 font-medium leading-relaxed">
             찾으시는 페이지가 삭제되었거나 주소가 변경되었습니다.<br />
             아래 버튼을 눌러 어울림 메인으로 돌아가실 수 있습니다.

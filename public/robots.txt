@@ -1,14 +1,15 @@
 # =============================================
-# 검색 엔진 크롤링 차단 (정식 오픈 전)
-# =============================================
-# 정식 오픈 시 아래 Disallow 를 삭제하고
-# Allow 주석을 해제하세요.
+# 어울림(THEWOOLLIM) robots.txt — 정식 오픈
+# 일반 페이지는 색인 허용, 관리자/투표 보안 경로는 차단
 # =============================================
 
 User-agent: *
-Disallow: /
+Allow: /
+Disallow: /admin8888
+Disallow: /admin8888/
+Disallow: /matching/results
+Disallow: /matching/results/
+Disallow: /matching/results/admin8888
+Disallow: /matching/results/admin8888/
 
-# --- 정식 오픈 후 아래로 교체 ---
-# User-agent: *
-# Allow: /
-# Sitemap: https://thewoollim.com/sitemap.xml
+Sitemap: https://thewoollim.com/sitemap.xml
