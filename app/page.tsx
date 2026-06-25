@@ -327,10 +327,14 @@ export default function SmoothOnePage() {
   // 부여해 파스텔 빨강(#f8d8dd) 톤으로 표시. 다른 카테고리 탭/필터·데이터 쿼리에는 무영향.
   const CALENDAR_EVENTS = useMemo(() => PARTIES.map(p => {
     const past = now ? partyVisibility(p, now) !== "active" : false;
+    const m = (p.dateString ?? "").match(/(\d{1,2}):(\d{2})/);
+    const start = m
+      ? `${p.calendarDate}T${m[1].padStart(2, "0")}:${m[2]}:00`
+      : p.calendarDate;
     return {
       id: p.id,
       title: p.title,
-      date: p.calendarDate,
+      start,
       classNames: past ? ["fc-event-ended"] : [],
       extendedProps: { location: p.location, target: p.target, price: p.price },
     };
@@ -338,19 +342,11 @@ export default function SmoothOnePage() {
   }), [PARTIES, now]);
 
   // 일정 섹션 모바일 리스트용 정렬 배열 (PC 캘린더는 CALENDAR_EVENTS 를 그대로 사용 — 무영향)
-  // 동일 날짜 내에서는 시작 시간 오름차순(15시 → 19시) 2차 정렬 적용
-  const sortedSchedule = useMemo(() => {
-    const timeOf = (id: string) => {
-      const p = PARTIES.find(party => party.id === id);
-      const m = (p?.dateString ?? "").match(/(\d{1,2}):(\d{2})/);
-      return m ? m[1].padStart(2, "0") + m[2] : "9999";
-    };
-    return [...CALENDAR_EVENTS].sort((a, b) => {
-      const dateCmp = a.date.localeCompare(b.date);
-      if (dateCmp !== 0) return dateCmp;
-      return timeOf(a.id).localeCompare(timeOf(b.id));
-    });
-  }, [CALENDAR_EVENTS, PARTIES]);
+  // start 가 ISO datetime(YYYY-MM-DDThh:mm:ss)이므로 그대로 비교하면 날짜·시간 모두 오름차순
+  const sortedSchedule = useMemo(
+    () => [...CALENDAR_EVENTS].sort((a, b) => a.start.localeCompare(b.start)),
+    [CALENDAR_EVENTS]
+  );
   const showScheduleMore = !scheduleMoreOpen && sortedSchedule.length > SCHEDULE_LIMIT_MOBILE;
 
   void activeTab; // 기존 useState는 호환을 위해 유지 (warning 회피용 reference)
@@ -654,7 +650,7 @@ export default function SmoothOnePage() {
               ) : (
                 (scheduleMoreOpen ? sortedSchedule : sortedSchedule.slice(0, SCHEDULE_LIMIT_MOBILE)).map((event) => {
                   const party = PARTIES.find(p => p.id === event.id);
-                  const dateObj = new Date(event.date + "T00:00:00");
+                  const dateObj = new Date(event.start.substring(0, 10) + "T00:00:00");
                   const month = dateObj.getMonth() + 1;
                   const day = dateObj.getDate();
                   const dayName = ["일", "월", "화", "수", "목", "금", "토"][dateObj.getDay()];
