@@ -745,6 +745,7 @@ export default function SmoothOnePage() {
                   }}
                   titleFormat={{ year: 'numeric', month: 'long' }}
                   dayMaxEvents={5}
+                  displayEventTime={false}
                   dayCellContent={(arg) => arg.dayNumberText.replace('일', '')}
                 />
               </div>
