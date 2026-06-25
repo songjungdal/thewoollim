@@ -338,10 +338,19 @@ export default function SmoothOnePage() {
   }), [PARTIES, now]);
 
   // 일정 섹션 모바일 리스트용 정렬 배열 (PC 캘린더는 CALENDAR_EVENTS 를 그대로 사용 — 무영향)
-  const sortedSchedule = useMemo(
-    () => [...CALENDAR_EVENTS].sort((a, b) => a.date.localeCompare(b.date)),
-    [CALENDAR_EVENTS]
-  );
+  // 동일 날짜 내에서는 시작 시간 오름차순(15시 → 19시) 2차 정렬 적용
+  const sortedSchedule = useMemo(() => {
+    const timeOf = (id: string) => {
+      const p = PARTIES.find(party => party.id === id);
+      const m = (p?.dateString ?? "").match(/(\d{1,2}):(\d{2})/);
+      return m ? m[1].padStart(2, "0") + m[2] : "9999";
+    };
+    return [...CALENDAR_EVENTS].sort((a, b) => {
+      const dateCmp = a.date.localeCompare(b.date);
+      if (dateCmp !== 0) return dateCmp;
+      return timeOf(a.id).localeCompare(timeOf(b.id));
+    });
+  }, [CALENDAR_EVENTS, PARTIES]);
   const showScheduleMore = !scheduleMoreOpen && sortedSchedule.length > SCHEDULE_LIMIT_MOBILE;
 
   void activeTab; // 기존 useState는 호환을 위해 유지 (warning 회피용 reference)
