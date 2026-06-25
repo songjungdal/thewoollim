@@ -726,6 +726,7 @@ export default function SmoothOnePage() {
                   .fc-event.fc-event-ended { background-color: #f8d8dd !important; border-left-color: rgba(154, 58, 71, 0.4) !important; }
                   .fc-event.fc-event-ended, .fc-event.fc-event-ended * { color: #7a2c37 !important; }
                   .fc-event.fc-event-ended:hover { background-color: #f4c5cd !important; box-shadow: 0 4px 12px rgba(248, 216, 221, 0.55) !important; }
+                  .fc-daygrid-event-dot { display: none !important; }
                 `}} />
                 <FullCalendar
                   plugins={[dayGridPlugin, interactionPlugin]}
