@@ -4,16 +4,31 @@ Options -Indexes
 # 2. Set Custom 404 Page
 ErrorDocument 404 /404.html
 
-# 3. SPA Fallback / React Router Fallback
+# 3. Cache Control — HTML은 항상 최신, 해시된 JS/CSS는 1년 캐시
+<IfModule mod_headers.c>
+    # HTML: 절대 캐시 안 함 (배포 후 구버전 청크 참조 문제 방지)
+    <FilesMatch "\.(html|htm)$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Pragma "no-cache"
+        Header set Expires "0"
+    </FilesMatch>
+
+    # Next.js 정적 청크(JS/CSS) — 파일명에 콘텐츠 해시 포함, 1년 캐시 안전
+    <FilesMatch "\.(js|css)$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </FilesMatch>
+</IfModule>
+
+# 4. Static export 라우팅
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteBase /
 
-    # If requested file or directory exists, serve it
+    # OAuth callbacks
+    RewriteRule ^api/auth/([a-z]+)/callback$ /api/auth/$1/callback.php [L]
+
+    # 실존 파일/디렉터리는 그대로 서빙
     RewriteCond %{REQUEST_FILENAME} -f [OR]
     RewriteCond %{REQUEST_FILENAME} -d
     RewriteRule ^ - [L]
-
-    # Otherwise, fallback to index.html for client-side routing
-    RewriteRule ^(.*)$ /index.html [L]
 </IfModule>
