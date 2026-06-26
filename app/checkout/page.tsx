@@ -211,7 +211,12 @@ function CheckoutContent() {
         return;
       }
 
-      // 2) PortOne V2 결제창 호출 (async/await)
+      // 2) PortOne V2 결제창 호출 (async/await) — SDK 로드 대기 (최대 5초)
+      let sdkWait = 0;
+      while (!window.PortOne && sdkWait < 50) {
+        await new Promise(r => setTimeout(r, 100));
+        sdkWait++;
+      }
       const PortOne = window.PortOne;
       if (!PortOne) {
         alert("결제 모듈이 로드되지 않았습니다. 페이지를 새로고침 후 다시 시도해주세요.");
