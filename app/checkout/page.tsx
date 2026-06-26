@@ -219,7 +219,7 @@ function CheckoutContent() {
       }
       console.log("[checkout] PortOne.requestPayment 호출", { orderId: pending.orderId, orderName, totalAmount });
       const response = await PortOne.requestPayment({
-        storeId:     "store-43be04f5-b74d-44aa-8f7d-080c3e981da4",
+        storeId:     "store-88922223-a4f8-473a-8d26-8244dfd9f209",
         paymentId:   pending.orderId,
         orderName,
         totalAmount,
