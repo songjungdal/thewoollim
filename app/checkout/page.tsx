@@ -11,22 +11,31 @@ import { useAuth, calcCouponDiscount } from "../context/AuthContext";
 import { useParties } from "../lib/useParties";
 import { priceForGender, VBANK_ACCOUNT_LINE } from "../lib/data";
 
+type PortOneRequest = {
+  storeId: string;
+  paymentId: string;
+  orderName: string;
+  totalAmount: number;
+  currency: string;
+  channelKey: string;
+  payMethod: string;
+  customer?: { name?: string; phoneNumber?: string; email?: string };
+  windowType?: { pc?: string; mobile?: string };
+};
+
+type PortOneResponse = {
+  code?: string;
+  message?: string;
+  paymentId?: string;
+};
+
 declare global {
   interface Window {
-    IMP?: {
-      init: (uid: string) => void;
-      request_pay: (params: Record<string, unknown>, callback: (rsp: ImpRsp) => void) => void;
+    PortOne?: {
+      requestPayment: (params: PortOneRequest) => Promise<PortOneResponse>;
     };
   }
 }
-
-type ImpRsp = {
-  success: boolean;
-  imp_uid: string;
-  merchant_uid: string;
-  paid_amount: number;
-  error_msg?: string;
-};
 
 function CheckoutContent() {
   const searchParams = useSearchParams();
@@ -201,41 +210,42 @@ function CheckoutContent() {
         return;
       }
 
-      // 2) PortOne V1 결제창 호출 (콜백 기반)
-      const IMP = window.IMP;
-      if (!IMP) {
+      // 2) PortOne V2 결제창 호출 (async/await)
+      const PortOne = window.PortOne;
+      if (!PortOne) {
         alert("결제 모듈이 로드되지 않았습니다. 페이지를 새로고침 후 다시 시도해주세요.");
         setPaying(false);
         return;
       }
-      IMP.init("imphdtest");
-      console.log("[checkout] IMP.request_pay 호출", { orderId: pending.orderId, orderName, totalAmount });
-      IMP.request_pay(
-        {
-          pg:           "html5_inicis.INIpayTest",
-          pay_method:   "card",
-          merchant_uid: pending.orderId,
-          name:         orderName,
-          amount:       totalAmount,
-          buyer_name:   profile?.name || "구매자",
-          buyer_tel:    profile?.phone || "01000000000",
-          buyer_email:  userEmail,
+      console.log("[checkout] PortOne.requestPayment 호출", { orderId: pending.orderId, orderName, totalAmount });
+      const response = await PortOne.requestPayment({
+        storeId:     "store-43be04f5-b74d-44aa-8f7d-080c3e981da4",
+        paymentId:   pending.orderId,
+        orderName,
+        totalAmount,
+        currency:    "CURRENCY_KRW",
+        channelKey:  "channel-key-inicis-test",
+        payMethod:   "CARD",
+        customer: {
+          name:        profile?.name || "구매자",
+          phoneNumber: profile?.phone || "01000000000",
+          email:       userEmail,
         },
-        (rsp) => {
-          if (rsp.success) {
-            console.log("[checkout] PortOne 결제 성공 — success.php 로 이동", rsp);
-            window.location.href =
-              `/api/payments/success.php?imp_uid=${encodeURIComponent(rsp.imp_uid)}&merchant_uid=${encodeURIComponent(rsp.merchant_uid)}&amount=${rsp.paid_amount}`;
-          } else {
-            console.warn("[checkout] PortOne 결제 실패/취소:", rsp.error_msg);
-            if (rsp.error_msg && rsp.error_msg !== "사용자가 결제를 취소하셨습니다") {
-              alert(`결제 오류: ${rsp.error_msg}`);
-            }
-            setPaying(false);
-          }
+        windowType: { pc: "POPUP", mobile: "POPUP" },
+      });
+      if (response?.code != null) {
+        // 사용자 취소는 조용히 복귀
+        console.warn("[checkout] PortOne 결제 실패/취소:", response.code, response.message);
+        if (response.code !== "FAILURE_TYPE_PG" || response.message) {
+          alert(`결제 오류: ${response.message || response.code}`);
         }
-      );
-      // IMP.request_pay 는 콜백 기반 — 결제창을 띄운 뒤 즉시 반환
+        setPaying(false);
+        return;
+      }
+      // 결제 성공 — 백엔드 검증 + booking 생성
+      console.log("[checkout] PortOne V2 결제 성공 — success.php 로 이동", response);
+      window.location.href =
+        `/api/payments/success.php?paymentId=${encodeURIComponent(pending.orderId)}&amount=${totalAmount}`;
     } catch (error: unknown) {
       const e = error as { message?: string };
       console.error("[checkout] 결제 요청 오류:", error);
