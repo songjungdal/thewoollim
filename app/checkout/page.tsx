@@ -246,8 +246,9 @@ function CheckoutContent() {
       }
       // 결제 성공 (팝업/인라인 경로) — 백엔드 검증 + booking 생성
       console.log("[checkout] PortOne V2 결제 성공 — success.php 로 이동", response);
-      window.location.href =
-        `/api/payments/success.php?paymentId=${encodeURIComponent(pending.orderId)}&amount=${totalAmount}`;
+      window.location.assign(
+        `/api/payments/success.php?paymentId=${encodeURIComponent(pending.orderId)}&amount=${totalAmount}`
+      );
     } catch (error: unknown) {
       const e = error as { message?: string };
       console.error("[checkout] 결제 요청 오류:", error);
