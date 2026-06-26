@@ -19,7 +19,7 @@ type PortOneRequest = {
   currency: string;
   channelKey: string;
   payMethod: string;
-  customer?: { name?: string; phoneNumber?: string; email?: string };
+  customer?: { fullName?: string; phoneNumber?: string; email?: string };
   windowType?: { pc?: string; mobile?: string };
   redirectUrl?: string;
 };
@@ -228,7 +228,7 @@ function CheckoutContent() {
         channelKey:  "channel-key-53e18746-f892-436d-a213-e836d46c32cd",
         payMethod:   "CARD",
         customer: {
-          name:        profile?.name || "구매자",
+          fullName:    profile?.name || "구매자",
           phoneNumber: profile?.phone || "01000000000",
           email:       userEmail,
         },
