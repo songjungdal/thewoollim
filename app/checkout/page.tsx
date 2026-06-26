@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -13,39 +13,20 @@ import { priceForGender, VBANK_ACCOUNT_LINE } from "../lib/data";
 
 declare global {
   interface Window {
-    TossPayments?: (clientKey: string) => {
-      widgets: (opts: { customerKey: string }) => TossWidgets;
+    IMP?: {
+      init: (uid: string) => void;
+      request_pay: (params: Record<string, unknown>, callback: (rsp: ImpRsp) => void) => void;
     };
   }
 }
 
-type TossWidgets = {
-  setAmount: (a: { currency: string; value: number }) => Promise<void>;
-  renderPaymentMethods: (opts: { selector: string; variantKey?: string }) => Promise<unknown>;
-  renderAgreement: (opts: { selector: string; variantKey?: string }) => Promise<unknown>;
-  requestPayment: (opts: {
-    orderId: string;
-    orderName: string;
-    successUrl: string;
-    failUrl: string;
-    customerEmail?: string;
-    customerName?: string;
-  }) => Promise<void>;
+type ImpRsp = {
+  success: boolean;
+  imp_uid: string;
+  merchant_uid: string;
+  paid_amount: number;
+  error_msg?: string;
 };
-
-const TOSS_CLIENT_KEY = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY || "";
-
-// 카드/간편결제(토스) 노출 토글 — 최종 승인 단계 동안 임시 비활성.
-// 재활성화: 이 값을 true 로만 바꾸면 위젯/결제버튼 원상복구 (1초 복구). 관련 코드는 삭제 X.
-const CARD_ENABLED = false;
-
-// 이메일 → customerKey (Toss v2 위젯이 요구하는 안정적 식별자, 50자 이하 영숫자)
-function emailToCustomerKey(email: string): string {
-  if (!email) return "ANONYMOUS";
-  // base64 (URL-safe) 후 영숫자만 추출 → 최대 50자
-  const b64 = typeof window !== "undefined" ? window.btoa(unescape(encodeURIComponent(email))) : email;
-  return ("wlim_" + b64.replace(/[^a-zA-Z0-9]/g, "")).slice(0, 50);
-}
 
 function CheckoutContent() {
   const searchParams = useSearchParams();
@@ -72,15 +53,10 @@ function CheckoutContent() {
   const totalQty = partyIds.length;
 
   const [paying, setPaying]   = useState(false);
-  const [ready,  setReady]    = useState(false);   // 위젯 렌더 완료 여부
-  const widgetsRef            = useRef<TossWidgets | null>(null);
-  // 결제 수단: 'toss'(신용카드/간편결제) | 'vbank'(무통장 입금) — v7.0
-  // 기본 진입 결제 수단 = 무통장 입금(vbank). (Toss SDK 로드/위젯 초기화 로직은 그대로 — 숨김 상태로 대기)
+  // 결제 수단: 'toss'(신용카드/간편결제) | 'vbank'(무통장 입금)
   const [payMethod, setPayMethod] = useState<"toss" | "vbank">("vbank");
   // 무통장 입금 접수 완료 안내 모달
   const [vbankModal, setVbankModal] = useState<{ amount: number } | null>(null);
-  // 약관 동의는 React 측 게이트 없음 — Toss SDK 가 requestPayment 호출 시점에 자체 enforce
-  // (이전 다중 소스 sync 가 race/iframe/SDK 호환성 이슈로 false-positive 빈발 → 단순화)
 
   // 결제 대상 파티 안에 적용된 쿠폰만 유효
   const couponApplicable = !!appliedCoupon && uniquePartyIds.includes(appliedCoupon.partyId);
@@ -104,58 +80,6 @@ function CheckoutContent() {
     }
   }, [mounted, isLoggedIn, router, singleId, multiIds]);
 
-  // ── Toss v2 위젯 초기화 (한 번만) — 결제 수단 + 약관 위젯 렌더 ──────────
-  useEffect(() => {
-    console.log("[checkout] init useEffect 진입", { mounted, isLoggedIn, partyCount: parties.length, totalAmount, userEmail, hasKey: !!TOSS_CLIENT_KEY, alreadyInit: !!widgetsRef.current });
-    if (!mounted || !isLoggedIn) return;
-    if (parties.length === 0 || totalAmount <= 0) return;
-    if (!TOSS_CLIENT_KEY) { console.warn("[checkout] TOSS_CLIENT_KEY 누락 — .env 확인 필요"); return; }
-    if (!userEmail)       { console.log("[checkout] userEmail 미준비 — 다음 hydration 대기"); return; }
-    if (widgetsRef.current) return; // 이미 초기화됨
-
-    let cancelled = false;
-    (async () => {
-      // SDK 로드 대기 (layout.tsx 의 async <script src=".../v2/standard">)
-      let tries = 0;
-      while (!window.TossPayments && tries < 50) {
-        await new Promise(r => setTimeout(r, 100));
-        tries++;
-      }
-      if (cancelled) return;
-      if (!window.TossPayments) { console.error("[checkout] TossPayments SDK 로드 실패 (5s 타임아웃)"); return; }
-      console.log("[checkout] SDK 로드 완료 — 위젯 초기화 시작");
-
-      try {
-        const tossPayments = window.TossPayments(TOSS_CLIENT_KEY);
-        const customerKey  = emailToCustomerKey(userEmail);
-        const w            = tossPayments.widgets({ customerKey });
-
-        // 위젯 인스턴스를 즉시 ref 에 lock — 후속 useEffect 실행이 가드로 차단되어
-        // renderPaymentMethods 가 같은 selector 에 두 번 호출되는 race 방지.
-        widgetsRef.current = w;
-
-        await w.setAmount({ currency: "KRW", value: totalAmount });
-        await w.renderPaymentMethods({ selector: "#payment-method", variantKey: "DEFAULT" });
-        // 약관 위젯 — 법적 표시용으로만 렌더 (게이팅은 Toss SDK 가 requestPayment 시 자체 처리)
-        await w.renderAgreement({ selector: "#agreement", variantKey: "AGREEMENT" });
-
-        // 위젯 DOM 은 이미 렌더 완료 — cancelled 무관하게 ready 마크
-        setReady(true);
-        console.log("[checkout] 위젯 렌더 완료 — ready=true");
-      } catch (e) {
-        console.error("[checkout] 위젯 초기화 실패:", e);
-        widgetsRef.current = null; // 에러 시 lock 해제 — 다음 trigger 에서 retry 가능
-      }
-    })();
-
-    return () => { cancelled = true; };
-  }, [mounted, isLoggedIn, parties.length, userEmail, TOSS_CLIENT_KEY, totalAmount]);
-
-  // ── 결제 금액이 바뀔 때마다 setAmount 동기화 (쿠폰 적용/해제 등) ─────────
-  useEffect(() => {
-    if (!widgetsRef.current || totalAmount <= 0) return;
-    widgetsRef.current.setAmount({ currency: "KRW", value: totalAmount }).catch(() => {});
-  }, [totalAmount]);
 
   if (!mounted || !isLoggedIn) {
     return (
@@ -185,13 +109,11 @@ function CheckoutContent() {
     : `${parties[0].title} 외 ${totalQty - 1}건`;
 
   const handlePayment = async () => {
-    console.log("[checkout] handlePayment 호출", { paying, ready, userEmail, gender: profile?.gender, totalAmount, partyCount: partyIds.length });
-    if (paying)                          { console.warn("[checkout] paying=true 이미 진행 중 — 중단"); return; }
-    // Toss 위젯은 토스 결제 시에만 필요 — 무통장 입금은 위젯 없이 진행
-    if (payMethod === "toss" && (!ready || !widgetsRef.current)) { console.warn("[checkout] 위젯 미준비 — 중단"); alert("결제 모듈이 아직 준비되지 않았습니다. 잠시 후 다시 시도해주세요."); return; }
-    if (!userEmail)                      { console.warn("[checkout] userEmail 없음 — 중단"); alert("로그인이 필요합니다."); router.push("/login"); return; }
-    if (!profile?.gender)                { console.warn("[checkout] 프로필 성별 미설정 — 중단"); alert("프로필 카드에서 성별을 먼저 등록해주세요."); router.push("/profile-setup/"); return; }
-    if (totalAmount <= 0)                { console.error("[checkout] totalAmount=0 — 결제 금액 비정상", { partyIds, totalAmount }); alert("결제 금액이 비정상입니다. 장바구니를 다시 확인해주세요."); return; }
+    console.log("[checkout] handlePayment 호출", { paying, userEmail, gender: profile?.gender, totalAmount, partyCount: partyIds.length });
+    if (paying)           { console.warn("[checkout] paying=true 이미 진행 중 — 중단"); return; }
+    if (!userEmail)       { console.warn("[checkout] userEmail 없음 — 중단"); alert("로그인이 필요합니다."); router.push("/login"); return; }
+    if (!profile?.gender) { console.warn("[checkout] 프로필 성별 미설정 — 중단"); alert("프로필 카드에서 성별을 먼저 등록해주세요."); router.push("/profile-setup/"); return; }
+    if (totalAmount <= 0) { console.error("[checkout] totalAmount=0 — 결제 금액 비정상", { partyIds, totalAmount }); alert("결제 금액이 비정상입니다. 장바구니를 다시 확인해주세요."); return; }
 
     // 중복 신청 차단 — 결제완료/확정 상태의 booking 이 cart 의 partyId 와 겹치면 안 됨
     const duplicateBookings = bookings.filter(b =>
@@ -279,29 +201,45 @@ function CheckoutContent() {
         return;
       }
 
-      // 2) Toss v2 위젯 — 결제 인증창 호출 (성공/실패 시 redirect)
-      const origin = window.location.origin;
-      console.log("[checkout] requestPayment 호출", { orderId: pending.orderId, orderName, totalAmount });
-      await widgetsRef.current!.requestPayment({
-        orderId:       pending.orderId,
-        orderName,
-        successUrl:    `${origin}/api/payments/success.php`,
-        failUrl:       `${origin}/api/payments/fail.php`,
-        customerEmail: userEmail,
-        customerName:  profile?.name || undefined,
-      });
-      // requestPayment 성공 시 redirect — 이 라인 도달 X
-    } catch (error: unknown) {
-      const e = error as { code?: string; name?: string; message?: string };
-      // 사용자 취소는 조용히 복귀
-      if (e?.code === "USER_CANCEL" || e?.code === "USER_CANCEL_PAYMENT") {
+      // 2) PortOne V1 결제창 호출 (콜백 기반)
+      const IMP = window.IMP;
+      if (!IMP) {
+        alert("결제 모듈이 로드되지 않았습니다. 페이지를 새로고침 후 다시 시도해주세요.");
         setPaying(false);
         return;
       }
-      console.error("[checkout] Toss SDK error:", error);
-      const code = e?.code || e?.name || "UNKNOWN";
-      const msg  = e?.message || "결제 요청에 실패했습니다.";
-      alert(`결제 오류 [${code}]\n${msg}`);
+      IMP.init("imphdtest");
+      console.log("[checkout] IMP.request_pay 호출", { orderId: pending.orderId, orderName, totalAmount });
+      IMP.request_pay(
+        {
+          pg:           "html5_inicis.INIpayTest",
+          pay_method:   "card",
+          merchant_uid: pending.orderId,
+          name:         orderName,
+          amount:       totalAmount,
+          buyer_name:   profile?.name || "구매자",
+          buyer_tel:    profile?.phone || "01000000000",
+          buyer_email:  userEmail,
+        },
+        (rsp) => {
+          if (rsp.success) {
+            console.log("[checkout] PortOne 결제 성공 — success.php 로 이동", rsp);
+            window.location.href =
+              `/api/payments/success.php?imp_uid=${encodeURIComponent(rsp.imp_uid)}&merchant_uid=${encodeURIComponent(rsp.merchant_uid)}&amount=${rsp.paid_amount}`;
+          } else {
+            console.warn("[checkout] PortOne 결제 실패/취소:", rsp.error_msg);
+            if (rsp.error_msg && rsp.error_msg !== "사용자가 결제를 취소하셨습니다") {
+              alert(`결제 오류: ${rsp.error_msg}`);
+            }
+            setPaying(false);
+          }
+        }
+      );
+      // IMP.request_pay 는 콜백 기반 — 결제창을 띄운 뒤 즉시 반환
+    } catch (error: unknown) {
+      const e = error as { message?: string };
+      console.error("[checkout] 결제 요청 오류:", error);
+      alert(`결제 오류: ${e?.message || "결제 요청에 실패했습니다."}`);
       setPaying(false);
     }
   };
@@ -439,7 +377,7 @@ function CheckoutContent() {
           {/* ── 결제 수단 선택 (v7.0) — 토스 결제 / 무통장 입금 ──────────────── */}
           <div className="grid grid-cols-2 gap-2.5 md:gap-3 mb-3">
             {([
-              { key: "toss",  title: "신용카드/간편결제", desc: "토스로 즉시 결제" },
+              { key: "toss",  title: "신용카드/간편결제", desc: "KG이니시스로 즉시 결제" },
               { key: "vbank", title: "무통장 입금",       desc: "계좌이체 후 입금 확인" },
             ] as const).map(opt => {
               const active = payMethod === opt.key;
@@ -465,32 +403,6 @@ function CheckoutContent() {
               );
             })}
           </div>
-
-          {/* ── Toss v2 결제수단 + 약관 위젯 — 카드 선택 + CARD_ENABLED 일 때만 노출.
-                 무통장 선택 또는 카드 비활성(CARD_ENABLED=false) 시 숨김 (언마운트 X, ready 유지) ── */}
-          <div className={(payMethod === "toss" && CARD_ENABLED) ? "" : "hidden"}>
-            <div className="bg-white rounded-2xl md:rounded-3xl p-2 md:p-3 border border-gray-100 mb-3">
-              <div id="payment-method" />
-            </div>
-            <div className="bg-white rounded-2xl md:rounded-3xl p-2 md:p-3 border border-gray-100 mb-3 relative">
-              <div id="agreement" />
-            </div>
-          </div>
-
-          {/* ── 카드/간편결제 임시 비활성 안내 — 카드 선택 시(위젯 자리)에 노출.
-                 우측 '무통장 입금 안내' 패널과 동일한 스타일 클래스 1:1 적용 ── */}
-          {payMethod === "toss" && !CARD_ENABLED && (
-            <div className="bg-white rounded-2xl md:rounded-3xl p-5 md:p-6 border-2 border-[#F6B26B]/60 mb-3">
-              <div className="flex items-center gap-2 mb-3">
-                <CreditCard size={18} className="text-[#FF2300]" />
-                <span className="font-black text-base md:text-lg text-brand-black">신용카드 / 간편결제 안내</span>
-              </div>
-              <p className="text-xs md:text-sm text-gray-500 font-medium leading-relaxed break-keep">
-                현재 더욱 안전한 결제 환경을 구축하기 위해 신용카드 및 간편결제 시스템 최종 승인 단계를 거치고 있습니다.
-                시스템 오픈 전까지는 우측의 [무통장 입금] 을 통해 바로 결제 및 예약 진행이 가능합니다. 불편을 드려 죄송합니다.
-              </p>
-            </div>
-          )}
 
           {/* ── 무통장 입금 안내 패널 — 무통장 선택 시 노출 ───────────────────── */}
           {payMethod === "vbank" && (
@@ -530,18 +442,13 @@ function CheckoutContent() {
             <ExternalLink size={13} className="text-gray-400 flex-shrink-0" />
           </Link>
 
-          {/* 결제 가능 조건 — 약관 동의는 Toss 결제창에서 자체 처리.
-              무통장 입금은 Toss 위젯(ready) 불필요 → vbank 일 땐 ready 게이트 제외 (v7.0).
-              카드 선택 + 카드 비활성(CARD_ENABLED=false) 시에는 결제 버튼 영역 전체 숨김. */}
-          {!(payMethod === "toss" && !CARD_ENABLED) && (() => {
-            const amountValid    = totalAmount > 0;
-            const partyIdsValid  = partyIds.length > 0;
-            const isVbank        = payMethod === "vbank";
-            const readyOk        = isVbank ? true : ready;
-            const canPay         = readyOk && amountValid && partyIdsValid && !paying;
+          {(() => {
+            const amountValid   = totalAmount > 0;
+            const partyIdsValid = partyIds.length > 0;
+            const isVbank       = payMethod === "vbank";
+            const canPay        = amountValid && partyIdsValid && !paying;
 
             const reason =
-              !readyOk        ? "결제 모듈 로딩 중..." :
               !amountValid    ? "결제 금액이 비정상입니다." :
               !partyIdsValid  ? "주문 항목이 비어있습니다." :
               "";
@@ -566,7 +473,7 @@ function CheckoutContent() {
                   className="w-full bg-brand-black text-white py-5 rounded-2xl font-black text-base md:text-xl hover:bg-brand-point transition-all shadow-xl hover:shadow-brand-point/30 flex items-center justify-center gap-3 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none"
                 >
                   <CreditCard size={22} />
-                  {paying ? payingLabel : !readyOk ? "결제 모듈 로딩 중..." : idleLabel}
+                  {paying ? payingLabel : idleLabel}
                 </button>
               </>
             );
