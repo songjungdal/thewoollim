@@ -21,6 +21,7 @@ type PortOneRequest = {
   payMethod: string;
   customer?: { name?: string; phoneNumber?: string; email?: string };
   windowType?: { pc?: string; mobile?: string };
+  redirectUrl?: string;
 };
 
 type PortOneResponse = {
@@ -231,7 +232,8 @@ function CheckoutContent() {
           phoneNumber: profile?.phone || "01000000000",
           email:       userEmail,
         },
-        windowType: { pc: "POPUP", mobile: "POPUP" },
+        // windowType 미지정 → PortOne이 채널/기기 최적 방식 자동 선택 (팝업 강제 해제)
+        redirectUrl: `${window.location.origin}/api/payments/success.php`,
       });
       if (response?.code != null) {
         // 사용자 취소는 조용히 복귀
@@ -242,7 +244,7 @@ function CheckoutContent() {
         setPaying(false);
         return;
       }
-      // 결제 성공 — 백엔드 검증 + booking 생성
+      // 결제 성공 (팝업/인라인 경로) — 백엔드 검증 + booking 생성
       console.log("[checkout] PortOne V2 결제 성공 — success.php 로 이동", response);
       window.location.href =
         `/api/payments/success.php?paymentId=${encodeURIComponent(pending.orderId)}&amount=${totalAmount}`;
@@ -413,6 +415,37 @@ function CheckoutContent() {
               );
             })}
           </div>
+
+          {/* ── 카드/간편결제 임베드 패널 — 카드 선택 시 노출 ──────────────────── */}
+          {payMethod === "toss" && (
+            <div id="payment-method" className="bg-white rounded-2xl md:rounded-3xl overflow-hidden border border-gray-100 mb-3">
+              <div className="px-5 md:px-6 py-4 border-b border-gray-100 flex items-center gap-2">
+                <CreditCard size={16} className="text-brand-point flex-shrink-0" />
+                <span className="font-black text-sm md:text-base text-brand-black">카드 결제 정보</span>
+              </div>
+              <div className="px-5 md:px-6 py-5 space-y-4">
+                {/* 카드사 뱃지 */}
+                <div className="flex flex-wrap gap-2 items-center">
+                  {["VISA", "Master", "AMEX", "국민", "신한", "현대", "삼성", "롯데"].map(b => (
+                    <span key={b} className="px-2 py-0.5 rounded-md bg-gray-100 text-[10px] md:text-[11px] font-black text-gray-500 tracking-tight">
+                      {b}
+                    </span>
+                  ))}
+                  <span className="text-[11px] text-gray-400 font-medium">외 국내 주요 카드 전체</span>
+                </div>
+                {/* 결제 예정 금액 */}
+                <div className="flex justify-between items-center rounded-xl bg-brand-point/5 border border-brand-point/15 px-4 py-3">
+                  <span className="text-gray-500 font-medium text-sm">결제 예정 금액</span>
+                  <span className="font-black text-xl md:text-2xl text-brand-point tabular-nums">
+                    ₩{totalAmount.toLocaleString()}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-400 leading-relaxed break-keep">
+                  아래 [결제하기] 버튼을 누르면 KG이니시스 보안 결제 화면으로 연결됩니다. 신용·체크카드 및 국내 주요 간편결제를 지원합니다.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* ── 무통장 입금 안내 패널 — 무통장 선택 시 노출 ───────────────────── */}
           {payMethod === "vbank" && (
