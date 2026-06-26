@@ -224,7 +224,7 @@ function CheckoutContent() {
         orderName,
         totalAmount,
         currency:    "CURRENCY_KRW",
-        channelKey:  "channel-key-inicis-test",
+        channelKey:  "channel-key-53e18746-f892-436d-a213-e836d46c32cd",
         payMethod:   "CARD",
         customer: {
           name:        profile?.name || "구매자",
