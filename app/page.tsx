@@ -283,6 +283,8 @@ export default function SmoothOnePage() {
   const [isDesktop, setIsDesktop] = useState(false);               // lg(1024px) 이상 여부
   const [applyMoreOpen, setApplyMoreOpen] = useState(false);       // 신청 섹션 더보기 펼침
   const [scheduleMoreOpen, setScheduleMoreOpen] = useState(false); // 일정(모바일) 더보기 펼침
+  const [mobileYear, setMobileYear]   = useState(0);  // 모바일 일정 선택 연도 (0=미초기화)
+  const [mobileMonth, setMobileMonth] = useState(0);  // 모바일 일정 선택 월  (0=미초기화)
 
   // 해상도 → 초기 노출 개수(12/10) 실시간 동기화
   useEffect(() => {
@@ -297,6 +299,13 @@ export default function SmoothOnePage() {
   useEffect(() => {
     setApplyMoreOpen(false);
   }, [activeAxis, filterValue]);
+
+  // 모바일 일정 섹션 — 마운트 1회, 현재 날짜 기준 연/월 초기화
+  useEffect(() => {
+    const d = new Date();
+    setMobileYear(d.getFullYear());
+    setMobileMonth(d.getMonth() + 1);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sortedParties = useMemo(() => {
     const filtered = [...PARTIES].filter(p => {
@@ -347,7 +356,29 @@ export default function SmoothOnePage() {
     () => [...CALENDAR_EVENTS].sort((a, b) => a.start.localeCompare(b.start)),
     [CALENDAR_EVENTS]
   );
-  const showScheduleMore = !scheduleMoreOpen && sortedSchedule.length > SCHEDULE_LIMIT_MOBILE;
+
+  // 모바일 일정 — 월 내비게이션 핸들러 (이전/다음 달 전환 + 더보기 접기)
+  const goPrevMonth = () => {
+    setScheduleMoreOpen(false);
+    setMobileYear(y => mobileMonth === 1 ? y - 1 : y);
+    setMobileMonth(m => m === 1 ? 12 : m - 1);
+  };
+  const goNextMonth = () => {
+    setScheduleMoreOpen(false);
+    setMobileYear(y => mobileMonth === 12 ? y + 1 : y);
+    setMobileMonth(m => m === 12 ? 1 : m + 1);
+  };
+
+  // 선택 연/월에 해당하는 일정만 추출 (sortedSchedule 이미 시간 오름차순)
+  const mobileSchedule = useMemo(() => {
+    if (!mobileYear) return [];
+    return sortedSchedule.filter(e => {
+      const d = new Date(e.start.substring(0, 10) + "T00:00:00");
+      return d.getFullYear() === mobileYear && d.getMonth() + 1 === mobileMonth;
+    });
+  }, [sortedSchedule, mobileYear, mobileMonth]);
+
+  const showScheduleMore = !scheduleMoreOpen && mobileSchedule.length > SCHEDULE_LIMIT_MOBILE;
 
   void activeTab; // 기존 useState는 호환을 위해 유지 (warning 회피용 reference)
 
@@ -643,55 +674,85 @@ export default function SmoothOnePage() {
               <p className="text-base md:text-lg text-gray-500 max-w-2xl mx-auto">신청 가능한 매칭파티 일정을 확인하세요.</p>
             </motion.div>
 
-            {/* Mobile: List View */}
-            <div className="md:hidden space-y-3">
-              {CALENDAR_EVENTS.length === 0 ? (
-                <p className="text-center text-gray-400 py-12">등록된 일정이 없습니다.</p>
-              ) : (
-                (scheduleMoreOpen ? sortedSchedule : sortedSchedule.slice(0, SCHEDULE_LIMIT_MOBILE)).map((event) => {
-                  const party = PARTIES.find(p => p.id === event.id);
-                  const dateObj = new Date(event.start.substring(0, 10) + "T00:00:00");
-                  const month = dateObj.getMonth() + 1;
-                  const day = dateObj.getDate();
-                  const dayName = ["일", "월", "화", "수", "목", "금", "토"][dateObj.getDay()];
-                  // 행사 일시 경과 → 파스텔 빨강(#f8d8dd) 톤으로 표시 (링크/클릭 동작은 그대로)
-                  const isPast = now && party ? partyVisibility(party, now) !== "active" : false;
-                  return (
-                    <button
-                      key={event.id}
-                      onClick={() => router.push(`/party/${event.id}`)}
-                      className={`w-full text-left rounded-2xl p-4 flex items-center gap-4 transition-all shadow-sm active:scale-[0.98] cursor-pointer ${
-                        isPast
-                          ? "bg-[#fdeef0] border border-[#f8d8dd] hover:border-[#e9a8b1] hover:bg-[#fbe3e7]"
-                          : "bg-gray-50 border border-gray-100 hover:border-brand-point hover:bg-white"
-                      }`}
-                    >
-                      <div className={`flex-shrink-0 w-14 rounded-xl py-2 text-center ${isPast ? "bg-[#f8d8dd]" : "bg-[#40E0D0]/15"}`}>
-                        <div className={`text-[11px] font-bold ${isPast ? "text-[#9a3a47]" : "text-[#008080]"}`}>{month}월</div>
-                        <div className={`text-2xl font-black leading-none ${isPast ? "text-[#7a2c37]" : "text-brand-black"}`}>{day}</div>
-                        <div className={`text-[11px] font-semibold ${isPast ? "text-[#9a3a47]/70" : "text-gray-400"}`}>{dayName}요일</div>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className={`font-bold text-[15px] mb-1 leading-snug ${isPast ? "text-[#7a2c37]" : "text-brand-black"}`}>{event.title}</div>
-                        <div className={`text-sm ${isPast ? "text-[#9a3a47]/85" : "text-gray-500"}`}>{party?.dateString}</div>
-                        <div className={`text-xs mt-0.5 truncate ${isPast ? "text-[#9a3a47]/70" : "text-gray-400"}`}>{party?.location} · {party?.target}</div>
-                      </div>
-                      <ArrowRight size={16} className={`flex-shrink-0 ${isPast ? "text-[#9a3a47]/50" : "text-gray-300"}`} />
-                    </button>
-                  );
-                })
-              )}
+            {/* Mobile: 연/월 내비게이션 + 월별 일정 리스트 */}
+            <div className="md:hidden">
 
-              {/* v9.2 — 모바일 전용 [더보기]: 일정이 10개 초과 + 미펼침일 때만. (PC 캘린더는 영향 없음) */}
-              {showScheduleMore && (
+              {/* 연도·월 내비게이션 바 */}
+              <div className="flex items-center justify-between mb-5 px-1">
                 <button
                   type="button"
-                  onClick={() => setScheduleMoreOpen(true)}
-                  className="mt-2 w-full h-12 inline-flex items-center justify-center gap-2 rounded-full border border-gray-300 text-gray-700 font-bold text-sm hover:border-brand-point hover:text-brand-point transition-colors"
+                  onClick={goPrevMonth}
+                  aria-label="이전 달"
+                  className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-100 text-brand-black hover:bg-brand-point hover:text-white active:scale-95 transition-all"
                 >
-                  더보기 <ChevronDown size={18} />
+                  <ChevronLeft size={22} strokeWidth={2.5} />
                 </button>
-              )}
+                <span className="font-black text-xl tracking-tight text-brand-black">
+                  {mobileYear > 0 ? `${mobileYear}년 ${mobileMonth}월` : ""}
+                </span>
+                <button
+                  type="button"
+                  onClick={goNextMonth}
+                  aria-label="다음 달"
+                  className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-100 text-brand-black hover:bg-brand-point hover:text-white active:scale-95 transition-all"
+                >
+                  <ChevronRight size={22} strokeWidth={2.5} />
+                </button>
+              </div>
+
+              {/* 선택 월 일정 리스트 */}
+              <div className="space-y-3">
+                {mobileSchedule.length === 0 ? (
+                  <p className="text-center text-gray-400 py-12">
+                    {mobileYear > 0 ? `${mobileMonth}월에 등록된 일정이 없습니다.` : ""}
+                  </p>
+                ) : (
+                  (scheduleMoreOpen ? mobileSchedule : mobileSchedule.slice(0, SCHEDULE_LIMIT_MOBILE)).map((event) => {
+                    const party = PARTIES.find(p => p.id === event.id);
+                    const dateObj = new Date(event.start.substring(0, 10) + "T00:00:00");
+                    const month = dateObj.getMonth() + 1;
+                    const day = dateObj.getDate();
+                    const dayName = ["일", "월", "화", "수", "목", "금", "토"][dateObj.getDay()];
+                    // 행사 일시 경과 → 파스텔 빨강(#f8d8dd) 톤으로 표시 (링크/클릭 동작은 그대로)
+                    const isPast = now && party ? partyVisibility(party, now) !== "active" : false;
+                    return (
+                      <button
+                        key={event.id}
+                        type="button"
+                        onClick={() => router.push(`/party/${event.id}`)}
+                        className={`w-full text-left rounded-2xl p-4 flex items-center gap-4 transition-all shadow-sm active:scale-[0.98] cursor-pointer ${
+                          isPast
+                            ? "bg-[#fdeef0] border border-[#f8d8dd] hover:border-[#e9a8b1] hover:bg-[#fbe3e7]"
+                            : "bg-gray-50 border border-gray-100 hover:border-brand-point hover:bg-white"
+                        }`}
+                      >
+                        <div className={`flex-shrink-0 w-14 rounded-xl py-2 text-center ${isPast ? "bg-[#f8d8dd]" : "bg-[#40E0D0]/15"}`}>
+                          <div className={`text-[11px] font-bold ${isPast ? "text-[#9a3a47]" : "text-[#008080]"}`}>{month}월</div>
+                          <div className={`text-2xl font-black leading-none ${isPast ? "text-[#7a2c37]" : "text-brand-black"}`}>{day}</div>
+                          <div className={`text-[11px] font-semibold ${isPast ? "text-[#9a3a47]/70" : "text-gray-400"}`}>{dayName}요일</div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className={`font-bold text-[15px] mb-1 leading-snug ${isPast ? "text-[#7a2c37]" : "text-brand-black"}`}>{event.title}</div>
+                          <div className={`text-sm ${isPast ? "text-[#9a3a47]/85" : "text-gray-500"}`}>{party?.dateString}</div>
+                          <div className={`text-xs mt-0.5 truncate ${isPast ? "text-[#9a3a47]/70" : "text-gray-400"}`}>{party?.location} · {party?.target}</div>
+                        </div>
+                        <ArrowRight size={16} className={`flex-shrink-0 ${isPast ? "text-[#9a3a47]/50" : "text-gray-300"}`} />
+                      </button>
+                    );
+                  })
+                )}
+
+                {/* 더보기 — 선택 월 일정이 10개 초과 시 (PC 캘린더 무영향) */}
+                {showScheduleMore && (
+                  <button
+                    type="button"
+                    onClick={() => setScheduleMoreOpen(true)}
+                    className="mt-2 w-full h-12 inline-flex items-center justify-center gap-2 rounded-full border border-gray-300 text-gray-700 font-bold text-sm hover:border-brand-point hover:text-brand-point transition-colors"
+                  >
+                    더보기 <ChevronDown size={18} />
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Desktop: Calendar View */}
