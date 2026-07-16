@@ -453,13 +453,16 @@ function CheckoutContent() {
             })}
           </div>
 
-          {/* ── 신용카드/간편결제 — 토스페이먼츠 v2 위젯 렌더 영역 ──────────── */}
-          {payMethod === "toss" && (
-            <div className="bg-white rounded-2xl md:rounded-3xl p-5 md:p-6 border-2 border-brand-point/30 mb-3">
-              <div id="payment-method" />
-              <div id="agreement" className="mt-2" />
-            </div>
-          )}
+          {/* ── 신용카드/간편결제 — 토스페이먼츠 v2 위젯 렌더 영역 ──────────────
+               탭 전환 시 이 div 를 언마운트하면 widgetsRef 는 남아있는데 SDK 가 그린
+               DOM 만 사라져, 재전환 시 renderPaymentMethods 가 재실행되지 않고
+               빈 화면으로 남는다. 그래서 언마운트 대신 display:none 으로만 숨긴다. ── */}
+          <div
+            className={`bg-white rounded-2xl md:rounded-3xl p-5 md:p-6 border-2 border-brand-point/30 mb-3 ${payMethod === "toss" ? "" : "hidden"}`}
+          >
+            <div id="payment-method" />
+            <div id="agreement" className="mt-2" />
+          </div>
 
           {/* ── 무통장 입금 안내 패널 — 무통장 선택 시 노출 ─────────────────── */}
           {payMethod === "vbank" && (
