@@ -13,7 +13,7 @@ export default function RefundPage() {
           <Image src="/images/sub-hero-bg.webp" alt="" fill className="object-cover object-center" />
           <div className="absolute inset-0 bg-white/75" />
           <div className="relative z-10 max-w-4xl mx-auto pt-6 md:pt-10">
-            <h1 className="text-4xl md:text-6xl font-black tracking-tighter mb-5 md:mb-8">환불규정</h1>
+            <h1 className="text-4xl md:text-6xl font-black tracking-tighter mb-5 md:mb-8">이용안내 및 환불규정</h1>
             <div className="w-20 md:w-24 h-1.5 bg-brand-point rounded-full"></div>
           </div>
         </section>
