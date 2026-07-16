@@ -493,13 +493,13 @@ function CheckoutContent() {
             href="/refund"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-between gap-2 w-full bg-brand-point/5 border border-brand-point/20 rounded-xl px-4 py-3 mb-3 text-sm font-bold text-gray-700 hover:bg-brand-point/10 hover:border-brand-point/40 transition-colors"
+            className="flex items-start justify-between gap-2 w-full bg-brand-point/5 border border-brand-point/20 rounded-xl px-4 py-3 mb-3 text-sm font-bold text-gray-700 hover:bg-brand-point/10 hover:border-brand-point/40 transition-colors"
           >
-            <span className="flex items-center gap-2 min-w-0">
-              <FileText size={15} className="text-brand-point flex-shrink-0" />
-              <span className="truncate">어울림 자체 환불 규정 확인하기</span>
+            <span className="flex items-start gap-2 min-w-0">
+              <FileText size={15} className="text-brand-point flex-shrink-0 mt-0.5" />
+              <span className="break-keep">서비스 제공 기간 및 환불 규정 확인하기</span>
             </span>
-            <ExternalLink size={13} className="text-gray-400 flex-shrink-0" />
+            <ExternalLink size={13} className="text-gray-400 flex-shrink-0 mt-0.5" />
           </Link>
 
           {/* ── 결제 버튼 — 신용카드/무통장 공통 노출 ───────────────────────── */}
