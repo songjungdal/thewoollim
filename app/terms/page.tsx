@@ -67,7 +67,17 @@ export default function TermsPage() {
               </section>
 
               <section>
-                <h2 className="text-xl md:text-2xl font-black text-black mb-4 md:mb-6">제6조 개인정보처리방침</h2>
+                <h2 className="text-xl md:text-2xl font-black text-black mb-4 md:mb-6">제6조 서비스 제공기간 및 유효기간 안내</h2>
+                <div className="space-y-3 md:space-y-4 text-gray-800">
+                  <ul className="list-disc pl-5 md:pl-6 space-y-3 md:space-y-4">
+                    <li><span className="font-bold">서비스 제공 기간(유효기간):</span> 본 파티 예약 서비스의 제공 기간은 결제일(구매일)로부터 3개월(90일)까지입니다.</li>
+                    <li><span className="font-bold">예약 소멸 기준:</span> 결제 후 3개월 이내에 파티 참가 예약을 완료하지 않거나 참가하지 않은 이용권은 기간 만료로 소멸되며, 이후에는 환불 및 서비스 제공이 불가합니다.</li>
+                  </ul>
+                </div>
+              </section>
+
+              <section>
+                <h2 className="text-xl md:text-2xl font-black text-black mb-4 md:mb-6">제7조 개인정보처리방침</h2>
                 <div className="space-y-3 md:space-y-4 text-gray-800">
                   <p>사이트 및 운영자는 회원의 비밀번호를 직접 보유하지 않으며, 개인정보와 관련된 사항은 사이트의 개인정보처리방침을 따릅니다.</p>
                   <p>운영자는 관계 법령이 정하는 바에 따라 회원의 개인정보를 보호하기 위하여 노력합니다.</p>
@@ -77,7 +87,7 @@ export default function TermsPage() {
               </section>
 
               <section>
-                <h2 className="text-xl md:text-2xl font-black text-black mb-4 md:mb-6">제7조 운영자의 의무</h2>
+                <h2 className="text-xl md:text-2xl font-black text-black mb-4 md:mb-6">제8조 운영자의 의무</h2>
                 <div className="space-y-3 md:space-y-4 text-gray-800">
                   <p>운영자는 이용회원의 의견이나 불만이 정당하다고 인정될 경우 신속히 처리하여야 합니다.</p>
                   <p>운영자는 계속적이고 안정적인 서비스 제공을 위하여 설비 장애 시 지체 없이 수리 또는 복구할 수 있도록 최선을 다합니다. 단, 천재지변이나 부득이한 사유가 있는 경우 서비스 운영을 일시 정지할 수 있습니다.</p>
@@ -85,7 +95,7 @@ export default function TermsPage() {
               </section>
 
               <section>
-                <h2 className="text-xl md:text-2xl font-black text-black mb-4 md:mb-6">제8조 회원의 의무</h2>
+                <h2 className="text-xl md:text-2xl font-black text-black mb-4 md:mb-6">제9조 회원의 의무</h2>
                 <div className="space-y-3 md:space-y-4 text-gray-800">
                   <p>회원은 약관, 운영정책, 공지사항 및 관계 법령을 준수하여야 하며, 사이트의 명예를 손상하거나 업무에 방해가 되는 행위를 해서는 안 됩니다.</p>
                   <p>회원은 이용 권한 및 계약상 지위를 타인에게 양도, 증여하거나 담보로 제공할 수 없습니다.</p>
@@ -95,7 +105,7 @@ export default function TermsPage() {
               </section>
 
               <section>
-                <h2 className="text-xl md:text-2xl font-black text-black mb-4 md:mb-6">제9조 서비스 이용 시간 및 중단</h2>
+                <h2 className="text-xl md:text-2xl font-black text-black mb-4 md:mb-6">제10조 서비스 이용 시간 및 중단</h2>
                 <div className="space-y-3 md:space-y-4 text-gray-800">
                   <p>서비스는 1일 24시간 운영을 원칙으로 하나, 시스템 점검 및 교체 등을 위해 서비스를 일시 중단할 수 있습니다. 이 경우 사전에 공지합니다.</p>
                   <p>국가비상사태, 정전, 천재지변, 서비스 이용 폭주 등 불가항력적인 사유가 발생한 경우 사전 예고 없이 서비스를 중단할 수 있습니다.</p>
@@ -103,7 +113,7 @@ export default function TermsPage() {
               </section>
 
               <section>
-                <h2 className="text-xl md:text-2xl font-black text-black mb-4 md:mb-6">제10조 서비스 이용 해지 및 제한</h2>
+                <h2 className="text-xl md:text-2xl font-black text-black mb-4 md:mb-6">제11조 서비스 이용 해지 및 제한</h2>
                 <div className="space-y-3 md:space-y-4 text-gray-800">
                   <p>회원이 이용계약을 해지하고자 할 때는 본인이 온라인을 통해 직접 등록해지 신청을 해야 합니다.</p>
                   <p>다음 각호의 행위를 한 경우 운영자는 서비스 이용을 제한하거나 계약을 해지할 수 있습니다.</p>
@@ -117,7 +127,7 @@ export default function TermsPage() {
               </section>
 
               <section>
-                <h2 className="text-xl md:text-2xl font-black text-black mb-4 md:mb-6">제11조 게시물의 관리 및 저작권</h2>
+                <h2 className="text-xl md:text-2xl font-black text-black mb-4 md:mb-6">제12조 게시물의 관리 및 저작권</h2>
                 <div className="space-y-3 md:space-y-4 text-gray-800">
                   <p>회원이 게시한 게시물의 저작권은 게시자 본인에게 귀속됩니다.</p>
                   <p>운영자는 상업적 목적이 아닌 경우 회원의 게시물을 서비스 내에 게재할 권리를 갖습니다.</p>
@@ -126,7 +136,7 @@ export default function TermsPage() {
               </section>
 
               <section>
-                <h2 className="text-xl md:text-2xl font-black text-black mb-4 md:mb-6">제12조 손해배상 및 면책</h2>
+                <h2 className="text-xl md:text-2xl font-black text-black mb-4 md:mb-6">제13조 손해배상 및 면책</h2>
                 <div className="space-y-3 md:space-y-4 text-gray-800">
                   <p>사이트 내에서 발생하는 민·형사상 책임은 1차적으로 회원 본인에게 있습니다.</p>
                   <p>운영자는 천재지변, 통신 장애, 회원의 귀책 사유로 인한 서비스 이용 장애에 대해서는 책임을 지지 않습니다.</p>
@@ -136,7 +146,7 @@ export default function TermsPage() {
               </section>
 
               <section>
-                <h2 className="text-xl md:text-2xl font-black text-black mb-4 md:mb-6">제13조 쿠폰 및 포인트</h2>
+                <h2 className="text-xl md:text-2xl font-black text-black mb-4 md:mb-6">제14조 쿠폰 및 포인트</h2>
                 <div className="space-y-3 md:space-y-4 text-gray-800">
                   <p>회사는 이벤트, 구매 후기 작성 등에 따라 쿠폰 및 포인트를 발급할 수 있습니다.</p>
                   <p>쿠폰과 포인트는 명시된 유효기간 내에만 사용 가능하며, 회원 탈퇴 시 자동으로 소멸됩니다.</p>
