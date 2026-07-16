@@ -1,6 +1,6 @@
 import Header from "../components/Header";
 import Footer from "../components/Footer";
-import { AlertCircle, CreditCard, RefreshCw, Info, ScrollText, Ban } from "lucide-react";
+import { AlertCircle, CreditCard, RefreshCw, Info, ScrollText, Ban, Clock } from "lucide-react";
 import Image from "next/image";
 
 export default function RefundPage() {
@@ -33,6 +33,28 @@ export default function RefundPage() {
 
             {/* 섹션들 — 우선순위 순 + 충분한 간격 */}
             <div className="space-y-16 md:space-y-24">
+
+              {/* ⓪ 환불 규정 및 유효기간 안내 — 서비스 제공기간/예약 소멸 기준 고지 */}
+              <section>
+                <div className="flex items-center gap-3 mb-6 md:mb-8">
+                  <Clock className="text-brand-point flex-shrink-0" size={24} />
+                  <h2 className="text-2xl md:text-3xl font-black tracking-tight">환불 규정 및 유효기간 안내</h2>
+                </div>
+                <ul className="bg-gray-50 border border-gray-100 rounded-2xl md:rounded-3xl p-6 md:p-9 space-y-4 md:space-y-5 text-sm md:text-base text-gray-700 leading-relaxed">
+                  <li className="flex gap-3">
+                    <span className="text-brand-point font-black flex-shrink-0">·</span>
+                    <span>
+                      <span className="font-bold text-gray-900">서비스 제공 기간(유효기간)</span> : 본 파티 예약 서비스의 제공 기간은 결제일(구매일)로부터 3개월(90일)까지입니다.
+                    </span>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="text-brand-point font-black flex-shrink-0">·</span>
+                    <span>
+                      <span className="font-bold text-gray-900">예약 소멸 기준</span> : 결제 후 3개월 이내에 파티 참가 예약을 완료하지 않거나 참가하지 않은 이용권은 기간 만료로 소멸되며, 이후에는 환불 및 서비스 제공이 불가합니다.
+                    </span>
+                  </li>
+                </ul>
+              </section>
 
               {/* ① 시기별 환불 안내 — 메인 강조 카드 (전폭, 컬러 tier 표) */}
               <section>
