@@ -70,7 +70,7 @@ function CheckoutContent() {
   const [paying, setPaying]       = useState(false);
   const widgetsRef                = useRef<TossWidgets | null>(null);
   // 결제 수단: 'toss'(신용카드/간편결제) | 'vbank'(무통장 입금)
-  const [payMethod, setPayMethod] = useState<"toss" | "vbank">("vbank");
+  const [payMethod, setPayMethod] = useState<"toss" | "vbank">("toss");
   // 무통장 입금 접수 완료 안내 모달
   const [vbankModal, setVbankModal] = useState<{ amount: number } | null>(null);
 
@@ -97,7 +97,6 @@ function CheckoutContent() {
   }, [mounted, isLoggedIn, router, singleId, multiIds]);
 
   // ── Toss v2 위젯 초기화 — #payment-method 패널이 DOM 에 존재할 때만 실행 ──
-  // (신용카드 탭 임시 숨김 중에는 DOM 에 해당 div 가 없으므로 자동 스킵됨)
   useEffect(() => {
     if (payMethod !== "toss") return;
     if (!mounted || !isLoggedIn) return;
@@ -454,16 +453,11 @@ function CheckoutContent() {
             })}
           </div>
 
-          {/* ── 신용카드/간편결제 — 시스템 승인 대기 안내 패널 ──────────────── */}
+          {/* ── 신용카드/간편결제 — 토스페이먼츠 v2 위젯 렌더 영역 ──────────── */}
           {payMethod === "toss" && (
             <div className="bg-white rounded-2xl md:rounded-3xl p-5 md:p-6 border-2 border-brand-point/30 mb-3">
-              <div className="flex items-center gap-2 mb-3">
-                <CreditCard size={18} className="text-brand-point" />
-                <span className="font-black text-base md:text-lg text-brand-black">신용카드/간편결제 안내</span>
-              </div>
-              <p className="text-sm md:text-base text-gray-700 font-medium leading-relaxed break-keep">
-                현재 더욱 안전한 결제 환경을 구축하기 위해 신용카드 및 간편결제 시스템 최종 승인 단계를 거치고 있습니다. 시스템 오픈 전까지는 우측의 [무통장 입금]을 통해 바로 결제 및 예약 진행이 가능합니다. 불편을 드려 죄송합니다.
-              </p>
+              <div id="payment-method" />
+              <div id="agreement" className="mt-2" />
             </div>
           )}
 
@@ -505,8 +499,8 @@ function CheckoutContent() {
             <ExternalLink size={13} className="text-gray-400 flex-shrink-0" />
           </Link>
 
-          {/* ── 결제 버튼 — 무통장 입금 선택 시에만 노출 (신용카드는 임시 숨김) ── */}
-          {payMethod === "vbank" && (() => {
+          {/* ── 결제 버튼 — 신용카드/무통장 공통 노출 ───────────────────────── */}
+          {(() => {
             const amountValid   = totalAmount > 0;
             const partyIdsValid = partyIds.length > 0;
             const canPay        = amountValid && partyIdsValid && !paying;
@@ -514,6 +508,9 @@ function CheckoutContent() {
               !amountValid   ? "결제 금액이 비정상입니다." :
               !partyIdsValid ? "주문 항목이 비어있습니다." :
               "";
+            const label = payMethod === "vbank"
+              ? <>₩{totalAmount.toLocaleString()} 입금 신청하기</>
+              : <>₩{totalAmount.toLocaleString()} 결제하기</>;
 
             return (
               <>
@@ -529,7 +526,7 @@ function CheckoutContent() {
                   className="w-full bg-brand-black text-white py-5 rounded-2xl font-black text-base md:text-xl hover:bg-brand-point transition-all shadow-xl hover:shadow-brand-point/30 flex items-center justify-center gap-3 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none"
                 >
                   <CreditCard size={22} />
-                  {paying ? "신청 처리 중..." : <>₩{totalAmount.toLocaleString()} 입금 신청하기</>}
+                  {paying ? "신청 처리 중..." : label}
                 </button>
               </>
             );
