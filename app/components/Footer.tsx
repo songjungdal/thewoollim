@@ -93,7 +93,7 @@ export default function Footer() {
               <h4 className="font-bold text-sm md:text-lg mb-4 md:mb-6">고객센터</h4>
               <ul className="text-gray-400 space-y-2 md:space-y-3 font-medium text-sm md:text-base break-keep">
                 <li><Link href="/refund" className="hover:text-brand-point transition-colors">이용안내 및 환불규정</Link></li>
-                <li><Link href="/report" className="hover:text-brand-point transition-colors">신고센터</Link></li>
+                <li><Link href="/report" className="hover:text-brand-point transition-colors">문의/민원접수</Link></li>
                 <li><Link href="/about" className="hover:text-brand-point transition-colors">회사소개</Link></li>
               </ul>
             </div>
