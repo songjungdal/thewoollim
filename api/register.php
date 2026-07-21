@@ -1,24 +1,25 @@
 <?php
 /**
- * 일반 회원가입 (이메일/비밀번호 + SMS 인증완료 필수).
+ * 일반 회원가입 (이메일/비밀번호 + 다날 본인인증 완료 필수).
  *
- * POST { email, password, name, phone } → { ok: true }
- *  - 휴대폰은 숫자만 (10~11자리, 01 시작)
+ * POST { email, password } → { ok: true }
  *  - 비밀번호 8자 이상
  *  - 이메일 형식
- *  - 이름은 1~50자
+ *  - 이름/성별/연락처/생년월일은 클라이언트가 보내도 무시 — verify-identity.php 가
+ *    세션에 저장한 검증값만 신뢰 (본인인증을 우회해 임의 값으로 가입하는 것을 차단)
  *
  * 사전조건:
- *  - 동일 브라우저 세션에서 verify-sms.php 성공해 verifiedPhone 일치 + 30분 이내
+ *  - 동일 브라우저 세션에서 verify-identity.php 성공해 verifiedIdentity 존재 + 30분 이내
+ *  - 만 19세 미만은 verify-identity.php 단계에서 이미 차단되지만, 방어적으로 재검증
  *
  * 처리:
  *  1) DB 중복 검사 (email/phone)
  *  2) bcrypt 해싱
- *  3) users 테이블 INSERT
+ *  3) users 테이블 INSERT (본인인증 검증된 이름/성별/연락처/생년월일 포함)
  *  4) WOOLLIM_USER 세션 발급 → 메인 진입 시 AuthContext 자동 인지
- *  5) 사용한 sms_<hash>.json 정리
+ *  5) 사용한 verifiedIdentity 세션 정리
  *
- * 실패: 400 / 409 / 500 + { ok:false, error }
+ * 실패: 400 / 401 / 403 / 409 / 500 + { ok:false, error }
  */
 
 declare(strict_types=1);
@@ -32,23 +33,31 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') jsonFail('method not allowed', 405);
 $body     = jsonBody();
 $email    = normalizeEmail((string)($body['email']    ?? ''));
 $password = (string)            ($body['password'] ?? '');
-$name     = trim((string)       ($body['name']     ?? ''));
-$phone    = preg_replace('/\D+/', '', (string)($body['phone'] ?? ''));
 
-if (!filter_var($email, FILTER_VALIDATE_EMAIL))                  jsonFail('이메일 형식이 올바르지 않습니다.');
-if (strlen($password) < 8)                                       jsonFail('비밀번호는 8자 이상이어야 합니다.');
-if ($name === '' || mb_strlen($name) > 50)                       jsonFail('이름을 1~50자 이내로 입력해주세요.');
-if (!preg_match('/^01\d{8,9}$/', $phone))                        jsonFail('휴대폰 번호 형식이 올바르지 않습니다.');
+if (!filter_var($email, FILTER_VALIDATE_EMAIL)) jsonFail('이메일 형식이 올바르지 않습니다.');
+if (strlen($password) < 8)                      jsonFail('비밀번호는 8자 이상이어야 합니다.');
 
-// SMS 인증 검증 (세션 + 30분)
-$vPhone = (string)($_SESSION['verifiedPhone']   ?? '');
-$vAt    = (int)   ($_SESSION['verifiedPhoneAt'] ?? 0);
-if ($vPhone !== $phone || $vAt === 0 || (time() - $vAt) > 1800) {
-    jsonFail('휴대폰 본인인증을 먼저 완료해주세요.', 401);
+// 다날 본인인증 검증 (세션 + 30분) — 이름/성별/연락처/생년월일의 유일한 출처
+$verified = $_SESSION['verifiedIdentity']   ?? null;
+$vAt      = (int)($_SESSION['verifiedIdentityAt'] ?? 0);
+if (!is_array($verified) || $vAt === 0 || (time() - $vAt) > 1800) {
+    jsonFail('본인인증을 먼저 완료해주세요.', 401);
 }
 
-// canonical 저장 형식: 하이픈 포함 (관리자 페이지 표시용 일관성)
-$phoneCanonical = formatPhone($phone);
+$name       = trim((string)($verified['name']      ?? ''));
+$gender     = (string)      ($verified['gender']    ?? '');
+$birthDate  = (string)      ($verified['birthDate'] ?? '');
+$phoneCanonical = (string)  ($verified['phone']     ?? '');
+$phone      = preg_replace('/\D+/', '', $phoneCanonical);
+
+if ($name === '' || $gender === '' || $birthDate === '' || !preg_match('/^01\d{8,9}$/', (string)$phone)) {
+    jsonFail('본인인증 정보가 올바르지 않습니다. 본인인증을 다시 진행해주세요.', 401);
+}
+
+// 방어적 재검증 — verify-identity.php 에서 이미 차단되지만 우회 경로 원천 차단
+if (calcAgeFromBirthDate($birthDate) < 19) {
+    jsonFail('어울림 서비스는 만 19세 이상 성인만 이용 가능합니다.', 403);
+}
 
 try {
     $pdo = getDB();
@@ -64,10 +73,10 @@ try {
 
     $hash = password_hash($password, PASSWORD_BCRYPT);
     $stmt = $pdo->prepare("
-        INSERT INTO users (email, password_hash, name, phone, marital_status, status, role)
-        VALUES (?, ?, ?, ?, '', 'active', 'user')
+        INSERT INTO users (email, password_hash, name, phone, gender, birth_date, marital_status, status, role)
+        VALUES (?, ?, ?, ?, ?, ?, '', 'active', 'user')
     ");
-    $stmt->execute([$email, $hash, $name, $phoneCanonical]);
+    $stmt->execute([$email, $hash, $name, $phoneCanonical, $gender, $birthDate]);
     $userId = (int)$pdo->lastInsertId();
 } catch (PDOException $e) {
     if ((int)$e->errorInfo[1] === 1062) {
@@ -81,8 +90,7 @@ try {
 loginUserSession($userId, $email);
 
 // 인증 정보 정리
-unset($_SESSION['verifiedPhone'], $_SESSION['verifiedPhoneAt']);
-@unlink(dataDir() . '/sms_' . md5($phone) . '.json');
+unset($_SESSION['verifiedIdentity'], $_SESSION['verifiedIdentityAt']);
 
 @file_put_contents(
     dataDir() . '/_register.log',

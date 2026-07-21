@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Lock, User, Phone, CheckCircle, ArrowLeft, ShieldCheck, X, KeyRound, UserSearch, ChevronDown, ChevronUp } from "lucide-react";
+import { Mail, Lock, Phone, CheckCircle, ArrowLeft, ShieldCheck, X, KeyRound, UserSearch, ChevronDown, ChevronUp } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Header from "../components/Header";
@@ -11,20 +11,36 @@ import { useAuth } from "../context/AuthContext";
 
 import { Suspense } from "react";
 
+// ── PortOne V2 본인인증(다날) SDK 타입 선언 ─────────────────────────────
+declare global {
+  interface Window {
+    PortOne?: {
+      requestIdentityVerification: (params: {
+        storeId: string;
+        channelKey: string;
+        identityVerificationId: string;
+      }) => Promise<{
+        identityVerificationId?: string;
+        code?: string;
+        message?: string;
+      }>;
+    };
+  }
+}
+
+const PORTONE_STORE_ID    = process.env.NEXT_PUBLIC_PORTONE_STORE_ID || "";
+const PORTONE_CHANNEL_KEY = process.env.NEXT_PUBLIC_PORTONE_IDENTITY_CHANNEL_KEY || "";
+
 function LoginContent() {
   const [activeTab, setActiveTab] = useState<"login" | "register">("login");
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
-  const [timer, setTimer] = useState(0);
-  const [isAuthSent, setIsAuthSent] = useState(false);
-  const [isPhoneVerified, setIsPhoneVerified] = useState(false);
-  const [authCode, setAuthCode] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [isSending, setIsSending] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(false);
+  // 다날 본인인증(PortOne V2) — 이름/성별/연락처/생년월일은 인증 결과에서만 채움
+  const [isIdentityVerifying, setIsIdentityVerifying] = useState(false);
+  const [isIdentityVerified,  setIsIdentityVerified]  = useState(false);
+  const [verifiedName,        setVerifiedName]        = useState("");
   // Registration form fields
-  const [registerName, setRegisterName] = useState("");
-  // 성별은 /onboarding 단계에서 수집 (가입 단계 중복 입력 방지)
+  // 성별은 본인인증으로 수집 (가입 단계 중복 입력 방지)
   const [registerEmail, setRegisterEmail] = useState("");
   const [registerPassword, setRegisterPassword] = useState("");
   const [registerPasswordConfirm, setRegisterPasswordConfirm] = useState("");
@@ -88,89 +104,49 @@ function LoginContent() {
     setFindPwResult(null);
   };
 
-  // Authentication Timer Logic
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (timer > 0) {
-      interval = setInterval(() => {
-        setTimer((prev) => prev - 1);
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [timer]);
-
-  const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${s < 10 ? "0" : ""}${s}`;
-  };
-
-  // 휴대폰 번호 자동 하이픈 (010-1234-5678 / 011-XXX-XXXX)
-  const formatPhone = (value: string) => {
-    const d = value.replace(/[^0-9]/g, "").slice(0, 11);
-    if (d.length < 4)  return d;
-    if (d.length < 7)  return `${d.slice(0, 3)}-${d.slice(3)}`;
-    if (d.length < 11) return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`;
-    return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`;
-  };
-
-  const handleSendAuthCode = async () => {
-    if (isSending || timer > 0) return;
-    const phone = phoneNumber.replace(/[^0-9]/g, "");
-    if (phone.length < 10 || phone.length > 11 || !phone.startsWith("01")) {
-      alert("올바른 휴대폰 번호를 입력해주세요.");
+  // 다날 본인인증 — PortOne V2 SDK 팝업 호출 → identityVerificationId 를
+  // 백엔드로 전달해 서버측에서 결과 조회 + 성인 검증 (클라이언트 값은 신뢰하지 않음)
+  const handleDanalVerification = async () => {
+    if (isIdentityVerifying || isIdentityVerified) return;
+    if (!window.PortOne) {
+      alert("본인인증 모듈을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.");
       return;
     }
-    setIsSending(true);
-    try {
-      const res = await fetch("/api/send-sms.php", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setIsAuthSent(true);
-        setTimer(data.cooldown || 60);
-        setAuthCode("");
-        alert("인증번호가 발송되었습니다. SMS를 확인해주세요.");
-      } else {
-        if (data.cooldown) setTimer(data.cooldown);
-        alert(data.error || "발송에 실패했습니다. 잠시 후 다시 시도해주세요.");
-      }
-    } catch {
-      alert("네트워크 오류로 발송에 실패했습니다.");
-    } finally {
-      setIsSending(false);
-    }
-  };
-
-  const handleVerifyCode = async () => {
-    if (isVerifying) return;
-    const phone = phoneNumber.replace(/[^0-9]/g, "");
-    if (!/^\d{6}$/.test(authCode)) {
-      alert("6자리 인증번호를 입력해주세요.");
+    if (!PORTONE_STORE_ID || !PORTONE_CHANNEL_KEY) {
+      alert("본인인증 설정 오류입니다. 관리자에게 문의해주세요.");
       return;
     }
-    setIsVerifying(true);
+    setIsIdentityVerifying(true);
     try {
-      const res = await fetch("/api/verify-sms.php", {
+      const identityVerificationId = `wlim_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+      const response = await window.PortOne.requestIdentityVerification({
+        storeId:    PORTONE_STORE_ID,
+        channelKey: PORTONE_CHANNEL_KEY,
+        identityVerificationId,
+      });
+      if (response.code != null) {
+        // 사용자 취소 등 — code 존재 시 실패로 간주, message 있으면만 안내
+        if (response.message) alert(response.message);
+        return;
+      }
+      const res = await fetch("/api/auth/verify-identity.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, code: authCode }),
+        body: JSON.stringify({
+          identityVerificationId: response.identityVerificationId || identityVerificationId,
+        }),
       });
       const data = await res.json();
-      if (data.ok) {
-        setIsPhoneVerified(true);
-        setTimer(0);
-        alert("본인인증이 완료되었습니다.");
-      } else {
-        alert(data.error || "인증번호가 일치하지 않습니다.");
+      if (!data?.ok) {
+        alert(data?.error || "본인인증에 실패했습니다.");
+        return;
       }
+      setVerifiedName(data.name || "");
+      setIsIdentityVerified(true);
     } catch {
-      alert("네트워크 오류로 인증 확인에 실패했습니다.");
+      alert("본인인증 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
     } finally {
-      setIsVerifying(false);
+      setIsIdentityVerifying(false);
     }
   };
 
@@ -186,13 +162,12 @@ function LoginContent() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isPhoneVerified) {
-      alert("휴대폰 번호 인증이 완료되지 않았습니다.\n인증번호 확인을 먼저 진행해 주세요.");
+    if (!isIdentityVerified) {
+      alert("다날 본인인증이 완료되지 않았습니다.\n본인인증을 먼저 진행해 주세요.");
       return;
     }
     // 누락 항목 한 번에 모아서 안내 (사용자가 어떤 부분을 채워야 하는지 명확하게)
     const missing: string[] = [];
-    if (!registerName.trim())            missing.push("이름");
     if (!registerEmail.trim())           missing.push("이메일");
     if (registerPassword.length < 8)     missing.push("비밀번호 (8자 이상)");
     if (!registerPasswordConfirm)        missing.push("비밀번호 확인");
@@ -208,15 +183,13 @@ function LoginContent() {
 
     setRegistering(true);
     try {
-      const phone = phoneNumber.replace(/[^0-9]/g, "");
+      // 이름/성별/연락처/생년월일은 서버가 다날 본인인증 세션값만 신뢰 — 클라이언트는 전송하지 않음
       const res = await fetch("/api/register.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email:    registerEmail.trim(),
           password: registerPassword,
-          name:     registerName.trim(),
-          phone,
         }),
       });
       // 응답이 JSON 이 아닌 경우(HTML 에러 페이지 등)도 안전하게 처리
@@ -392,88 +365,22 @@ function LoginContent() {
                     <form className="space-y-6" onSubmit={handleRegister}>
                       <div>
                         <label className={labelClass}>본인인증</label>
-                        <div className="flex flex-wrap sm:flex-nowrap gap-2 mb-2">
-                           <div className="relative flex-1 min-w-0 basis-full sm:basis-auto">
-                              <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                              <input
-                                type="tel"
-                                inputMode="numeric"
-                                placeholder="010-0000-0000"
-                                className={inputClass}
-                                value={phoneNumber}
-                                onChange={e => setPhoneNumber(formatPhone(e.target.value))}
-                                maxLength={13}
-                                readOnly={isPhoneVerified}
-                                aria-label="휴대폰 번호"
-                              />
-                           </div>
-                           <button
-                             type="button"
-                             onClick={handleSendAuthCode}
-                             disabled={isPhoneVerified || isSending || timer > 0}
-                             className="w-full sm:w-auto px-4 py-3 sm:py-0 min-h-[44px] bg-brand-black text-white rounded-xl font-bold text-sm whitespace-nowrap hover:bg-brand-point transition-colors disabled:bg-gray-200 disabled:cursor-not-allowed"
-                           >
-                              {isSending
-                                ? "발송 중..."
-                                : isPhoneVerified
-                                  ? "인증완료"
-                                  : timer > 0 && isAuthSent
-                                    ? `재전송 (${timer}s)`
-                                    : isAuthSent
-                                      ? "재전송"
-                                      : "인증번호 받기"}
-                           </button>
-                        </div>
-                        {isAuthSent && (
-                          <div className="flex flex-wrap sm:flex-nowrap gap-2 animate-in fade-in slide-in-from-top-1">
-                            <div className="relative flex-1 min-w-0 basis-full sm:basis-auto">
-                              <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                              <input
-                                type="text"
-                                inputMode="numeric"
-                                placeholder="인증번호 6자리"
-                                className={inputClass + (isPhoneVerified ? " bg-gray-100 text-gray-500 cursor-not-allowed" : "")}
-                                maxLength={6}
-                                value={authCode}
-                                onChange={(e) => setAuthCode(e.target.value.replace(/[^0-9]/g, ""))}
-                                readOnly={isPhoneVerified}
-                                disabled={isPhoneVerified}
-                                aria-label="인증번호"
-                              />
-                              {timer > 0 && !isPhoneVerified && (
-                                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-brand-point font-black text-sm">{formatTime(timer)}</span>
-                              )}
-                            </div>
-                            <button
-                              type="button"
-                              onClick={handleVerifyCode}
-                              disabled={isVerifying || isPhoneVerified}
-                              className="w-full sm:w-auto px-4 py-3 sm:py-0 min-h-[44px] bg-brand-point text-white rounded-xl font-bold text-sm whitespace-nowrap hover:brightness-110 transition-all disabled:bg-gray-300 disabled:cursor-not-allowed"
-                            >
-                              {isPhoneVerified ? "인증 완료" : (isVerifying ? "확인 중..." : "인증 확인")}
-                            </button>
+                        {!isIdentityVerified ? (
+                          <button
+                            type="button"
+                            onClick={handleDanalVerification}
+                            disabled={isIdentityVerifying}
+                            className="w-full min-h-[52px] px-4 py-3.5 bg-brand-black text-white rounded-xl font-bold text-sm md:text-base flex items-center justify-center gap-2 hover:bg-brand-point transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                          >
+                            <ShieldCheck size={18} className="flex-shrink-0" />
+                            {isIdentityVerifying ? "본인인증 진행 중..." : "다날 본인인증 완료하기"}
+                          </button>
+                        ) : (
+                          <div className="flex items-center gap-2 bg-brand-point/10 border border-brand-point/30 rounded-xl px-4 py-3.5 min-h-[52px] text-brand-point font-bold text-sm md:text-base break-keep">
+                            <CheckCircle size={18} className="flex-shrink-0" />
+                            {verifiedName}님 본인인증이 완료되었습니다. (만 19세 이상 확인)
                           </div>
                         )}
-                        {isPhoneVerified && (
-                          <div className="flex items-center gap-2 text-brand-point font-bold text-sm mt-2 ml-1">
-                            <CheckCircle size={16} /> 본인인증이 완료되었습니다.
-                          </div>
-                        )}
-                      </div>
-
-                      <div>
-                        <label className={labelClass}>이름</label>
-                        <div className="relative">
-                          <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                          <input
-                            type="text"
-                            placeholder="실명을 입력해주세요"
-                            className={inputClass}
-                            value={registerName}
-                            onChange={e => setRegisterName(e.target.value)}
-                            required
-                          />
-                        </div>
                       </div>
 
                       <div>

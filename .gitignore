@@ -37,10 +37,11 @@ yarn-error.log*
 /api/db-config.php
 /api/**/db-config.php
 
-# SMS / OAuth / Toss secrets — never commit. Use *.example.php as the template.
+# SMS / OAuth / Toss / PortOne secrets — never commit. Use *.example.php as the template.
 /api/auth/sms-config.php
 /api/auth/oauth-config.php
 /api/payments/toss-config.php
+/api/auth/portone-config.php
 
 # Server-side runtime data (preserved on server, not in repo)
 /api/data/

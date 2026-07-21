@@ -59,6 +59,7 @@ export default function RootLayout({
         <meta name="format-detection" content="telephone=no" />
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
         <script src="https://js.tosspayments.com/v2/standard" defer></script>
+        <script src="https://cdn.portone.io/v2/browser-sdk.js" defer></script>
       </head>
       <body className="bg-brand-lightgray text-brand-black antialiased font-sans selection:bg-brand-point selection:text-white">
         <ClientProviders>
