@@ -388,7 +388,7 @@ function LoginContent() {
                             className="w-full min-h-[52px] px-4 py-3.5 bg-brand-black text-white rounded-xl font-bold text-sm md:text-base flex items-center justify-center gap-2 hover:bg-brand-point transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
                           >
                             <ShieldCheck size={18} className="flex-shrink-0" />
-                            {isIdentityVerifying ? "본인인증 진행 중..." : "다날 본인인증 완료하기"}
+                            {isIdentityVerifying ? "본인인증 진행 중..." : "만 19세 이상 본인인증"}
                           </button>
                         ) : (
                           <div className="flex items-center gap-2 bg-brand-point/10 border border-brand-point/30 rounded-xl px-4 py-3.5 min-h-[52px] text-brand-point font-bold text-sm md:text-base break-keep">
