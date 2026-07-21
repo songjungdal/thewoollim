@@ -2,11 +2,13 @@
 /**
  * 일반 회원가입 (이메일/비밀번호 + 다날 본인인증 완료 필수).
  *
- * POST { email, password } → { ok: true }
+ * POST { email, password, phone } → { ok: true }
  *  - 비밀번호 8자 이상
  *  - 이메일 형식
- *  - 이름/성별/연락처/생년월일은 클라이언트가 보내도 무시 — verify-identity.php 가
+ *  - 이름/성별/생년월일은 클라이언트가 보내도 무시 — verify-identity.php 가
  *    세션에 저장한 검증값만 신뢰 (본인인증을 우회해 임의 값으로 가입하는 것을 차단)
+ *  - 연락처(phone)는 폼 입력값 사용 — 다날 "본인인증"(CI/DI) 상품 응답에는
+ *    휴대폰 번호가 포함되지 않아 본인인증 결과로 대체 불가 (형식만 서버 검증)
  *
  * 사전조건:
  *  - 동일 브라우저 세션에서 verify-identity.php 성공해 verifiedIdentity 존재 + 30분 이내
@@ -15,7 +17,7 @@
  * 처리:
  *  1) DB 중복 검사 (email/phone)
  *  2) bcrypt 해싱
- *  3) users 테이블 INSERT (본인인증 검증된 이름/성별/연락처/생년월일 포함)
+ *  3) users 테이블 INSERT (본인인증 검증된 이름/성별/생년월일 + 폼 입력 연락처)
  *  4) WOOLLIM_USER 세션 발급 → 메인 진입 시 AuthContext 자동 인지
  *  5) 사용한 verifiedIdentity 세션 정리
  *
@@ -33,26 +35,29 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') jsonFail('method not allowed', 405);
 $body     = jsonBody();
 $email    = normalizeEmail((string)($body['email']    ?? ''));
 $password = (string)            ($body['password'] ?? '');
+$phone    = preg_replace('/\D+/', '', (string)($body['phone'] ?? ''));
 
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) jsonFail('이메일 형식이 올바르지 않습니다.');
 if (strlen($password) < 8)                      jsonFail('비밀번호는 8자 이상이어야 합니다.');
+if (!preg_match('/^01\d{8,9}$/', (string)$phone)) jsonFail('휴대폰 번호 형식이 올바르지 않습니다.');
 
-// 다날 본인인증 검증 (세션 + 30분) — 이름/성별/연락처/생년월일의 유일한 출처
+// 다날 본인인증 검증 (세션 + 30분) — 이름/성별/생년월일의 유일한 출처
 $verified = $_SESSION['verifiedIdentity']   ?? null;
 $vAt      = (int)($_SESSION['verifiedIdentityAt'] ?? 0);
 if (!is_array($verified) || $vAt === 0 || (time() - $vAt) > 1800) {
     jsonFail('본인인증을 먼저 완료해주세요.', 401);
 }
 
-$name       = trim((string)($verified['name']      ?? ''));
-$gender     = (string)      ($verified['gender']    ?? '');
-$birthDate  = (string)      ($verified['birthDate'] ?? '');
-$phoneCanonical = (string)  ($verified['phone']     ?? '');
-$phone      = preg_replace('/\D+/', '', $phoneCanonical);
+$name      = trim((string)($verified['name']      ?? ''));
+$gender    = (string)      ($verified['gender']    ?? '');
+$birthDate = (string)      ($verified['birthDate'] ?? '');
 
-if ($name === '' || $gender === '' || $birthDate === '' || !preg_match('/^01\d{8,9}$/', (string)$phone)) {
+if ($name === '' || $gender === '' || $birthDate === '') {
     jsonFail('본인인증 정보가 올바르지 않습니다. 본인인증을 다시 진행해주세요.', 401);
 }
+
+// canonical 저장 형식: 하이픈 포함 (관리자 페이지 표시용 일관성)
+$phoneCanonical = formatPhone((string)$phone);
 
 // 방어적 재검증 — verify-identity.php 에서 이미 차단되지만 우회 경로 원천 차단
 if (calcAgeFromBirthDate($birthDate) < 19) {

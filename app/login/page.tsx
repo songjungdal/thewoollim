@@ -35,12 +35,13 @@ function LoginContent() {
   const [activeTab, setActiveTab] = useState<"login" | "register">("login");
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
-  // 다날 본인인증(PortOne V2) — 이름/성별/연락처/생년월일은 인증 결과에서만 채움
+  // 다날 본인인증(PortOne V2) — 이름/성별/생년월일은 인증 결과에서만 채움
   const [isIdentityVerifying, setIsIdentityVerifying] = useState(false);
   const [isIdentityVerified,  setIsIdentityVerified]  = useState(false);
   const [verifiedName,        setVerifiedName]        = useState("");
   // Registration form fields
-  // 성별은 본인인증으로 수집 (가입 단계 중복 입력 방지)
+  // 성별/생년월일은 본인인증으로 수집. 연락처는 본인인증(CI/DI 상품) 응답에 없어 별도 입력.
+  const [registerPhone, setRegisterPhone] = useState("");
   const [registerEmail, setRegisterEmail] = useState("");
   const [registerPassword, setRegisterPassword] = useState("");
   const [registerPasswordConfirm, setRegisterPasswordConfirm] = useState("");
@@ -102,6 +103,15 @@ function LoginContent() {
     setFindPwInput("");
     setFindIdResult(null);
     setFindPwResult(null);
+  };
+
+  // 휴대폰 번호 자동 하이픈 (010-1234-5678)
+  const formatPhone = (value: string) => {
+    const d = value.replace(/[^0-9]/g, "").slice(0, 11);
+    if (d.length < 4)  return d;
+    if (d.length < 7)  return `${d.slice(0, 3)}-${d.slice(3)}`;
+    if (d.length < 11) return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`;
+    return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`;
   };
 
   // 다날 본인인증 — PortOne V2 SDK 팝업 호출 → identityVerificationId 를
@@ -167,7 +177,11 @@ function LoginContent() {
       return;
     }
     // 누락 항목 한 번에 모아서 안내 (사용자가 어떤 부분을 채워야 하는지 명확하게)
+    const phoneDigits = registerPhone.replace(/[^0-9]/g, "");
     const missing: string[] = [];
+    if (phoneDigits.length < 10 || phoneDigits.length > 11 || !phoneDigits.startsWith("01")) {
+      missing.push("연락처 (010-0000-0000)");
+    }
     if (!registerEmail.trim())           missing.push("이메일");
     if (registerPassword.length < 8)     missing.push("비밀번호 (8자 이상)");
     if (!registerPasswordConfirm)        missing.push("비밀번호 확인");
@@ -183,13 +197,14 @@ function LoginContent() {
 
     setRegistering(true);
     try {
-      // 이름/성별/연락처/생년월일은 서버가 다날 본인인증 세션값만 신뢰 — 클라이언트는 전송하지 않음
+      // 이름/성별/생년월일은 서버가 다날 본인인증 세션값만 신뢰 — 연락처만 폼 입력값 전송
       const res = await fetch("/api/register.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email:    registerEmail.trim(),
           password: registerPassword,
+          phone:    phoneDigits,
         }),
       });
       // 응답이 JSON 이 아닌 경우(HTML 에러 페이지 등)도 안전하게 처리
@@ -381,6 +396,23 @@ function LoginContent() {
                             {verifiedName}님 본인인증이 완료되었습니다. (만 19세 이상 확인)
                           </div>
                         )}
+                      </div>
+
+                      <div>
+                        <label className={labelClass}>연락처</label>
+                        <div className="relative">
+                          <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                          <input
+                            type="tel"
+                            inputMode="numeric"
+                            placeholder="010-0000-0000"
+                            className={inputClass}
+                            value={registerPhone}
+                            onChange={e => setRegisterPhone(formatPhone(e.target.value))}
+                            maxLength={13}
+                            required
+                          />
+                        </div>
                       </div>
 
                       <div>
