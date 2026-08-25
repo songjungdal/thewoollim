@@ -67,7 +67,7 @@ export default function RefundPage() {
                 </p>
                 <div className="rounded-2xl md:rounded-3xl border-2 border-brand-point/20 overflow-hidden">
                   {[
-                    { when: "파티 5일 전 이상",  rate: "100% 환불", tone: "bg-emerald-50",  label: "text-emerald-700",  badge: "bg-emerald-100 text-emerald-800" },
+                    { when: "파티 5일 전 이상",  rate: "전액 환불", tone: "bg-emerald-50",  label: "text-emerald-700",  badge: "bg-emerald-100 text-emerald-800" },
                     { when: "파티 4일 전",       rate: "80% 환불",   tone: "bg-amber-50/60",  label: "text-amber-700",    badge: "bg-amber-100 text-amber-800" },
                     { when: "파티 3일 전",       rate: "50% 환불",   tone: "bg-amber-50/60",  label: "text-amber-700",    badge: "bg-amber-100 text-amber-800" },
                     { when: "파티 2일 전 ~ 당일", rate: "환불 불가",  tone: "bg-red-50/60",     label: "text-red-700",      badge: "bg-red-100 text-red-700" },
@@ -142,7 +142,7 @@ export default function RefundPage() {
                 <ul className="bg-gray-50 border border-gray-100 rounded-2xl md:rounded-3xl p-6 md:p-9 space-y-4 md:space-y-5 text-sm md:text-base text-gray-700 leading-relaxed">
                   <li className="flex gap-3">
                     <span className="text-brand-point font-black flex-shrink-0">·</span>
-                    <span>주최측의 사정으로 파티가 취소될 경우 <span className="font-bold text-gray-900">100% 환불</span>해 드립니다.</span>
+                    <span>주최측의 사정으로 파티가 취소될 경우 <span className="font-bold text-gray-900">전액 환불</span>해 드립니다.</span>
                   </li>
                   <li className="flex gap-3">
                     <span className="text-brand-point font-black flex-shrink-0">·</span>
