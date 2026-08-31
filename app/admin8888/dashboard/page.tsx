@@ -884,9 +884,20 @@ export default function AdminDashboard() {
       ...prev,
     ]);
   };
-  const removeCoupon = (idx: number) => {
+  const removeCoupon = async (idx: number) => {
     if (!confirm("이 쿠폰을 삭제하시겠습니까?")) return;
-    setCoupons(prev => prev.filter((_, i) => i !== idx));
+    const next = coupons.filter((_, i) => i !== idx);
+    setCoupons(next);
+    // 로컬 state만 지우면 30초 주기 자동 새로고침(loadAll)이 서버의 원래 목록으로 덮어써
+    // 삭제가 되돌아가 보임 — 저장 버튼과 동일한 API로 즉시 서버에 반영.
+    const res = await fetch("/api/admin/coupons.php", {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "save", coupons: next }),
+    });
+    const d = await res.json();
+    if (d?.ok) setCoupons(d.coupons || next);
+    else { alert(d?.error || "쿠폰 삭제 저장 실패 — 다시 시도해주세요."); await loadAll(); }
   };
   const updateCoupon = (idx: number, patch: Partial<Coupon>) => {
     setCoupons(prev => prev.map((c, i) => i === idx ? { ...c, ...patch } : c));
@@ -1575,12 +1586,20 @@ export default function AdminDashboard() {
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-bold text-gray-700 mb-1.5">남성 정원 *</label>
-                          <input type="number" min={0} max={100} value={partyForm.maleStock} onChange={e => setPartyForm(p => ({ ...p, maleStock: parseInt(e.target.value || "0", 10) }))}
+                          <input type="number" min={0} max={100} value={partyForm.maleStock} onChange={e => {
+                              const cleaned = String(parseInt(e.target.value || "0", 10));
+                              e.target.value = cleaned; // 선행 0 제거 즉시 반영 (controlled input 미갱신 방지)
+                              setPartyForm(p => ({ ...p, maleStock: parseInt(cleaned, 10) }));
+                            }}
                             className="w-full px-4 py-3 rounded-lg border border-gray-200 text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none" aria-label="남성 정원" />
                         </div>
                         <div>
                           <label className="block text-sm font-bold text-gray-700 mb-1.5">여성 정원 *</label>
-                          <input type="number" min={0} max={100} value={partyForm.femaleStock} onChange={e => setPartyForm(p => ({ ...p, femaleStock: parseInt(e.target.value || "0", 10) }))}
+                          <input type="number" min={0} max={100} value={partyForm.femaleStock} onChange={e => {
+                              const cleaned = String(parseInt(e.target.value || "0", 10));
+                              e.target.value = cleaned;
+                              setPartyForm(p => ({ ...p, femaleStock: parseInt(cleaned, 10) }));
+                            }}
                             className="w-full px-4 py-3 rounded-lg border border-gray-200 text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none" aria-label="여성 정원" />
                         </div>
                       </div>
