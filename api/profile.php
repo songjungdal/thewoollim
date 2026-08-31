@@ -144,15 +144,28 @@ if ($method === 'POST') {
             $bk = json_decode((string)file_get_contents($bf), true);
             if (is_array($bk)) {
                 $changed = false;
+                $advancedBookings = []; // 확정 대기중(pending_approval) 알림 문자 발송용
                 foreach ($bk as &$b) {
                     if (is_array($b) && (string)($b['status'] ?? '') === 'paid_pending_profile') {
                         $b['status']    = 'pending_approval';
                         $b['updatedAt'] = date('c');
                         $changed = true; $advanced = true;
+                        $advancedBookings[] = $b;
                     }
                 }
                 unset($b);
-                if ($changed) file_put_contents($bf, json_encode($bk, JSON_UNESCAPED_UNICODE));
+                if ($changed) {
+                    file_put_contents($bf, json_encode($bk, JSON_UNESCAPED_UNICODE));
+
+                    // 확정 대기중(pending_approval) 전환 DB 반영 성공 직후 → 알리고 신청접수 알림 문자
+                    // (테스트/관리자 계정 제외, 실패해도 프로필 저장 응답 무중단)
+                    try {
+                        require_once __DIR__ . '/_pending_sms.php';
+                        foreach ($advancedBookings as $ab) { notifyPendingSms($email, $ab); }
+                    } catch (Throwable $e) {
+                        error_log('[profile pending sms] ' . $e->getMessage());
+                    }
+                }
             }
         }
     }

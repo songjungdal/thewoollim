@@ -300,6 +300,7 @@ if (!is_array($bookings)) $bookings = [];
 
 $now = date('c');
 $couponApplied = false;
+$newBookings = []; // 확정 대기중(pending_approval) 알림 문자 발송용 — 이번 요청에서 새로 생성된 booking만 추적
 foreach ($partyIds as $pid) {
     // 회원 성별 기반 가격 — pending.php 와 동일 규칙
     $partyPrice  = priceForGender($partyMap[$pid] ?? [], $gender);
@@ -307,7 +308,7 @@ foreach ($partyIds as $pid) {
     $rowDiscount = $isCouponHit ? $couponDiscount : 0;
     if ($isCouponHit) $couponApplied = true;
     $rowTotal = max(0, $partyPrice - $rowDiscount);
-    $bookings[] = [
+    $newBooking = [
         'id'          => bin2hex(random_bytes(8)),
         'partyId'     => $pid,
         'status'      => $initialStatus,
@@ -320,8 +321,21 @@ foreach ($partyIds as $pid) {
         'createdAt'   => $now,
         'updatedAt'   => $now,
     ];
+    $bookings[]    = $newBooking;
+    $newBookings[] = $newBooking;
 }
 file_put_contents($bookingsFile, json_encode($bookings, JSON_UNESCAPED_UNICODE));
+
+// 확정 대기중(pending_approval) 전환 DB 반영 성공 직후 → 알리고 신청접수 알림 문자
+// (테스트/관리자 계정 제외, 실패해도 결제 흐름 무중단)
+if ($initialStatus === 'pending_approval') {
+    try {
+        require_once __DIR__ . '/../_pending_sms.php';
+        foreach ($newBookings as $nb) { notifyPendingSms($email, $nb); }
+    } catch (Throwable $e) {
+        error_log('[payments/success pending sms] ' . $e->getMessage());
+    }
+}
 
 // ── 결제된 partyId 만 카트에서 정밀 제거 (atomic, flock) ─────────────
 //    혹시라도 결제하지 않은 다른 항목은 그대로 보존.

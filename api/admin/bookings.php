@@ -148,16 +148,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } catch (Throwable $e) {}
         $newStatus = $profileComplete ? 'pending_approval' : 'paid_pending_profile';
 
+        $confirmedBooking = null;
         foreach ($bookings as &$b) {
             if (($b['id'] ?? '') === $bid) {
                 $b['status']      = $newStatus;
                 $b['updatedAt']   = date('c');
                 $b['vbankPaidAt'] = date('c');
+                $confirmedBooking = $b;
                 break;
             }
         }
         unset($b);
         saveBookings($email, $bookings);
+
+        // 확정 대기중(pending_approval) 전환 DB 반영 성공 직후 → 알리고 신청접수 알림 문자
+        // (테스트/관리자 계정 제외, 실패해도 입금확인 응답 무중단)
+        if ($newStatus === 'pending_approval') {
+            try {
+                require_once __DIR__ . '/../_pending_sms.php';
+                notifyPendingSms($email, is_array($confirmedBooking) ? $confirmedBooking : []);
+            } catch (Throwable $e) {
+                error_log('[admin/bookings confirm_vbank pending sms] ' . $e->getMessage());
+            }
+        }
 
         @file_put_contents($dataDir . '/_vbank_confirm.log', sprintf(
             "[%s] CONFIRM_VBANK email=%s bid=%s partyId=%s gender=%s newStatus=%s\n",
