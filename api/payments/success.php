@@ -321,6 +321,10 @@ foreach ($partyIds as $pid) {
         'createdAt'   => $now,
         'updatedAt'   => $now,
     ];
+    if ($initialStatus === 'paid_pending_profile') {
+        // 1차(즉시) 프로필작성 안내 발송 플래그 — 실제 발송은 파일 저장 이후 아래에서 수행
+        $newBooking['profileNotifiedAt'] = $now;
+    }
     $bookings[]    = $newBooking;
     $newBookings[] = $newBooking;
 }
@@ -334,6 +338,17 @@ if ($initialStatus === 'pending_approval') {
         foreach ($newBookings as $nb) { notifyPendingSms($email, $nb); }
     } catch (Throwable $e) {
         error_log('[payments/success pending sms] ' . $e->getMessage());
+    }
+}
+
+// 결제완료(프로필 대기) 전환 DB 반영 성공 직후 → 알리고 프로필작성 안내 문자 (1차 즉시발송)
+// (테스트/관리자 계정 제외, 실패해도 결제 흐름 무중단)
+if ($initialStatus === 'paid_pending_profile') {
+    try {
+        require_once __DIR__ . '/../_profile_notify_sms.php';
+        foreach ($newBookings as $nb) { notifyProfileReminderSms($email, (string)($nb['id'] ?? ''), 'initial'); }
+    } catch (Throwable $e) {
+        error_log('[payments/success profile notify sms] ' . $e->getMessage());
     }
 }
 

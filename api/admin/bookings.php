@@ -154,6 +154,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $b['status']      = $newStatus;
                 $b['updatedAt']   = date('c');
                 $b['vbankPaidAt'] = date('c');
+                if ($newStatus === 'paid_pending_profile') {
+                    // 1차(즉시) 프로필작성 안내 발송 플래그 — 실제 발송은 저장 이후 아래에서 수행
+                    $b['profileNotifiedAt'] = date('c');
+                }
                 $confirmedBooking = $b;
                 break;
             }
@@ -169,6 +173,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 notifyPendingSms($email, is_array($confirmedBooking) ? $confirmedBooking : []);
             } catch (Throwable $e) {
                 error_log('[admin/bookings confirm_vbank pending sms] ' . $e->getMessage());
+            }
+        }
+
+        // 결제완료(프로필 대기) 전환 DB 반영 성공 직후 → 알리고 프로필작성 안내 문자 (1차 즉시발송)
+        // (테스트/관리자 계정 제외, 실패해도 입금확인 응답 무중단)
+        if ($newStatus === 'paid_pending_profile') {
+            try {
+                require_once __DIR__ . '/../_profile_notify_sms.php';
+                notifyProfileReminderSms($email, (string)($confirmedBooking['id'] ?? $bid), 'initial');
+            } catch (Throwable $e) {
+                error_log('[admin/bookings confirm_vbank profile notify sms] ' . $e->getMessage());
             }
         }
 
