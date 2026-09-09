@@ -18,11 +18,18 @@ type Participant = {
   ageBand: string;
   mbti: string;
   job: string;
-  status?: "confirmed" | "pending_approval" | "completed" | string;
+  status?: "confirmed" | "pending_approval" | "completed" | "paid_pending_profile" | string;
 };
 
 /** 상태 미니 배지 — 마이페이지 STATUS_DISPLAY 와 동일 색상/라벨, 사이즈만 컴팩트 */
 function StatusMiniBadge({ status }: { status?: string }) {
+  if (status === "paid_pending_profile") {
+    return (
+      <span className="inline-flex items-center text-[9px] md:text-[10px] font-black px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 whitespace-nowrap">
+        결제완료(프로필 대기)
+      </span>
+    );
+  }
   if (status === "confirmed") {
     return (
       <span className="inline-flex items-center text-[9px] md:text-[10px] font-black px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 whitespace-nowrap">

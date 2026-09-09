@@ -9,8 +9,9 @@
  * }
  *
  * 노출 규칙:
- *  - status ∈ ['confirmed', 'pending_approval'] 만 노출
- *    (paid_pending_profile = 프로필 미완성, cancelled = 취소 → 둘 다 제외)
+ *  - status ∈ ['confirmed', 'pending_approval', 'paid_pending_profile'] 만 노출
+ *    (cancelled = 취소 → 제외. paid_pending_profile 은 mbti/job 이 비어있는 채로 노출되며,
+ *     프로필 작성 완료로 pending_approval 전환 시 프론트 30초 폴링으로 자동 반영됨)
  *  - paymentId 가 'test-' 로 시작하면 제외 (테스트 데이터 필터)
  *  - 이름은 maskName() 으로 마스킹, 생년월일은 ageBand() 으로 변환
  *  - 직업·MBTI 는 그대로 노출 (관리자 폼에서 입력한 공개 의도)
@@ -36,7 +37,7 @@ if ($partyId === '') {
 }
 
 $dir = dataDir();
-$VISIBLE_STATUSES = ['confirmed', 'pending_approval', 'completed'];
+$VISIBLE_STATUSES = ['confirmed', 'pending_approval', 'completed', 'paid_pending_profile'];
 
 $male = [];
 $female = [];
