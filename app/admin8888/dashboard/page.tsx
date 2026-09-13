@@ -8,6 +8,7 @@ import { useParties, broadcastPartiesUpdated } from "../../lib/useParties";
 import { formatPhoneKR } from "../../lib/phone";
 import { calculateRefund } from "../../lib/refund";
 import { formatKST } from "../../lib/datetime";
+import { partyVisibility } from "../../lib/data";
 
 type AdminUser = {
   id: number; email: string; name: string; gender: string; phone: string;
@@ -2444,14 +2445,18 @@ export default function AdminDashboard() {
           const ym = today.slice(0, 7);
           const newMembers = users.filter(u => (u.created_at || "").startsWith(today)).length;
           const monthParties = PARTIES.filter(p => (p.calendarDate || "").startsWith(ym)).length;
-          const byStatusGender = (st: string, g: string) => bookings.filter(b => b.status === st && b.userGender === g).length;
+          // 홈페이지에 현재 노출 중인(=만료되지 않은) 파티만 집계 대상으로 — 종료 후 방치된 과거 신청건이 섞여
+          // 홈페이지 현황과 어긋나 보이는 문제 방지 (홈페이지 노출 기준과 동일하게 partyVisibility 재사용)
+          const visiblePartyIds = new Set(
+            PARTIES.filter(p => partyVisibility(p) !== "expired").map(p => p.id)
+          );
+          const byStatusGender = (st: string, g: string) =>
+            bookings.filter(b => b.status === st && b.userGender === g && visiblePartyIds.has(b.partyId)).length;
           const cancelReq = bookings.filter(b => b.status === "cancel_requested").length;
           const newMemos = memos.filter(m => (m.created_at || "").slice(0, 10) === today).length;
           // 변동 없음(0) → 검정 / 변동 있음(0 초과) → 빨강 (청록 포인트색은 시인성 낮아 교체)
           const Num = ({ v }: { v: number }) => <span className={`font-black ${v === 0 ? "text-black" : "text-red-600"} text-2xl md:text-3xl align-middle mx-0.5`}>{v}</span>;
-          const GenderLine = ({ st }: { st: string }) => (
-            <>남 <Num v={byStatusGender(st, "남성")} />명 <span className="text-gray-300 mx-1">|</span> 여 <Num v={byStatusGender(st, "여성")} />명</>
-          );
+          const PARTY_STATUS_ROWS = ["vbank_pending", "paid_pending_profile", "pending_approval", "confirmed"] as const;
           return (
             <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -2476,14 +2481,35 @@ export default function AdminDashboard() {
                       <li>• 이번달 진행 중인 파티 : <Num v={monthParties} />개</li>
                     </ul>
                   </div>
-                  {/* 파티 신청 현황 */}
+                  {/* 파티 신청 현황 — 표 형태로 정리해 성별/상태별 숫자를 한눈에 비교 가능하도록 구성 */}
                   <div>
                     <p className="font-black text-brand-black mb-2">[파티 신청 현황]</p>
-                    <ul className="space-y-1.5 pl-1">
-                      <li>• 입금 확인 중 : <GenderLine st="vbank_pending" /></li>
-                      <li>• 결제 완료 : <GenderLine st="paid_pending_profile" /></li>
-                      <li>• 확정 대기 중 : <GenderLine st="pending_approval" /></li>
-                    </ul>
+                    <div className="rounded-xl border border-gray-100 overflow-hidden">
+                      <div className="grid grid-cols-[1fr_40px_40px_44px] items-center gap-1 px-3 py-1.5 bg-gray-50 text-[10px] md:text-[11px] font-bold text-gray-400">
+                        <span>상태</span>
+                        <span className="text-center">남</span>
+                        <span className="text-center">여</span>
+                        <span className="text-center">합계</span>
+                      </div>
+                      {PARTY_STATUS_ROWS.map((st, i) => {
+                        const m = byStatusGender(st, "남성");
+                        const f = byStatusGender(st, "여성");
+                        const sum = m + f;
+                        return (
+                          <div
+                            key={st}
+                            className={`grid grid-cols-[1fr_40px_40px_44px] items-center gap-1 px-3 py-2.5 ${i > 0 ? "border-t border-gray-100" : ""}`}
+                          >
+                            <span className={`inline-flex w-fit items-center px-2 py-1 rounded-full text-[11px] md:text-xs font-black whitespace-nowrap ${STATUS_LABEL[st].tone}`}>
+                              {STATUS_LABEL[st].label}
+                            </span>
+                            <span className={`text-center font-black text-base md:text-lg ${m === 0 ? "text-black" : "text-red-600"}`}>{m}</span>
+                            <span className={`text-center font-black text-base md:text-lg ${f === 0 ? "text-black" : "text-red-600"}`}>{f}</span>
+                            <span className={`text-center font-black text-base md:text-lg ${sum === 0 ? "text-gray-300" : "text-brand-black"}`}>{sum}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                   {/* 업무 확인 필요 */}
                   <div>
