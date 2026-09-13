@@ -49,7 +49,7 @@ export default function ReportPage() {
                 <ul className="space-y-3 md:space-y-4 text-sm md:text-base border-t border-white/10 pt-6 md:pt-8">
                   <li className="flex justify-between items-center gap-3">
                     <span className="flex items-center gap-2 text-gray-400"><Phone size={16} className="text-brand-point flex-shrink-0" />전화 문의</span>
-                    <span className="font-bold text-right">031-602-9144</span>
+                    <span className="font-bold text-right">010-6750-3722</span>
                   </li>
                   <li className="flex justify-between items-center gap-3">
                     <span className="flex items-center gap-2 text-gray-400"><Mail size={16} className="text-brand-point flex-shrink-0" />이메일 문의</span>
