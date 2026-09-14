@@ -287,7 +287,13 @@ function CheckoutContent() {
       }
       console.error("[checkout] Toss SDK error:", error);
       const code = e?.code || e?.name || "UNKNOWN";
-      const msg  = e?.message || "결제 요청에 실패했습니다.";
+      // 필수 약관 미동의 — 에러코드/영문 노출 없이 안내 문구만 표시
+      if (code === "NEED_AGREEMENT_WITH_REQUIRED_TERMS") {
+        alert("[필수] 결제 서비스 이용 약관, 개인정보 처리 동의해주세요.");
+        setPaying(false);
+        return;
+      }
+      const msg = e?.message || "결제 요청에 실패했습니다.";
       alert(`결제 오류 [${code}]\n${msg}`);
       setPaying(false);
     }
