@@ -102,7 +102,7 @@ const EMPTY_PARTY: PartyForm = {
   targetGroup: "", theme: "", locationTag: "",
 };
 
-function BookingTable({ label, toneClass, rows, party, onApprove, onCancel, onConfirmVBank }: {
+function BookingTable({ label, toneClass, rows, party, onApprove, onCancel, onConfirmVBank, onFullRefund }: {
   label: string;
   toneClass: string;
   rows: BookingRow[];
@@ -110,6 +110,7 @@ function BookingTable({ label, toneClass, rows, party, onApprove, onCancel, onCo
   onApprove: (email: string, bookingId: string) => void;
   onCancel: (email: string, bookingId: string) => void;
   onConfirmVBank: (email: string, bookingId: string) => void;
+  onFullRefund: (email: string, bookingId: string) => void;
 }) {
   // 카운트는 cancelled 제외 — 취소자는 아래 테이블 행에 line-through 로 보존만 됨.
   const activeCount = rows.filter(r => r.status !== "cancelled").length;
@@ -155,13 +156,32 @@ function BookingTable({ label, toneClass, rows, party, onApprove, onCancel, onCo
                         <X size={11} /> 취소 완료
                       </span>
                     ) : (
-                      <button
-                        type="button"
-                        onClick={() => onCancel(b.userEmail, b.id)}
-                        className="inline-flex items-center gap-1 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 px-2.5 py-1.5 rounded-lg text-xs font-black transition-colors"
-                      >
-                        <X size={11} /> 취소
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        {/* 100% 환불(신규) — 카드결제만 노출, 취소요청/환불완료 진행 중인 건은 [취소요청] 탭과 충돌 방지 위해 숨김.
+                             무통장 건은 취소할 Toss 결제가 없어 버튼 대신 [무통장] 표기만. 기존 [취소] 버튼은 아래 그대로 유지. */}
+                        {(b.status !== "cancel_requested" && b.status !== "refund_completed") && (
+                          b.paymentMethod === "vbank" ? (
+                            <span className="inline-flex items-center px-2 py-1.5 rounded-lg text-[11px] font-black bg-gray-100 text-gray-500 whitespace-nowrap">
+                              무통장
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => onFullRefund(b.userEmail, b.id)}
+                              className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 px-2.5 py-1.5 rounded-lg text-xs font-black transition-colors whitespace-nowrap"
+                            >
+                              <RotateCcw size={11} /> 100%환불
+                            </button>
+                          )
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => onCancel(b.userEmail, b.id)}
+                          className="inline-flex items-center gap-1 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 px-2.5 py-1.5 rounded-lg text-xs font-black transition-colors"
+                        >
+                          <X size={11} /> 취소
+                        </button>
+                      </div>
                     )}
                   </td>
                   <td className={`px-3 py-2.5 font-bold ${isCancelled ? "line-through" : ""}`}>{b.userName}</td>
@@ -817,6 +837,25 @@ export default function AdminDashboard() {
     }
   };
 
+  // 카드결제 100% 환불 취소 (신규) — 취소 시기별 환불 규정 무시하고 결제금액 전액 즉시 Toss 취소.
+  // 무통장 건은 백엔드에서 차단되므로 버튼 자체를 노출하지 않음(BookingTable 분기).
+  const cancelBookingFullRefund = async (email: string, bookingId: string) => {
+    if (!confirm("이 예약을 100% 환불 처리하시겠습니까?\n\n카드 결제 금액 전액이 취소 시기와 무관하게 토스페이먼츠로 즉시 환불되며,\n해당 회원은 명단에서 [취소 완료]로 표시되고 파티의 성별 인원수가 즉시 -1 차감됩니다.")) return;
+    const res = await fetch("/api/admin/bookings.php", {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "cancel_full_refund", email, bookingId }),
+    });
+    const d = await res.json();
+    if (d?.ok) {
+      try { new BroadcastChannel("woollim_party_counts").postMessage({ at: Date.now() }); } catch { }
+      alert(`100% 환불 처리 완료 (환불 ₩${(d.refundAmount ?? 0).toLocaleString()})`);
+      await loadAll();
+    } else {
+      alert(d?.error || "100% 환불 처리 실패");
+    }
+  };
+
   // 취소요청 승인(환불 처리) — 카드: Toss 취소 API / 무통장: 상태만 변경. 인원 카운트는 미변경 (v7.0)
   const approveCancelRequest = async (email: string, bookingId: string, isVbank: boolean) => {
     if (!confirm("환불을 진행하겠습니까?")) return;
@@ -1381,8 +1420,8 @@ export default function AdminDashboard() {
                                 </button>
                               </div>
                               {/* 본문 — 기존 BookingTable 그대로 (취소/참가확정 핸들러 무변경) */}
-                              <BookingTable label="남성 신청자" toneClass="bg-[#4facfe]/10 text-[#3a85d9]" rows={males} party={party} onApprove={approveBooking} onCancel={cancelBooking} onConfirmVBank={confirmVBankBooking} />
-                              <BookingTable label="여성 신청자" toneClass="bg-rose-100 text-rose-700" rows={females} party={party} onApprove={approveBooking} onCancel={cancelBooking} onConfirmVBank={confirmVBankBooking} />
+                              <BookingTable label="남성 신청자" toneClass="bg-[#4facfe]/10 text-[#3a85d9]" rows={males} party={party} onApprove={approveBooking} onCancel={cancelBooking} onConfirmVBank={confirmVBankBooking} onFullRefund={cancelBookingFullRefund} />
+                              <BookingTable label="여성 신청자" toneClass="bg-rose-100 text-rose-700" rows={females} party={party} onApprove={approveBooking} onCancel={cancelBooking} onConfirmVBank={confirmVBankBooking} onFullRefund={cancelBookingFullRefund} />
                             </motion.div>
                           )}
                         </AnimatePresence>

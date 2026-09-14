@@ -4,6 +4,10 @@
  *  GET  : 모든 회원의 예약 + 회원 정보 조인 (status/gender 필터링용 데이터 포함)
  *  POST { action: "approve", email, bookingId } → status='paid_pending_profile'|'pending_approval' → 'confirmed'
  *  POST { action: "cancel",  email, bookingId } → status='cancelled' + party_counts -1 (atomic)
+ *  POST { action: "cancel_full_refund", email, bookingId } → 카드결제 전액 Toss 즉시취소 + status='cancelled' + party_counts -1
+ *
+ *  'cancel' / 'cancel_full_refund' 공통: DB 상태 업데이트 성공 직후 _cancel_sms.php 의 notifyCancelSms() 로
+ *  취소완료 알리고 문자 발송 (테스트/관리자 계정 제외, 실패해도 취소 처리 자체는 무중단).
  */
 
 declare(strict_types=1);
@@ -82,7 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email  = (string)($body['email']     ?? '');
     $bid    = (string)($body['bookingId'] ?? '');
 
-    if (!in_array($action, ['approve', 'cancel', 'confirm_vbank', 'approve_refund'], true)) {
+    if (!in_array($action, ['approve', 'cancel', 'confirm_vbank', 'approve_refund', 'cancel_full_refund'], true)) {
         http_response_code(400);
         echo json_encode(['ok' => false, 'error' => 'unknown action']);
         exit;
@@ -341,6 +345,123 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    // ─── action === 'cancel_full_refund' — 관리자 100% 환불 취소 (신규) ────────────
+    //  카드결제 전용: 취소 시기별 환불 규정(refund.ts) 무시하고 결제금액 전액을 즉시 Toss 취소.
+    //  무통장은 취소할 Toss 결제가 없으므로 차단 — 기존 [취소] 버튼으로 수동 처리해야 함.
+    //  이미 [취소요청] 승인 흐름(cancel_requested/refund_completed) 중인 건은 중복 환불 방지를 위해 차단.
+    //  ⚠ 기존 'cancel'/'approve_refund' 액션 로직은 아래에서 전혀 수정하지 않음 — 이 블록은 완전 신규 추가.
+    if ($action === 'cancel_full_refund') {
+        $found = false; $target = null; $idx = -1;
+        foreach ($bookings as $i => $b) {
+            if (is_array($b) && (string)($b['id'] ?? '') === $bid) {
+                $target = $b; $idx = $i; $found = true; break;
+            }
+        }
+        if (!$found) { echo json_encode(['ok' => false, 'error' => 'booking not found']); exit; }
+
+        $curStatus = (string)($target['status'] ?? '');
+        if ($curStatus === 'cancelled') {
+            echo json_encode(['ok' => false, 'error' => '이미 취소된 예약입니다.']); exit;
+        }
+        if (in_array($curStatus, ['cancel_requested', 'refund_completed'], true)) {
+            echo json_encode(['ok' => false, 'error' => '취소요청 처리 중인 예약입니다. [취소요청] 탭에서 처리해주세요.']); exit;
+        }
+        if ((string)($target['paymentMethod'] ?? '') === 'vbank') {
+            echo json_encode(['ok' => false, 'error' => '무통장 입금 건은 100% 환불을 사용할 수 없습니다. [취소] 버튼을 이용해주세요.']); exit;
+        }
+
+        $paidAmount = (int)($target['total'] ?? 0);
+        if ($paidAmount > 0) {
+            $paymentKey = (string)($target['paymentId'] ?? '');
+            if ($paymentKey === '') {
+                echo json_encode(['ok' => false, 'error' => '결제 키(paymentId)가 없어 카드 취소를 진행할 수 없습니다.']); exit;
+            }
+            try {
+                $cfg = require __DIR__ . '/../payments/toss-config.php';
+                $ch  = curl_init('https://api.tosspayments.com/v1/payments/' . urlencode($paymentKey) . '/cancel');
+                curl_setopt_array($ch, [
+                    CURLOPT_POST           => true,
+                    CURLOPT_POSTFIELDS     => json_encode(['cancelReason' => '관리자 100% 환불 처리', 'cancelAmount' => $paidAmount]),
+                    CURLOPT_HTTPHEADER     => [
+                        'Authorization: Basic ' . base64_encode($cfg['secret_key'] . ':'),
+                        'Content-Type: application/json',
+                    ],
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT        => 20,
+                ]);
+                $tossBody = curl_exec($ch);
+                $tossHttp = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $tossJson = is_string($tossBody) ? (json_decode($tossBody, true) ?: []) : [];
+                curl_close($ch);
+                @file_put_contents("$dataDir/_toss_refund.log", sprintf(
+                    "[%s] CANCEL_FULL_REFUND paymentKey=%s amount=%d http=%d body=%s\n",
+                    date('c'), $paymentKey, $paidAmount, $tossHttp, substr((string)$tossBody, 0, 400)
+                ), FILE_APPEND);
+                // 이미 취소된 결제(ALREADY_CANCELED)는 성공으로 간주
+                $alreadyCanceled = ($tossHttp === 400 && (string)($tossJson['code'] ?? '') === 'ALREADY_CANCELED_PAYMENT');
+                if ($tossHttp !== 200 && !$alreadyCanceled) {
+                    echo json_encode(['ok' => false, 'error' => 'Toss 결제 취소 실패: ' . (string)($tossJson['message'] ?? "HTTP $tossHttp")]); exit;
+                }
+            } catch (Throwable $e) {
+                error_log('[cancel_full_refund toss] ' . $e->getMessage());
+                echo json_encode(['ok' => false, 'error' => '결제 취소 처리 중 오류가 발생했습니다.']); exit;
+            }
+        }
+
+        $beforeBooking = $target;
+        $bookings[$idx]['status']       = 'cancelled';
+        $bookings[$idx]['updatedAt']    = date('c');
+        $bookings[$idx]['cancelledAt']  = date('c');
+        $bookings[$idx]['cancelledBy']  = 'admin';
+        $bookings[$idx]['refundAmount'] = $paidAmount;
+        saveBookings($email, $bookings);
+
+        // party_counts 해당 성별 -1 (atomic) — 기존 'cancel' 액션과 완전히 동일한 규칙 재사용
+        $partyId   = (string)($beforeBooking['partyId'] ?? '');
+        $gender    = (string)($beforeBooking['gender']  ?? '');
+        $genderKey = $gender === '남성' ? 'male' : 'female';
+        $wasCounted = !(($beforeBooking['paymentMethod'] ?? '') === 'vbank' && empty($beforeBooking['vbankPaidAt']));
+        if ($partyId !== '' && $wasCounted) {
+            $countsFile = "$dataDir/party_counts.json";
+            $fp = fopen($countsFile, 'c+');
+            if ($fp) {
+                flock($fp, LOCK_EX);
+                $raw = stream_get_contents($fp);
+                $counts = $raw ? json_decode($raw, true) : [];
+                if (!is_array($counts)) $counts = [];
+                if (!isset($counts[$partyId]) || !is_array($counts[$partyId])) {
+                    $counts[$partyId] = ['male' => 0, 'female' => 0];
+                }
+                $counts[$partyId][$genderKey] = max(0, (int)($counts[$partyId][$genderKey] ?? 0) - 1);
+                ftruncate($fp, 0); rewind($fp); fwrite($fp, json_encode($counts));
+                fflush($fp); flock($fp, LOCK_UN); fclose($fp);
+            }
+        }
+
+        @file_put_contents($dataDir . '/_admin_cancellations.log', sprintf(
+            "[%s] CANCELLED_FULL_REFUND email=%s bid=%s partyId=%s gender=%s amount=%d\n",
+            date('c'), $email, $bid, $partyId, $gender, $paidAmount
+        ), FILE_APPEND);
+
+        // 취소 처리 DB 반영 성공 직후 → 알리고 취소완료 안내 문자 발송 (테스트/관리자 계정 제외, 실패해도 무중단)
+        try {
+            require_once __DIR__ . '/_cancel_sms.php';
+            notifyCancelSms($email, is_array($beforeBooking) ? $beforeBooking : []);
+        } catch (Throwable $e) {
+            error_log('[admin/bookings cancel_full_refund sms] ' . $e->getMessage());
+        }
+
+        logAdminActivity(
+            'update', 'booking', $bid,
+            "예약 100% 환불 취소 — 회원 {$email}, 파티 #{$partyId}, 성별 {$gender}, 환불 {$paidAmount}원",
+            ['status' => $beforeBooking['status'] ?? ''],
+            ['status' => 'cancelled']
+        );
+
+        echo json_encode(['ok' => true, 'partyId' => $partyId, 'gender' => $gender, 'refundAmount' => $paidAmount]);
+        exit;
+    }
+
     // ─── action === 'cancel' ──────────────────────────────────────
     $found = false;
     $beforeBooking = null;
@@ -391,6 +512,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         "[%s] CANCELLED email=%s bid=%s partyId=%s gender=%s\n",
         date('c'), $email, $bid, $partyId, $gender
     ), FILE_APPEND);
+
+    // 취소 처리 DB 반영 성공 직후 → 알리고 취소완료 안내 문자 발송 (테스트/관리자 계정 제외, 실패해도 무중단)
+    try {
+        require_once __DIR__ . '/_cancel_sms.php';
+        notifyCancelSms($email, is_array($beforeBooking) ? $beforeBooking : []);
+    } catch (Throwable $e) {
+        error_log('[admin/bookings cancel sms] ' . $e->getMessage());
+    }
 
     logAdminActivity(
         'update', 'booking', $bid,
