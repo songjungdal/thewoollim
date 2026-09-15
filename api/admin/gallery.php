@@ -59,8 +59,8 @@ try {
             }
             if (mb_strlen($alt) > 200) jsonFail('alt_text 가 너무 깁니다 (최대 200자).');
 
-            // sort_order 기본값: 현재 최대값 + 10 (뒤에 붙임)
-            $stmt = $pdo->query("SELECT COALESCE(MAX(sort_order), 0) + 10 AS next_order FROM review_gallery");
+            // sort_order 기본값: 현재 최소값 - 10 (맨 앞에 붙임 → 홈페이지 최신순 노출)
+            $stmt = $pdo->query("SELECT COALESCE(MIN(sort_order), 20) - 10 AS next_order FROM review_gallery");
             $nextOrder = (int)($stmt->fetch()['next_order'] ?? 10);
 
             $stmt = $pdo->prepare("INSERT INTO review_gallery (image_path, alt_text, sort_order) VALUES (?, ?, ?)");
