@@ -815,51 +815,25 @@ export default function PartyClientView({ id }: { id: string }) {
                       <span className="w-1 h-4 bg-brand-point rounded-full" />
                       인원별 소요 시간 안내
                     </h4>
-                    {/* 모바일: 카드 뷰 (수직 쌓기 + bullet + 여유 간격) / 데스크톱: 테이블 */}
-                    <div className="md:hidden space-y-3">
+                    {/* 유형 열 삭제 후 구분/총 소요시간 2개 값만 남아 표 대신 카드형 배치로 재구성.
+                         모바일: 가로 1줄(구분 좌측·시간 우측) 스택 / 데스크톱: 3칸 그리드로 세로 중앙 정렬 — 빈 공간 없이 균형 있게 배치 */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       {[
-                        { kind: "8 : 8 파티",   total: "약 2시간 30분", type: "대화 시간 여유로운 편" },
-                        { kind: "10 : 10 파티", total: "약 3시간",      type: "표준 로테이션" },
-                        { kind: "12 : 12 파티", total: "약 3시간 30분", type: "가장 많은 만남" },
+                        { kind: "6 : 6 파티",   total: "약 2시간" },
+                        { kind: "8 : 8 파티",   total: "약 2시간 30분" },
+                        { kind: "10 : 10 파티", total: "약 3시간" },
                       ].map((row, i) => (
-                        <div key={i} className="bg-brand-point/5 border border-brand-point/15 rounded-xl p-4 leading-relaxed">
-                          {/* kind 라벨 — brand-point 청록 bullet 으로 항목 구분 강화 */}
-                          <div className="flex items-center gap-2 mb-2">
+                        <div
+                          key={i}
+                          className="bg-brand-point/5 border border-brand-point/15 rounded-xl px-5 py-4 flex items-center justify-between gap-3 md:flex-col md:justify-center md:text-center md:gap-1.5 md:py-6"
+                        >
+                          <div className="flex items-center gap-2 md:gap-1.5">
                             <span className="w-1.5 h-1.5 rounded-full bg-brand-point flex-shrink-0" />
-                            <span className="font-black text-base text-brand-black">{row.kind}</span>
+                            <span className="font-black text-base text-brand-black break-keep">{row.kind}</span>
                           </div>
-                          {/* 시간 행 — flex-wrap 으로 좁은 화면에서도 안전 줄바꿈 */}
-                          <div className="flex items-baseline flex-wrap gap-x-2 gap-y-1 text-sm pl-4">
-                            <span className="text-gray-500 font-medium">총</span>
-                            <span className="font-bold text-brand-point break-keep">{row.total}</span>
-                          </div>
-                          <p className="text-xs text-gray-500 font-medium mt-2 pl-4 break-keep leading-relaxed">{row.type}</p>
+                          <span className="font-black text-lg md:text-xl text-brand-point tabular-nums break-keep">{row.total}</span>
                         </div>
                       ))}
-                    </div>
-                    <div className="hidden md:block overflow-hidden rounded-xl border border-gray-100">
-                      <table className="w-full text-sm">
-                        <thead className="bg-brand-point/10 text-gray-600">
-                          <tr>
-                            <th className="px-5 py-3 text-left font-black tracking-wider text-brand-point uppercase text-xs">구분</th>
-                            <th className="px-5 py-3 text-left font-black tracking-wider text-brand-point uppercase text-xs">총 소요 시간</th>
-                            <th className="px-5 py-3 text-left font-black tracking-wider text-brand-point uppercase text-xs">유형</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                          {[
-                            { kind: "8 : 8 파티",   total: "약 2시간 30분", type: "대화 시간 여유로운 편" },
-                            { kind: "10 : 10 파티", total: "약 3시간",      type: "표준 로테이션" },
-                            { kind: "12 : 12 파티", total: "약 3시간 30분", type: "가장 많은 만남" },
-                          ].map((row, i) => (
-                            <tr key={i} className="bg-white hover:bg-brand-point/5 transition-colors">
-                              <td className="px-5 py-3.5 font-bold text-brand-black">{row.kind}</td>
-                              <td className="px-5 py-3.5 font-black text-brand-point tabular-nums">{row.total}</td>
-                              <td className="px-5 py-3.5 text-gray-600">{row.type}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
                     </div>
                   </div>
                 </div>
