@@ -573,7 +573,7 @@ export default function SmoothOnePage() {
                     {/* 제목 — 우측 상단 배지가 가리지 않도록 우측 패딩 확보 */}
                     <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-5 group-hover:text-brand-point transition-colors leading-snug pr-16 md:pr-20">{card.title}</h3>
                     <div className="space-y-2.5 md:space-y-3 mb-5 md:mb-6 text-gray-600 font-medium flex-1 text-sm md:text-base">
-                      <div className="flex items-center gap-2.5"><Calendar size={16} className="text-gray-400 group-hover:text-brand-point transition-colors flex-shrink-0" /> {card.dateString}</div>
+                      <div className="flex items-center gap-2.5"><Calendar size={16} className="text-gray-400 group-hover:text-brand-point transition-colors flex-shrink-0" /> <span className="font-bold">{card.dateString}</span></div>
                       <div className="flex items-center gap-2.5"><MapPin size={16} className="text-gray-400 group-hover:text-brand-point transition-colors flex-shrink-0" /> {card.location}</div>
                       <div className="flex items-center gap-2.5"><Users size={16} className="text-gray-400 group-hover:text-brand-point transition-colors flex-shrink-0" /> {card.target}</div>
                     </div>
