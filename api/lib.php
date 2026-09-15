@@ -204,6 +204,17 @@ function calcCouponDiscount(array $coupon, int $lineTotal): int {
     return min($amount, $lineTotal);
 }
 
+// ─── 쿠폰 성별 대상 제한 ────────────────────────────────────────────
+//   maleAllowed / femaleAllowed 가 명시적으로 false 인 경우만 차단.
+//   필드 자체가 없는 기존(구버전) 쿠폰 데이터는 항상 허용 — 하위호환 유지.
+//   서버측 단일 진실 — coupons-validate.php / pending.php / success.php /
+//   vbank-submit.php 가 모두 이 함수로 판정.
+function couponAllowsGender(array $coupon, string $gender): bool {
+    if ($gender === '남성') return !array_key_exists('maleAllowed', $coupon)   || !empty($coupon['maleAllowed']);
+    if ($gender === '여성') return !array_key_exists('femaleAllowed', $coupon) || !empty($coupon['femaleAllowed']);
+    return true;
+}
+
 // ─── 쿠폰 사용 횟수 (max_count 검증용) ──────────────────────────────
 function countCouponUsages(array $usages, string $code): int {
     $code = strtoupper($code);

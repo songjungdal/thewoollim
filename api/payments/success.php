@@ -226,6 +226,11 @@ if ($couponCode !== '') {
         flock($fp, LOCK_UN); fclose($fp);
         redirectFail('쿠폰이 유효하지 않습니다');
     }
+    if (!couponAllowsGender($found, $gender)) {
+        flock($fp, LOCK_UN); fclose($fp);
+        $maleOk = !array_key_exists('maleAllowed', $found) || !empty($found['maleAllowed']);
+        redirectFail(($maleOk ? '남성' : '여성') . ' 회원만 사용할 수 있는 쿠폰입니다');
+    }
     // 쿠폰 적용 대상 파티의 단가 기준으로 할인 금액 계산
     // 쿠폰 대상 파티의 성별별 가격 기준 — pending.php 와 동일 규칙으로 amount 검증 일치 보장
     $linePrice      = priceForGender($partyMap[$couponPartyId], $gender);

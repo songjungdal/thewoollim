@@ -11,6 +11,7 @@
 
 declare(strict_types=1);
 require_once __DIR__ . '/lib.php';
+require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/auth/_session.php';
 jsonHeaders();
 
@@ -38,6 +39,21 @@ if (!$found || empty($found['active'])) jsonFail('유효하지 않은 쿠폰입�
 
 if (!empty($found['expiresAt']) && strtotime((string)$found['expiresAt']) < strtotime(date('Y-m-d'))) {
     jsonFail('만료된 쿠폰입니다.');
+}
+
+// 할인 대상 성별 제한 — 프로필에 성별이 아직 없으면(가입 초기) 이 단계는 건너뛰고
+// 실제 결제 단계(pending.php)에서 성별 필수 검증이 별도로 이루어짐.
+try {
+    $pdo  = getDB();
+    $stmt = $pdo->prepare("SELECT gender FROM users WHERE LOWER(email) = LOWER(?) AND status='active' LIMIT 1");
+    $stmt->execute([$email]);
+    $userGender = (string)($stmt->fetch()['gender'] ?? '');
+} catch (Throwable $e) {
+    $userGender = '';
+}
+if ($userGender !== '' && !couponAllowsGender($found, $userGender)) {
+    $maleOk = !array_key_exists('maleAllowed', $found) || !empty($found['maleAllowed']);
+    jsonFail(($maleOk ? '남성' : '여성') . ' 회원만 사용할 수 있는 쿠폰입니다.');
 }
 
 $usages = file_exists($usagesFile) ? json_decode((string)file_get_contents($usagesFile), true) : [];

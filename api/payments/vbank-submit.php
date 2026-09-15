@@ -104,6 +104,10 @@ if ($couponCode !== '') {
         (!empty($found['expiresAt']) && strtotime($found['expiresAt']) < strtotime(date('Y-m-d')))) {
         jsonFail('쿠폰이 유효하지 않습니다.');
     }
+    if (!couponAllowsGender($found, $gender)) {
+        $maleOk = !array_key_exists('maleAllowed', $found) || !empty($found['maleAllowed']);
+        jsonFail(($maleOk ? '남성' : '여성') . ' 회원만 사용할 수 있는 쿠폰입니다.');
+    }
     if (!in_array($couponPartyId, $partyIds, true)) jsonFail('쿠폰 적용 파티를 선택해주세요.');
     if (!isset($partyMap[$couponPartyId]))          jsonFail('쿠폰 적용 파티를 찾을 수 없습니다.');
 

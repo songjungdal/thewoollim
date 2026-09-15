@@ -96,6 +96,10 @@ if ($couponCode !== '') {
     if (!empty($found['expiresAt']) && strtotime($found['expiresAt']) < strtotime(date('Y-m-d'))) {
         jsonFail('만료된 쿠폰입니다.');
     }
+    if (!couponAllowsGender($found, $userGender)) {
+        $maleOk = !array_key_exists('maleAllowed', $found) || !empty($found['maleAllowed']);
+        jsonFail(($maleOk ? '남성' : '여성') . ' 회원만 사용할 수 있는 쿠폰입니다.');
+    }
     if (!in_array($couponPartyId, $partyIds, true)) jsonFail('쿠폰 적용 파티를 선택해주세요.');
 
     // 총 수량 한도 사전 체크 (실 차감은 success 의 atomic consume)

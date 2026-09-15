@@ -283,14 +283,19 @@ export default function AdminDashboard() {
     code: string;
     discount_type: "amount" | "percent";    // 정액(KRW) / 정률(%)
     amount: number;                          // type=amount → KRW, type=percent → 1~100
-    max_discount: number;                    // type=percent 의 차감 한도 (KRW), 0 = 무제한
+    max_discount: number;                    // type=percent 의 차감 한도 (KRW), 0 = 무제한 (UI 노출은 제거, 데이터/계산은 유지)
     max_count: number;                       // 총 발급 가능 수량, 0 = 무제한
+    maleAllowed: boolean;                    // 할인 대상 — 남성 사용 가능 여부 (기본 true)
+    femaleAllowed: boolean;                  // 할인 대상 — 여성 사용 가능 여부 (기본 true)
     expiresAt: string;
     active: boolean;
     createdAt?: string;
     used_count?: number;                     // 서버에서 GET 시점 집계 (read-only)
   };
   const [coupons, setCoupons] = useState<Coupon[]>([]);
+  // 쿠폰 추가/수정 중 미저장 변경 플래그 — 30초 주기 자동 새로고침(loadAll)이
+  // 저장 전 로컬 draft(새로 추가한 쿠폰 등)를 서버 목록으로 덮어써 사라지는 문제 방지.
+  const couponsDirtyRef = useRef(false);
   const [company, setCompany] = useState({ name: "", ceo: "", biz_no: "", address: "", telecom: "" });
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
   const [galleryUploading, setGalleryUploading] = useState(false);
@@ -546,7 +551,8 @@ export default function AdminDashboard() {
     ]);
     if (u?.users) setUsers(u.users);
     if (b?.rows) setBookings(b.rows);
-    if (c?.coupons) setCoupons(Array.isArray(c.coupons) ? c.coupons : []);
+    // 미저장 쿠폰 편집 중(dirty)이면 자동 새로고침이 draft를 덮어쓰지 않도록 스킵
+    if (c?.coupons && !couponsDirtyRef.current) setCoupons(Array.isArray(c.coupons) ? c.coupons : []);
     if (co?.company) setCompany(co.company);
     if (g?.items) setGallery(Array.isArray(g.items) ? g.items : []);
     if (m?.items) setMemos(Array.isArray(m.items) ? m.items : []);
@@ -905,11 +911,12 @@ export default function AdminDashboard() {
       body: JSON.stringify({ action: "save", coupons }),
     });
     const d = await res.json();
-    if (d?.ok) { alert("쿠폰 저장 완료"); setCoupons(d.coupons || []); }
+    if (d?.ok) { couponsDirtyRef.current = false; alert("쿠폰 저장 완료"); setCoupons(d.coupons || []); }
     else alert("저장 실패");
   };
 
   const addCoupon = () => {
+    couponsDirtyRef.current = true; // 저장 전까지 자동 새로고침이 이 draft를 덮어쓰지 않도록
     setCoupons(prev => [
       {
         code:          "",
@@ -917,6 +924,8 @@ export default function AdminDashboard() {
         amount:        10000,
         max_discount:  0,
         max_count:     0,
+        maleAllowed:   true,
+        femaleAllowed: true,
         expiresAt:     "",
         active:        true,
         createdAt:     new Date().toISOString(),
@@ -936,10 +945,11 @@ export default function AdminDashboard() {
       body: JSON.stringify({ action: "save", coupons: next }),
     });
     const d = await res.json();
-    if (d?.ok) setCoupons(d.coupons || next);
-    else { alert(d?.error || "쿠폰 삭제 저장 실패 — 다시 시도해주세요."); await loadAll(); }
+    if (d?.ok) { couponsDirtyRef.current = false; setCoupons(d.coupons || next); }
+    else { couponsDirtyRef.current = false; alert(d?.error || "쿠폰 삭제 저장 실패 — 다시 시도해주세요."); await loadAll(); }
   };
   const updateCoupon = (idx: number, patch: Partial<Coupon>) => {
+    couponsDirtyRef.current = true; // 저장 전까지 자동 새로고침이 편집 중인 값을 덮어쓰지 않도록
     setCoupons(prev => prev.map((c, i) => i === idx ? { ...c, ...patch } : c));
   };
 
@@ -1784,7 +1794,7 @@ export default function AdminDashboard() {
                       <th className="text-left px-3 md:px-4 py-3">쿠폰 코드</th>
                       <th className="text-left px-3 md:px-4 py-3">종류</th>
                       <th className="text-left px-3 md:px-4 py-3">할인값</th>
-                      <th className="text-left px-3 md:px-4 py-3">최대 할인 (정률)</th>
+                      <th className="text-left px-3 md:px-4 py-3">할인 대상</th>
                       <th className="text-left px-3 md:px-4 py-3">총 수량</th>
                       <th className="text-left px-3 md:px-4 py-3">만료일</th>
                       <th className="text-left px-3 md:px-4 py-3">상태</th>
@@ -1828,6 +1838,7 @@ export default function AdminDashboard() {
                               onChange={e => {
                                 let v = Math.max(0, parseInt(e.target.value || "0", 10));
                                 if (isPercent) v = Math.min(100, v);
+                                e.target.value = String(v); // 선행 0 제거 즉시 반영 (controlled input 미갱신 방지)
                                 updateCoupon(idx, { amount: v });
                               }}
                               className="w-24 px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm font-bold bg-white text-right" aria-label="할인값"
@@ -1835,22 +1846,46 @@ export default function AdminDashboard() {
                             <span className="ml-1 text-gray-500 text-xs">{isPercent ? "%" : "원"}</span>
                           </td>
                           <td className="px-3 md:px-4 py-3">
-                            <input
-                              type="number" min={0} step={1000}
-                              value={c.max_discount}
-                              disabled={!isPercent}
-                              onChange={e => updateCoupon(idx, { max_discount: Math.max(0, parseInt(e.target.value || "0", 10)) })}
-                              className={`w-28 px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm font-bold bg-white text-right ${!isPercent ? "opacity-40 cursor-not-allowed" : ""}`}
-                              aria-label="최대 할인"
-                              placeholder="0=무제한"
-                            />
-                            <span className="ml-1 text-gray-500 text-xs">원</span>
+                            <div className="flex items-center gap-3">
+                              <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={c.maleAllowed}
+                                  onChange={e => {
+                                    const next = e.target.checked;
+                                    if (!next && !c.femaleAllowed) return; // 남/여 최소 1개는 체크 유지
+                                    updateCoupon(idx, { maleAllowed: next });
+                                  }}
+                                  className="w-4 h-4 accent-[#3a85d9] cursor-pointer"
+                                  aria-label="남성 할인 대상"
+                                />
+                                <span className="text-xs font-black text-[#3a85d9]">남성</span>
+                              </label>
+                              <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={c.femaleAllowed}
+                                  onChange={e => {
+                                    const next = e.target.checked;
+                                    if (!next && !c.maleAllowed) return; // 남/여 최소 1개는 체크 유지
+                                    updateCoupon(idx, { femaleAllowed: next });
+                                  }}
+                                  className="w-4 h-4 accent-rose-500 cursor-pointer"
+                                  aria-label="여성 할인 대상"
+                                />
+                                <span className="text-xs font-black text-rose-600">여성</span>
+                              </label>
+                            </div>
                           </td>
                           <td className="px-3 md:px-4 py-3">
                             <input
                               type="number" min={0} step={1}
                               value={c.max_count}
-                              onChange={e => updateCoupon(idx, { max_count: Math.max(0, parseInt(e.target.value || "0", 10)) })}
+                              onChange={e => {
+                                const v = Math.max(0, parseInt(e.target.value || "0", 10));
+                                e.target.value = String(v); // 선행 0 제거 즉시 반영 (controlled input 미갱신 방지)
+                                updateCoupon(idx, { max_count: v });
+                              }}
                               className="w-20 px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm font-bold bg-white text-right"
                               aria-label="총 수량" placeholder="0=무제한"
                             />
@@ -1890,7 +1925,7 @@ export default function AdminDashboard() {
               </div>
               <p className="text-xs text-gray-400 mt-3 leading-relaxed">
                 · <strong>종류</strong> — 정액(원): 정해진 금액 차감 / 정률(%): 결제 금액의 N% 차감.<br />
-                · <strong>최대 할인</strong> — 정률 쿠폰의 KRW 차감 한도. 0 = 무제한.<br />
+                · <strong>할인 대상</strong> — 체크된 성별만 이 쿠폰을 사용할 수 있음. 남/여 둘 다 체크 시 모두 사용 가능(기본값). 최소 1개는 항상 체크되어 있어야 함.<br />
                 · <strong>총 수량</strong> — 전체 사용자 누적 발급 가능 수량. 0 = 무제한. 한도 도달 시 자동 차단.<br />
                 · 한 사용자가 동일 쿠폰을 두 번 이상 사용할 수 없음.<br />
                 · 만료일 비어있으면 무기한. 변경 후 [저장] 버튼 클릭 필요.

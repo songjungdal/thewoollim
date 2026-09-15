@@ -12,6 +12,7 @@
  *     amount,                                // type=amount 면 KRW, type=percent 면 %
  *     max_discount,                          // type=percent 의 차감 한도 (KRW), 0 = 무제한
  *     max_count,                             // 총 발급 가능 수량, 0 = 무제한
+ *     maleAllowed, femaleAllowed,            // 할인 대상 성별 (기본 둘 다 true) — 사용처: couponAllowsGender() in lib.php
  *   }
  *
  * 저장: /api/data/coupons.json (단일 진실 소스)
@@ -55,6 +56,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             'discount_type' => 'amount',
             'max_discount'  => 0,
             'max_count'     => 0,
+            'maleAllowed'   => true,
+            'femaleAllowed' => true,
         ], $c, ['used_count' => $usedMap[$code] ?? 0]);
     }
     jsonOut(['ok' => true, 'coupons' => $out]);
@@ -83,12 +86,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // percent 타입은 0~100 범위로 클램프
         if ($type === 'percent') $amount = min(100, $amount);
 
+        // 할인 대상 성별 — 필드 없으면(구버전 데이터) 기본 둘 다 허용.
+        // 둘 다 false 로 들어오면(비정상 입력) 아무도 쓸 수 없는 쿠폰이 되므로 둘 다 true 로 보정.
+        $maleAllowed   = array_key_exists('maleAllowed',   $c) ? !empty($c['maleAllowed'])   : true;
+        $femaleAllowed = array_key_exists('femaleAllowed', $c) ? !empty($c['femaleAllowed']) : true;
+        if (!$maleAllowed && !$femaleAllowed) { $maleAllowed = true; $femaleAllowed = true; }
+
         $clean[] = [
             'code'          => $code,
             'discount_type' => $type,
             'amount'        => $amount,
             'max_discount'  => max(0, (int)($c['max_discount'] ?? 0)),
             'max_count'     => max(0, (int)($c['max_count']    ?? 0)),
+            'maleAllowed'   => $maleAllowed,
+            'femaleAllowed' => $femaleAllowed,
             'expiresAt'     => trim((string)($c['expiresAt'] ?? '')),
             'active'        => !empty($c['active']),
             'createdAt'     => (string)($c['createdAt'] ?? date('c')),
