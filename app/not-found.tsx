@@ -10,7 +10,7 @@ export default function NotFound() {
     <div className="flex flex-col min-h-screen bg-brand-lightgray text-brand-black">
       <Header />
       
-      <main className="flex-1 flex items-center justify-center px-6">
+      <main className="flex-1 flex items-center justify-center px-6 py-20 md:py-32">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
