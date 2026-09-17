@@ -9,7 +9,7 @@ import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import { partyStockStatus } from "../../lib/data";
 import { useAuth } from "../../context/AuthContext";
-import { useParties } from "../../lib/useParties";
+import { useParties, usePartiesLoaded } from "../../lib/useParties";
 import { checkEligibility, eligibilitySummary, calculateAge } from "../../lib/eligibility";
 
 type Participant = {
@@ -118,6 +118,7 @@ function ParticipantColumn({
 
 export default function PartyClientView({ id }: { id: string }) {
   const PARTIES = useParties();
+  const partiesLoaded = usePartiesLoaded();
   const baseItem = PARTIES.find(p => p.id === id);
   const router = useRouter();
   const { isLoggedIn, addToCart, profile, partyCounts, cart, bookings, verifySession } = useAuth();
@@ -171,6 +172,24 @@ export default function PartyClientView({ id }: { id: string }) {
     : undefined;
 
   if (!detailItem) {
+    // 실시간 파티 데이터 최초 fetch가 아직 끝나지 않은 구간 — 빌드 시점 샘플 목록만 있어
+    // 실제로는 존재하는 파티도 일시적으로 못 찾은 것처럼 보일 수 있으므로, fetch 완료 전까지는
+    // "찾을 수 없음" 대신 로딩 상태를 보여줘 자연스럽게 진입되도록 함.
+    if (!partiesLoaded) {
+      return (
+        <div className="flex flex-col min-h-screen">
+          <Header />
+          <main className="flex-1 flex items-center justify-center px-4">
+            <span
+              role="status"
+              aria-label="불러오는 중"
+              className="block w-11 h-11 rounded-full border-[3px] border-gray-200 border-t-brand-point animate-spin"
+            />
+          </main>
+          <Footer />
+        </div>
+      );
+    }
     return (
       <div className="flex flex-col min-h-screen">
         <Header />
