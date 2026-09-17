@@ -6,28 +6,6 @@ import { PARTIES as DEFAULT_PARTIES, TARGET_GROUPS, THEMES, LOCATION_TAGS, type 
 const CHANNEL_NAME = "woollim_parties";
 const STORAGE_KEY  = "woollim_parties_updated_at";
 
-// 파티 라이브 데이터의 "최초 1회 fetch 시도"가 끝났는지(성공/실패 무관) 여부.
-// useParties() 는 빌드 시점 디폴트(샘플 8건)로 먼저 렌더된 뒤 실제 데이터로 교체되는데,
-// 이 최초 fetch 가 끝나기 전엔 실제로 존재하는 파티도 디폴트 목록에 없어 "찾을 수 없음"으로
-// 오판될 수 있다. useParties() 자체의 시그니처/동작은 전혀 바꾸지 않는 순수 추가 기능.
-let partiesFirstLoadSettled = false;
-const partiesFirstLoadListeners = new Set<() => void>();
-function notifyPartiesFirstLoadSettled() {
-  if (partiesFirstLoadSettled) return;
-  partiesFirstLoadSettled = true;
-  partiesFirstLoadListeners.forEach(fn => fn());
-}
-export function usePartiesLoaded(): boolean {
-  const [loaded, setLoaded] = useState(partiesFirstLoadSettled);
-  useEffect(() => {
-    if (partiesFirstLoadSettled) { setLoaded(true); return; }
-    const listener = () => setLoaded(true);
-    partiesFirstLoadListeners.add(listener);
-    return () => { partiesFirstLoadListeners.delete(listener); };
-  }, []);
-  return loaded;
-}
-
 /**
  * 같은 브라우저 내 다른 탭에서 즉시 갱신 트리거.
  * 두 가지 메커니즘을 함께 사용해 신뢰성 확보:
@@ -94,8 +72,7 @@ export function useParties(): Party[] {
           });
           setParties(normalized);
         })
-        .catch(() => {})
-        .finally(() => notifyPartiesFirstLoadSettled());
+        .catch(() => {});
     };
 
     load();

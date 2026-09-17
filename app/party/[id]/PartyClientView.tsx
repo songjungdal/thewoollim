@@ -7,9 +7,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
-import { partyStockStatus } from "../../lib/data";
+import { partyStockStatus, PARTIES as SEED_PARTIES } from "../../lib/data";
 import { useAuth } from "../../context/AuthContext";
-import { useParties, usePartiesLoaded } from "../../lib/useParties";
+import { useParties } from "../../lib/useParties";
 import { checkEligibility, eligibilitySummary, calculateAge } from "../../lib/eligibility";
 
 type Participant = {
@@ -118,7 +118,11 @@ function ParticipantColumn({
 
 export default function PartyClientView({ id }: { id: string }) {
   const PARTIES = useParties();
-  const partiesLoaded = usePartiesLoaded();
+  // useParties()는 마운트 시 빌드타임 샘플(SEED_PARTIES)로 먼저 렌더된 뒤 실시간 데이터로 교체됨.
+  // 참조가 SEED_PARTIES 그대로라는 건 "이 마운트에서 아직 실시간 데이터를 못 받은 상태"라는 뜻이므로,
+  // 이 경우엔 "찾을 수 없음"으로 오판하지 않도록 별도 로딩 상태로 처리 (라우트 이동 때마다 새로 계산되어
+  // 이전 페이지의 로딩 상태를 물려받지 않음 — 전역/모듈 상태 없이 이 컴포넌트 렌더에서만 판단).
+  const partiesLoaded = PARTIES !== SEED_PARTIES;
   const baseItem = PARTIES.find(p => p.id === id);
   const router = useRouter();
   const { isLoggedIn, addToCart, profile, partyCounts, cart, bookings, verifySession } = useAuth();
