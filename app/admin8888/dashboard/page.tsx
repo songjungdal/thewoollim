@@ -2524,8 +2524,16 @@ export default function AdminDashboard() {
           const visiblePartyIds = new Set(
             PARTIES.filter(p => partyVisibility(p) !== "expired").map(p => p.id)
           );
-          const byStatusGender = (st: string, g: string) =>
-            bookings.filter(b => b.status === st && b.userGender === g && visiblePartyIds.has(b.partyId)).length;
+          // 참가확정 완료는 이미 모집종료(행사일 경과)된 파티까지 포함되면 "지금 필요한 현황"이 아니게
+          // 되므로, 아직 행사일이 지나지 않은(active) 파티만 집계 — 다른 상태(입금확인중/결제완료/확정대기중)는
+          // 기존 visiblePartyIds 범위 그대로 유지.
+          const activePartyIds = new Set(
+            PARTIES.filter(p => partyVisibility(p) === "active").map(p => p.id)
+          );
+          const byStatusGender = (st: string, g: string) => {
+            const idSet = st === "confirmed" ? activePartyIds : visiblePartyIds;
+            return bookings.filter(b => b.status === st && b.userGender === g && idSet.has(b.partyId)).length;
+          };
           const cancelReq = bookings.filter(b => b.status === "cancel_requested").length;
           const newMemos = memos.filter(m => (m.created_at || "").slice(0, 10) === today).length;
           // 변동 없음(0) → 검정 / 변동 있음(0 초과) → 빨강 (청록 포인트색은 시인성 낮아 교체)
