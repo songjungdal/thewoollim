@@ -275,6 +275,7 @@ export default function AdminDashboard() {
   const [opsHideToday, setOpsHideToday] = useState(false);
   const [opsNow, setOpsNow] = useState("");
   const [opsErrorCount, setOpsErrorCount] = useState(0);
+  const [opsSmsRemainLms, setOpsSmsRemainLms] = useState<number | null>(null);
   const PARTIES = useParties();
 
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -763,6 +764,9 @@ export default function AdminDashboard() {
     setShowOpsPopup(true);
     fetch("/api/admin/error-count.php", { cache: "no-store", credentials: "include" })
       .then(r => r.json()).then(j => { if (j?.ok) setOpsErrorCount(Number(j.count) || 0); }).catch(() => {});
+    // 알리고 잔여 발송 가능 건수 (LMS 기준 — 이 앱의 알림 문자는 전부 LMS로 발송됨) — 조회 전용, 실패해도 무시
+    fetch("/api/admin/sms-remain.php", { cache: "no-store", credentials: "include" })
+      .then(r => r.json()).then(j => { if (j?.ok) setOpsSmsRemainLms(Number(j.lms) || 0); }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authChecked]);
 
@@ -2537,7 +2541,7 @@ export default function AdminDashboard() {
           const cancelReq = bookings.filter(b => b.status === "cancel_requested").length;
           const newMemos = memos.filter(m => (m.created_at || "").slice(0, 10) === today).length;
           // 변동 없음(0) → 검정 / 변동 있음(0 초과) → 빨강 (청록 포인트색은 시인성 낮아 교체)
-          const Num = ({ v }: { v: number }) => <span className={`font-black ${v === 0 ? "text-black" : "text-red-600"} text-2xl md:text-3xl align-middle mx-0.5`}>{v}</span>;
+          const Num = ({ v }: { v: number }) => <span className={`font-black ${v === 0 ? "text-black" : "text-red-600"} text-xl md:text-2xl align-middle mx-0.5`}>{v}</span>;
           const PARTY_STATUS_ROWS = ["vbank_pending", "paid_pending_profile", "pending_approval", "confirmed"] as const;
           return (
             <motion.div
@@ -2549,25 +2553,25 @@ export default function AdminDashboard() {
                 initial={{ opacity: 0, scale: 0.94, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.94, y: 16 }}
                 transition={{ type: "spring", stiffness: 260, damping: 24 }}
                 onClick={e => e.stopPropagation()}
-                className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 md:p-8"
+                className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-5 md:p-7"
               >
                 <h3 className="font-black text-lg md:text-xl text-brand-black">현재 운영 현황입니다.</h3>
-                <p className="text-xs md:text-sm text-gray-400 font-bold mb-5">({opsNow} 기준)</p>
+                <p className="text-xs md:text-sm text-gray-400 font-bold mb-3 md:mb-4">({opsNow} 기준)</p>
 
-                <div className="space-y-5 text-sm md:text-base text-gray-700 font-medium">
+                <div className="space-y-3 md:space-y-4 text-sm md:text-base text-gray-700 font-medium">
                   {/* 오늘자 기본 현황 */}
                   <div>
-                    <p className="font-black text-brand-black mb-2">[오늘자 기본 현황]</p>
-                    <ul className="space-y-1.5 pl-1">
+                    <p className="font-black text-brand-black mb-1.5">[오늘자 기본 현황]</p>
+                    <ul className="space-y-1 pl-1">
                       <li>• 신규 가입 회원 : <Num v={newMembers} />명</li>
                       <li>• 이번달 진행 중인 파티 : <Num v={monthParties} />개</li>
                     </ul>
                   </div>
                   {/* 파티 신청 현황 — 표 형태로 정리해 성별/상태별 숫자를 한눈에 비교 가능하도록 구성 */}
                   <div>
-                    <p className="font-black text-brand-black mb-2">[파티 신청 현황]</p>
+                    <p className="font-black text-brand-black mb-1.5">[파티 신청 현황]</p>
                     <div className="rounded-xl border border-gray-100 overflow-hidden">
-                      <div className="grid grid-cols-[1fr_40px_40px_44px] items-center gap-1 px-3 py-1.5 bg-gray-50 text-[10px] md:text-[11px] font-bold text-gray-400">
+                      <div className="grid grid-cols-[1fr_40px_40px_44px] items-center gap-1 px-3 py-1 bg-gray-50 text-[10px] md:text-[11px] font-bold text-gray-400">
                         <span>상태</span>
                         <span className="text-center">남</span>
                         <span className="text-center">여</span>
@@ -2580,14 +2584,14 @@ export default function AdminDashboard() {
                         return (
                           <div
                             key={st}
-                            className={`grid grid-cols-[1fr_40px_40px_44px] items-center gap-1 px-3 py-2.5 ${i > 0 ? "border-t border-gray-100" : ""}`}
+                            className={`grid grid-cols-[1fr_40px_40px_44px] items-center gap-1 px-3 py-1.5 ${i > 0 ? "border-t border-gray-100" : ""}`}
                           >
-                            <span className={`inline-flex w-fit items-center px-2 py-1 rounded-full text-[11px] md:text-xs font-black whitespace-nowrap ${STATUS_LABEL[st].tone}`}>
+                            <span className={`inline-flex w-fit items-center px-2 py-0.5 rounded-full text-[11px] md:text-xs font-black whitespace-nowrap ${STATUS_LABEL[st].tone}`}>
                               {STATUS_LABEL[st].label}
                             </span>
-                            <span className={`text-center font-black text-base md:text-lg ${m === 0 ? "text-black" : "text-red-600"}`}>{m}</span>
-                            <span className={`text-center font-black text-base md:text-lg ${f === 0 ? "text-black" : "text-red-600"}`}>{f}</span>
-                            <span className={`text-center font-black text-base md:text-lg ${sum === 0 ? "text-gray-300" : "text-brand-black"}`}>{sum}</span>
+                            <span className={`text-center font-black text-sm md:text-base ${m === 0 ? "text-black" : "text-red-600"}`}>{m}</span>
+                            <span className={`text-center font-black text-sm md:text-base ${f === 0 ? "text-black" : "text-red-600"}`}>{f}</span>
+                            <span className={`text-center font-black text-sm md:text-base ${sum === 0 ? "text-gray-300" : "text-brand-black"}`}>{sum}</span>
                           </div>
                         );
                       })}
@@ -2595,17 +2599,21 @@ export default function AdminDashboard() {
                   </div>
                   {/* 업무 확인 필요 */}
                   <div>
-                    <p className="font-black text-brand-black mb-2">[업무 확인 필요]</p>
-                    <ul className="space-y-1.5 pl-1">
+                    <p className="font-black text-brand-black mb-1.5">[업무 확인 필요]</p>
+                    <ul className="space-y-1 pl-1">
                       <li>• 취소 요청 : <Num v={cancelReq} />건</li>
                       <li>• 신규 업무 메모 : <Num v={newMemos} />건</li>
                       <li>• 시스템 에러 : <Num v={opsErrorCount} />건 {opsErrorCount === 0 && <span className="text-emerald-600 font-bold">(정상)</span>}</li>
                     </ul>
+                    {/* 알림 문자 잔여 발송 가능 건수 — 충전 타이밍 놓쳐 문자 미발송되는 것 방지용 참고 정보 (조회 전용) */}
+                    <p className="text-[10px] md:text-[11px] text-gray-400 font-medium mt-1.5 pl-1">
+                      회원가입 문자 : 콘솔 확인 필요 (다날) / 연동자동 문자 : {opsSmsRemainLms === null ? "확인 중" : `${opsSmsRemainLms.toLocaleString()}건`} (알리고)
+                    </p>
                   </div>
                 </div>
 
                 {/* 하단 컨트롤 */}
-                <div className="flex items-center justify-end gap-3 mt-7 pt-5 border-t border-gray-100">
+                <div className="flex items-center justify-end gap-3 mt-4 pt-3 md:pt-4 border-t border-gray-100">
                   <label className="flex items-center gap-2 text-xs md:text-sm font-bold text-gray-500 cursor-pointer select-none">
                     <input
                       type="checkbox"
