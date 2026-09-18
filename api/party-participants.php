@@ -84,6 +84,7 @@ foreach ($users as $u) {
             'mbti'       => (string)($u['mbti'] ?? ''),
             'job'        => (string)($u['job']  ?? ''),
             'status'     => (string)($b['status'] ?? ''),  // 'confirmed' | 'pending_approval'
+            'createdAt'  => (string)($b['createdAt'] ?? ''), // 정렬 전용 — 응답 직전에 제거
         ];
 
         if ($u['gender'] === '남성')      $male[]   = $entry;
@@ -93,6 +94,15 @@ foreach ($users as $u) {
         break;
     }
 }
+
+// 참가신청 순서(먼저 신청한 사람이 위, 최근 신청한 사람이 아래)로 정렬 — createdAt 오름차순
+usort($male,   fn($a, $b) => strcmp((string)$a['createdAt'], (string)$b['createdAt']));
+usort($female, fn($a, $b) => strcmp((string)$a['createdAt'], (string)$b['createdAt']));
+
+// 정렬 전용 필드 — 응답 스키마는 기존과 동일하게 유지
+foreach ($male as &$e)   unset($e['createdAt']);
+foreach ($female as &$e) unset($e['createdAt']);
+unset($e);
 
 echo json_encode([
     'ok'     => true,
