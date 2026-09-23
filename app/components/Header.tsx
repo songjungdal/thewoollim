@@ -42,7 +42,7 @@ export default function Header() {
           */}
           {[
             { href: "/#apply",        id: "apply",        label: "참여하기" },
-            { href: "/#gallery",      id: "gallery",      label: "후기갤러리" },
+            { href: "/#gallery",      id: "gallery",      label: "현장스케치" },
             { href: "/#participants", id: "participants", label: "실시간 참여자" },
             { href: "/#schedule",     id: "schedule",     label: "매칭파티 일정" },
             { href: "/#faq",          id: "faq",          label: "FAQ" },
@@ -92,7 +92,7 @@ export default function Header() {
       {isMenuOpen && (
         <div className="md:hidden absolute top-[72px] left-0 w-full bg-black border-b border-gray-800 p-6 flex flex-col gap-6 font-semibold text-white shadow-2xl">
           <Link href="/#apply" onClick={(e) => handleScroll(e, 'apply')}>참여하기</Link>
-          <Link href="/#gallery" onClick={(e) => handleScroll(e, 'gallery')}>후기갤러리</Link>
+          <Link href="/#gallery" onClick={(e) => handleScroll(e, 'gallery')}>현장스케치</Link>
           <Link href="/#participants" onClick={(e) => handleScroll(e, 'participants')}>실시간 참여자</Link>
           <Link href="/#schedule" onClick={(e) => handleScroll(e, 'schedule')}>매칭파티 일정</Link>
           <Link href="/#faq" onClick={(e) => handleScroll(e, 'faq')}>FAQ</Link>

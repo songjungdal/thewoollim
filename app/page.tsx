@@ -642,9 +642,9 @@ export default function SmoothOnePage() {
         <section id="gallery" className="py-16 md:py-32 px-4 md:px-6 bg-brand-black text-white">
           <div className="max-w-7xl mx-auto">
             <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="text-center mb-10 md:mb-16">
-              <h2 className="text-4xl md:text-6xl font-bold mb-4 md:mb-6 tracking-tight">후기갤러리</h2>
+              <h2 className="text-4xl md:text-6xl font-bold mb-4 md:mb-6 tracking-tight">현장스케치</h2>
               <p className="text-sm md:text-lg text-gray-400 max-w-2xl mx-auto leading-relaxed break-keep px-2">
-                어울림에서 피어난 따뜻하고 감각적인 시간들.
+                설렘과 온기가 가득했던 생생한 순간들
               </p>
             </motion.div>
             

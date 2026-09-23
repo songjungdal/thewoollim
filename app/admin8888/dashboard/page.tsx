@@ -994,7 +994,7 @@ export default function AdminDashboard() {
     { key: "parties", label: "매칭파티", icon: Calendar },
     { key: "coupons", label: "쿠폰 관리", icon: Tag },
     { key: "company", label: "기업 정보", icon: Building2 },
-    { key: "gallery", label: "후기 갤러리 관리", icon: ImageIcon },
+    { key: "gallery", label: "현장스케치 관리", icon: ImageIcon },
     { key: "logs", label: "로그 관리", icon: FileText },
     { key: "cancel_requests", label: "취소요청", icon: RotateCcw },
     { key: "memos", label: "업무 메모", icon: StickyNote },
@@ -1976,9 +1976,9 @@ export default function AdminDashboard() {
             <section>
               <div className="flex items-end justify-between mb-4 md:mb-5 flex-wrap gap-3">
                 <div>
-                  <h2 className="text-xl md:text-2xl font-black tracking-tight">후기 갤러리 관리</h2>
+                  <h2 className="text-xl md:text-2xl font-black tracking-tight">현장스케치 관리</h2>
                   <p className="text-xs md:text-sm text-gray-500 mt-1">
-                    메인페이지 후기 섹션에 노출되는 이미지를 관리합니다. 변경 사항은 즉시 메인에 반영됩니다.
+                    메인페이지 현장스케치 섹션에 노출되는 이미지를 관리합니다. 변경 사항은 즉시 메인에 반영됩니다.
                   </p>
                 </div>
                 <label className="inline-flex items-center gap-2 bg-brand-point hover:brightness-110 text-white px-4 py-2.5 rounded-xl font-bold text-sm cursor-pointer transition-all">
