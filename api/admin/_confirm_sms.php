@@ -13,13 +13,14 @@ declare(strict_types=1);
 
 if (!function_exists('notifyConfirmSms')) {
 
-    /** 발송 제외 대상(테스트/관리자) 이메일 — 소문자 비교 */
+    /** 발송 제외 대상(테스트/관리자) 이메일 — 소문자 비교. _pending_sms.php / _cancel_sms.php 등과 동일 규칙 */
     function _confirmSmsIsTestAccount(string $email, string $role): bool {
         $email = strtolower(trim($email));
         if ($role === 'admin') return true;                 // 관리자 role 제외
         if (str_ends_with($email, '@woollim.local')) return true; // 관리자 계정 도메인 제외
+        // 테스트 계정 패턴: a1~a10@naver.com, b1~b10@naver.com
+        if (preg_match('/^[ab](?:[1-9]|10)@naver\.com$/', $email)) return true;
         $testList = [
-            'a1@naver.com',
             'pletora@naver.com',
         ];
         return in_array($email, $testList, true);
