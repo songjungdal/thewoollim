@@ -100,6 +100,13 @@ try {
         @rename($oldFile, $newFile);
     }
 
+    // ── 후기게시판에 작성했던 글도 탈퇴와 동시에 삭제 (best-effort — 실패해도 탈퇴 자체는 계속 진행)
+    try {
+        $pdo->prepare("DELETE FROM reviews WHERE user_id = ?")->execute([$userId]);
+    } catch (Throwable $e) {
+        error_log('[delete-account] reviews cleanup failed: ' . $e->getMessage());
+    }
+
     @file_put_contents(
         dataDir() . '/_account_deletions.log',
         sprintf("[%s] withdrawn userId=%d originalEmail=%s ip=%s\n",

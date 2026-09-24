@@ -11,6 +11,7 @@ import Link from "next/link";
 import Image from "next/image";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
+import ReviewBoard from "./components/ReviewBoard";
 import { PARTICIPANTS, FAQS, partyStockStatus, partyVisibility, categoryLabel } from "./lib/data";
 import { useAuth } from "./context/AuthContext";
 import { useParties } from "./lib/useParties";
@@ -665,6 +666,8 @@ export default function SmoothOnePage() {
             </div>
           </div>
         </section>
+
+        <ReviewBoard />
 
         {/* Matching Schedule Section (Calendar Implementation) */}
         <section id="schedule" className="py-16 md:py-32 px-4 md:px-6 bg-white shadow-[0_-20px_40px_rgba(0,0,0,0.02)]">
