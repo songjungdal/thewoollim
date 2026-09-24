@@ -292,6 +292,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $bookings[$idx]['refundMethod']   = $isVbank ? 'vbank' : 'card';
         saveBookings($email, $bookings);
 
+        // 사용했던 쿠폰이 있으면 사용 이력 해제 — 재사용 가능하도록 복원
+        releaseCouponUsage((string)($target['couponCode'] ?? ''), $email);
+
         @file_put_contents($dataDir . '/_admin_refunds.log', sprintf(
             "[%s] REFUND_APPROVED email=%s bid=%s method=%s amount=%d\n",
             date('c'), $email, $bid, $isVbank ? 'vbank' : 'card', $refundAmount
@@ -438,6 +441,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
+        // 사용했던 쿠폰이 있으면 사용 이력 해제 — 재사용 가능하도록 복원
+        releaseCouponUsage((string)($beforeBooking['couponCode'] ?? ''), $email);
+
         @file_put_contents($dataDir . '/_admin_cancellations.log', sprintf(
             "[%s] CANCELLED_FULL_REFUND email=%s bid=%s partyId=%s gender=%s amount=%d\n",
             date('c'), $email, $bid, $partyId, $gender, $paidAmount
@@ -507,6 +513,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             fflush($fp); flock($fp, LOCK_UN); fclose($fp);
         }
     }
+
+    // 사용했던 쿠폰이 있으면 사용 이력 해제 — 재사용 가능하도록 복원
+    releaseCouponUsage((string)($beforeBooking['couponCode'] ?? ''), $email);
 
     @file_put_contents($dataDir . '/_admin_cancellations.log', sprintf(
         "[%s] CANCELLED email=%s bid=%s partyId=%s gender=%s\n",

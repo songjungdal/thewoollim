@@ -225,6 +225,33 @@ function countCouponUsages(array $usages, string $code): int {
     return $n;
 }
 
+// ─── 쿠폰 사용 이력 해제 (취소/환불 시 "사용 안 한 것처럼" 복원) ──────────────
+//   coupon_usages.json 에서 해당 code+email 사용 기록을 제거.
+//   - 동일 사용자 재사용 차단 검사(coupons-validate.php/pending.php/success.php/
+//     vbank-submit.php)와 max_count 집계(countCouponUsages)가 모두 이 파일을
+//     그때그때 다시 읽어 판정하므로, 기록만 지우면 재사용 가능 여부·잔여 발급
+//     수량·관리자 화면의 "사용 N건" 표시까지 자동으로 원복됨(다른 로직 수정 불필요).
+//   - 한 사용자는 같은 코드를 1회만 쓸 수 있어(중복 사용 차단) 매칭 건은 최대 1개.
+function releaseCouponUsage(string $code, string $email): void {
+    if ($code === '' || $email === '') return;
+    $file = dataDir() . '/coupon_usages.json';
+    if (!file_exists($file)) return;
+    $fp = fopen($file, 'c+');
+    if (!$fp) return;
+    flock($fp, LOCK_EX);
+    $raw = stream_get_contents($fp);
+    $usages = $raw ? json_decode($raw, true) : [];
+    if (!is_array($usages)) $usages = [];
+    $next = array_values(array_filter($usages, function ($u) use ($code, $email) {
+        if (!is_array($u)) return true;
+        $sameCode  = strtoupper((string)($u['code']  ?? '')) === strtoupper($code);
+        $sameEmail = strtolower((string)($u['email'] ?? '')) === strtolower($email);
+        return !($sameCode && $sameEmail);
+    }));
+    ftruncate($fp, 0); rewind($fp); fwrite($fp, json_encode($next, JSON_UNESCAPED_UNICODE));
+    fflush($fp); flock($fp, LOCK_UN); fclose($fp);
+}
+
 // ─── 데이터 디렉토리 경로 ──────────────────────────────────────────
 function dataDir(): string {
     // /var/www/thewoollim/api/<this>.php → /var/www/thewoollim/api/data
