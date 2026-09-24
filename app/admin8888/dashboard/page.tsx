@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Users, Ticket, Tag, Building2, LogOut, ShieldCheck, CheckCircle2, Clock, AlertTriangle, Calendar, Plus, Pencil, Trash2, ImageIcon, X, FileText, Search, StickyNote, Save, ChevronDown, CreditCard, RotateCcw } from "lucide-react";
+import { Users, Ticket, Tag, Building2, LogOut, ShieldCheck, CheckCircle2, Clock, AlertTriangle, Calendar, Plus, Pencil, Trash2, ImageIcon, X, FileText, Search, StickyNote, Save, ChevronDown, CreditCard, RotateCcw, Star } from "lucide-react";
 import { useParties, broadcastPartiesUpdated } from "../../lib/useParties";
 import { formatPhoneKR } from "../../lib/phone";
 import { calculateRefund } from "../../lib/refund";
@@ -26,7 +26,7 @@ type BookingRow = {
   userStatus?: string;       // 'active' | 'withdrawn' — 회원 탈퇴 여부
   userInterests?: string; userIdealType?: string;
 };
-type TabKey = "members" | "bookings" | "parties" | "coupons" | "company" | "gallery" | "logs" | "cancel_requests" | "memos";
+type TabKey = "members" | "bookings" | "parties" | "coupons" | "company" | "gallery" | "reviews" | "logs" | "cancel_requests" | "memos";
 
 type MemoItem = {
   id: number;
@@ -300,6 +300,26 @@ export default function AdminDashboard() {
   const [company, setCompany] = useState({ name: "", ceo: "", biz_no: "", address: "", telecom: "" });
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
   const [galleryUploading, setGalleryUploading] = useState(false);
+  // 후기게시판 관리
+  type AdminReview = {
+    id: number;
+    user_id: number | null;
+    author_name: string | null;
+    author_email: string | null;
+    author_phone: string | null;
+    gender: string;
+    age_group: string;
+    rating: number;
+    content: string;
+    is_admin_created: number;
+    created_at: string;
+    updated_at: string;
+  };
+  const [reviews, setReviews] = useState<AdminReview[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewFormOpen, setReviewFormOpen] = useState(false);
+  const [reviewEditId, setReviewEditId] = useState<number | null>(null);
+  const [reviewForm, setReviewForm] = useState({ gender: "여성", age_group: "", rating: 5, content: "" });
   // 업무 메모 (포스트잇)
   const [memos, setMemos] = useState<MemoItem[]>([]);
   const [memoEditingId, setMemoEditingId] = useState<number | null>(null);
@@ -749,6 +769,60 @@ export default function AdminDashboard() {
     broadcastGallery();
   };
 
+  // 후기게시판 — 탭 진입 시 로드 (logs 탭과 동일 lazy-load 패턴)
+  const loadReviews = useCallback(async () => {
+    setReviewsLoading(true);
+    try {
+      const res = await fetch("/api/admin/reviews.php", { cache: "no-store", credentials: "include" });
+      const d = await res.json();
+      if (d?.ok) setReviews(Array.isArray(d.reviews) ? d.reviews : []);
+    } finally {
+      setReviewsLoading(false);
+    }
+  }, []);
+  useEffect(() => { if (tab === "reviews" && authChecked) loadReviews(); }, [tab, authChecked, loadReviews]);
+
+  const openReviewCreate = () => {
+    setReviewEditId(null);
+    setReviewForm({ gender: "여성", age_group: "", rating: 5, content: "" });
+    setReviewFormOpen(true);
+  };
+  const openReviewEdit = (r: AdminReview) => {
+    setReviewEditId(r.id);
+    setReviewForm({ gender: r.gender, age_group: r.age_group, rating: r.rating, content: r.content });
+    setReviewFormOpen(true);
+  };
+  const saveReview = async () => {
+    const { gender, age_group, rating, content } = reviewForm;
+    if (!gender) { alert("성별을 선택해주세요."); return; }
+    if (!age_group.trim()) { alert("나이대를 입력해주세요."); return; }
+    if (!content.trim()) { alert("내용을 입력해주세요."); return; }
+    const res = await fetch("/api/admin/reviews.php", {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(
+        reviewEditId
+          ? { action: "update", id: reviewEditId, gender, age_group: age_group.trim(), rating, content: content.trim() }
+          : { action: "create", gender, age_group: age_group.trim(), rating, content: content.trim() }
+      ),
+    });
+    const d = await res.json();
+    if (!d?.ok) { alert(d?.error || "저장 실패"); return; }
+    setReviewFormOpen(false);
+    await loadReviews();
+  };
+  const deleteReview = async (id: number) => {
+    if (!confirm("이 후기를 삭제하시겠습니까?")) return;
+    const res = await fetch("/api/admin/reviews.php", {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "delete", id }),
+    });
+    const d = await res.json();
+    if (!d?.ok) { alert(d?.error || "삭제 실패"); return; }
+    setReviews(prev => prev.filter(r => r.id !== id));
+  };
+
   useEffect(() => { if (authChecked) loadAll(); }, [authChecked, loadAll]);
 
   // 운영 현황 팝업 — 진입(authChecked) 시 1회. 당일 '열지 않기' 했으면 스킵. (v7.0)
@@ -909,6 +983,32 @@ export default function AdminDashboard() {
   };
 
   const saveCoupons = async () => {
+    // 저장 전 검증 — 빈 코드 / 중복 코드는 서버(api/admin/coupons.php)가 조용히 버리고도
+    // "저장 완료"로 응답해 쿠폰이 소리소문없이 사라지는 문제가 있어, 여기서 먼저 걸러서
+    // 명확히 경고하고 저장 자체를 진행하지 않음 (행 번호는 화면에 보이는 순서 기준 1부터).
+    const emptyRows = coupons
+      .map((c, i) => ({ row: i + 1, empty: c.code.trim() === "" }))
+      .filter(x => x.empty)
+      .map(x => x.row);
+    if (emptyRows.length > 0) {
+      alert(`쿠폰 코드가 비어있는 항목이 있습니다 (${emptyRows.join(", ")}번째 행). 코드를 입력한 후 다시 저장해주세요.`);
+      return;
+    }
+
+    const rowsByCode = new Map<string, number[]>();
+    coupons.forEach((c, i) => {
+      const code = c.code.trim().toUpperCase();
+      const rows = rowsByCode.get(code) ?? [];
+      rows.push(i + 1);
+      rowsByCode.set(code, rows);
+    });
+    const duplicates = Array.from(rowsByCode.entries()).filter(([, rows]) => rows.length > 1);
+    if (duplicates.length > 0) {
+      const detail = duplicates.map(([code, rows]) => `"${code}" (${rows.join(", ")}번째 행)`).join(", ");
+      alert(`쿠폰 코드가 중복되었습니다: ${detail}\n코드를 서로 다르게 수정한 후 다시 저장해주세요.`);
+      return;
+    }
+
     const res = await fetch("/api/admin/coupons.php", {
       method: "POST", credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -995,6 +1095,7 @@ export default function AdminDashboard() {
     { key: "coupons", label: "쿠폰 관리", icon: Tag },
     { key: "company", label: "기업 정보", icon: Building2 },
     { key: "gallery", label: "현장스케치 관리", icon: ImageIcon },
+    { key: "reviews", label: "후기게시판", icon: Star },
     { key: "logs", label: "로그 관리", icon: FileText },
     { key: "cancel_requests", label: "취소요청", icon: RotateCcw },
     { key: "memos", label: "업무 메모", icon: StickyNote },
@@ -2062,6 +2163,160 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* === 후기게시판 관리 === */}
+          {tab === "reviews" && (
+            <section>
+              <div className="flex items-end justify-between mb-4 md:mb-5 flex-wrap gap-3">
+                <div>
+                  <h2 className="text-xl md:text-2xl font-black tracking-tight">후기게시판</h2>
+                  <p className="text-xs md:text-sm text-gray-500 mt-1">
+                    회원 작성 후기 및 관리자 직접 등록 후기를 관리합니다. 사용자 화면에는 익명으로만 노출됩니다.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={openReviewCreate}
+                  className="inline-flex items-center gap-1.5 bg-brand-point text-brand-black px-4 py-2.5 rounded-lg text-sm font-black hover:brightness-95 transition-all"
+                >
+                  <Plus size={14} /> 새 후기 등록
+                </button>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-gray-200 overflow-x-auto">
+                <table className="w-full text-sm whitespace-nowrap">
+                  <thead className="bg-gray-50 text-gray-600 font-bold">
+                    <tr>
+                      <th className="text-left px-3 md:px-4 py-3">No</th>
+                      <th className="text-left px-3 md:px-4 py-3">작성자 회원정보</th>
+                      <th className="text-left px-3 md:px-4 py-3">성별</th>
+                      <th className="text-left px-3 md:px-4 py-3">나이대</th>
+                      <th className="text-left px-3 md:px-4 py-3">별점</th>
+                      <th className="text-left px-3 md:px-4 py-3">후기 내용</th>
+                      <th className="text-left px-3 md:px-4 py-3">작성일</th>
+                      <th className="text-left px-3 md:px-4 py-3">관리</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reviewsLoading && (
+                      <tr><td colSpan={8} className="text-center text-gray-300 py-8">불러오는 중...</td></tr>
+                    )}
+                    {!reviewsLoading && reviews.length === 0 && (
+                      <tr><td colSpan={8} className="text-center text-gray-400 py-8">등록된 후기가 없습니다. [새 후기 등록] 버튼으로 등록하세요.</td></tr>
+                    )}
+                    {reviews.map((r, idx) => (
+                      <tr key={r.id} className="border-t border-gray-100">
+                        <td className="px-3 md:px-4 py-3 text-gray-400 tabular-nums">{idx + 1}</td>
+                        <td className="px-3 md:px-4 py-3">
+                          {r.is_admin_created ? (
+                            <span className="text-xs font-bold text-gray-400">관리자 직접 등록</span>
+                          ) : (
+                            <div className="text-xs leading-relaxed">
+                              <p className="font-bold text-brand-black">{r.author_name || "-"}</p>
+                              <p className="text-gray-500 font-mono">{r.author_email || "-"}</p>
+                              <p className="text-gray-500">{formatPhoneKR(r.author_phone || "")}</p>
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-3 md:px-4 py-3 font-bold">{r.gender}</td>
+                        <td className="px-3 md:px-4 py-3">{r.age_group}</td>
+                        <td className="px-3 md:px-4 py-3">
+                          <span className="inline-flex items-center gap-0.5">
+                            {[1, 2, 3, 4, 5].map(i => (
+                              <Star key={i} size={13} className={i <= r.rating ? "fill-brand-point text-brand-point" : "text-gray-200"} />
+                            ))}
+                          </span>
+                        </td>
+                        <td className="px-3 md:px-4 py-3 max-w-[280px] truncate text-gray-600" title={r.content}>{r.content}</td>
+                        <td className="px-3 md:px-4 py-3 text-gray-500">{r.created_at?.slice(0, 10)}</td>
+                        <td className="px-3 md:px-4 py-3">
+                          <div className="flex gap-1.5">
+                            <button type="button" onClick={() => openReviewEdit(r)}
+                              className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors" aria-label="수정">
+                              <Pencil size={14} />
+                            </button>
+                            <button type="button" onClick={() => deleteReview(r.id)}
+                              className="p-1.5 rounded-lg hover:bg-red-50 text-red-500 transition-colors" aria-label="삭제">
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* 후기 등록/수정 모달 */}
+              {reviewFormOpen && (
+                <div className="fixed inset-0 z-[220] bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 md:p-4">
+                  <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-5 md:p-7">
+                    <div className="flex items-center justify-between mb-5">
+                      <h3 className="font-black text-lg md:text-xl text-brand-black">
+                        {reviewEditId ? `후기 수정 #${reviewEditId}` : "새 후기 등록"}
+                      </h3>
+                      <button type="button" onClick={() => setReviewFormOpen(false)} className="text-gray-400 hover:text-brand-black transition-colors" aria-label="닫기">
+                        <X size={20} />
+                      </button>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-1.5">성별</label>
+                        <div className="flex gap-2">
+                          {(["남성", "여성"] as const).map(g => (
+                            <button
+                              key={g} type="button"
+                              onClick={() => setReviewForm(f => ({ ...f, gender: g }))}
+                              className={`flex-1 py-2.5 rounded-lg text-sm font-bold border transition-colors ${
+                                reviewForm.gender === g
+                                  ? (g === "남성" ? "bg-[#4facfe]/15 border-[#3a85d9] text-[#3a85d9]" : "bg-rose-100 border-rose-400 text-rose-600")
+                                  : "border-gray-200 text-gray-400"
+                              }`}
+                            >
+                              {g}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <FormField
+                        label="나이대"
+                        value={reviewForm.age_group}
+                        onChange={v => setReviewForm(f => ({ ...f, age_group: v }))}
+                        placeholder="예: 30대 초반"
+                      />
+
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-1.5">별점</label>
+                        <div className="flex items-center gap-1.5">
+                          {[1, 2, 3, 4, 5].map(i => (
+                            <button key={i} type="button" onClick={() => setReviewForm(f => ({ ...f, rating: i }))} aria-label={`${i}점`}>
+                              <Star size={26} className={i <= reviewForm.rating ? "fill-brand-point text-brand-point" : "text-gray-200"} />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <FormField
+                        label="후기 내용"
+                        value={reviewForm.content}
+                        onChange={v => setReviewForm(f => ({ ...f, content: v }))}
+                        textarea
+                      />
+                    </div>
+
+                    <button
+                      type="button" onClick={saveReview}
+                      className="w-full mt-6 bg-brand-black text-white py-3.5 rounded-xl font-black text-sm hover:bg-brand-point hover:text-brand-black transition-colors"
+                    >
+                      {reviewEditId ? "수정 완료" : "등록하기"}
+                    </button>
+                  </div>
                 </div>
               )}
             </section>
