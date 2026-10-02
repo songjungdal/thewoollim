@@ -2,9 +2,9 @@
 /**
  * D-1(파티 하루 전) 참가확정 회원 리마인드 알림 문자 — 알리고.
  *
- * 실행: 서버 crontab 전용 CLI 스크립트. 실결제 계정에 실제 SMS 비용이 발생하는 배치라
- * 공개 HTTP 엔드포인트로 노출하지 않고 CLI 실행만 허용함.
- *   예) 0 1 * * *  php /var/www/thewoollim/api/cron/d1_reminder.php   (매일 01:00 UTC = 10:00 KST)
+ * 실행: 서버 systemd 타이머(d1-reminder.timer) 전용 CLI 스크립트. 실결제 계정에 실제 SMS 비용이
+ * 발생하는 배치라 공개 HTTP 엔드포인트로 노출하지 않고 CLI 실행만 허용함.
+ *   OnCalendar=*-*-* 09:00:00  (매일 09:00 UTC = 18:00 KST)
  *
  * 흐름:
  *  1) '내일'(Asia/Seoul 기준) calendarDate 와 일치하는 파티 전부 조회
