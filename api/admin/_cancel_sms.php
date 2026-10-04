@@ -36,8 +36,9 @@ if (!function_exists('notifyCancelSms')) {
     /**
      * @param string $email   취소 처리된 회원 이메일
      * @param array  $booking 취소 전 booking 레코드 스냅샷 (partyId 포함)
+     * @param string $kind    'cancel'(회원 취소) | 'full_refund'(관리자 강제취소 100%환불)
      */
-    function notifyCancelSms(string $email, array $booking): void {
+    function notifyCancelSms(string $email, array $booking, string $kind = 'cancel'): void {
         try {
             // 1) 회원 정보 (이름/연락처/role) 조회
             $pdo  = getDB();
@@ -77,17 +78,29 @@ if (!function_exists('notifyCancelSms')) {
             $ptime = $dt['time'] !== '' ? $dt['time'] : '추후 안내';
 
             // 3) 메시지 — 템플릿 (줄바꿈/특수문자 그대로 유지)
-            $msg =
-                "[어울림] 매칭파티 취소 완료 안내\n" .
-                "안녕하세요, {$name}님.\n" .
-                "신청하신 매칭파티 일정이 정상적으로 취소되었습니다.\n" .
-                "일시: {$pdate}\n" .
-                "시간: {$ptime}\n" .
-                "장소: {$loc}\n" .
-                "• 카드 결제: 카드사 사정에 따라 영업일 기준 2~3일 내 승인 취소/환불됩니다.\n" .
-                "• 무통장 입금: 운영팀에서 개별적으로 환불 계좌를 확인하여 환불처리됩니다.\n" .
-                "파티 취소 규정에 따라 환불 금액이 산정되며, 자세한 내역은 홈페이지 마이페이지에서 확인하실 수 있습니다.\n" .
-                "다음번에 더 좋은 인연으로 모실 수 있기를 바랍니다. 감사합니다.";
+            if ($kind === 'full_refund') {
+                $msg =
+                    "[어울림] 매칭파티 취소 및 전액 환불 안내\n" .
+                    "안녕하세요, {$name}님.\n" .
+                    "운영팀 사정(성비 및 최소 인원 미달)으로 인해 신청하신 매칭파티 일정이 부득이하게 취소되었습니다.\n" .
+                    "일시: {$pdate} {$ptime}\n" .
+                    "장소: {$loc}\n" .
+                    "운영팀 취소에 따라 결제하신 참가비는 100% 전액 환불 처리됩니다.\n" .
+                    "- 카드 결제 : 카드사 기준 2~3일 내 자동 승인 취소\n" .
+                    "- 무통장 : 운영팀 확인 후 입력 계좌로 환불\n" .
+                    "파티를 기다려주신 마음에 사과드리며, 다음번에 더 좋은 인연으로 모실 수 있도록 하겠습니다. 감사합니다.";
+            } else {
+                $msg =
+                    "[어울림] 매칭파티 취소 완료 안내\n" .
+                    "안녕하세요, {$name}님.\n" .
+                    "신청하신 매칭파티 일정이 정상적으로 취소되었습니다.\n" .
+                    "일시: {$pdate} {$ptime}\n" .
+                    "장소: {$loc}\n" .
+                    "- 카드 결제 : 카드사 기준 2~3일 내 자동 승인 취소\n" .
+                    "- 무통장 : 운영팀 확인 후 입력 계좌로 환불\n" .
+                    "파티 취소 규정에 따라 환불 금액이 산정되며, 자세한 내역은 홈페이지 마이페이지에서 확인하실 수 있습니다.\n" .
+                    "다음번에 더 좋은 인연으로 모실 수 있기를 바랍니다. 감사합니다.";
+            }
 
             // 4) 발신 설정
             $cfgPath = __DIR__ . '/../auth/sms-config.php';
@@ -106,7 +119,7 @@ if (!function_exists('notifyCancelSms')) {
                 'msg_type'    => $msgType,
                 'testmode_yn' => 'N',
             ];
-            if ($msgType === 'LMS') $params['title'] = '[어울림] 취소 완료 안내';
+            if ($msgType === 'LMS') $params['title'] = $kind === 'full_refund' ? '[어울림] 취소 및 전액 환불 안내' : '[어울림] 취소 완료 안내';
 
             $ch = curl_init('https://apis.aligo.in/send/');
             curl_setopt_array($ch, [

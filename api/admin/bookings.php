@@ -457,7 +457,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // 취소 처리 DB 반영 성공 직후 → 알리고 취소완료 안내 문자 발송 (테스트/관리자 계정 제외, 실패해도 무중단)
         try {
             require_once __DIR__ . '/_cancel_sms.php';
-            notifyCancelSms($email, is_array($beforeBooking) ? $beforeBooking : []);
+            notifyCancelSms($email, is_array($beforeBooking) ? $beforeBooking : [], 'full_refund');
         } catch (Throwable $e) {
             error_log('[admin/bookings cancel_full_refund sms] ' . $e->getMessage());
         }
