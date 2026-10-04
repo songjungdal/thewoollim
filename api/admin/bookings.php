@@ -98,6 +98,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     //  카드결제 success.php 와 동일 분기 — 결제완료 후 프로필 작성/자동전환 흐름을 그대로 탄다.
     //  (카드는 결제 즉시 +1, 무통장은 입금 확인된 지금 +1)
     if ($action === 'confirm_vbank') {
+        $paidAmount = $body['paidAmount'] ?? null;
+        if (!is_int($paidAmount) || $paidAmount < 0) {
+            echo json_encode(['ok' => false, 'error' => '실제 입금 금액을 올바르게 입력해주세요.']); exit;
+        }
         $found = false; $target = null;
         foreach ($bookings as &$b) {
             if (($b['id'] ?? '') === $bid) {
@@ -158,6 +162,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $b['status']      = $newStatus;
                 $b['updatedAt']   = date('c');
                 $b['vbankPaidAt'] = date('c');
+                $b['total']       = $paidAmount;
                 if ($newStatus === 'paid_pending_profile') {
                     // 1차(즉시) 프로필작성 안내 발송 플래그 — 실제 발송은 저장 이후 아래에서 수행
                     $b['profileNotifiedAt'] = date('c');
@@ -192,15 +197,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         @file_put_contents($dataDir . '/_vbank_confirm.log', sprintf(
-            "[%s] CONFIRM_VBANK email=%s bid=%s partyId=%s gender=%s newStatus=%s\n",
-            date('c'), $email, $bid, $partyId, $gender, $newStatus
+            "[%s] CONFIRM_VBANK email=%s bid=%s partyId=%s gender=%s newStatus=%s paid=%d\n",
+            date('c'), $email, $bid, $partyId, $gender, $newStatus, $paidAmount
         ), FILE_APPEND);
 
         logAdminActivity(
             'update', 'booking', $bid,
-            "무통장 입금 확인 — 회원 {$email}, 파티 #{$partyId}, 성별 {$gender} (+1 인원 반영, → {$newStatus})",
-            ['status' => 'vbank_pending'],
-            ['status' => $newStatus]
+            "무통장 입금 확인 — 회원 {$email}, 파티 #{$partyId}, 성별 {$gender} (+1 인원 반영, → {$newStatus}, 입금액 {$paidAmount}원)",
+            ['status' => 'vbank_pending', 'total' => (int)($target['total'] ?? 0)],
+            ['status' => $newStatus, 'total' => $paidAmount]
         );
 
         echo json_encode(['ok' => true, 'partyId' => $partyId, 'gender' => $gender, 'status' => $newStatus]);

@@ -152,9 +152,9 @@ async function postBookings(email: string, payload: Record<string, unknown>): Pr
 function normalizeCart(raw: unknown): CartItem[] {
   if (!Array.isArray(raw)) return [];
   return raw
-    .filter(item => item && typeof item === "object" && typeof (item as any).partyId === "string")
+    .filter(item => item && typeof item === "object" && typeof (item as Record<string, unknown>).partyId === "string")
     .map(item => {
-      const i = item as any;
+      const i = item as Record<string, unknown>;
       const qRaw = Number(i.quantity);
       const q = Number.isFinite(qRaw) && qRaw >= 1 ? Math.floor(qRaw) : 1;
       return { partyId: String(i.partyId), quantity: q };

@@ -65,8 +65,8 @@ type AdminLogRow = {
   target_type: string;
   target_id: string;
   summary: string;
-  before_value: any;
-  after_value: any;
+  before_value: unknown;
+  after_value: unknown;
   user_agent: string;
 };
 
@@ -109,7 +109,7 @@ function BookingTable({ label, toneClass, rows, party, onApprove, onCancel, onCo
   party: { title: string; price: number } | undefined;
   onApprove: (email: string, bookingId: string) => void;
   onCancel: (email: string, bookingId: string) => void;
-  onConfirmVBank: (email: string, bookingId: string) => void;
+  onConfirmVBank: (email: string, bookingId: string, defaultAmount: number) => void;
   onFullRefund: (email: string, bookingId: string) => void;
 }) {
   // 카운트는 cancelled 제외 — 취소자는 아래 테이블 행에 line-through 로 보존만 됨.
@@ -215,7 +215,7 @@ function BookingTable({ label, toneClass, rows, party, onApprove, onCancel, onCo
                       <span className="text-xs text-gray-400 font-bold">—</span>
                     ) : b.status === "vbank_pending" ? (
                       // 무통장 입금 신청자 — [결제확인] 시 pending_approval 전환 + 인원 +1 (v7.0)
-                      <button type="button" onClick={() => onConfirmVBank(b.userEmail, b.id)}
+                      <button type="button" onClick={() => onConfirmVBank(b.userEmail, b.id, b.total ?? party?.price ?? 0)}
                         className="inline-flex items-center gap-1 bg-[#fce5cd] text-[#FF2300] px-2.5 md:px-3 py-1.5 rounded-lg text-xs font-black hover:brightness-95 transition-all">
                         <CreditCard size={11} /> 결제확인
                       </button>
@@ -371,6 +371,9 @@ export default function AdminDashboard() {
   const [genderFilter, setGenderFilter] = useState<"all" | "남성" | "여성">("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "paid_pending_profile" | "pending_approval" | "confirmed" | "completed">("all");
   const [cancelSearch, setCancelSearch] = useState(""); // [취소요청] 탭 검색어 (v7.0)
+  const [vbankModal, setVbankModal] = useState<{ email: string; bookingId: string; amount: string } | null>(null);
+  const [vbankError, setVbankError] = useState("");
+  const [vbankSubmitting, setVbankSubmitting] = useState(false);
   // 월 필터 — 기본값: 현재 KST 월 (Asia/Seoul). 'all' = 모든 월 노출
   const [monthFilter, setMonthFilter] = useState<string>(() => {
     const kst = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
@@ -407,19 +410,19 @@ export default function AdminDashboard() {
   const openPartyEdit = (id: string) => {
     const p = PARTIES.find(x => x.id === id);
     if (!p) return;
-    const ams = (p as any).allowedMaritalStatus;
-    const tg = (p as any).targetGroup;
-    const th = (p as any).theme;
-    const lt = (p as any).locationTag;
+    const ams = p.allowedMaritalStatus;
+    const tg = p.targetGroup;
+    const th = p.theme;
+    const lt = p.locationTag;
     setPartyForm({
-      id: p.id, title: p.title, description: (p as any).description ?? "",
+      id: p.id, title: p.title, description: p.description ?? "",
       dateString: p.dateString, calendarDate: p.calendarDate,
       location: p.location, target: p.target, price: p.price,
-      priceMale:   Number((p as any).priceMale   ?? 0),
-      priceFemale: Number((p as any).priceFemale ?? 0),
+      priceMale:   Number(p.priceMale   ?? 0),
+      priceFemale: Number(p.priceFemale ?? 0),
       tag: p.tag,
       maleStock: p.maleStock, femaleStock: p.femaleStock,
-      imageUrl: (p as any).imageUrl ?? "",
+      imageUrl: p.imageUrl ?? "",
       minAge: p.minAge != null ? String(p.minAge) : "",
       maxAge: p.maxAge != null ? String(p.maxAge) : "",
       allowedMaritalStatus: (ams === "싱글" || ams === "돌싱") ? ams : "all",
@@ -463,7 +466,7 @@ export default function AdminDashboard() {
     // 7가지 필수 항목 검증 — 누락 항목명을 alert 에 명시
     const missing: string[] = [];
     if (!String(f.title).trim())                          missing.push("제목");
-    if (!String((f as any).description ?? "").trim())     missing.push("내용/소개");
+    if (!String(f.description ?? "").trim())              missing.push("내용/소개");
     if (!String(f.dateString).trim() || !String(f.calendarDate).trim()) missing.push("행사 일시");
     if (!String(f.location).trim())                       missing.push("장소");
     if (!String(f.target).trim())                         missing.push("대상");
@@ -883,23 +886,40 @@ export default function AdminDashboard() {
     else alert(d?.error || "처리 실패");
   };
 
-  // 무통장 입금 확인 — vbank_pending → pending_approval 전환 + 인원 +1 (v7.0)
-  const confirmVBankBooking = async (email: string, bookingId: string) => {
-    if (!confirm("입금을 확인하셨습니까?\n\n[결제확인] 시 해당 회원이 '확정 대기 중'으로 전환되고,\n파티의 성별 인원수에 즉시 +1 반영됩니다.")) return;
-    const res = await fetch("/api/admin/bookings.php", {
-      method: "POST", credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "confirm_vbank", email, bookingId }),
-    });
-    const d = await res.json();
-    if (d?.ok) {
-      try { new BroadcastChannel("woollim_party_counts").postMessage({ at: Date.now() }); } catch { }
-      // 카드결제와 동일 분기 — 프로필 미완성=결제완료(프로필 대기) / 완성=확정 대기 중 (v5.9)
-      const label = d.status === "pending_approval" ? "확정 대기 중" : "결제완료(프로필 작성 대기)";
-      alert(`입금 확인 완료 — '${label}'으로 전환되었습니다. (인원 +1 반영)`);
-      await loadAll();
-    } else {
-      alert(d?.error || "입금 확인 처리 실패");
+  // 무통장 입금 확인 — 실제 입금액 입력 모달을 먼저 띄운 뒤 제출 (v7.0)
+  const confirmVBankBooking = (email: string, bookingId: string, defaultAmount: number) => {
+    setVbankError("");
+    setVbankModal({ email, bookingId, amount: String(defaultAmount) });
+  };
+
+  const submitVBankBooking = async () => {
+    if (!vbankModal || vbankSubmitting) return;
+    const digits = vbankModal.amount.replace(/[,\s원]/g, "");
+    const paidAmount = Number(digits);
+    if (!/^\d+$/.test(digits)) {
+      setVbankError("올바른 금액을 숫자로 입력해주세요.");
+      return;
+    }
+    setVbankSubmitting(true);
+    try {
+      const res = await fetch("/api/admin/bookings.php", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "confirm_vbank", email: vbankModal.email, bookingId: vbankModal.bookingId, paidAmount }),
+      });
+      const d = await res.json();
+      if (d?.ok) {
+        try { new BroadcastChannel("woollim_party_counts").postMessage({ at: Date.now() }); } catch { }
+        // 카드결제와 동일 분기 — 프로필 미완성=결제완료(프로필 대기) / 완성=확정 대기 중 (v5.9)
+        const label = d.status === "pending_approval" ? "확정 대기 중" : "결제완료(프로필 작성 대기)";
+        setVbankModal(null);
+        alert(`입금 확인 완료 — '${label}'으로 전환되었습니다. (인원 +1 반영)`);
+        await loadAll();
+      } else {
+        setVbankError(d?.error || "입금 확인 처리 실패");
+      }
+    } finally {
+      setVbankSubmitting(false);
     }
   };
 
@@ -1346,7 +1366,7 @@ export default function AdminDashboard() {
                         <option key={m} value={m}>{labelMonth(m)}</option>
                       ))}
                     </select>
-                    <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)}
+                    <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as typeof statusFilter)}
                       className="px-3 py-2 rounded-lg border border-gray-200 text-sm font-medium bg-white" aria-label="상태 필터">
                       <option value="all">전체 상태</option>
                       <option value="paid_pending_profile">결제완료(프로필 대기)</option>
@@ -1618,8 +1638,8 @@ export default function AdminDashboard() {
                       <tr key={p.id} className="border-t border-gray-100 hover:bg-gray-50">
                         <td className="px-3 py-2.5 font-bold text-gray-400">{p.id}</td>
                         <td className="px-3 py-2.5">
-                          {(p as any).imageUrl
-                            ? <img src={(p as any).imageUrl} alt="" className="w-12 h-9 object-cover rounded" />
+                          {p.imageUrl
+                            ? <img src={p.imageUrl} alt="" className="w-12 h-9 object-cover rounded" />
                             : <div className="w-12 h-9 bg-gray-100 rounded flex items-center justify-center text-gray-300"><ImageIcon size={14} /></div>}
                         </td>
                         <td className="px-3 py-2.5 font-bold">{p.title}</td>
@@ -2058,7 +2078,7 @@ export default function AdminDashboard() {
                   <div key={key}>
                     <label className="block text-sm font-bold text-gray-700 mb-1.5">{label}</label>
                     <input
-                      type="text" value={(company as any)[key] ?? ""}
+                      type="text" value={company[key] ?? ""}
                       onChange={e => setCompany(prev => ({ ...prev, [key]: e.target.value }))}
                       className="w-full px-4 py-3 rounded-lg border border-gray-200 text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point focus:border-brand-point outline-none" aria-label={label}
                     />
@@ -2770,6 +2790,34 @@ export default function AdminDashboard() {
 
         </motion.div>
       </main>
+
+      {/* 무통장 입금 확인 — 실제 입금액 입력 모달 (탭 바깥에 렌더해 모든 탭에서 노출) */}
+      {vbankModal && (
+        <div className="fixed inset-0 z-[220] bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 md:p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5 md:p-7">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-black text-lg md:text-xl text-brand-black">무통장 입금 확인</h3>
+              <button type="button" onClick={() => setVbankModal(null)} disabled={vbankSubmitting} className="text-gray-400 hover:text-brand-black transition-colors disabled:opacity-40" aria-label="닫기">
+                <X size={20} />
+              </button>
+            </div>
+            <label className="block text-sm font-bold text-gray-700 mb-1.5">실제 입금된 금액 (원)</label>
+            <input
+              type="text" inputMode="numeric" autoFocus
+              value={vbankModal.amount}
+              onChange={e => { const v = e.target.value; setVbankModal(m => (m ? { ...m, amount: v } : m)); setVbankError(""); }}
+              onKeyDown={e => { if (e.key === "Enter") submitVBankBooking(); }}
+              className="w-full px-4 py-3 rounded-lg border border-gray-200 text-base font-bold tabular-nums focus:ring-2 focus:ring-brand-point outline-none"
+            />
+            <p className="text-xs text-gray-500 mt-2">입력한 금액으로 결제금액이 변경되며, 해당 회원은 ‘확정 대기 중’(또는 프로필 대기)으로 전환되고 파티 인원 +1 반영됩니다.</p>
+            {vbankError && <p className="text-xs font-bold text-red-600 mt-2">{vbankError}</p>}
+            <div className="flex gap-2 mt-5">
+              <button type="button" onClick={() => setVbankModal(null)} disabled={vbankSubmitting} className="flex-1 py-2.5 rounded-lg border border-gray-200 text-sm font-bold text-gray-500 hover:bg-gray-50 disabled:opacity-40">취소</button>
+              <button type="button" onClick={submitVBankBooking} disabled={vbankSubmitting} className="flex-1 py-2.5 rounded-lg bg-brand-point text-brand-black text-sm font-black hover:brightness-95 disabled:opacity-50">{vbankSubmitting ? "처리 중..." : "결제확인"}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* === 운영 현황 팝업 (v7.0) — 진입 시 실시간 집계. 데이터는 이미 로드된 상태에서 클라 계산 === */}
       <AnimatePresence>

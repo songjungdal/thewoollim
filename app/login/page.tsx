@@ -56,6 +56,7 @@ function LoginContent() {
   const [findPwInput, setFindPwInput] = useState("");
   const [findIdResult, setFindIdResult] = useState<string | null>(null);
   const [findPwResult, setFindPwResult] = useState<string | null>(null);
+  const [findPwOk, setFindPwOk] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   // 사용자 정책: 로그인 성공 시 항상 메인 페이지로 이동.
@@ -64,35 +65,50 @@ function LoginContent() {
   void searchParams;
   const { login } = useAuth();
 
-  const maskEmail = (email: string) => {
-    const [local, domain] = email.split("@");
-    if (!domain) return email;
-    const shown = local.slice(0, Math.min(2, local.length));
-    return `${shown}${"*".repeat(Math.max(1, local.length - 2))}@${domain}`;
-  };
-
-  const handleFindId = (e: React.FormEvent) => {
+  const handleFindId = async (e: React.FormEvent) => {
     e.preventDefault();
     const phone = findIdInput.replace(/[^0-9]/g, "");
-    // Simulated lookup — registered admin phone: 010-0000-0010
-    if (phone === "01000000010") {
-      setFindIdResult(`회원님의 이메일 아이디는 ${maskEmail("pletora@naver.com")} 입니다.`);
-    } else if (phone.length >= 10) {
-      setFindIdResult("일치하는 회원 정보를 찾을 수 없습니다.");
-    } else {
+    if (phone.length < 10) {
       setFindIdResult("올바른 휴대폰 번호를 입력해주세요.");
+      return;
+    }
+    try {
+      const res = await fetch("/api/auth/find-id.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone }),
+      });
+      const d = await res.json();
+      setFindIdResult(d?.ok
+        ? `회원님의 이메일 아이디는 ${d.maskedEmail} 입니다.`
+        : (d?.error || "일치하는 회원 정보를 찾을 수 없습니다."));
+    } catch {
+      setFindIdResult("서버와 통신하지 못했습니다. 잠시 후 다시 시도해주세요.");
     }
   };
 
-  const handleFindPw = (e: React.FormEvent) => {
+  const handleFindPw = async (e: React.FormEvent) => {
     e.preventDefault();
     const email = findPwInput.trim().toLowerCase();
-    if (email === "pletora@naver.com") {
-      setFindPwResult(`${email} 으로 임시 비밀번호가 발송되었습니다.\n로그인 후 반드시 비밀번호를 변경해주세요.`);
-    } else if (email.includes("@")) {
-      setFindPwResult("일치하는 회원 정보를 찾을 수 없습니다.");
-    } else {
+    if (!email.includes("@")) {
+      setFindPwOk(false);
       setFindPwResult("올바른 이메일 주소를 입력해주세요.");
+      return;
+    }
+    try {
+      const res = await fetch("/api/auth/reset-password.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const d = await res.json();
+      setFindPwOk(!!d?.ok);
+      setFindPwResult(d?.ok
+        ? `${d.maskedPhone} 휴대폰으로 임시 비밀번호가 발송되었습니다.\n로그인 후 반드시 비밀번호를 변경해주세요.`
+        : (d?.error || "일치하는 회원 정보를 찾을 수 없습니다."));
+    } catch {
+      setFindPwOk(false);
+      setFindPwResult("서버와 통신하지 못했습니다. 잠시 후 다시 시도해주세요.");
     }
   };
 
@@ -607,7 +623,7 @@ function LoginContent() {
                       <input
                         type="tel"
                         value={findIdInput}
-                        onChange={e => { setFindIdInput(e.target.value); setFindIdResult(null); }}
+                        onChange={e => { setFindIdInput(formatPhone(e.target.value)); setFindIdResult(null); }}
                         placeholder="010-0000-0000"
                         className="w-full pl-12 pr-4 py-4 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-brand-point focus:border-brand-point transition-all outline-none font-medium text-sm"
                       />
@@ -641,7 +657,7 @@ function LoginContent() {
                       <KeyRound size={30} className="text-brand-point hidden md:block" />
                     </div>
                     <h3 className="text-lg md:text-xl font-black mb-1.5">비밀번호 찾기</h3>
-                    <p className="text-xs md:text-sm text-gray-500 font-medium">가입 시 등록하신 이메일로 임시 비밀번호를 보내드립니다.</p>
+                    <p className="text-xs md:text-sm text-gray-500 font-medium">가입 시 등록하신 이메일을 입력하시면, 등록된 휴대폰 번호로 임시 비밀번호를 보내드립니다.</p>
                   </div>
 
                   <form onSubmit={handleFindPw} className="space-y-4">
@@ -665,7 +681,7 @@ function LoginContent() {
 
                   {findPwResult && (
                     <div className={`mt-5 p-4 rounded-xl border text-sm leading-relaxed whitespace-pre-line ${
-                      findPwResult.includes("발송")
+                      findPwOk
                         ? "bg-brand-point/5 border-brand-point/30 text-gray-800 font-medium"
                         : "bg-red-50 border-red-100 text-red-700"
                     }`}>

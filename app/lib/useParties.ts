@@ -40,7 +40,7 @@ export function useParties(): Party[] {
         .then(r => r.ok ? r.json() : null)
         .then((data) => {
           if (cancelled || !Array.isArray(data) || data.length === 0) return;
-          const normalized: Party[] = data.map((p: any) => {
+          const normalized: Party[] = data.map((p: Record<string, unknown>) => {
             const ams = p.allowedMaritalStatus;
             return {
               id:           String(p.id ?? ""),

@@ -4,12 +4,12 @@ import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ShoppingBag, LogOut, User, Trash2, Calendar, MapPin, CheckSquare, Square, CreditCard, Pencil, AlertTriangle, X, Ticket, Clock, CheckCircle2, Check } from "lucide-react";
+import { ShoppingBag, LogOut, User, Trash2, Calendar, MapPin, CheckSquare, Square, CreditCard, Pencil, AlertTriangle, X, Ticket, Clock, CheckCircle2, Check, KeyRound } from "lucide-react";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useAuth, calcCouponDiscount, type BookingStatus } from "../context/AuthContext";
 import { useParties } from "../lib/useParties";
-import { partyStockStatus, priceForGender, VBANK_ACCOUNT_LINE } from "../lib/data";
+import { partyStockStatus, priceForGender, VBANK_ACCOUNT_LINE, PARTIES as SEED_PARTIES } from "../lib/data";
 
 // 관리자 페이지의 신청자 상태 배지 규격과 동일한 색상 조합 사용 (admin8888/dashboard STATUS_LABEL)
 const STATUS_DISPLAY: Record<BookingStatus, { label: string; tone: string; stripe: string; icon: typeof Clock; sub?: string }> = {
@@ -80,9 +80,61 @@ const STATUS_DISPLAY: Record<BookingStatus, { label: string; tone: string; strip
 export default function MyPage() {
   const { mounted, isLoggedIn, userEmail, userRole, logout, verifySession, cart, removeFromCart, profile, deleteAccount, bookings, appliedCoupon, applyCoupon, clearCoupon, partyCounts, refreshCart, refreshBookings } = useAuth();
   const PARTIES = useParties();
+  // API 응답을 받은 뒤에만 삭제된 파티 예약을 숨긴다 (빌드 시점 기본값/로딩 중에는 전부 표시)
+  const partiesLoaded = PARTIES !== SEED_PARTIES;
+  const visibleBookings = partiesLoaded ? bookings.filter(b => PARTIES.some(p => p.id === b.partyId)) : bookings;
   const router = useRouter();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [pwModalOpen, setPwModalOpen] = useState(false);
+  const [pwForm, setPwForm] = useState({ current: "", next: "", confirm: "" });
+  const [pwError, setPwError] = useState("");
+  const [pwSubmitting, setPwSubmitting] = useState(false);
+
+  const closePwModal = () => {
+    if (pwSubmitting) return;
+    setPwModalOpen(false);
+    setPwForm({ current: "", next: "", confirm: "" });
+    setPwError("");
+  };
+
+  const handleChangePassword = async () => {
+    if (pwSubmitting) return;
+    if (!pwForm.current || !pwForm.next || !pwForm.confirm) {
+      setPwError("모든 항목을 입력해주세요.");
+      return;
+    }
+    if (pwForm.next.length < 8) {
+      setPwError("새 비밀번호는 8자 이상이어야 합니다.");
+      return;
+    }
+    if (pwForm.next !== pwForm.confirm) {
+      setPwError("새 비밀번호가 서로 일치하지 않습니다.");
+      return;
+    }
+    setPwSubmitting(true);
+    setPwError("");
+    try {
+      const res = await fetch("/api/auth/change-password.php", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword: pwForm.current, newPassword: pwForm.next }),
+      });
+      const d = await res.json();
+      if (d?.ok) {
+        setPwModalOpen(false);
+        setPwForm({ current: "", next: "", confirm: "" });
+        alert("비밀번호가 변경되었습니다.");
+      } else {
+        setPwError(d?.error || "비밀번호 변경에 실패했습니다.");
+      }
+    } catch {
+      setPwError("서버와 통신하지 못했습니다. 잠시 후 다시 시도해주세요.");
+    } finally {
+      setPwSubmitting(false);
+    }
+  };
   const [withdrawing, setWithdrawing] = useState(false);
 
   // 파티별 쿠폰 입력값 / 메시지 / 로딩 상태
@@ -155,9 +207,11 @@ export default function MyPage() {
     })();
   }, [mounted, isLoggedIn, verifySession, logout, router]);
 
-  useEffect(() => {
+  const [syncedCart, setSyncedCart] = useState<typeof cart | null>(null);
+  if (syncedCart !== cart) {
+    setSyncedCart(cart);
     setSelectedIds(new Set(cart.map(c => c.partyId)));
-  }, [cart]);
+  }
 
   // 마이페이지 진입/포커스 복귀 시 카트 + 예약 강제 동기화 — 관리자 status 변경 즉시 반영.
   // 다중 트리거 (PC/모바일 모두 신뢰성 확보):
@@ -274,6 +328,15 @@ export default function MyPage() {
               >
                 <Pencil size={14} /> 정보수정
               </Link>
+              {userRole !== "admin" && (
+                <button
+                  type="button"
+                  onClick={() => { setPwError(""); setPwModalOpen(true); }}
+                  className="inline-flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 text-white px-4 md:px-5 py-3 rounded-xl font-bold transition-all text-sm w-fit whitespace-nowrap"
+                >
+                  <KeyRound size={14} /> 비밀번호 변경
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleLogout}
@@ -286,16 +349,16 @@ export default function MyPage() {
         </section>
 
         {/* My Bookings Section — emphasized */}
-        {bookings.length > 0 && (
+        {visibleBookings.length > 0 && (
           <section className="py-10 md:py-16 px-4 md:px-6">
             <div className="max-w-4xl mx-auto">
               <div className="flex items-center gap-3 mb-7 md:mb-10">
                 <Ticket size={22} className="text-brand-point" />
                 <h2 className="text-2xl md:text-3xl font-black tracking-tight">내 예약 현황</h2>
-                <span className="bg-brand-point text-white text-xs font-black px-2.5 py-1 rounded-full">{bookings.length}</span>
+                <span className="bg-brand-point text-white text-xs font-black px-2.5 py-1 rounded-full">{visibleBookings.length}</span>
               </div>
               <div className="space-y-4 md:space-y-5">
-                {[...bookings].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(b => {
+                {[...visibleBookings].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(b => {
                   const party = PARTIES.find(p => p.id === b.partyId);
                   const meta  = STATUS_DISPLAY[b.status] ?? STATUS_DISPLAY.paid_pending_profile;
                   const Icon  = meta.icon;
@@ -320,7 +383,11 @@ export default function MyPage() {
 
                         {/* Party title */}
                         <h3 className="font-black text-lg md:text-2xl leading-snug text-brand-black">
-                          {party?.title ?? `파티 #${b.partyId}`}
+                          {party ? (
+                            <Link href={`/party/${b.partyId}`} className="hover:text-brand-point hover:underline underline-offset-4 transition-colors">
+                              {party.title}
+                            </Link>
+                          ) : `파티 #${b.partyId}`}
                         </h3>
 
                         {/* Meta info */}
@@ -713,6 +780,85 @@ export default function MyPage() {
                     {withdrawing ? "처리 중..." : "탈퇴하기"}
                   </button>
                 </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Change password modal */}
+      <AnimatePresence>
+        {pwModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={closePwModal}
+            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 20 }}
+              transition={{ type: "spring", stiffness: 260, damping: 22 }}
+              onClick={e => e.stopPropagation()}
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-sm md:max-w-md p-6 md:p-9 relative max-h-[90vh] overflow-y-auto"
+            >
+              <button
+                type="button"
+                onClick={closePwModal}
+                disabled={pwSubmitting}
+                className="absolute top-4 right-4 text-gray-300 hover:text-gray-600 transition-colors disabled:opacity-30"
+                aria-label="닫기"
+              >
+                <X size={22} />
+              </button>
+
+              <div className="flex flex-col items-center text-center mb-6">
+                <div className="w-14 h-14 md:w-16 md:h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                  <KeyRound size={26} className="text-gray-700 md:hidden" />
+                  <KeyRound size={30} className="text-gray-700 hidden md:block" />
+                </div>
+                <h3 className="text-lg md:text-xl font-black mb-1.5">비밀번호 변경</h3>
+                <p className="text-xs md:text-sm text-gray-500 font-medium">현재 비밀번호를 확인한 뒤 새 비밀번호로 변경합니다.</p>
+              </div>
+
+              <div className="space-y-3.5 text-left">
+                {([
+                  ["current", "현재 비밀번호", "current-password"],
+                  ["next", "새 비밀번호 (8자 이상)", "new-password"],
+                  ["confirm", "새 비밀번호 확인", "new-password"],
+                ] as const).map(([key, label, autoComplete]) => (
+                  <div key={key}>
+                    <label className="block text-sm font-bold text-gray-700 mb-1.5">{label}</label>
+                    <input
+                      type="password"
+                      autoComplete={autoComplete}
+                      value={pwForm[key]}
+                      onChange={e => { const v = e.target.value; setPwForm(f => ({ ...f, [key]: v })); setPwError(""); }}
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 text-base font-medium bg-gray-50 focus:bg-white focus:ring-2 focus:ring-brand-point outline-none"
+                    />
+                  </div>
+                ))}
+              </div>
+
+              {pwError && <p className="text-xs md:text-sm font-bold text-red-600 mt-4">{pwError}</p>}
+
+              <div className="flex flex-col sm:flex-row gap-2.5 mt-6">
+                <button
+                  type="button"
+                  onClick={closePwModal}
+                  disabled={pwSubmitting}
+                  className="flex-1 bg-white border-2 border-gray-200 text-gray-700 py-3.5 rounded-xl font-bold text-sm md:text-base hover:border-brand-black hover:text-brand-black transition-all order-2 sm:order-1 disabled:opacity-40"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={handleChangePassword}
+                  disabled={pwSubmitting}
+                  className="flex-1 bg-gray-800 text-white py-3.5 rounded-xl font-black text-sm md:text-base hover:bg-gray-700 transition-all shadow-lg order-1 sm:order-2 disabled:opacity-50"
+                >
+                  {pwSubmitting ? "처리 중..." : "변경하기"}
+                </button>
               </div>
             </motion.div>
           </motion.div>
