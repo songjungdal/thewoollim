@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef, Fragment } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Users, Ticket, Tag, Building2, LogOut, ShieldCheck, CheckCircle2, Clock, AlertTriangle, Calendar, Plus, Pencil, Trash2, ImageIcon, X, FileText, Search, StickyNote, Save, ChevronDown, CreditCard, RotateCcw, Star } from "lucide-react";
@@ -8,7 +8,7 @@ import { useParties, broadcastPartiesUpdated } from "../../lib/useParties";
 import { formatPhoneKR } from "../../lib/phone";
 import { calculateRefund } from "../../lib/refund";
 import { formatKST } from "../../lib/datetime";
-import { partyVisibility } from "../../lib/data";
+import { partyVisibility, type Party } from "../../lib/data";
 
 type AdminUser = {
   id: number; email: string; name: string; gender: string; phone: string;
@@ -102,11 +102,12 @@ const EMPTY_PARTY: PartyForm = {
   targetGroup: "", theme: "", locationTag: "",
 };
 
-function BookingTable({ label, toneClass, rows, party, onApprove, onCancel, onConfirmVBank, onFullRefund }: {
+function BookingTable({ label, toneClass, rows, party, remarks, onApprove, onCancel, onConfirmVBank, onFullRefund }: {
   label: string;
   toneClass: string;
   rows: BookingRow[];
   party: { title: string; price: number } | undefined;
+  remarks: Record<string, string[]>;
   onApprove: (email: string, bookingId: string) => void;
   onCancel: (email: string, bookingId: string) => void;
   onConfirmVBank: (email: string, bookingId: string, defaultAmount: number) => void;
@@ -123,14 +124,14 @@ function BookingTable({ label, toneClass, rows, party, onApprove, onCancel, onCo
         <table className="w-full text-xs md:text-sm whitespace-nowrap">
           <thead className="bg-gray-50 text-gray-500 font-bold">
             <tr>
-              {["취소", "이름", "연락처", "생년월일", "이메일", "직업", "결제일", "결제금액", "상태", "관리"].map(h => (
+              {["취소", "이름", "연락처", "생년월일", "직업", "결제금액", "상태", "관리", "결제일", "이메일", "비고"].map(h => (
                 <th key={h} className="text-left px-3 py-2.5 first:pl-5 md:first:pl-7">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
-              <tr><td colSpan={10} className="text-center text-gray-300 py-6 text-xs">신청자 없음</td></tr>
+              <tr><td colSpan={11} className="text-center text-gray-300 py-6 text-xs">신청자 없음</td></tr>
             )}
             {rows.map(b => {
               const isCancelled = b.status === "cancelled";
@@ -187,15 +188,7 @@ function BookingTable({ label, toneClass, rows, party, onApprove, onCancel, onCo
                   <td className={`px-3 py-2.5 font-bold ${isCancelled ? "line-through" : ""}`}>{b.userName}</td>
                   <td className="px-3 py-2.5 tabular-nums">{formatPhoneKR(b.userPhone)}</td>
                   <td className="px-3 py-2.5 text-gray-600 tabular-nums" title="프로필 카드 기반 (수정 불가)">{birth}</td>
-                  {/* v3.6: MBTI 컬럼만 이메일(로그인 아이디)로 교체. 길이 대응 — font-mono + text-xs (md:text-sm) + max-w + truncate.
-                       탈퇴 회원은 시스템 익명화로 이메일이 매우 길어지므로 노출 생략 ("—"). */}
-                  {b.userStatus === "withdrawn" ? (
-                    <td className="px-3 py-2.5 text-xs md:text-sm text-gray-400">—</td>
-                  ) : (
-                    <td className="px-3 py-2.5 font-mono text-xs md:text-sm text-gray-700 max-w-[240px] truncate" title={b.userEmail || ""}>{b.userEmail || "-"}</td>
-                  )}
                   <td className="px-3 py-2.5">{b.userJob || "-"}</td>
-                  <td className="px-3 py-2.5 text-gray-500">{b.createdAt?.slice(0, 10)}</td>
                   <td className={`px-3 py-2.5 font-black ${isCancelled ? "text-gray-400 line-through" : "text-brand-point"}`}>₩{(b.total ?? party?.price ?? 0).toLocaleString()}</td>
                   <td className="px-3 py-2.5">
                     <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] md:text-xs font-black ${meta.tone}`}>{meta.label}</span>
@@ -226,6 +219,15 @@ function BookingTable({ label, toneClass, rows, party, onApprove, onCancel, onCo
                       </button>
                     )}
                   </td>
+                  <td className="px-3 py-2.5 text-gray-500">{b.createdAt?.slice(0, 10)}</td>
+                  {/* v3.6: MBTI 컬럼만 이메일(로그인 아이디)로 교체. 길이 대응 — font-mono + text-xs (md:text-sm) + max-w + truncate.
+                       탈퇴 회원은 시스템 익명화로 이메일이 매우 길어지므로 노출 생략 ("—"). */}
+                  {b.userStatus === "withdrawn" ? (
+                    <td className="px-3 py-2.5 text-xs md:text-sm text-gray-400">—</td>
+                  ) : (
+                    <td className="px-3 py-2.5 font-mono text-xs md:text-sm text-gray-700 max-w-[240px] truncate" title={b.userEmail || ""}>{b.userEmail || "-"}</td>
+                  )}
+                  <td className="px-3 py-2.5 text-xs md:text-sm text-gray-700 font-medium whitespace-pre-line">{isCancelled ? "-" : (remarks[b.id]?.join("\n") || "-")}</td>
                 </tr>
               );
             })}
@@ -280,6 +282,49 @@ export default function AdminDashboard() {
 
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [bookings, setBookings] = useState<BookingRow[]>([]);
+
+  // 비고: 같은 파티에 신청한 이성 신청자와 과거 파티(신청 결제일 이전)에서 함께 참가확정 완료됐던 파티 날짜·시간
+  // 상태 필터와 무관하게 전체 예약으로 계산한다 (필터로 상대 신청자가 빠져도 기록이 누락되지 않도록)
+  const remarksByBookingId = useMemo(() => {
+    const DONE = new Set(["confirmed", "completed"]);
+    const partyStartMs = (p: Party): number | null => {
+      const m = /(\d{1,2}):(\d{2})/.exec(p.dateString || "");
+      if (!m || !/^\d{4}-\d{2}-\d{2}$/.test(p.calendarDate || "")) return null;
+      const ms = new Date(`${p.calendarDate}T${m[1].padStart(2, "0")}:${m[2]}:00+09:00`).getTime();
+      return Number.isNaN(ms) ? null : ms;
+    };
+    const doneKeys = new Set<string>();
+    const activeByParty = new Map<string, BookingRow[]>();
+    for (const b of bookings) {
+      if (b.status === "cancelled") continue;
+      const list = activeByParty.get(b.partyId) ?? [];
+      list.push(b);
+      activeByParty.set(b.partyId, list);
+      if (DONE.has(b.status)) doneKeys.add(`${b.partyId}|${b.userEmail}`);
+    }
+    const pastParties = PARTIES
+      .map(p => ({ party: p, startMs: partyStartMs(p) }))
+      .filter((x): x is { party: Party; startMs: number } => x.startMs !== null)
+      .sort((a, b) => a.startMs - b.startMs);
+    const isMF = (g: string) => g === "남성" || g === "여성";
+    const result: Record<string, string[]> = {};
+    for (const b of bookings) {
+      if (b.status === "cancelled" || !isMF(b.userGender)) continue;
+      const createdMs = new Date(b.createdAt).getTime();
+      if (Number.isNaN(createdMs)) continue;
+      const counterparts = (activeByParty.get(b.partyId) ?? [])
+        .filter(o => isMF(o.userGender) && o.userGender !== b.userGender && o.userEmail !== b.userEmail);
+      if (counterparts.length === 0) continue;
+      const lines: string[] = [];
+      for (const { party, startMs } of pastParties) {
+        if (startMs >= createdMs) break;
+        if (!doneKeys.has(`${party.id}|${b.userEmail}`)) continue;
+        if (counterparts.some(o => doneKeys.has(`${party.id}|${o.userEmail}`))) lines.push(party.dateString);
+      }
+      if (lines.length > 0) result[b.id] = lines;
+    }
+    return result;
+  }, [bookings, PARTIES]);
   type Coupon = {
     code: string;
     discount_type: "amount" | "percent";    // 정액(KRW) / 정률(%)
@@ -1555,8 +1600,8 @@ export default function AdminDashboard() {
                                 </button>
                               </div>
                               {/* 본문 — 기존 BookingTable 그대로 (취소/참가확정 핸들러 무변경) */}
-                              <BookingTable label="남성 신청자" toneClass="bg-[#4facfe]/10 text-[#3a85d9]" rows={males} party={party} onApprove={approveBooking} onCancel={cancelBooking} onConfirmVBank={confirmVBankBooking} onFullRefund={cancelBookingFullRefund} />
-                              <BookingTable label="여성 신청자" toneClass="bg-rose-100 text-rose-700" rows={females} party={party} onApprove={approveBooking} onCancel={cancelBooking} onConfirmVBank={confirmVBankBooking} onFullRefund={cancelBookingFullRefund} />
+                              <BookingTable label="남성 신청자" toneClass="bg-[#4facfe]/10 text-[#3a85d9]" rows={males} party={party} remarks={remarksByBookingId}onApprove={approveBooking} onCancel={cancelBooking} onConfirmVBank={confirmVBankBooking} onFullRefund={cancelBookingFullRefund} />
+                              <BookingTable label="여성 신청자" toneClass="bg-rose-100 text-rose-700" rows={females} party={party} remarks={remarksByBookingId}onApprove={approveBooking} onCancel={cancelBooking} onConfirmVBank={confirmVBankBooking} onFullRefund={cancelBookingFullRefund} />
                             </motion.div>
                           )}
                         </AnimatePresence>
