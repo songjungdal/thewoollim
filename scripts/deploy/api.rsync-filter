@@ -1,0 +1,44 @@
+# PHP API(api/ → 운영 웹 루트/api/) rsync 필터
+#
+# PHP API 는 --delete 없이 "추가·변경된 파일만" 반영한다.
+# (과거 rsync --delete 로 서버 전용 PHP 가 삭제된 사고가 있었음 — 커밋 5e05015)
+#
+# 규칙 의미
+#   P 경로 : 보호(protect). 서버에서 절대 삭제하지 않는다.
+#   - 경로 : 제외(exclude). 업로드하지 않고, 서버 쪽 파일은 그대로 둔다.
+# 경로 앞의 / 는 api/ 폴더 기준이라는 뜻이다.
+
+# 비밀 설정 파일 5종 — 서버에만 존재 (chmod 640)
+P /db-config.php
+- /db-config.php
+P /auth/sms-config.php
+- /auth/sms-config.php
+P /auth/oauth-config.php
+- /auth/oauth-config.php
+P /auth/portone-config.php
+- /auth/portone-config.php
+P /payments/toss-config.php
+- /payments/toss-config.php
+# 위 5종 외에 이름이 *-config.php 인 파일도 모두 보호 (*.example.php 는 제외 대상 아님)
+P /**/*-config.php
+- /**/*-config.php
+
+# 운영 데이터 (파티·예약·장바구니·쿠폰·회사정보·로그 등)
+P /data/
+- /data/
+
+# 로그인 세션
+P /auth/sessions/
+- /auth/sessions/
+P /admin/sessions/
+- /admin/sessions/
+P /**/sessions/
+- /**/sessions/
+
+# 업로드 폴더 (.gitignore 의 /api/uploads/ 와 동일)
+P /uploads/
+- /uploads/
+
+# 로그 파일
+P *.log
+- *.log

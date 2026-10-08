@@ -1,0 +1,470 @@
+# 어울림 운영 배포 (수동 실행 전용)
+#
+# 실행: GitHub 저장소 → Actions → "Deploy (manual)" → Run workflow
+#       또는 Claude Code 에 "배포해 줘" (docs/DEPLOYMENT.md 의 절차를 따름)
+#
+# 모드
+#   plan          빌드·검사 후, 서버와 비교해 "무엇이 바뀌는지"만 보여줌 (서버 변경 없음)
+#   deploy        plan 과 같은 검사를 통과한 뒤 백업 → 반영 → 상태 확인 (잠금 해제 + 승인 필요)
+#   rollback-list 서버에 있는 배포 백업 목록 보기 (서버 변경 없음)
+#   rollback      지정한 백업으로 되돌리기 (잠금 해제 + 승인 필요)
+#
+# 안전장치
+#   - 빌드·타입검사·린트·PHP 문법검사·패키지 검사 중 하나라도 실패하면 이후 작업은 실행되지 않음
+#   - deploy / rollback 은 아래 DEPLOY_UNLOCKED 가 "true" 일 때만 동작 (지금은 잠금 상태)
+#     → 잠금 해제는 이 파일을 PR 로 수정·리뷰·병합해야만 가능
+#   - deploy 는 main 브랜치에서만, 확인 문구 DEPLOY 입력 시에만 동작
+#   - production 환경 승인자(Required reviewers)를 지정하면 반영 직전 사람의 승인을 한 번 더 받음
+#   - 비밀 설정·운영 데이터·세션·업로드는 rsync 필터(scripts/deploy/*.rsync-filter)로 덮어쓰기·삭제 금지
+
+name: Deploy (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "실행 모드"
+        type: choice
+        options: [plan, deploy, rollback-list, rollback]
+        default: plan
+      target:
+        description: "배포 대상 (plan / deploy)"
+        type: choice
+        options: [all, frontend, api]
+        default: all
+      frontend_delete:
+        description: "프론트엔드: 서버에만 남은 옛 정적 파일 삭제 허용 (api/, uploads/, .htaccess 는 항상 보호)"
+        type: boolean
+        default: false
+      confirm:
+        description: "deploy 는 DEPLOY, rollback 은 ROLLBACK 입력"
+        type: string
+        default: ""
+      backup_name:
+        description: "rollback 할 백업 파일 이름 (rollback-list 결과에서 복사)"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+# 운영 서버에는 한 번에 하나의 배포 작업만
+concurrency:
+  group: thewoollim-production
+  cancel-in-progress: false
+
+env:
+  # ─── 실제 반영 잠금 ─────────────────────────────────────────────
+  # "false" 인 동안 deploy / rollback 은 반드시 실패한다 (plan, rollback-list 만 동작).
+  # 운영 반영을 시작하려면 PR 로 "true" 로 바꾸고 리뷰·병합한다.
+  DEPLOY_UNLOCKED: "false"
+  # ────────────────────────────────────────────────────────────────
+  WEB_ROOT: ${{ vars.DEPLOY_WEB_ROOT || '/var/www/thewoollim' }}
+  STAGING_ROOT: ${{ vars.DEPLOY_STAGING_DIR || '/home/admin/htdocs' }}
+  BACKUP_DIR: ${{ vars.DEPLOY_BACKUP_DIR || '/home/admin/deploy-backups' }}
+  SITE_URL: ${{ vars.DEPLOY_SITE_URL || 'https://thewoollim.com' }}
+  DEPLOY_SSH_USER: ${{ vars.DEPLOY_SSH_USER || 'admin' }}
+  DEPLOY_SSH_PORT: ${{ vars.DEPLOY_SSH_PORT || '22' }}
+  DEPLOY_ACCESS_MODE: ${{ vars.DEPLOY_ACCESS_MODE || 'direct' }}
+  DEPLOY_FILE_OWNER: ${{ vars.DEPLOY_FILE_OWNER || '' }}
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────
+  # 1. 빌드와 검사 (서버 접속 없음)
+  # ─────────────────────────────────────────────────────────────────
+  build:
+    name: 빌드·검사
+    if: inputs.mode == 'plan' || inputs.mode == 'deploy'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: 소스 가져오기
+        uses: actions/checkout@v4
+
+      - name: Node.js 준비
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 빌드용 공개 키 확인
+        env:
+          NEXT_PUBLIC_TOSS_CLIENT_KEY: ${{ secrets.NEXT_PUBLIC_TOSS_CLIENT_KEY }}
+          NEXT_PUBLIC_PORTONE_STORE_ID: ${{ secrets.NEXT_PUBLIC_PORTONE_STORE_ID }}
+          NEXT_PUBLIC_PORTONE_IDENTITY_CHANNEL_KEY: ${{ secrets.NEXT_PUBLIC_PORTONE_IDENTITY_CHANNEL_KEY }}
+        run: |
+          missing=""
+          for v in NEXT_PUBLIC_TOSS_CLIENT_KEY NEXT_PUBLIC_PORTONE_STORE_ID NEXT_PUBLIC_PORTONE_IDENTITY_CHANNEL_KEY; do
+            [ -n "${!v}" ] || missing="$missing $v"
+          done
+          if [ -n "$missing" ]; then
+            if [ "${{ inputs.mode }}" = "deploy" ]; then
+              echo "::error::빌드에 필요한 Secret 이 없습니다:$missing — 이대로 배포하면 결제·본인인증이 동작하지 않습니다."
+              exit 1
+            fi
+            echo "::warning::빌드용 Secret 미등록:$missing (plan 모드라 계속 진행)"
+          fi
+
+      - name: 의존성 설치 (npm ci)
+        run: npm ci --no-audit --no-fund
+
+      - name: 타입 검사
+        run: npx tsc --noEmit
+
+      - name: 린트 (오류 시 중단, 경고는 허용)
+        run: npx eslint .
+
+      - name: 프론트엔드 빌드 (npm run build → out/)
+        env:
+          NEXT_PUBLIC_TOSS_CLIENT_KEY: ${{ secrets.NEXT_PUBLIC_TOSS_CLIENT_KEY }}
+          NEXT_PUBLIC_PORTONE_STORE_ID: ${{ secrets.NEXT_PUBLIC_PORTONE_STORE_ID }}
+          NEXT_PUBLIC_PORTONE_IDENTITY_CHANNEL_KEY: ${{ secrets.NEXT_PUBLIC_PORTONE_IDENTITY_CHANNEL_KEY }}
+          NEXT_PUBLIC_SITE_URL: ${{ vars.DEPLOY_SITE_URL || 'https://thewoollim.com' }}
+        run: npm run build
+
+      - name: 배포 패키지 만들기 + 안전 검사 (PHP 문법, 금지 파일)
+        run: bash scripts/deploy/prepare-payload.sh "$RUNNER_TEMP/payload"
+
+      - name: 배포 패키지 보관
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-payload
+          path: ${{ runner.temp }}/payload
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: error
+
+  # ─────────────────────────────────────────────────────────────────
+  # 2. 배포 계획 (rsync --dry-run, 서버 변경 없음)
+  # ─────────────────────────────────────────────────────────────────
+  plan:
+    name: 배포 계획 (dry-run)
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 배포 패키지 받기
+        uses: actions/download-artifact@v4
+        with:
+          name: deploy-payload
+          path: payload
+
+      - name: 서버 연결 설정 여부 확인
+        id: conf
+        env:
+          HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+        run: |
+          if [ -z "$HOST" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "## 배포 계획"
+              echo "서버 접속 Secret 이 아직 등록되지 않아 **빌드·검사만** 수행했습니다. (서버 비교 생략)"
+              echo
+              echo '```'; cat payload/MANIFEST.txt; echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+          if [ "${{ inputs.mode }}" = "deploy" ] && [ -z "$HOST" ]; then
+            echo "::error::deploy 모드에는 서버 접속 Secret 이 필요합니다."; exit 1
+          fi
+
+      - name: AWS 자격증명 (보안그룹 임시 허용 모드)
+        if: steps.conf.outputs.ready == 'true' && env.DEPLOY_ACCESS_MODE == 'aws-sg-temporary'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: 보안그룹 임시 허용
+        if: steps.conf.outputs.ready == 'true' && env.DEPLOY_ACCESS_MODE == 'aws-sg-temporary'
+        env:
+          AWS_SECURITY_GROUP_ID: ${{ vars.AWS_SECURITY_GROUP_ID }}
+        run: bash scripts/deploy/aws-sg.sh open
+
+      - name: SSH 설정
+        if: steps.conf.outputs.ready == 'true'
+        env:
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}
+          DEPLOY_SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+        run: bash scripts/deploy/ssh-setup.sh
+
+      - name: 서버와 비교 (rsync --dry-run)
+        if: steps.conf.outputs.ready == 'true'
+        env:
+          TARGET: ${{ inputs.target }}
+          FRONTEND_DELETE: ${{ inputs.frontend_delete }}
+        run: |
+          set -euo pipefail
+          ssh thewoollim-prod "test -d '$WEB_ROOT/api'" || { echo "::error::서버에 $WEB_ROOT/api 가 없습니다. 웹 경로를 확인하세요."; exit 1; }
+          OPTS=(-n -rlt --checksum --itemize-changes --rsync-path="sudo -n rsync")
+          [ -n "$DEPLOY_FILE_OWNER" ] && OPTS+=(--chown="$DEPLOY_FILE_OWNER")
+          mkdir -p plan
+          if [ "$TARGET" = "all" ] || [ "$TARGET" = "api" ]; then
+            rsync "${OPTS[@]}" --filter="merge payload/api.rsync-filter" \
+              payload/api/ "thewoollim-prod:$WEB_ROOT/api/" > plan/api.txt
+          fi
+          if [ "$TARGET" = "all" ] || [ "$TARGET" = "frontend" ]; then
+            FOPTS=("${OPTS[@]}"); [ "$FRONTEND_DELETE" = "true" ] && FOPTS+=(--delete)
+            rsync "${FOPTS[@]}" --filter="merge payload/frontend.rsync-filter" \
+              payload/out/ "thewoollim-prod:$WEB_ROOT/" > plan/frontend.txt
+          fi
+          {
+            echo "## 배포 계획 (서버 변경 없음)"
+            echo "- 커밋: \`$(grep '^commit=' payload/MANIFEST.txt | cut -d= -f2)\` / 브랜치: \`${GITHUB_REF_NAME}\`"
+            echo "- 대상: \`$TARGET\` / 프론트엔드 옛 파일 삭제: \`$FRONTEND_DELETE\`"
+            echo
+            echo "| 대상 | 새 파일·변경 파일 | 새 폴더 | 삭제 예정 |"
+            echo "|---|---|---|---|"
+            for f in plan/*.txt; do
+              n="$(basename "$f" .txt)"
+              echo "| $n | $(grep -c '^[<>]f' "$f" || true) | $(grep -c '^cd' "$f" || true) | $(grep -c '^\*deleting' "$f" || true) |"
+            done
+            echo
+            for f in plan/*.txt; do
+              echo "<details><summary>$(basename "$f" .txt) 변경 목록 (최대 200줄)</summary>"
+              echo; echo '```'; head -n 200 "$f"; echo '```'; echo "</details>"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+          # API 는 절대 삭제가 있으면 안 됨
+          if [ -f plan/api.txt ] && grep -q '^\*deleting' plan/api.txt; then
+            echo "::error::API 배포 계획에 삭제가 포함되어 있습니다. 중단합니다."; exit 1
+          fi
+
+      - name: 배포 계획 보관
+        if: steps.conf.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-plan
+          path: plan
+          retention-days: 14
+
+      - name: 보안그룹 임시 허용 제거
+        if: always() && steps.conf.outputs.ready == 'true' && env.DEPLOY_ACCESS_MODE == 'aws-sg-temporary'
+        env:
+          AWS_SECURITY_GROUP_ID: ${{ vars.AWS_SECURITY_GROUP_ID }}
+        run: bash scripts/deploy/aws-sg.sh close
+
+  # ─────────────────────────────────────────────────────────────────
+  # 3. 운영 반영 (잠금 해제 + main + DEPLOY 확인 + production 승인)
+  # ─────────────────────────────────────────────────────────────────
+  deploy:
+    name: 운영 반영
+    needs: [build, plan]
+    if: inputs.mode == 'deploy'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: ${{ vars.DEPLOY_SITE_URL || 'https://thewoollim.com' }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: 배포 조건 확인
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          [ "$DEPLOY_UNLOCKED" = "true" ] || { echo "::error::실제 반영이 잠겨 있습니다 (deploy.yml 의 DEPLOY_UNLOCKED=false). plan 만 사용할 수 있습니다."; exit 1; }
+          [ "$GITHUB_REF" = "refs/heads/main" ] || { echo "::error::운영 배포는 main 브랜치에서만 가능합니다 (현재: $GITHUB_REF_NAME)."; exit 1; }
+          [ "$CONFIRM" = "DEPLOY" ] || { echo "::error::확인 문구(confirm)에 DEPLOY 를 입력해야 합니다."; exit 1; }
+
+      - uses: actions/checkout@v4
+
+      - name: 배포 패키지 받기 (plan 과 동일한 빌드 결과)
+        uses: actions/download-artifact@v4
+        with:
+          name: deploy-payload
+          path: payload
+
+      - name: AWS 자격증명 (보안그룹 임시 허용 모드)
+        if: env.DEPLOY_ACCESS_MODE == 'aws-sg-temporary'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: 보안그룹 임시 허용
+        if: env.DEPLOY_ACCESS_MODE == 'aws-sg-temporary'
+        env:
+          AWS_SECURITY_GROUP_ID: ${{ vars.AWS_SECURITY_GROUP_ID }}
+        run: bash scripts/deploy/aws-sg.sh open
+
+      - name: SSH 설정
+        env:
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}
+          DEPLOY_SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+        run: bash scripts/deploy/ssh-setup.sh
+
+      - name: 서버 임시 경로로 업로드 (운영 경로는 아직 변경 없음)
+        run: |
+          set -euo pipefail
+          REL="$STAGING_ROOT/thewoollim-gha-release"
+          echo "REL=$REL" >> "$GITHUB_ENV"
+          ssh thewoollim-prod "mkdir -p '$REL'"
+          # --delete 는 Actions 전용 임시 폴더(thewoollim-gha-release) 안에서만 사용
+          rsync -rlt --checksum --delete payload/ "thewoollim-prod:$REL/"
+
+      - name: 백업 → 반영 (API 먼저, 그다음 프론트엔드)
+        env:
+          TARGET: ${{ inputs.target }}
+          FRONTEND_DELETE: ${{ inputs.frontend_delete }}
+        run: |
+          set -euo pipefail
+          LABEL="$(date -u +%Y%m%d-%H%M%S)-${GITHUB_SHA::7}"
+          echo "BACKUP_LABEL=$LABEL" >> "$GITHUB_ENV"
+          targets=()
+          { [ "$TARGET" = "all" ] || [ "$TARGET" = "api" ]; } && targets+=(api)
+          { [ "$TARGET" = "all" ] || [ "$TARGET" = "frontend" ]; } && targets+=(frontend)
+          for t in "${targets[@]}"; do
+            echo "::group::$t 백업"
+            ssh thewoollim-prod "bash $(printf %q "$REL/remote-backup.sh") $t $(printf %q "$WEB_ROOT") $(printf %q "$BACKUP_DIR") $LABEL"
+            echo "::endgroup::"
+            echo "::group::$t 반영"
+            ssh thewoollim-prod "bash $(printf %q "$REL/remote-apply.sh") $t $(printf %q "$REL") $(printf %q "$WEB_ROOT") $FRONTEND_DELETE $(printf %q "$DEPLOY_FILE_OWNER")"
+            echo "::endgroup::"
+          done
+
+      - name: 배포 후 상태 확인
+        run: |
+          sleep 5
+          bash scripts/deploy/healthcheck.sh "$SITE_URL"
+
+      - name: 결과 요약
+        if: always()
+        run: |
+          {
+            echo "## 운영 반영 결과: ${{ job.status }}"
+            echo "- 커밋: \`$GITHUB_SHA\`"
+            echo "- 대상: \`${{ inputs.target }}\`"
+            echo "- 백업 이름: \`${BACKUP_LABEL:-백업 전 중단}\` (서버 $BACKUP_DIR)"
+            echo
+            echo "문제가 있으면 mode=rollback-list 로 백업 목록을 확인한 뒤 mode=rollback, backup_name=<파일이름>, confirm=ROLLBACK 으로 되돌립니다."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 보안그룹 임시 허용 제거
+        if: always() && env.DEPLOY_ACCESS_MODE == 'aws-sg-temporary'
+        env:
+          AWS_SECURITY_GROUP_ID: ${{ vars.AWS_SECURITY_GROUP_ID }}
+        run: bash scripts/deploy/aws-sg.sh close
+
+  # ─────────────────────────────────────────────────────────────────
+  # 4. 백업 목록 보기 (서버 변경 없음, 승인 불필요)
+  # ─────────────────────────────────────────────────────────────────
+  rollback-list:
+    name: 백업 목록
+    if: inputs.mode == 'rollback-list'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: AWS 자격증명 (보안그룹 임시 허용 모드)
+        if: env.DEPLOY_ACCESS_MODE == 'aws-sg-temporary'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: 보안그룹 임시 허용
+        if: env.DEPLOY_ACCESS_MODE == 'aws-sg-temporary'
+        env:
+          AWS_SECURITY_GROUP_ID: ${{ vars.AWS_SECURITY_GROUP_ID }}
+        run: bash scripts/deploy/aws-sg.sh open
+
+      - name: SSH 설정
+        env:
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}
+          DEPLOY_SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+        run: bash scripts/deploy/ssh-setup.sh
+
+      - name: 백업 목록
+        run: |
+          {
+            echo "## 서버 배포 백업 목록"
+            echo '```'
+            ssh thewoollim-prod "bash -s -- list $(printf %q "$BACKUP_DIR")" < scripts/deploy/remote-rollback.sh
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: 보안그룹 임시 허용 제거
+        if: always() && env.DEPLOY_ACCESS_MODE == 'aws-sg-temporary'
+        env:
+          AWS_SECURITY_GROUP_ID: ${{ vars.AWS_SECURITY_GROUP_ID }}
+        run: bash scripts/deploy/aws-sg.sh close
+
+  # ─────────────────────────────────────────────────────────────────
+  # 5. 롤백 (잠금 해제 + ROLLBACK 확인 + production 승인)
+  # ─────────────────────────────────────────────────────────────────
+  rollback:
+    name: 롤백
+    if: inputs.mode == 'rollback'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: ${{ vars.DEPLOY_SITE_URL || 'https://thewoollim.com' }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: 롤백 조건 확인
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+          BACKUP_NAME: ${{ inputs.backup_name }}
+        run: |
+          [ "$DEPLOY_UNLOCKED" = "true" ] || { echo "::error::실제 반영이 잠겨 있습니다 (DEPLOY_UNLOCKED=false)."; exit 1; }
+          [ "$CONFIRM" = "ROLLBACK" ] || { echo "::error::확인 문구(confirm)에 ROLLBACK 을 입력해야 합니다."; exit 1; }
+          [[ "$BACKUP_NAME" =~ ^[0-9]{8}-[0-9]{6}-[0-9a-f]{7}\.(frontend|api)\.tar\.gz$ ]] \
+            || { echo "::error::backup_name 형식이 올바르지 않습니다 (예: 20261008-120000-abc1234.frontend.tar.gz)."; exit 1; }
+
+      - uses: actions/checkout@v4
+
+      - name: AWS 자격증명 (보안그룹 임시 허용 모드)
+        if: env.DEPLOY_ACCESS_MODE == 'aws-sg-temporary'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: 보안그룹 임시 허용
+        if: env.DEPLOY_ACCESS_MODE == 'aws-sg-temporary'
+        env:
+          AWS_SECURITY_GROUP_ID: ${{ vars.AWS_SECURITY_GROUP_ID }}
+        run: bash scripts/deploy/aws-sg.sh open
+
+      - name: SSH 설정
+        env:
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}
+          DEPLOY_SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+        run: bash scripts/deploy/ssh-setup.sh
+
+      - name: 롤백 실행
+        env:
+          BACKUP_NAME: ${{ inputs.backup_name }}
+        run: |
+          ssh thewoollim-prod "bash -s -- restore $(printf %q "$BACKUP_DIR") $(printf %q "$WEB_ROOT") $(printf %q "$BACKUP_NAME")" < scripts/deploy/remote-rollback.sh
+
+      - name: 롤백 후 상태 확인
+        run: |
+          sleep 5
+          bash scripts/deploy/healthcheck.sh "$SITE_URL"
+
+      - name: 보안그룹 임시 허용 제거
+        if: always() && env.DEPLOY_ACCESS_MODE == 'aws-sg-temporary'
+        env:
+          AWS_SECURITY_GROUP_ID: ${{ vars.AWS_SECURITY_GROUP_ID }}
+        run: bash scripts/deploy/aws-sg.sh close

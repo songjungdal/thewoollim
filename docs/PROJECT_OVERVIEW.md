@@ -117,7 +117,10 @@ thewoollim/
 - `app/sitemap.ts`: 빌드할 때 한 번 sitemap.xml을 만듭니다. 공개 페이지 8개와 모집 중인 파티 상세 페이지만 넣습니다.
 - `public/robots.txt`: 관리자 경로와 매칭 투표 경로는 검색 노출을 막습니다.
 - `public/.htaccess`: HTML은 캐시하지 않고, JS/CSS는 1년 캐시합니다. 404 페이지 지정, OAuth 콜백 주소 연결 규칙이 있습니다.
-- 실제 배포 방법(업로드 방식, 서버 경로)은 [코드상 확인 불가]입니다.
+- 운영 배포는 GitHub Actions 수동 워크플로(`.github/workflows/deploy.yml`)로 합니다. 빌드·검사 → 배포 계획(dry-run) → 백업 → 반영 → 상태 확인 순서이며, 자세한 절차와 설정 항목은 `docs/DEPLOYMENT.md` 에 있습니다.
+  - 프론트엔드(`out/`)와 PHP API(`api/`)는 따로 배포할 수 있습니다.
+  - 서버의 비밀 설정, 운영 데이터(`api/data/`), 세션, 업로드 이미지, `.htaccess` 는 배포가 덮어쓰거나 지우지 않도록 규칙(`scripts/deploy/*.rsync-filter`)으로 보호합니다.
+  - 서버는 AWS EC2 이고 SSH(`admin` 계정)로 접속합니다(워크플로 기본값). 접속 정보는 GitHub Secrets 에만 둡니다.
 
 ---
 
