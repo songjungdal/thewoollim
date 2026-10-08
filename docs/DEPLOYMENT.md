@@ -40,6 +40,15 @@
 | `rollback-list` | 서버의 백업 목록 표시 | 없음 | 서버 Secret |
 | `rollback` | 지정한 백업으로 복원 → 상태 확인 | 있음 | `DEPLOY_UNLOCKED: "true"` + `confirm=ROLLBACK` + production 승인 |
 
+**잠금 상태에서도 서버와 통신하는 경우**
+
+| 모드 | 서버 SSH 접속 | 서버 파일 변경 | AWS 보안그룹 변경 |
+|---|---|---|---|
+| `plan` (서버 Secret 미등록) | 없음 | 없음 | 없음 |
+| `plan` (서버 Secret 등록) | **있음** — 접속 확인, `sudo -n true`, `rsync --dry-run` (읽기만) | 없음 | `aws-sg-temporary` 일 때만 실행기 IP 를 **임시로 추가했다가 제거** |
+| `rollback-list` | **있음** — 백업 폴더 목록 읽기 | 없음 | 위와 같음 |
+| `deploy` / `rollback` (잠금) | 없음 — 첫 단계에서 실패 | 없음 | 없음 |
+
 **지금은 잠금 상태**입니다(`deploy.yml` 의 `DEPLOY_UNLOCKED: "false"`). `plan`과 `rollback-list`만 동작하고, `deploy`·`rollback`은 첫 단계에서 실패합니다. 잠금을 풀려면 이 값을 `"true"`로 바꾸는 PR 을 리뷰·병합해야 합니다.
 
 **배포 대상(target)**
@@ -188,5 +197,6 @@ Claude Code 에서 "배포해 줘"라고 요청하면 Claude 는 위 순서대�
 - **.htaccess**: 요청에 따라 서버의 `.htaccess` 를 보존하도록 했습니다. 저장소의 `public/.htaccess` 를 수정해도 자동 반영되지 않으므로, 바꿀 때는 서버에서 따로 적용해야 합니다.
 - **파일 소유자**: 반영은 `sudo rsync` 로 하므로 변경된 파일의 소유자가 root 로 바뀔 수 있습니다. 기존 소유자(예: `admin:www-data`)를 유지하려면 `DEPLOY_FILE_OWNER` 를 지정합니다. 운영 데이터 파일은 배포 대상이 아니므로 영향이 없습니다.
 - **문자 예약발송 타이머(systemd)**, DB 마이그레이션, PHP 비밀 설정 변경은 이 워크플로의 범위가 아닙니다.
-- **보안 강화(권장)**: `actions/*`, `aws-actions/*` 를 버전 태그 대신 커밋 SHA 로 고정하면 외부 액션 변조 위험이 줄어듭니다.
+- **외부 액션**: `actions/checkout`, `setup-node`, `upload-artifact`, `download-artifact`, `aws-actions/configure-aws-credentials` 를 커밋 SHA 로 고정했습니다(버전은 주석). 업데이트할 때도 SHA 로 바꿉니다.
+- **GITHUB_TOKEN 권한**: 기본값은 권한 없음(`permissions: {}`). 빌드는 `contents: read`, 서버를 다루는 작업은 `contents: read` + `id-token: write`(AWS 임시 자격증명용)만 씁니다. checkout 은 토큰을 남기지 않도록 `persist-credentials: false` 입니다.
 - 워크플로 파일(`.github/workflows/`)을 push 하려면 GitHub 토큰에 workflow 권한이 필요합니다.

@@ -45,8 +45,8 @@ on:
         type: string
         default: ""
 
-permissions:
-  contents: read
+# GITHUB_TOKEN 기본 권한 없음 — 각 작업에서 필요한 최소 권한만 지정
+permissions: {}
 
 # 운영 서버에는 한 번에 하나의 배포 작업만
 concurrency:
@@ -78,12 +78,25 @@ jobs:
     if: inputs.mode == 'plan' || inputs.mode == 'deploy'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    permissions:
+      contents: read
     steps:
+      - name: 잠금 확인 (잠금 상태의 deploy 는 서버 접속 전에 여기서 중단)
+        if: inputs.mode == 'deploy'
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          [ "$DEPLOY_UNLOCKED" = "true" ] || { echo "::error::실제 반영이 잠겨 있습니다 (deploy.yml 의 DEPLOY_UNLOCKED=false). plan 만 사용할 수 있습니다."; exit 1; }
+          [ "$GITHUB_REF" = "refs/heads/main" ] || { echo "::error::운영 배포는 main 브랜치에서만 가능합니다 (현재: $GITHUB_REF_NAME)."; exit 1; }
+          [ "$CONFIRM" = "DEPLOY" ] || { echo "::error::확인 문구(confirm)에 DEPLOY 를 입력해야 합니다."; exit 1; }
+
       - name: 소스 가져오기
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Node.js 준비
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
@@ -127,7 +140,7 @@ jobs:
         run: bash scripts/deploy/prepare-payload.sh "$RUNNER_TEMP/payload"
 
       - name: 배포 패키지 보관
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: deploy-payload
           path: ${{ runner.temp }}/payload
@@ -147,10 +160,12 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: 배포 패키지 받기
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: deploy-payload
           path: payload
@@ -177,7 +192,7 @@ jobs:
 
       - name: AWS 자격증명 (보안그룹 임시 허용 모드)
         if: steps.conf.outputs.ready == 'true' && env.DEPLOY_ACCESS_MODE == 'aws-sg-temporary'
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
@@ -240,7 +255,7 @@ jobs:
 
       - name: 배포 계획 보관
         if: steps.conf.outputs.ready == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: deploy-plan
           path: plan
@@ -276,17 +291,19 @@ jobs:
           [ "$GITHUB_REF" = "refs/heads/main" ] || { echo "::error::운영 배포는 main 브랜치에서만 가능합니다 (현재: $GITHUB_REF_NAME)."; exit 1; }
           [ "$CONFIRM" = "DEPLOY" ] || { echo "::error::확인 문구(confirm)에 DEPLOY 를 입력해야 합니다."; exit 1; }
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: 배포 패키지 받기 (plan 과 동일한 빌드 결과)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: deploy-payload
           path: payload
 
       - name: AWS 자격증명 (보안그룹 임시 허용 모드)
         if: env.DEPLOY_ACCESS_MODE == 'aws-sg-temporary'
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
@@ -368,11 +385,13 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: AWS 자격증명 (보안그룹 임시 허용 모드)
         if: env.DEPLOY_ACCESS_MODE == 'aws-sg-temporary'
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
@@ -430,11 +449,13 @@ jobs:
           [[ "$BACKUP_NAME" =~ ^[0-9]{8}-[0-9]{6}-[0-9a-f]{7}\.(frontend|api)\.tar\.gz$ ]] \
             || { echo "::error::backup_name 형식이 올바르지 않습니다 (예: 20261008-120000-abc1234.frontend.tar.gz)."; exit 1; }
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: AWS 자격증명 (보안그룹 임시 허용 모드)
         if: env.DEPLOY_ACCESS_MODE == 'aws-sg-temporary'
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
