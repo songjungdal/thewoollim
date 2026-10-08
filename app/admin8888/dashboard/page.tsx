@@ -1746,7 +1746,7 @@ export default function AdminDashboard() {
                             <input type="file" accept="image/*" aria-label="대표 이미지"
                               onChange={e => { const f = e.target.files?.[0]; if (f) uploadImage(f); }}
                               className="block w-full text-xs file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-brand-black file:text-white file:font-bold file:cursor-pointer hover:file:bg-brand-point" />
-                            <p className="text-xs text-gray-400 mt-1.5">JPG/PNG/WebP, 최대 5MB. 권장 1200×800</p>
+                            <p className="text-xs text-gray-400 mt-1.5">JPG/PNG/WebP, 최대 5MB. 메인페이지 카드·상세페이지 상단에 공통 노출 — 가로로 넓은 배너형 권장 (예: 1200×300)</p>
                             {uploading && <p className="text-xs text-brand-point mt-1">업로드 중...</p>}
                             {partyForm.imageUrl && (
                               <button onClick={() => setPartyForm(p => ({ ...p, imageUrl: "" }))}

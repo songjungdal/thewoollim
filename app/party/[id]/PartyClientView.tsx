@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Star, Heart, Clock, ShoppingBag, X, ClipboardList, Users as UsersIcon, ShieldCheck, Info } from "lucide-react";
+import { ArrowLeft, Heart, Clock, ShoppingBag, X, ClipboardList, Users as UsersIcon, ShieldCheck, Info } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Header from "../../components/Header";
@@ -314,27 +314,24 @@ export default function PartyClientView({ id }: { id: string }) {
           transition={{ duration: 0.5 }}
           className="max-w-7xl mx-auto px-4 md:px-6 py-10 md:py-24 min-h-[85vh]"
         >
-          <Link href="/#apply" className="inline-flex items-center gap-2 text-gray-500 hover:text-brand-black mb-7 md:mb-12 font-bold transition-colors text-sm md:text-base">
-            <ArrowLeft size={18} /> 목록으로 돌아가기
-          </Link>
+          <div className="max-w-4xl mx-auto">
+            <Link href="/#apply" className="inline-flex items-center gap-2 text-gray-500 hover:text-brand-black mb-7 md:mb-12 font-bold transition-colors text-sm md:text-base">
+              <ArrowLeft size={18} /> 목록으로 돌아가기
+            </Link>
+          </div>
 
-          {/* TOP SECTION: MAIN INFO */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-7 md:gap-16 mb-10 md:mb-24">
-            {/* Left: 대표 이미지 — 관리자가 등록한 imageUrl을 동적 렌더링, 없으면 placeholder */}
-            <div className="aspect-[5/3] lg:aspect-auto lg:h-full lg:min-h-[520px] bg-neutral-900 rounded-2xl md:rounded-[2rem] flex items-center justify-center relative overflow-hidden group">
-              {detailItem.imageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={detailItem.imageUrl}
-                  alt={detailItem.title}
-                  className="absolute inset-0 w-full h-full object-cover"
-                />
-              ) : (
-                <div className="absolute inset-0 bg-neutral-800 flex items-center justify-center opacity-40">
-                  <Star size={48} className="text-gray-400" />
-                </div>
-              )}
-              {/* 상태 배지 — 우선순위: 행사일 경과(모집종료) > 정원 만석(모집마감) > 모집중 */}
+          {/* TOP SECTION: MAIN INFO — 이미지 상단 → 제목 → 소제목 → 일시/장소/대상 → 참가비 → 남녀 인원 → 확인사항 → 참가대상 → 버튼,
+               전부 max-w-4xl 단일 컬럼 (아래 다른 섹션들과 좌/우 폭 통일) */}
+          <div className="max-w-4xl mx-auto mb-10 md:mb-16">
+            {/* 최상단 이미지 — 관리자페이지의 "대표 이미지"(imageUrl)를 그대로 노출, 미등록 파티는 메인페이지와 동일한 공통 디폴트로 대체 */}
+            <div className="relative mb-6 md:mb-8">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={detailItem.imageUrl || "/images/party_card_default_banner.jpg"}
+                alt={detailItem.title}
+                className="block w-full h-auto"
+              />
+              {/* 상태 배지 — 우선순위: 행사일 경과(모집종료) > 정원 만석(모집마감) > 모집중 (기존 로직 그대로) */}
               {(() => {
                 const status: "ended" | "full" | "open" =
                   isExpired ? "ended" : stock.allFull ? "full" : "open";
@@ -344,187 +341,165 @@ export default function PartyClientView({ id }: { id: string }) {
                   open:  { label: "모집중",   cls: "bg-brand-point text-black" },
                 }[status];
                 return (
-                  <div className={`absolute top-4 left-4 md:top-6 md:left-6 font-bold px-4 py-1.5 md:px-5 md:py-2 rounded-full text-xs md:text-sm shadow-xl z-10 ${badge.cls}`}>
+                  <div className={`absolute top-3 left-3 md:top-4 md:left-4 font-bold px-3 py-1 md:px-4 md:py-1.5 rounded-full text-xs md:text-sm shadow-xl z-10 ${badge.cls}`}>
                     {badge.label}
                   </div>
                 );
               })()}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+              {/* 남녀 인원 — 이미지 우측 하단 오버레이 (아이콘 + 남성 파랑 / 여성 분홍), 가독성을 위해 흰색 pill 배경 */}
+              <div className="absolute bottom-3 right-3 md:bottom-4 md:right-4 flex items-center gap-2 bg-white/95 px-2.5 py-1 md:px-3 md:py-1.5 rounded-full shadow-lg z-10 text-[11px] md:text-xs font-bold">
+                <span className="flex items-center gap-1 text-blue-400">
+                  <UsersIcon size={12} className="flex-shrink-0" />
+                  남성 {detailItem.maleBooked}/{detailItem.maleStock}
+                </span>
+                <span className="flex items-center gap-1 text-pink-400">
+                  <UsersIcon size={12} className="flex-shrink-0" />
+                  여성 {detailItem.femaleBooked}/{detailItem.femaleStock}
+                </span>
+              </div>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent pointer-events-none" />
             </div>
 
-            {/* Right: Info & Checkout */}
-            <div className="flex flex-col justify-between min-h-0">
-              <div>
-                {/* 모바일/태블릿(md) 가독성 유지 — PC(lg+) 만 5xl→4xl 축소 (~25%) + 자간 -0.015em */}
-                <h1 className="text-3xl md:text-5xl lg:text-4xl font-black tracking-[-0.015em] mb-3 md:mb-4 leading-snug">{detailItem.title}</h1>
-                {/* 관리자가 등록한 소개(description) 우선 노출 — 없으면 기본 카피 */}
-                <p className="text-sm md:text-lg text-gray-500 mb-5 md:mb-8 font-medium leading-relaxed whitespace-pre-line break-keep">
-                  {detailItem.description?.trim()
-                    ? detailItem.description
-                    : "단순한 만남을 넘어 감성을 향유하는 시간.\n어울림이 큐레이션한 프리미엄 네트워킹에 초대합니다."}
-                </p>
+            {/* 제목 — 중앙정렬 */}
+            <h1 className="text-2xl md:text-3xl font-black tracking-tight mb-2 leading-snug text-center">{detailItem.title}</h1>
+            {/* 내용(소개) — 관리자가 등록한 소개(description) 우선 노출, 없으면 기본 카피 — 중앙정렬 */}
+            <p className="text-xs md:text-sm text-gray-500 mb-4 md:mb-5 font-medium leading-relaxed whitespace-pre-line break-keep text-center">
+              {detailItem.description?.trim()
+                ? detailItem.description
+                : "단순한 만남을 넘어 감성을 향유하는 시간.\n어울림이 큐레이션한 프리미엄 네트워킹에 초대합니다."}
+            </p>
 
-                {/* Info rows — 라벨/값 폰트 한 단계 확대, 행간 미세 증가 */}
-                <div className="space-y-0 mb-5 md:mb-8">
-                  {[
-                    { label: "일시 (Date)", value: detailItem.dateString },
-                    { label: "장소 (Location)", value: detailItem.location },
-                    { label: "대상 (Target)", value: detailItem.target },
-                  ].map((row) => (
-                    <div key={row.label} className="flex flex-col md:flex-row md:justify-between md:items-center py-3.5 md:py-4 border-b border-gray-200 gap-0.5 md:gap-0">
-                      <span className="text-sm md:text-lg text-gray-400 md:text-gray-500 font-medium md:w-40">{row.label}</span>
-                      <span className="font-bold text-base md:text-lg md:text-right">{row.value}</span>
-                    </div>
-                  ))}
-                  {/* 참가비 — 성별별 분리 표시 (남성 / 여성). 미설정 시 price 폴백 단일 표시 */}
-                  {(() => {
-                    const pm = (detailItem as { priceMale?: number }).priceMale;
-                    const pf = (detailItem as { priceFemale?: number }).priceFemale;
-                    const hasSplit = (pm && pm > 0) || (pf && pf > 0);
-                    const maleAmt   = pm && pm > 0 ? pm : detailItem.price;
-                    const femaleAmt = pf && pf > 0 ? pf : detailItem.price;
-                    // 다른 info row 와 동일한 컨테이너 클래스 (gap-0.5 md:gap-0) — 모바일 좌측 정렬 통일.
-                    // 값 컨테이너의 justify 는 PC 만 우측 (md:justify-end) — 모바일은 다른 행처럼 좌측.
-                    return (
-                      <div className="flex flex-col md:flex-row md:justify-between md:items-center py-3.5 md:py-4 border-b border-gray-200 gap-0.5 md:gap-0">
-                        <span className="text-sm md:text-lg text-gray-400 md:text-gray-500 font-medium md:w-40 flex-shrink-0">참가비 (Price)</span>
-                        {hasSplit ? (
-                          <span className="font-black text-brand-black md:text-right flex flex-wrap items-baseline md:justify-end gap-x-2 md:gap-x-3 gap-y-1">
-                            <span className="inline-flex items-baseline gap-1">
-                              <span className="text-xs md:text-sm text-gray-500 font-bold">남성</span>
-                              <span className="text-2xl md:text-3xl tabular-nums">₩{maleAmt.toLocaleString()}</span>
-                            </span>
-                            <span className="text-gray-300 text-base md:text-xl">/</span>
-                            <span className="inline-flex items-baseline gap-1">
-                              <span className="text-xs md:text-sm text-gray-500 font-bold">여성</span>
-                              <span className="text-2xl md:text-3xl tabular-nums">₩{femaleAmt.toLocaleString()}</span>
-                            </span>
-                          </span>
-                        ) : (
-                          <span className="font-black text-2xl md:text-3xl text-brand-black tabular-nums md:text-right">₩{detailItem.price.toLocaleString()}</span>
-                        )}
-                      </div>
-                    );
-                  })()}
+            {/* Info rows — 일시/장소/대상 */}
+            <div className="space-y-0 mb-4 md:mb-5">
+              {[
+                { label: "일시 (Date)", value: detailItem.dateString },
+                { label: "장소 (Location)", value: detailItem.location },
+                { label: "대상 (Target)", value: detailItem.target },
+              ].map((row) => (
+                <div key={row.label} className="flex items-center justify-between py-2.5 border-b border-gray-200 text-xs md:text-sm gap-2">
+                  <span className="text-gray-400 font-medium flex-shrink-0">{row.label}</span>
+                  <span className={`font-bold text-right ${row.label === "일시 (Date)" ? "text-sm md:text-base" : ""}`}>{row.value}</span>
                 </div>
-
-                {/* Gender stock — minimal underline typography */}
-                <div className="flex items-center border-t border-b border-gray-300 py-4 md:py-5 mb-5 md:mb-6">
-                  <div className="flex-1 flex items-baseline justify-center gap-2.5 md:gap-3">
-                    <span className="text-sm md:text-base font-bold text-gray-400 tracking-wider">남성</span>
-                    <span className={`text-xl md:text-2xl font-black tabular-nums ${stock.maleFull ? "text-gray-400" : "text-brand-black"}`}>
-                      {detailItem.maleBooked}/{detailItem.maleStock}
-                    </span>
-                    {stock.maleFull && (
-                      <span className="text-[11px] md:text-xs font-black text-gray-400 tracking-wider">마감</span>
-                    )}
-                  </div>
-                  <div className="w-px h-7 md:h-8 bg-gray-300" />
-                  <div className="flex-1 flex items-baseline justify-center gap-2.5 md:gap-3">
-                    <span className="text-sm md:text-base font-bold text-gray-400 tracking-wider">여성</span>
-                    <span className={`text-xl md:text-2xl font-black tabular-nums ${stock.femaleFull ? "text-gray-400" : "text-brand-black"}`}>
-                      {detailItem.femaleBooked}/{detailItem.femaleStock}
-                    </span>
-                    {stock.femaleFull && (
-                      <span className="text-[11px] md:text-xs font-black text-gray-400 tracking-wider">마감</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Notice — 신청 전 확인사항 (좌측 이미지와 하단 라인 맞추기 위해 패딩/마진 미세 조정) */}
-                <div className="bg-white p-3.5 md:p-4 rounded-xl md:rounded-2xl border border-gray-200 mb-4 md:mb-4">
-                  <h4 className="font-bold mb-1.5 flex items-center gap-2 text-sm md:text-base">
-                    <Heart size={15} className="text-brand-point" /> 신청 전 꼭 확인해주세요.
-                  </h4>
-                  <p className="text-xs md:text-sm text-gray-500 leading-relaxed break-keep">
-                    어울림은 진정성 있는 만남을 위해 <strong className="font-bold text-brand-black">100% 사전 승인제</strong>로 운영됩니다.
-                    결제 후 프로필 정보를 입력해 주시면 <strong className="font-bold text-brand-black">[확정 대기 중]</strong> 상태가 되며,
-                    관리자의 꼼꼼한 확인을 거쳐 최종 <strong className="font-bold text-brand-black">[참가 확정]</strong>이 이루어집니다.
-                    참가 확정 및 안내 문자는 확정 시점에 맞춰 순차적으로 발송됩니다.
-                  </p>
-                </div>
-              </div>
-
-              {/* 참가 자격 안내 — 자격 제한이 설정된 경우 노출 */}
-              {eligibilityLabel && (
-                <div className={`mb-4 md:mb-5 px-4 py-2.5 rounded-xl text-xs md:text-sm font-bold border ${
-                  isLoggedIn && !eligibility.ok
-                    ? "bg-red-50 border-red-100 text-red-700"
-                    : "bg-brand-point/10 border-brand-point/20 text-brand-point"
-                }`}>
-                  <span className="font-black">참가 대상</span> · {eligibilityLabel}
-                  {isLoggedIn && !eligibility.ok && (
-                    <span className="block mt-1 font-medium text-red-600">
-                      {eligibility.message}
-                      {userAge !== null && eligibility.reason === "ageOutOfRange" && ` (현재 만 ${userAge}세)`}
-                    </span>
-                  )}
-                </div>
-              )}
-
-              {/* CTA Buttons — pinned to bottom */}
-              {/* 행사 종료된 파티 — 단일 빨간 버튼으로 교체 (클릭 불가) */}
-              {isExpired ? (
-                <div className="mt-auto">
-                  <div
-                    role="status"
-                    aria-disabled="true"
-                    className="w-full px-5 md:px-8 py-4 md:py-5 rounded-xl md:rounded-2xl text-base md:text-xl font-bold shadow-xl text-center bg-[#FF0000] text-white pointer-events-none select-none"
-                  >
-                    모집 종료된 파티
-                  </div>
-                </div>
-              ) : (() => {
-                const userGender = profile?.gender;
-                const userSideFull =
-                  (userGender === "남성" && stock.maleFull) ||
-                  (userGender === "여성" && stock.femaleFull);
-                const eligibilityBlocked = isLoggedIn && !eligibility.ok;
-                // 실제 disabled 는 정원/자격 사유만 — alreadyBooked 는 클릭 가능 (confirm 으로 안내)
-                const hardDisabled = stock.allFull || userSideFull || eligibilityBlocked;
-                // 회색 스타일 적용 조건 — 시각적으로 비활성처럼 보이지만 alreadyBooked 는 클릭 가능
-                const grayedOut = alreadyBooked || hardDisabled;
-                const label = alreadyBooked
-                  ? "이미 신청된 파티"
-                  : stock.allFull
-                    ? "모집 마감"
-                    : userGender === "남성" && stock.maleFull
-                      ? "남성 마감"
-                      : userGender === "여성" && stock.femaleFull
-                        ? "여성 마감"
-                        : eligibilityBlocked
-                          ? "참가 대상 아님"
-                          : "참가신청";
+              ))}
+              {/* 참가비 — 성별별 분리 표시 (남성 / 여성). 미설정 시 price 폴백 단일 표시 */}
+              {(() => {
+                const pm = (detailItem as { priceMale?: number }).priceMale;
+                const pf = (detailItem as { priceFemale?: number }).priceFemale;
+                const hasSplit = (pm && pm > 0) || (pf && pf > 0);
+                const maleAmt   = pm && pm > 0 ? pm : detailItem.price;
+                const femaleAmt = pf && pf > 0 ? pf : detailItem.price;
                 return (
-                  <div className="flex gap-3 md:gap-4 mt-auto">
-                    <button
-                      type="button"
-                      onClick={handleCheckout}
-                      disabled={hardDisabled}
-                      className={`flex-[2] px-5 md:px-8 py-4 md:py-5 rounded-xl md:rounded-2xl text-base md:text-xl font-bold transition-all shadow-xl ${
-                        grayedOut
-                          ? `bg-gray-200 text-gray-400 shadow-none ${alreadyBooked && !hardDisabled ? "cursor-pointer hover:bg-gray-300" : "cursor-not-allowed"}`
-                          : "bg-brand-black text-white hover:bg-brand-point hover:shadow-brand-point/30"
-                      }`}
-                    >
-                      {label}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleAddToCart}
-                      disabled={hardDisabled}
-                      className={`flex-1 px-5 md:px-8 py-4 md:py-5 rounded-xl md:rounded-2xl text-base md:text-xl font-bold transition-all shadow-xl ${
-                        grayedOut
-                          ? `bg-gray-200 text-gray-400 shadow-none ${alreadyBooked && !hardDisabled ? "cursor-pointer hover:bg-gray-300" : "cursor-not-allowed"}`
-                          : "bg-brand-black text-white hover:bg-brand-point"
-                      }`}
-                    >
-                      장바구니
-                    </button>
+                  <div className="flex items-center justify-between py-2.5 border-b border-gray-200 text-xs md:text-sm gap-2">
+                    <span className="text-gray-400 font-medium flex-shrink-0">참가비 (Price)</span>
+                    {hasSplit ? (
+                      <span className="font-black text-brand-black flex flex-wrap items-baseline justify-end gap-x-2 gap-y-0.5">
+                        <span className="inline-flex items-baseline gap-1">
+                          <span className="text-[11px] md:text-xs text-gray-500 font-bold">남성</span>
+                          <span className="text-base md:text-lg tabular-nums">₩{maleAmt.toLocaleString()}</span>
+                        </span>
+                        <span className="text-gray-300">/</span>
+                        <span className="inline-flex items-baseline gap-1">
+                          <span className="text-[11px] md:text-xs text-gray-500 font-bold">여성</span>
+                          <span className="text-base md:text-lg tabular-nums">₩{femaleAmt.toLocaleString()}</span>
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="font-black text-base md:text-lg text-brand-black tabular-nums">₩{detailItem.price.toLocaleString()}</span>
+                    )}
                   </div>
                 );
               })()}
             </div>
+
+            {/* 신청 전 꼭 확인해주세요 */}
+            <div className="bg-white p-3.5 rounded-xl border border-gray-200 mb-3">
+              <h4 className="font-bold mb-1.5 flex items-center gap-1.5 text-xs md:text-sm">
+                <Heart size={14} className="text-brand-point" /> 신청 전 꼭 확인해주세요.
+              </h4>
+              <p className="text-[11px] md:text-xs text-gray-500 leading-relaxed break-keep">
+                어울림은 진정성 있는 만남을 위해 <strong className="font-bold text-brand-black">100% 사전 승인제</strong>로 운영됩니다.
+                결제 후 프로필 정보를 입력해 주시면 <strong className="font-bold text-brand-black">[확정 대기 중]</strong> 상태가 되며,
+                관리자의 꼼꼼한 확인을 거쳐 최종 <strong className="font-bold text-brand-black">[참가 확정]</strong>이 이루어집니다.
+                참가 확정 및 안내 문자는 확정 시점에 맞춰 순차적으로 발송됩니다.
+              </p>
+            </div>
+
+            {/* 참가 대상 표시 — 자격 제한이 설정된 경우 노출 (기존 로직 그대로) */}
+            {eligibilityLabel && (
+              <div className={`mb-4 px-3.5 py-2 rounded-xl text-[11px] md:text-xs font-bold border ${
+                isLoggedIn && !eligibility.ok
+                  ? "bg-red-50 border-red-100 text-red-700"
+                  : "bg-brand-point/10 border-brand-point/20 text-brand-point"
+              }`}>
+                <span className="font-black">참가 대상</span> · {eligibilityLabel}
+                {isLoggedIn && !eligibility.ok && (
+                  <span className="block mt-1 font-medium text-red-600">
+                    {eligibility.message}
+                    {userAge !== null && eligibility.reason === "ageOutOfRange" && ` (현재 만 ${userAge}세)`}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* 참가하기 / 장바구니 버튼 — 조건/비활성화 로직은 기존 그대로, 기본 문구만 "참가신청"→"참가하기" */}
+            {isExpired ? (
+              <div
+                role="status"
+                aria-disabled="true"
+                className="w-full px-5 py-3 rounded-xl text-sm font-bold shadow-xl text-center bg-[#FF0000] text-white pointer-events-none select-none"
+              >
+                모집 종료된 파티
+              </div>
+            ) : (() => {
+              const userGender = profile?.gender;
+              const userSideFull =
+                (userGender === "남성" && stock.maleFull) ||
+                (userGender === "여성" && stock.femaleFull);
+              const eligibilityBlocked = isLoggedIn && !eligibility.ok;
+              // 실제 disabled 는 정원/자격 사유만 — alreadyBooked 는 클릭 가능 (confirm 으로 안내)
+              const hardDisabled = stock.allFull || userSideFull || eligibilityBlocked;
+              // 회색 스타일 적용 조건 — 시각적으로 비활성처럼 보이지만 alreadyBooked 는 클릭 가능
+              const grayedOut = alreadyBooked || hardDisabled;
+              const label = alreadyBooked
+                ? "이미 신청된 파티"
+                : stock.allFull
+                  ? "모집 마감"
+                  : userGender === "남성" && stock.maleFull
+                    ? "남성 마감"
+                    : userGender === "여성" && stock.femaleFull
+                      ? "여성 마감"
+                      : eligibilityBlocked
+                        ? "참가 대상 아님"
+                        : "참가하기";
+              return (
+                <div className="flex gap-2.5">
+                  <button
+                    type="button"
+                    onClick={handleCheckout}
+                    disabled={hardDisabled}
+                    className={`flex-[2] px-5 py-3 rounded-xl text-sm font-bold transition-all shadow-xl ${
+                      grayedOut
+                        ? `bg-gray-200 text-gray-400 shadow-none ${alreadyBooked && !hardDisabled ? "cursor-pointer hover:bg-gray-300" : "cursor-not-allowed"}`
+                        : "bg-brand-black text-white hover:bg-brand-point hover:shadow-brand-point/30"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleAddToCart}
+                    disabled={hardDisabled}
+                    className={`flex-1 px-5 py-3 rounded-xl text-sm font-bold transition-all shadow-xl ${
+                      grayedOut
+                        ? `bg-gray-200 text-gray-400 shadow-none ${alreadyBooked && !hardDisabled ? "cursor-pointer hover:bg-gray-300" : "cursor-not-allowed"}`
+                        : "bg-brand-black text-white hover:bg-brand-point"
+                    }`}
+                  >
+                    장바구니
+                  </button>
+                </div>
+              );
+            })()}
           </div>
 
           {/* PARTICIPANTS PANEL — 다른 섹션들(참가 신청 방법/Party Timeline 등)과 동일 폭 max-w-4xl */}
