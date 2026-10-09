@@ -113,16 +113,16 @@ export default function OnboardingPage() {
           </div>
           <h1 className="text-2xl md:text-3xl font-black mb-2 tracking-tight">필수 회원정보</h1>
           <p className="text-gray-500 font-medium text-sm md:text-base leading-relaxed">
-            매칭파티 신청 전,<br className="sm:hidden" /> 아래 정보를 한 번만 입력해주세요.
+            파티 신청 전,<br className="sm:hidden" /> 아래 정보를 한 번만 입력해주세요.
           </p>
         </div>
 
         <form className="space-y-5 md:space-y-6" onSubmit={handleSubmit} noValidate>
           {/* 이름 */}
           <div>
-            <label className={labelClass}>이름 <span className="text-brand-point">*</span></label>
+            <label className={labelClass}>이름 <span className="text-brand-point-ink">*</span></label>
             <div className="relative">
-              <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
               <input
                 type="text"
                 placeholder="실명을 입력해주세요"
@@ -136,7 +136,7 @@ export default function OnboardingPage() {
 
           {/* 성별 */}
           <div>
-            <label className={labelClass}>성별 <span className="text-brand-point">*</span></label>
+            <label className={labelClass}>성별 <span className="text-brand-point-ink">*</span></label>
             <div className="grid grid-cols-2 gap-2 md:gap-3">
               {(["남성", "여성"] as const).map(g => {
                 const sel = gender === g;
@@ -160,9 +160,9 @@ export default function OnboardingPage() {
 
           {/* 생년월일 */}
           <div>
-            <label className={labelClass}>생년월일 <span className="text-brand-point">*</span></label>
+            <label className={labelClass}>생년월일 <span className="text-brand-point-ink">*</span></label>
             <div className="relative">
-              <Cake className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={18} />
+              <Cake className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" size={18} />
               <input
                 type="date"
                 value={birthDate}
@@ -178,9 +178,9 @@ export default function OnboardingPage() {
 
           {/* 연락처 */}
           <div>
-            <label className={labelClass}>연락처 <span className="text-brand-point">*</span></label>
+            <label className={labelClass}>연락처 <span className="text-brand-point-ink">*</span></label>
             <div className="relative">
-              <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
               <input
                 type="tel"
                 inputMode="numeric"
@@ -197,7 +197,7 @@ export default function OnboardingPage() {
           {/* 혼인여부 */}
           <div>
             <label className={labelClass}>
-              <span className="inline-flex items-center gap-1.5"><Heart size={13} className="text-brand-point" /> 혼인여부 <span className="text-brand-point">*</span></span>
+              <span className="inline-flex items-center gap-1.5"><Heart size={13} className="text-brand-point-ink" /> 혼인여부 <span className="text-brand-point-ink">*</span></span>
             </label>
             <div className="grid grid-cols-2 gap-2 md:gap-3">
               {(["싱글", "돌싱"] as const).map(m => {
@@ -224,7 +224,7 @@ export default function OnboardingPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full bg-brand-point text-white py-4 md:py-4.5 rounded-xl font-black text-base md:text-lg hover:brightness-110 transition-all shadow-xl hover:shadow-brand-point/40 disabled:bg-gray-300 disabled:cursor-not-allowed"
+            className="w-full bg-brand-point text-black py-4 md:py-4.5 rounded-xl font-black text-base md:text-lg hover:brightness-110 transition-all shadow-xl hover:shadow-brand-point/40 disabled:bg-gray-300 disabled:cursor-not-allowed"
           >
             {submitting ? "저장 중..." : "저장하고 시작하기"}
           </button>
@@ -234,7 +234,7 @@ export default function OnboardingPage() {
             type="button"
             onClick={() => {
               // 알림 최우선 → [확인] 후 마이페이지로 이동 (목적지 / → /mypage 변경)
-              alert("프로필 정보를 입력하셔야 어울림 매칭파티에 참가하실 수 있습니다. 마이페이지 [정보수정]을 통해 프로필 정보를 완성해 주세요.");
+              alert("프로필 정보를 입력하셔야 어울림 파티에 참가하실 수 있습니다. 마이페이지 [정보수정]을 통해 프로필 정보를 완성해 주세요.");
               snoozeOnboarding();
               router.push("/mypage");
             }}
@@ -244,7 +244,7 @@ export default function OnboardingPage() {
             나중에 입력하기
           </button>
 
-          <p className="text-[11px] md:text-xs text-gray-400 font-medium text-center leading-relaxed pt-1">
+          <p className="text-xs text-gray-500 font-medium text-center leading-relaxed pt-1">
             필수 정보는 프로필 카드 작성 시 반드시 필요합니다.<br className="sm:hidden" />
             저장 후에는 이름·성별·생년월일이 본인인증 정보로 잠깁니다.
           </p>

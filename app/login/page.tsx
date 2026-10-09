@@ -296,13 +296,13 @@ function LoginContent() {
             <div className="flex bg-gray-100 p-2 m-6 rounded-2xl">
               <button 
                 onClick={() => setActiveTab("login")}
-                className={`flex-1 py-3 rounded-xl font-bold transition-all ${activeTab === "login" ? "bg-white text-brand-black shadow-sm" : "text-gray-400 hover:text-gray-600"}`}
+                className={`flex-1 py-3 rounded-xl font-bold transition-all ${activeTab === "login" ? "bg-white text-brand-black shadow-sm" : "text-gray-600 hover:text-brand-black"}`}
               >
                 로그인
               </button>
               <button 
                 onClick={() => setActiveTab("register")}
-                className={`flex-1 py-3 rounded-xl font-bold transition-all ${activeTab === "register" ? "bg-white text-brand-black shadow-sm" : "text-gray-400 hover:text-gray-600"}`}
+                className={`flex-1 py-3 rounded-xl font-bold transition-all ${activeTab === "register" ? "bg-white text-brand-black shadow-sm" : "text-gray-600 hover:text-brand-black"}`}
               >
                 회원가입
               </button>
@@ -322,18 +322,18 @@ function LoginContent() {
                       <div>
                         <label className={labelClass}>이메일 주소</label>
                         <div className="relative">
-                          <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                          <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
                           <input type="email" placeholder="example@thewoollim.com" className={inputClass} required value={loginEmail} onChange={e => setLoginEmail(e.target.value)} />
                         </div>
                       </div>
                       <div>
                         <label className={labelClass}>비밀번호</label>
                         <div className="relative">
-                          <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                          <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
                           <input type="password" placeholder="••••••••" className={inputClass} required value={loginPassword} onChange={e => setLoginPassword(e.target.value)} />
                         </div>
                       </div>
-                      <button type="submit" className="w-full bg-brand-black text-white py-4 rounded-xl font-bold text-lg hover:bg-brand-point transition-all shadow-xl hover:shadow-brand-point/20">
+                      <button type="submit" className="w-full bg-brand-black text-white py-4 rounded-xl font-bold text-lg hover:bg-brand-point hover:text-black transition-all shadow-xl hover:shadow-brand-point/20">
                         로그인하기
                       </button>
                     </form>
@@ -343,7 +343,7 @@ function LoginContent() {
                       <button
                         type="button"
                         onClick={() => setShowFindId(true)}
-                        className="!bg-transparent hover:!bg-transparent focus:!bg-transparent active:!bg-transparent !border-0 !outline-none focus:!ring-0 !shadow-none text-gray-400 hover:!text-brand-point cursor-pointer p-0 transition-colors duration-200 ease-out"
+                        className="!bg-transparent hover:!bg-transparent focus:!bg-transparent active:!bg-transparent !border-0 !outline-none focus:!ring-0 !shadow-none text-gray-500 hover:!text-brand-point-ink cursor-pointer px-0 py-3.5 -my-3.5 transition-colors duration-200 ease-out"
                       >
                         아이디 찾기
                       </button>
@@ -351,7 +351,7 @@ function LoginContent() {
                       <button
                         type="button"
                         onClick={() => setShowFindPw(true)}
-                        className="!bg-transparent hover:!bg-transparent focus:!bg-transparent active:!bg-transparent !border-0 !outline-none focus:!ring-0 !shadow-none text-gray-400 hover:!text-brand-point cursor-pointer p-0 transition-colors duration-200 ease-out"
+                        className="!bg-transparent hover:!bg-transparent focus:!bg-transparent active:!bg-transparent !border-0 !outline-none focus:!ring-0 !shadow-none text-gray-500 hover:!text-brand-point-ink cursor-pointer px-0 py-3.5 -my-3.5 transition-colors duration-200 ease-out"
                       >
                         비밀번호 찾기
                       </button>
@@ -362,7 +362,7 @@ function LoginContent() {
                       <>
                         <div className="relative my-10">
                           <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-100"></div></div>
-                          <div className="relative flex justify-center text-sm uppercase"><span className="bg-white px-4 text-gray-400 font-bold tracking-widest">SNS 간편 로그인</span></div>
+                          <div className="relative flex justify-center text-sm uppercase"><span className="bg-white px-4 text-gray-500 font-bold tracking-widest">SNS 간편 로그인</span></div>
                         </div>
 
                         <div className="space-y-3">
@@ -401,13 +401,13 @@ function LoginContent() {
                             type="button"
                             onClick={handleDanalVerification}
                             disabled={isIdentityVerifying}
-                            className="w-full min-h-[52px] px-4 py-3.5 bg-brand-black text-white rounded-xl font-bold text-sm md:text-base flex items-center justify-center gap-2 hover:bg-brand-point transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                            className="w-full min-h-[52px] px-4 py-3.5 bg-brand-black text-white rounded-xl font-bold text-sm md:text-base flex items-center justify-center gap-2 hover:bg-brand-point hover:text-black transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
                           >
                             <ShieldCheck size={18} className="flex-shrink-0" />
                             {isIdentityVerifying ? "본인인증 진행 중..." : "만 19세 이상 본인인증"}
                           </button>
                         ) : (
-                          <div className="flex items-center gap-2 bg-brand-point/10 border border-brand-point/30 rounded-xl px-4 py-3.5 min-h-[52px] text-brand-point font-bold text-sm md:text-base break-keep">
+                          <div className="flex items-center gap-2 bg-brand-point/10 border border-brand-point/30 rounded-xl px-4 py-3.5 min-h-[52px] text-brand-point-ink font-bold text-sm md:text-base break-keep">
                             <CheckCircle size={18} className="flex-shrink-0" />
                             {verifiedName}님 본인인증이 완료되었습니다. (만 19세 이상 확인)
                           </div>
@@ -417,7 +417,7 @@ function LoginContent() {
                       <div>
                         <label className={labelClass}>연락처</label>
                         <div className="relative">
-                          <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                          <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
                           <input
                             type="tel"
                             inputMode="numeric"
@@ -434,7 +434,7 @@ function LoginContent() {
                       <div>
                         <label className={labelClass}>이메일 주소 (ID)</label>
                         <div className="relative">
-                          <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                          <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
                           <input
                             type="email"
                             placeholder="example@thewoollim.com"
@@ -449,7 +449,7 @@ function LoginContent() {
                       <div>
                         <label className={labelClass}>비밀번호</label>
                         <div className="relative">
-                          <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                          <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
                           <input
                             type="password"
                             placeholder="8자 이상의 영문/숫자 조합"
@@ -465,7 +465,7 @@ function LoginContent() {
                       <div>
                         <label className={labelClass}>비밀번호 확인</label>
                         <div className="relative">
-                          <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                          <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
                           <input
                             type="password"
                             placeholder="비밀번호를 한 번 더 입력"
@@ -487,7 +487,7 @@ function LoginContent() {
                           </p>
                         )}
                         {registerPasswordConfirm && registerPassword === registerPasswordConfirm && (
-                          <p className="text-xs text-brand-point font-bold mt-1.5 ml-1 flex items-center gap-1">
+                          <p className="text-xs text-brand-point-ink font-bold mt-1.5 ml-1 flex items-center gap-1">
                             <CheckCircle size={12} /> 비밀번호가 일치합니다.
                           </p>
                         )}
@@ -498,14 +498,14 @@ function LoginContent() {
                         <div className="p-5 md:p-6">
                           <div className="flex items-center justify-between mb-4 gap-3">
                             <h4 className="font-black text-gray-900 text-sm md:text-base leading-snug flex items-center gap-1.5 whitespace-nowrap">
-                              <ShieldCheck size={16} className="text-brand-point flex-shrink-0" />
+                              <ShieldCheck size={16} className="text-brand-point-ink flex-shrink-0" />
                               개인정보 수집 및 이용 동의
-                              <span className="text-brand-point text-xs md:text-sm">(필수)</span>
+                              <span className="text-brand-point-ink text-xs md:text-sm">(필수)</span>
                             </h4>
                             <button
                               type="button"
                               onClick={() => setRegisterConsentExpanded(v => !v)}
-                              className="flex items-center gap-1 text-xs md:text-sm font-bold text-brand-point hover:brightness-90 transition-all flex-shrink-0 px-2 py-1"
+                              className="flex items-center gap-1 text-xs md:text-sm font-bold text-brand-point-ink hover:brightness-90 transition-all flex-shrink-0 px-2 py-3.5 -my-2.5"
                             >
                               {registerConsentExpanded ? <>접기 <ChevronUp size={14} /></> : <>자세히 <ChevronDown size={14} /></>}
                             </button>
@@ -520,7 +520,7 @@ function LoginContent() {
 이름, 이메일, 연락처(휴대전화번호), 비밀번호 (이후 프로필 카드 작성 시 거주지역·직업·MBTI·관심사·이상형 추가)
 
 ■ 수집·이용 목적
-① 매칭파티 참여자 신원 확인 및 본인 인증
+① 파티(매칭파티·솔로파티 등) 참여자 신원 확인 및 본인 인증
 ② 서비스 이용에 따른 고객 관리·민원 처리
 ③ 맞춤형 매칭 및 일정·변경사항 안내
 
@@ -530,7 +530,7 @@ function LoginContent() {
  · 분쟁 처리 기록: 3년 (전자상거래법)
  · 접속 로그: 3개월 (통신비밀보호법)
 
-위 사항에 대한 동의를 거부할 권리가 있으나, 거부 시 어울림 매칭파티 서비스 이용이 제한됩니다.`}
+위 사항에 대한 동의를 거부할 권리가 있으나, 거부 시 어울림 파티 서비스 이용이 제한됩니다.`}
                             </motion.div>
                           )}
 
@@ -548,12 +548,12 @@ function LoginContent() {
                               onChange={e => setRegisterConsent(e.target.checked)}
                               className="w-6 h-6 rounded accent-brand-point cursor-pointer flex-shrink-0"
                             />
-                            <span className={`text-sm md:text-base font-bold leading-snug flex-1 ${registerConsent ? "text-brand-point" : "text-gray-700"}`}>
+                            <span className={`text-sm md:text-base font-bold leading-snug flex-1 ${registerConsent ? "text-brand-point-ink" : "text-gray-700"}`}>
                               위 내용에 동의합니다.
                               <span className="ml-1 text-xs md:text-sm font-black">(필수)</span>
                             </span>
                             {registerConsent && (
-                              <CheckCircle size={20} className="text-brand-point flex-shrink-0" strokeWidth={3} />
+                              <CheckCircle size={20} className="text-brand-point-ink flex-shrink-0" strokeWidth={3} />
                             )}
                           </label>
                         </div>
@@ -562,7 +562,7 @@ function LoginContent() {
                       <button
                         type="submit"
                         disabled={registering}
-                        className="w-full bg-brand-black text-white py-4 rounded-xl font-bold text-lg hover:bg-brand-point transition-all shadow-xl disabled:bg-gray-200 disabled:shadow-none mt-4 disabled:cursor-not-allowed"
+                        className="w-full bg-brand-black text-white py-4 rounded-xl font-bold text-lg hover:bg-brand-point hover:text-black transition-all shadow-xl disabled:bg-gray-200 disabled:shadow-none mt-4 disabled:cursor-not-allowed"
                       >
                         {registering ? "가입 중..." : "가입 완료하기"}
                       </button>
@@ -573,7 +573,7 @@ function LoginContent() {
             </div>
           </div>
 
-          <Link href="/" className="flex items-center justify-center gap-2 text-gray-400 hover:text-white mt-10 font-bold transition-colors">
+          <Link href="/" className="flex items-center justify-center gap-2 py-3 mt-7 -mb-3 md:py-0 md:mt-10 md:mb-0 text-gray-400 hover:text-white font-bold transition-colors">
             <ArrowLeft size={18} /> 메인으로 돌아가기
           </Link>
         </motion.div>
@@ -595,11 +595,11 @@ function LoginContent() {
               exit={{ opacity: 0, scale: 0.92, y: 20 }}
               transition={{ type: "spring", stiffness: 260, damping: 22 }}
               onClick={e => e.stopPropagation()}
-              className="bg-white rounded-3xl shadow-2xl w-full max-w-sm md:max-w-md p-7 md:p-9 relative"
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-sm md:max-w-md p-7 md:p-9 relative max-h-[90vh] overflow-y-auto md:max-h-none md:overflow-visible"
             >
               <button
                 onClick={closeFindModals}
-                className="absolute top-4 right-4 text-gray-300 hover:text-gray-600 transition-colors"
+                className="absolute top-4 right-4 -m-[11px] p-[11px] text-gray-500 hover:text-gray-600 transition-colors"
                 aria-label="닫기"
               >
                 <X size={22} />
@@ -610,8 +610,8 @@ function LoginContent() {
                 <>
                   <div className="flex flex-col items-center text-center mb-6">
                     <div className="w-14 h-14 md:w-16 md:h-16 bg-brand-point/10 rounded-full flex items-center justify-center mb-4">
-                      <UserSearch size={26} className="text-brand-point md:hidden" />
-                      <UserSearch size={30} className="text-brand-point hidden md:block" />
+                      <UserSearch size={26} className="text-brand-point-ink md:hidden" />
+                      <UserSearch size={30} className="text-brand-point-ink hidden md:block" />
                     </div>
                     <h3 className="text-lg md:text-xl font-black mb-1.5">아이디 찾기</h3>
                     <p className="text-xs md:text-sm text-gray-500 font-medium">가입 시 인증하신 휴대폰 번호를 입력해주세요.</p>
@@ -619,18 +619,18 @@ function LoginContent() {
 
                   <form onSubmit={handleFindId} className="space-y-4">
                     <div className="relative">
-                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
                       <input
                         type="tel"
                         value={findIdInput}
                         onChange={e => { setFindIdInput(formatPhone(e.target.value)); setFindIdResult(null); }}
                         placeholder="010-0000-0000"
-                        className="w-full pl-12 pr-4 py-4 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-brand-point focus:border-brand-point transition-all outline-none font-medium text-sm"
+                        className="w-full pl-12 pr-4 py-4 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-brand-point focus:border-brand-point transition-all outline-none font-medium text-base md:text-sm"
                       />
                     </div>
                     <button
                       type="submit"
-                      className="w-full bg-brand-black text-white py-4 rounded-xl font-black text-sm md:text-base hover:bg-brand-point transition-all shadow-lg"
+                      className="w-full bg-brand-black text-white py-4 rounded-xl font-black text-sm md:text-base hover:bg-brand-point hover:text-black transition-all shadow-lg"
                     >
                       아이디 찾기
                     </button>
@@ -653,8 +653,8 @@ function LoginContent() {
                 <>
                   <div className="flex flex-col items-center text-center mb-6">
                     <div className="w-14 h-14 md:w-16 md:h-16 bg-brand-point/10 rounded-full flex items-center justify-center mb-4">
-                      <KeyRound size={26} className="text-brand-point md:hidden" />
-                      <KeyRound size={30} className="text-brand-point hidden md:block" />
+                      <KeyRound size={26} className="text-brand-point-ink md:hidden" />
+                      <KeyRound size={30} className="text-brand-point-ink hidden md:block" />
                     </div>
                     <h3 className="text-lg md:text-xl font-black mb-1.5">비밀번호 찾기</h3>
                     <p className="text-xs md:text-sm text-gray-500 font-medium">가입 시 등록하신 이메일을 입력하시면, 등록된 휴대폰 번호로 임시 비밀번호를 보내드립니다.</p>
@@ -662,18 +662,18 @@ function LoginContent() {
 
                   <form onSubmit={handleFindPw} className="space-y-4">
                     <div className="relative">
-                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
                       <input
                         type="email"
                         value={findPwInput}
                         onChange={e => { setFindPwInput(e.target.value); setFindPwResult(null); }}
                         placeholder="example@thewoollim.com"
-                        className="w-full pl-12 pr-4 py-4 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-brand-point focus:border-brand-point transition-all outline-none font-medium text-sm"
+                        className="w-full pl-12 pr-4 py-4 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-brand-point focus:border-brand-point transition-all outline-none font-medium text-base md:text-sm"
                       />
                     </div>
                     <button
                       type="submit"
-                      className="w-full bg-brand-black text-white py-4 rounded-xl font-black text-sm md:text-base hover:bg-brand-point transition-all shadow-lg"
+                      className="w-full bg-brand-black text-white py-4 rounded-xl font-black text-sm md:text-base hover:bg-brand-point hover:text-black transition-all shadow-lg"
                     >
                       임시 비밀번호 받기
                     </button>

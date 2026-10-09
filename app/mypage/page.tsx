@@ -17,7 +17,7 @@ const STATUS_DISPLAY: Record<BookingStatus, { label: string; tone: string; strip
   vbank_pending: {
     label:  "입금 확인 중",
     sub:    "안내된 계좌로 입금해주시면 확인 후 확정됩니다",
-    tone:   "bg-[#fce5cd] text-[#FF2300]",   // v7.1 — 배경 FCE5CD(연한 살구) / 글자 FF2300 유지
+    tone:   "bg-[#fce5cd] text-danger",   // v7.1 — 배경 FCE5CD(연한 살구) / 글자 FF2300 유지
     stripe: "bg-[#F6B26B]",
     icon:   Clock,
   },
@@ -57,8 +57,8 @@ const STATUS_DISPLAY: Record<BookingStatus, { label: string; tone: string; strip
   cancel_requested: {
     label:  "취소 요청 중",
     sub:    "운영팀에서 환불 요청을 확인 중입니다",
-    tone:   "bg-[#f4cccc] text-[#CC0000] font-bold",   // 파스텔 붉은 배경 / 붉은 글자
-    stripe: "bg-[#CC0000]",
+    tone:   "bg-[#f4cccc] text-danger font-bold",   // 파스텔 붉은 배경 / 붉은 글자
+    stripe: "bg-danger",
     icon:   Clock,
   },
   // 환불 완료: 운영팀 환불 처리 완료 (v7.0)
@@ -306,8 +306,8 @@ export default function MyPage() {
           <div className="max-w-4xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div className="flex items-center gap-5">
               <div className="w-16 h-16 md:w-20 md:h-20 bg-brand-point rounded-full flex items-center justify-center flex-shrink-0">
-                <User size={30} className="text-white md:hidden" />
-                <User size={38} className="text-white hidden md:block" />
+                <User size={30} className="text-black md:hidden" />
+                <User size={38} className="text-black hidden md:block" />
               </div>
               <div>
                 <p className="text-gray-400 text-xs md:text-sm font-medium mb-1">
@@ -324,7 +324,7 @@ export default function MyPage() {
             <div className="flex gap-2.5 flex-wrap">
               <Link
                 href="/profile-setup/"
-                className="inline-flex items-center gap-2 bg-brand-point hover:brightness-110 text-white px-4 md:px-5 py-3 rounded-xl font-bold transition-all text-sm w-fit no-underline"
+                className="inline-flex items-center gap-2 bg-brand-point hover:brightness-110 text-black px-4 md:px-5 py-3 rounded-xl font-bold transition-all text-sm w-fit no-underline"
               >
                 <Pencil size={14} /> 정보수정
               </Link>
@@ -353,9 +353,9 @@ export default function MyPage() {
           <section className="py-10 md:py-16 px-4 md:px-6">
             <div className="max-w-4xl mx-auto">
               <div className="flex items-center gap-3 mb-7 md:mb-10">
-                <Ticket size={22} className="text-brand-point" />
+                <Ticket size={22} className="text-brand-point-ink" />
                 <h2 className="text-2xl md:text-3xl font-black tracking-tight">내 예약 현황</h2>
-                <span className="bg-brand-point text-white text-xs font-black px-2.5 py-1 rounded-full">{visibleBookings.length}</span>
+                <span className="bg-brand-point text-black text-xs font-black px-2.5 py-1 rounded-full">{visibleBookings.length}</span>
               </div>
               <div className="space-y-4 md:space-y-5">
                 {[...visibleBookings].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(b => {
@@ -384,7 +384,7 @@ export default function MyPage() {
                         {/* Party title */}
                         <h3 className="font-black text-lg md:text-2xl leading-snug text-brand-black">
                           {party ? (
-                            <Link href={`/party/${b.partyId}`} className="hover:text-brand-point hover:underline underline-offset-4 transition-colors">
+                            <Link href={`/party/${b.partyId}`} className="py-3 hover:text-brand-point-ink hover:underline underline-offset-4 transition-colors">
                               {party.title}
                             </Link>
                           ) : `파티 #${b.partyId}`}
@@ -394,11 +394,11 @@ export default function MyPage() {
                         {party && (
                           <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:gap-x-5 sm:gap-y-1.5 text-sm md:text-base text-gray-700 font-bold">
                             <span className="flex items-center gap-2">
-                              <Calendar size={15} className="text-brand-point flex-shrink-0" />
+                              <Calendar size={15} className="text-brand-point-ink flex-shrink-0" />
                               {party.dateString}
                             </span>
                             <span className="flex items-center gap-2">
-                              <MapPin size={15} className="text-brand-point flex-shrink-0" />
+                              <MapPin size={15} className="text-brand-point-ink flex-shrink-0" />
                               {party.location}
                             </span>
                           </div>
@@ -407,16 +407,16 @@ export default function MyPage() {
                         {/* 무통장 입금 안내 가이드 — '입금 확인 중' 상태일 때만 (v7.0) */}
                         {b.status === "vbank_pending" && (
                           <div className="mt-3 rounded-xl border-2 border-[#F6B26B] bg-[#F6B26B]/10 p-4 md:p-5 space-y-2.5">
-                            <div className="text-[#FF2300] font-black text-sm md:text-base">[ 상태: 입금 확인 중 ]</div>
+                            <div className="text-danger font-black text-sm md:text-base">[ 상태: 입금 확인 중 ]</div>
                             <div className="font-black text-brand-black text-sm md:text-base">무통장 입금 안내</div>
                             <div className="text-sm md:text-base font-bold text-brand-black space-y-1">
                               <div>입금 계좌: <span className="font-bold text-black">{VBANK_ACCOUNT_LINE}</span></div>
                               <div>참가 비용: <span className="font-bold text-black tabular-nums">{(b.total ?? party?.price ?? 0).toLocaleString()}원</span></div>
                             </div>
-                            <p className="text-xs md:text-sm text-gray-600 font-medium leading-relaxed break-keep">
+                            <p className="text-[13px] md:text-sm text-gray-600 font-medium leading-relaxed break-keep">
                               현재 회원님의 입금 내역을 확인하고 있습니다. 운영팀에서 입금 확인을 완료하는 대로 ‘참가확정(또는 확정 대기 중)’ 상태로 변경되며, 안내 문자가 발송됩니다. 조금만 기다려 주세요!
                             </p>
-                            <p className="text-[11px] md:text-xs text-[#FF2300] font-bold leading-relaxed break-keep">
+                            <p className="text-[13px] md:text-xs text-danger font-bold leading-relaxed break-keep">
                               ※ 신청자명과 실제 입금자명이 다를 경우 확인이 늦어질 수 있으니, 다를 경우 고객센터나 1:1 문의로 꼭 말씀해 주세요.
                             </p>
                           </div>
@@ -428,7 +428,7 @@ export default function MyPage() {
                         <div className="flex md:items-center">
                           <Link
                             href="/profile-setup/"
-                            className="w-full md:w-auto inline-flex items-center justify-center gap-1.5 bg-brand-black text-white px-5 py-3 rounded-xl font-black text-sm md:text-base hover:bg-brand-point transition-all whitespace-nowrap text-center no-underline"
+                            className="w-full md:w-auto inline-flex items-center justify-center gap-1.5 bg-brand-black text-white px-5 py-3 rounded-xl font-black text-sm md:text-base hover:bg-brand-point hover:text-black transition-all whitespace-nowrap text-center no-underline"
                           >
                             <Pencil size={14} /> 프로필 카드 작성
                           </Link>
@@ -447,29 +447,29 @@ export default function MyPage() {
           <div className="max-w-4xl mx-auto">
 
             <div className="flex items-center gap-3 mb-7 md:mb-10">
-              <ShoppingBag size={22} className="text-brand-point" />
+              <ShoppingBag size={22} className="text-brand-point-ink" />
               <h2 className="text-2xl md:text-3xl font-black tracking-tight">장바구니</h2>
-              <span className="bg-brand-point text-white text-xs font-black px-2.5 py-1 rounded-full">{cartTotalQty}</span>
+              <span className="bg-brand-point text-black text-xs font-black px-2.5 py-1 rounded-full">{cartTotalQty}</span>
             </div>
 
             {cartParties.length === 0 ? (
               <div className="bg-white rounded-2xl md:rounded-3xl p-10 md:p-16 text-center border border-gray-100">
                 <ShoppingBag size={44} className="text-gray-200 mx-auto mb-5" />
-                <p className="text-gray-400 font-bold mb-6 text-sm md:text-base">장바구니가 비어있습니다.</p>
+                <p className="text-gray-500 font-bold mb-6 text-sm md:text-base">장바구니가 비어있습니다.</p>
                 <Link
                   href="/#apply"
-                  className="inline-block bg-brand-black text-white px-8 py-3.5 rounded-xl font-bold hover:bg-brand-point transition-colors text-sm md:text-base"
+                  className="inline-block bg-brand-black text-white px-8 py-3.5 rounded-xl font-bold hover:bg-brand-point hover:text-black transition-colors text-sm md:text-base"
                 >
-                  매칭파티 보러가기
+                  파티 보러가기
                 </Link>
               </div>
             ) : (
               <div className="space-y-4">
                 {/* Select All */}
                 <div className="flex items-center gap-3 px-2">
-                  <button onClick={toggleAll} className="flex items-center gap-2 text-sm font-bold text-gray-600 hover:text-brand-point transition-colors">
+                  <button onClick={toggleAll} className="flex items-center gap-2 py-3 -my-3 text-sm font-bold text-gray-600 hover:text-brand-point-ink transition-colors">
                     {allSelected
-                      ? <CheckSquare size={20} className="text-brand-point" />
+                      ? <CheckSquare size={20} className="text-brand-point-ink" />
                       : <Square size={20} />
                     }
                     전체선택 ({selectedIds.size}/{cartParties.length})
@@ -493,17 +493,17 @@ export default function MyPage() {
                       {/* 헤더: 체크 + 모집중 / 삭제 */}
                       <div className="flex items-center justify-between mb-4 md:mb-5">
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <button onClick={() => toggleOne(party.id)} className="flex-shrink-0" aria-label="선택">
+                          <button onClick={() => toggleOne(party.id)} className="flex-shrink-0 p-[11px] -m-[11px]" aria-label="선택">
                             {isSelected
-                              ? <CheckSquare size={22} className="text-brand-point" />
-                              : <Square size={22} className="text-gray-300" />
+                              ? <CheckSquare size={22} className="text-brand-point-ink" />
+                              : <Square size={22} className="text-gray-500" />
                             }
                           </button>
-                          <span className="inline-flex items-center text-[11px] md:text-xs font-black text-brand-point bg-brand-point/10 px-2.5 py-1 rounded-full">모집중</span>
+                          <span className="inline-flex items-center text-xs font-black text-brand-point-ink bg-brand-point/10 px-2.5 py-1 rounded-full">모집중</span>
                         </div>
                         <button
                           onClick={() => removeFromCart(party.id)}
-                          className="p-2 rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-500 transition-all flex-shrink-0"
+                          className="relative p-2 rounded-lg text-gray-500 hover:bg-red-50 hover:text-danger transition-all flex-shrink-0 before:absolute before:-inset-1.5"
                           aria-label="삭제"
                         >
                           <Trash2 size={17} />
@@ -512,12 +512,12 @@ export default function MyPage() {
 
                       {/* 본문: 제목 + 일시/장소 (전체 클릭 가능) */}
                       <Link href={`/party/${party.id}`} className="block group">
-                        <h3 className="font-black text-lg md:text-2xl mb-3 md:mb-4 leading-snug group-hover:text-brand-point transition-colors break-keep">
+                        <h3 className="font-black text-lg md:text-2xl mb-3 md:mb-4 leading-snug group-hover:text-brand-point-ink transition-colors break-keep">
                           {party.title}
                         </h3>
                         <div className="flex flex-col gap-2 md:gap-2.5 text-sm md:text-base text-gray-600 font-medium">
-                          <span className="flex items-center gap-2"><Calendar size={15} className="text-brand-point flex-shrink-0" /> {party.dateString}</span>
-                          <span className="flex items-center gap-2"><MapPin size={15} className="text-brand-point flex-shrink-0" /> {party.location}</span>
+                          <span className="flex items-center gap-2"><Calendar size={15} className="text-brand-point-ink flex-shrink-0" /> {party.dateString}</span>
+                          <span className="flex items-center gap-2"><MapPin size={15} className="text-brand-point-ink flex-shrink-0" /> {party.location}</span>
                         </div>
                       </Link>
 
@@ -530,12 +530,12 @@ export default function MyPage() {
                           const lineFinal = computeRowPrice(party.id, lineTotal);
                           return (
                             <div className="flex items-baseline justify-between gap-3">
-                              <span className="text-xs md:text-sm font-bold text-gray-400 uppercase tracking-wider">결제 금액</span>
+                              <span className="text-xs md:text-sm font-bold text-gray-500 uppercase tracking-wider">결제 금액</span>
                               <div className="flex flex-col items-end leading-tight gap-0.5">
                                 {couponHere ? (
                                   <>
-                                    <s className="text-gray-400 text-xs md:text-sm font-medium tabular-nums">₩{lineTotal.toLocaleString()}</s>
-                                    <span className="font-black text-2xl md:text-3xl text-brand-point whitespace-nowrap tabular-nums">₩{lineFinal.toLocaleString()}</span>
+                                    <s className="text-gray-500 text-xs md:text-sm font-medium tabular-nums">₩{lineTotal.toLocaleString()}</s>
+                                    <span className="font-black text-2xl md:text-3xl text-brand-point-ink whitespace-nowrap tabular-nums">₩{lineFinal.toLocaleString()}</span>
                                   </>
                                 ) : (
                                   <span className="font-black text-2xl md:text-3xl text-brand-black whitespace-nowrap tabular-nums">₩{lineTotal.toLocaleString()}</span>
@@ -550,13 +550,13 @@ export default function MyPage() {
                           {couponHere ? (
                             <div className="space-y-2">
                               <div className="flex items-center gap-2 px-4 py-3 rounded-xl border-2 border-brand-point bg-brand-point/5">
-                                <Check size={16} className="text-brand-point flex-shrink-0" strokeWidth={3} />
-                                <span className="font-black text-sm md:text-base text-brand-point truncate">{appliedCoupon!.code}</span>
-                                <span className="ml-auto text-xs md:text-sm font-black text-brand-point whitespace-nowrap">{couponLabel()}</span>
+                                <Check size={16} className="text-brand-point-ink flex-shrink-0" strokeWidth={3} />
+                                <span className="font-black text-sm md:text-base text-brand-point-ink truncate">{appliedCoupon!.code}</span>
+                                <span className="ml-auto text-xs md:text-sm font-black text-brand-point-ink whitespace-nowrap">{couponLabel()}</span>
                               </div>
                               <button
                                 onClick={handleRemoveCoupon}
-                                className="block ml-auto text-xs md:text-sm text-gray-400 hover:text-red-500 font-bold underline underline-offset-2 py-1"
+                                className="block ml-auto text-xs md:text-sm text-gray-500 hover:text-danger font-bold underline underline-offset-2 py-3.5 -my-2.5"
                               >
                                 쿠폰 해제
                               </button>
@@ -566,7 +566,7 @@ export default function MyPage() {
                               <p className="text-xs md:text-sm text-gray-500 font-bold leading-snug min-w-0 truncate">
                                 다른 파티에 쿠폰 적용 중
                               </p>
-                              <button onClick={handleRemoveCoupon} className="text-xs md:text-sm text-brand-point underline font-black whitespace-nowrap flex-shrink-0">변경</button>
+                              <button onClick={handleRemoveCoupon} className="text-xs md:text-sm text-brand-point-ink underline font-black whitespace-nowrap flex-shrink-0">변경</button>
                             </div>
                           ) : (
                             <div className="flex flex-row gap-2">
@@ -587,14 +587,14 @@ export default function MyPage() {
                                 type="button"
                                 onClick={() => handleApplyCoupon(party.id)}
                                 disabled={couponLoadingId === party.id || !(couponInputs[party.id] || "").trim()}
-                                className="flex-[1] h-14 px-3 sm:px-5 bg-brand-black text-white rounded-xl font-black text-sm whitespace-nowrap hover:bg-brand-point transition-all disabled:bg-gray-200 disabled:text-gray-400"
+                                className="flex-[1] h-14 px-3 sm:px-5 bg-brand-black text-white rounded-xl font-black text-sm whitespace-nowrap hover:bg-brand-point hover:text-black transition-all disabled:bg-gray-200 disabled:text-gray-400"
                               >
                                 {couponLoadingId === party.id ? "확인 중..." : "적용"}
                               </button>
                             </div>
                           )}
                           {couponMsg[party.id] && !couponHere && (
-                            <p className={`text-xs md:text-sm mt-2 ml-1 font-bold ${couponMsg[party.id]!.startsWith("✓") ? "text-brand-point" : "text-red-500"}`}>
+                            <p className={`text-xs md:text-sm mt-2 ml-1 font-bold ${couponMsg[party.id]!.startsWith("✓") ? "text-brand-point-ink" : "text-red-500"}`}>
                               {couponMsg[party.id]}
                             </p>
                           )}
@@ -612,7 +612,7 @@ export default function MyPage() {
                         <span>상품 금액</span>
                         <span className="tabular-nums">₩{selectedOriginalTotal.toLocaleString()}</span>
                       </div>
-                      <div className="flex justify-between items-center text-brand-point font-bold">
+                      <div className="flex justify-between items-center text-brand-point-ink font-bold">
                         <span>쿠폰 할인 ({appliedCoupon?.code})</span>
                         <span className="tabular-nums">- ₩{selectedDiscount.toLocaleString()}</span>
                       </div>
@@ -621,9 +621,9 @@ export default function MyPage() {
                   <div className="flex justify-between items-center mb-5">
                     <span className="font-black text-base md:text-lg">
                       {allSelected ? "전체 결제금액" : "선택 결제금액"}{" "}
-                      <span className="text-brand-point">({selectedParties.length}건)</span>
+                      <span className="text-brand-point-ink">({selectedParties.length}건)</span>
                     </span>
-                    <span className="font-black text-xl md:text-3xl text-brand-point tabular-nums">
+                    <span className="font-black text-xl md:text-3xl text-brand-point-ink tabular-nums">
                       ₩{selectedTotal.toLocaleString()}
                     </span>
                   </div>
@@ -639,7 +639,7 @@ export default function MyPage() {
                         {/* Primary: Pay all */}
                         <Link
                           href={`/checkout/?ids=${allIds}`}
-                          className="flex items-center justify-center gap-2 w-full bg-brand-black text-white py-4 rounded-xl font-black text-base md:text-lg hover:bg-brand-point transition-all text-center mb-3"
+                          className="flex items-center justify-center gap-2 w-full bg-brand-black text-white py-4 rounded-xl font-black text-base md:text-lg hover:bg-brand-point hover:text-black transition-all text-center mb-3"
                         >
                           <CreditCard size={20} />
                           전체 결제하기 ({cartTotalQty}건) · ₩{cartTotal.toLocaleString()}
@@ -649,7 +649,7 @@ export default function MyPage() {
                         {!allSelected && selectedParties.length > 0 && (
                           <Link
                             href={`/checkout/?ids=${selectedIdsStr}`}
-                            className="flex items-center justify-center gap-2 w-full bg-white border-2 border-brand-black text-brand-black py-3.5 rounded-xl font-black text-sm md:text-base hover:bg-brand-point hover:text-white hover:border-brand-point transition-all text-center"
+                            className="flex items-center justify-center gap-2 w-full bg-white border-2 border-brand-black text-brand-black py-3.5 rounded-xl font-black text-sm md:text-base hover:bg-brand-point hover:text-black hover:border-brand-point transition-all text-center"
                           >
                             선택 항목만 결제하기 ({selectedParties.reduce((s, p) => s + qtyOf(p.id), 0)}건)
                           </Link>
@@ -658,7 +658,7 @@ export default function MyPage() {
                     );
                   })()}
                   {selectedParties.length === 0 && (
-                    <p className="text-center text-xs text-gray-400 font-medium">
+                    <p className="text-center text-xs text-gray-500 font-medium">
                       일부 항목만 결제하려면 체크박스로 선택해주세요.
                     </p>
                   )}
@@ -673,7 +673,7 @@ export default function MyPage() {
           <div className="max-w-4xl mx-auto flex justify-center md:justify-end items-center gap-5">
             <Link
               href="/mypage/cancel/"
-              className="text-xs md:text-sm text-gray-400 hover:text-gray-600 underline underline-offset-4 py-2 transition-colors no-underline-link"
+              className="text-xs md:text-sm text-gray-500 hover:text-danger underline underline-offset-4 px-1 -mx-1 py-3.5 -my-1.5 transition-colors no-underline-link"
             >
               취소요청
             </Link>
@@ -705,8 +705,8 @@ export default function MyPage() {
                 });
                 if (blocking) {
                   alert(
-                    "잠시만요! 아직 진행 중인 매칭 파티가 남아있어요.\n" +
-                    "현재 진행 대기 중인 매칭 파티가 있습니다.\n" +
+                    "잠시만요! 아직 진행 중인 파티가 남아있어요.\n" +
+                    "현재 진행 대기 중인 파티가 있습니다.\n" +
                     "탈퇴 버튼 바로 옆에 있는 [취소요청] 버튼을 눌러 먼저 정리를 마쳐주세요.\n" +
                     "모든 신청 내역이 취소된 후에 회원 탈퇴가 가능합니다."
                   );
@@ -714,7 +714,7 @@ export default function MyPage() {
                 }
                 setShowWithdrawModal(true);
               }}
-              className="!bg-transparent hover:!bg-transparent focus:!bg-transparent !border-0 !outline-none !shadow-none text-xs md:text-sm text-gray-400 hover:!text-gray-600 underline underline-offset-4 cursor-pointer py-2 px-0 transition-colors duration-200 ease-out"
+              className="!bg-transparent hover:!bg-transparent focus:!bg-transparent !border-0 !outline-none !shadow-none text-xs md:text-sm text-gray-500 hover:!text-danger underline underline-offset-4 cursor-pointer py-3.5 -my-1.5 px-1 -mx-1 transition-colors duration-200 ease-out"
             >
               회원탈퇴
             </button>
@@ -738,12 +738,12 @@ export default function MyPage() {
               exit={{ opacity: 0, scale: 0.92, y: 20 }}
               transition={{ type: "spring", stiffness: 260, damping: 22 }}
               onClick={e => e.stopPropagation()}
-              className="bg-white rounded-3xl shadow-2xl w-full max-w-sm md:max-w-md p-7 md:p-9 relative"
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-sm md:max-w-md p-7 md:p-9 relative max-h-[90vh] overflow-y-auto md:max-h-none md:overflow-visible"
             >
               <button
                 onClick={() => !withdrawing && setShowWithdrawModal(false)}
                 disabled={withdrawing}
-                className="absolute top-4 right-4 text-gray-300 hover:text-gray-600 transition-colors disabled:opacity-30"
+                className="absolute top-4 right-4 -m-[11px] p-[11px] text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-30"
                 aria-label="닫기"
               >
                 <X size={22} />
@@ -775,7 +775,7 @@ export default function MyPage() {
                     type="button"
                     onClick={handleWithdraw}
                     disabled={withdrawing}
-                    className="flex-1 bg-red-500 text-white py-3.5 rounded-xl font-black text-sm md:text-base hover:bg-red-600 transition-all shadow-lg order-1 sm:order-2 disabled:bg-red-300 disabled:cursor-not-allowed"
+                    className="flex-1 bg-danger text-white py-3.5 rounded-xl font-black text-sm md:text-base hover:bg-red-700 transition-all shadow-lg order-1 sm:order-2 disabled:bg-red-300 disabled:cursor-not-allowed"
                   >
                     {withdrawing ? "처리 중..." : "탈퇴하기"}
                   </button>
@@ -806,7 +806,7 @@ export default function MyPage() {
                 type="button"
                 onClick={closePwModal}
                 disabled={pwSubmitting}
-                className="absolute top-4 right-4 text-gray-300 hover:text-gray-600 transition-colors disabled:opacity-30"
+                className="absolute top-4 right-4 -m-[11px] p-[11px] text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-30"
                 aria-label="닫기"
               >
                 <X size={22} />
@@ -818,7 +818,7 @@ export default function MyPage() {
                   <KeyRound size={30} className="text-gray-700 hidden md:block" />
                 </div>
                 <h3 className="text-lg md:text-xl font-black mb-1.5">비밀번호 변경</h3>
-                <p className="text-xs md:text-sm text-gray-500 font-medium">현재 비밀번호를 확인한 뒤 새 비밀번호로 변경합니다.</p>
+                <p className="text-[13px] md:text-sm text-gray-500 font-medium">현재 비밀번호를 확인한 뒤 새 비밀번호로 변경합니다.</p>
               </div>
 
               <div className="space-y-3.5 text-left">

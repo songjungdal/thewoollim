@@ -120,36 +120,43 @@ if ($couponCode !== '') {
     $couponDiscount = calcCouponDiscount($found, $linePrice);
 
     $cfp = fopen($usagesFile, 'c+');
-    if ($cfp) {
-        flock($cfp, LOCK_EX);
-        $craw = stream_get_contents($cfp);
-        $usages = $craw ? json_decode($craw, true) : [];
-        if (!is_array($usages)) $usages = [];
-        // 동일 사용자 중복 사용 차단
-        foreach ($usages as $usage) {
-            if (strtoupper((string)($usage['code'] ?? '')) === $couponCode &&
-                strtolower((string)($usage['email'] ?? '')) === strtolower($email)) {
-                flock($cfp, LOCK_UN); fclose($cfp);
-                jsonFail('이미 사용한 쿠폰입니다.');
-            }
-        }
-        // 총 발급 수량 한도 enforce
-        $maxCount = max(0, (int)($found['max_count'] ?? 0));
-        if ($maxCount > 0 && countCouponUsages($usages, $couponCode) >= $maxCount) {
-            flock($cfp, LOCK_UN); fclose($cfp);
-            jsonFail('쿠폰 발급 수량이 모두 소진되었습니다.');
-        }
-        $usages[] = [
-            'code'          => $couponCode,
-            'email'         => $email,
-            'discount_type' => (string)($found['discount_type'] ?? 'amount'),
-            'amount'        => (int)($found['amount'] ?? 0),
-            'discount'      => $couponDiscount,
-            'usedAt'        => date('c'),
-        ];
-        ftruncate($cfp, 0); rewind($cfp); fwrite($cfp, json_encode($usages, JSON_UNESCAPED_UNICODE));
-        fflush($cfp); flock($cfp, LOCK_UN); fclose($cfp);
+    if (!$cfp) {
+        // 쿠폰 사용 이력 파일을 열 수 없음 — 사용 기록·중복/수량 검사 없이 할인만 적용되지 않도록 신청을 거절 (예약 미생성)
+        @file_put_contents("$dataDir/_counts_failure_alert.log", sprintf(
+            "[%s] COUPON_FILE_OPEN_FAILED vbank-submit email=%s coupon=%s — 신청 거절\n",
+            date('c'), $email, $couponCode
+        ), FILE_APPEND);
+        error_log('[payments/vbank-submit] coupon_usages.json fopen failed');
+        jsonFail('일시적인 오류로 신청하지 못했습니다. 잠시 후 다시 시도해주세요.', 500);
     }
+    flock($cfp, LOCK_EX);
+    $craw = stream_get_contents($cfp);
+    $usages = $craw ? json_decode($craw, true) : [];
+    if (!is_array($usages)) $usages = [];
+    // 동일 사용자 중복 사용 차단
+    foreach ($usages as $usage) {
+        if (strtoupper((string)($usage['code'] ?? '')) === $couponCode &&
+            strtolower((string)($usage['email'] ?? '')) === strtolower($email)) {
+            flock($cfp, LOCK_UN); fclose($cfp);
+            jsonFail('이미 사용한 쿠폰입니다.');
+        }
+    }
+    // 총 발급 수량 한도 enforce
+    $maxCount = max(0, (int)($found['max_count'] ?? 0));
+    if ($maxCount > 0 && countCouponUsages($usages, $couponCode) >= $maxCount) {
+        flock($cfp, LOCK_UN); fclose($cfp);
+        jsonFail('쿠폰 발급 수량이 모두 소진되었습니다.');
+    }
+    $usages[] = [
+        'code'          => $couponCode,
+        'email'         => $email,
+        'discount_type' => (string)($found['discount_type'] ?? 'amount'),
+        'amount'        => (int)($found['amount'] ?? 0),
+        'discount'      => $couponDiscount,
+        'usedAt'        => date('c'),
+    ];
+    ftruncate($cfp, 0); rewind($cfp); fwrite($cfp, json_encode($usages, JSON_UNESCAPED_UNICODE));
+    fflush($cfp); flock($cfp, LOCK_UN); fclose($cfp);
 }
 
 $amount = max(0, $total - $couponDiscount);

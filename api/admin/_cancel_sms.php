@@ -63,12 +63,14 @@ if (!function_exists('notifyCancelSms')) {
             // 2) 파티 정보 (일시/장소)
             $partyId = (string)($booking['partyId'] ?? '');
             $loc = $dateString = '';
+            $typeLabel = '매칭파티';   // 파티 종류명 (매칭파티 / 솔로파티) — 파티를 못 찾으면 기본값
             $parties = json_decode((string)@file_get_contents(dataDir() . '/parties.json'), true);
             if (is_array($parties)) {
                 foreach ($parties as $p) {
                     if ((string)($p['id'] ?? '') === $partyId) {
                         $loc        = (string)($p['location']   ?? '');
                         $dateString = (string)($p['dateString'] ?? '');
+                        $typeLabel  = partyTypeLabel($p);
                         break;
                     }
                 }
@@ -80,9 +82,9 @@ if (!function_exists('notifyCancelSms')) {
             // 3) 메시지 — 템플릿 (줄바꿈/특수문자 그대로 유지)
             if ($kind === 'full_refund') {
                 $msg =
-                    "[어울림] 매칭파티 취소 및 전액 환불 안내\n" .
+                    "[어울림] {$typeLabel} 취소 및 전액 환불 안내\n" .
                     "안녕하세요, {$name}님.\n" .
-                    "운영팀 사정(성비 및 최소 인원 미달)으로 인해 신청하신 매칭파티 일정이 부득이하게 취소되었습니다.\n" .
+                    "운영팀 사정(성비 및 최소 인원 미달)으로 인해 신청하신 {$typeLabel} 일정이 부득이하게 취소되었습니다.\n" .
                     "일시: {$pdate} {$ptime}\n" .
                     "장소: {$loc}\n" .
                     "운영팀 취소에 따라 결제하신 참가비는 100% 전액 환불 처리됩니다.\n" .
@@ -91,9 +93,9 @@ if (!function_exists('notifyCancelSms')) {
                     "파티를 기다려주신 마음에 사과드리며, 다음번에 더 좋은 인연으로 모실 수 있도록 하겠습니다. 감사합니다.";
             } else {
                 $msg =
-                    "[어울림] 매칭파티 취소 완료 안내\n" .
+                    "[어울림] {$typeLabel} 취소 완료 안내\n" .
                     "안녕하세요, {$name}님.\n" .
-                    "신청하신 매칭파티 일정이 정상적으로 취소되었습니다.\n" .
+                    "신청하신 {$typeLabel} 일정이 정상적으로 취소되었습니다.\n" .
                     "일시: {$pdate} {$ptime}\n" .
                     "장소: {$loc}\n" .
                     "- 카드 결제 : 카드사 기준 2~3일 내 자동 승인 취소\n" .

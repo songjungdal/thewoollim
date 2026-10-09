@@ -45,7 +45,7 @@ export default function Header() {
             { href: "/#gallery",      id: "gallery",      label: "현장스케치" },
             { href: "/#reviews",      id: "reviews",      label: "후기게시판" },
             { href: "/#participants", id: "participants", label: "실시간 참여자" },
-            { href: "/#schedule",     id: "schedule",     label: "매칭파티 일정" },
+            { href: "/#schedule",     id: "schedule",     label: "파티 일정" },
             { href: "/#faq",          id: "faq",          label: "FAQ" },
           ].map(item => (
             <Link
@@ -65,7 +65,7 @@ export default function Header() {
               >
                 <ShoppingBag size={22} />
                 {cart.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-brand-point text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center">{cart.reduce((s, i) => s + (i.quantity ?? 1), 0)}</span>
+                  <span className="absolute -top-1 -right-1 bg-brand-point text-black text-xs font-black w-4 h-4 rounded-full flex items-center justify-center">{cart.reduce((s, i) => s + (i.quantity ?? 1), 0)}</span>
                 )}
               </Link>
               <Link
@@ -85,25 +85,25 @@ export default function Header() {
           )}
         </nav>
 
-        <button className="md:hidden" onClick={() => setIsMenuOpen(!isMenuOpen)}>
+        <button className="md:hidden -mr-2 w-11 h-11 flex items-center justify-center" aria-label={isMenuOpen ? "메뉴 닫기" : "메뉴 열기"} onClick={() => setIsMenuOpen(!isMenuOpen)}>
           {isMenuOpen ? <X size={28} /> : <Menu size={28} />}
         </button>
       </div>
 
       {isMenuOpen && (
-        <div className="md:hidden absolute top-[72px] left-0 w-full bg-black border-b border-gray-800 p-6 flex flex-col gap-6 font-semibold text-white shadow-2xl">
-          <Link href="/#apply" onClick={(e) => handleScroll(e, 'apply')}>참여하기</Link>
-          <Link href="/#gallery" onClick={(e) => handleScroll(e, 'gallery')}>현장스케치</Link>
-          <Link href="/#reviews" onClick={(e) => handleScroll(e, 'reviews')}>후기게시판</Link>
-          <Link href="/#participants" onClick={(e) => handleScroll(e, 'participants')}>실시간 참여자</Link>
-          <Link href="/#schedule" onClick={(e) => handleScroll(e, 'schedule')}>매칭파티 일정</Link>
-          <Link href="/#faq" onClick={(e) => handleScroll(e, 'faq')}>FAQ</Link>
+        <div className="md:hidden absolute top-[72px] left-0 w-full bg-black border-b border-gray-800 px-6 py-4 flex flex-col gap-1 font-semibold text-white shadow-2xl">
+          <Link href="/#apply" className="py-2.5" onClick={(e) => handleScroll(e, 'apply')}>참여하기</Link>
+          <Link href="/#gallery" className="py-2.5" onClick={(e) => handleScroll(e, 'gallery')}>현장스케치</Link>
+          <Link href="/#reviews" className="py-2.5" onClick={(e) => handleScroll(e, 'reviews')}>후기게시판</Link>
+          <Link href="/#participants" className="py-2.5" onClick={(e) => handleScroll(e, 'participants')}>실시간 참여자</Link>
+          <Link href="/#schedule" className="py-2.5" onClick={(e) => handleScroll(e, 'schedule')}>파티 일정</Link>
+          <Link href="/#faq" className="py-2.5" onClick={(e) => handleScroll(e, 'faq')}>FAQ</Link>
           {mounted && isLoggedIn ? (
-            <Link href="/mypage" className="text-brand-point font-bold flex items-center gap-2" onClick={() => setIsMenuOpen(false)}>
-              마이페이지 {cart.length > 0 && <span className="bg-brand-point text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center">{cart.reduce((s, i) => s + (i.quantity ?? 1), 0)}</span>}
+            <Link href="/mypage" className="py-2.5 text-brand-point font-bold flex items-center gap-2" onClick={() => setIsMenuOpen(false)}>
+              마이페이지 {cart.length > 0 && <span className="bg-brand-point text-black text-xs font-black w-4 h-4 rounded-full flex items-center justify-center">{cart.reduce((s, i) => s + (i.quantity ?? 1), 0)}</span>}
             </Link>
           ) : (
-            <Link href="/login" className="text-brand-point font-bold" onClick={() => setIsMenuOpen(false)}>로그인</Link>
+            <Link href="/login" className="py-2.5 text-brand-point font-bold" onClick={() => setIsMenuOpen(false)}>로그인</Link>
           )}
         </div>
       )}

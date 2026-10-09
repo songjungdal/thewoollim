@@ -297,6 +297,11 @@ if ($couponCode !== '') {
     $couponDiscount = calcCouponDiscount($found, $linePrice);
 
     $cfp = fopen($usagesFile, 'c+');
+    if (!$cfp) {
+        // 쿠폰 사용 이력 파일을 열 수 없음 — 승인된 결제를 남기지 않도록 다른 승인 뒤 실패와 같이 자동 취소
+        if ($fp) { flock($fp, LOCK_UN); fclose($fp); }
+        autoCancelAndFail('쿠폰 처리 중 오류가 발생했습니다', '쿠폰 처리 오류로 자동 취소', 'COUPON_FILE', "coupon=$couponCode file=coupon_usages.json");
+    }
     flock($cfp, LOCK_EX);
     $craw = stream_get_contents($cfp);
     $usages = $craw ? json_decode($craw, true) : [];

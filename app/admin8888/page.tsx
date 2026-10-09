@@ -52,7 +52,7 @@ export default function AdminLoginPage() {
       >
         <div className="flex flex-col items-center text-center mb-7">
           <div className="w-14 h-14 bg-brand-point/10 rounded-full flex items-center justify-center mb-4">
-            <ShieldCheck size={28} className="text-brand-point" />
+            <ShieldCheck size={28} className="text-brand-point-ink" />
           </div>
           <h1 className="text-2xl font-black mb-1">관리자 로그인</h1>
           <p className="text-sm text-gray-500 font-medium">어울림 통합 관리 시스템</p>
@@ -62,7 +62,7 @@ export default function AdminLoginPage() {
           <div>
             <label htmlFor="admin-id" className="block text-sm font-bold text-gray-700 mb-1.5">아이디</label>
             <div className="relative">
-              <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
               <input
                 id="admin-id"
                 type="text" value={id} onChange={e => setId(e.target.value)}
@@ -74,7 +74,7 @@ export default function AdminLoginPage() {
           <div>
             <label htmlFor="admin-pw" className="block text-sm font-bold text-gray-700 mb-1.5">비밀번호</label>
             <div className="relative">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
               <input
                 id="admin-pw"
                 type="password" value={pw} onChange={e => setPw(e.target.value)}
@@ -85,7 +85,7 @@ export default function AdminLoginPage() {
           </div>
           <button
             type="submit" disabled={submitting}
-            className="w-full bg-brand-black text-white py-4 rounded-xl font-black text-base hover:bg-brand-point transition-all shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed"
+            className="w-full bg-brand-black text-white py-4 rounded-xl font-black text-base hover:bg-brand-point hover:text-black transition-all shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed"
           >
             {submitting ? "로그인 중..." : "로그인"}
           </button>

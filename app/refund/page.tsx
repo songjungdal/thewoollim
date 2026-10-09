@@ -27,7 +27,7 @@ export default function RefundPage() {
               <AlertCircle className="text-red-500 mt-0.5 flex-shrink-0" size={22} />
               <div className="space-y-1.5">
                 <h3 className="text-red-900 font-black text-base md:text-lg leading-snug">꼭 확인해주세요!</h3>
-                <p className="text-red-800 text-sm md:text-base leading-relaxed">파티 매칭 확정 이후에는 스케줄 조율 및 노쇼 방지를 위해 환불이 제한될 수 있습니다.</p>
+                <p className="text-red-800 text-sm md:text-base leading-relaxed">파티 참가 확정 이후에는 스케줄 조율 및 노쇼 방지를 위해 환불이 제한될 수 있습니다.</p>
               </div>
             </div>
 
@@ -37,18 +37,18 @@ export default function RefundPage() {
               {/* ⓪ 환불 규정 및 유효기간 안내 — 서비스 제공기간/예약 소멸 기준 고지 */}
               <section>
                 <div className="flex items-center gap-3 mb-6 md:mb-8">
-                  <Clock className="text-brand-point flex-shrink-0" size={24} />
+                  <Clock className="text-brand-point-ink flex-shrink-0" size={24} />
                   <h2 className="text-2xl md:text-3xl font-black tracking-tight">환불 규정 및 유효기간 안내</h2>
                 </div>
                 <ul className="bg-gray-50 border border-gray-100 rounded-2xl md:rounded-3xl p-6 md:p-9 space-y-4 md:space-y-5 text-sm md:text-base text-gray-700 leading-relaxed">
                   <li className="flex gap-3">
-                    <span className="text-brand-point font-black flex-shrink-0">·</span>
+                    <span className="text-brand-point-ink font-black flex-shrink-0">·</span>
                     <span>
                       <span className="font-bold text-gray-900">서비스 제공 기간(유효기간)</span> : 본 파티 예약 서비스의 제공 기간은 결제일(구매일)로부터 3개월(90일)까지입니다.
                     </span>
                   </li>
                   <li className="flex gap-3">
-                    <span className="text-brand-point font-black flex-shrink-0">·</span>
+                    <span className="text-brand-point-ink font-black flex-shrink-0">·</span>
                     <span>
                       <span className="font-bold text-gray-900">예약 소멸 기준</span> : 결제 후 3개월 이내에 파티 참가 예약을 완료하지 않거나 참가하지 않은 이용권은 기간 만료로 소멸되며, 이후에는 환불 및 서비스 제공이 불가합니다.
                     </span>
@@ -59,7 +59,7 @@ export default function RefundPage() {
               {/* ① 시기별 환불 안내 — 메인 강조 카드 (전폭, 컬러 tier 표) */}
               <section>
                 <div className="flex items-center gap-3 mb-6 md:mb-8">
-                  <RefreshCw className="text-brand-point flex-shrink-0" size={24} />
+                  <RefreshCw className="text-brand-point-ink flex-shrink-0" size={24} />
                   <h2 className="text-2xl md:text-3xl font-black tracking-tight">취소 시기별 환불 안내</h2>
                 </div>
                 <p className="text-sm md:text-base text-gray-500 font-medium leading-relaxed mb-6 md:mb-8">
@@ -89,18 +89,18 @@ export default function RefundPage() {
               <section className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
                 <div className="bg-white border border-gray-100 rounded-2xl md:rounded-3xl p-6 md:p-8 hover:border-brand-point/30 transition-colors">
                   <div className="flex items-center gap-3 mb-4 md:mb-5">
-                    <Info className="text-brand-point flex-shrink-0" size={22} />
+                    <Info className="text-brand-point-ink flex-shrink-0" size={22} />
                     <h2 className="text-lg md:text-xl font-black">취소 안내</h2>
                   </div>
                   <p className="text-sm md:text-base text-gray-700 leading-relaxed">
-                    취소 신청은 <span className="font-black text-brand-point">마이페이지</span>를 통해 가능하며,
+                    취소 신청은 <span className="font-black text-brand-point-ink">마이페이지</span>를 통해 가능하며,
                     취소 완료 시 결제 수단으로 자동 환불됩니다.
                   </p>
                 </div>
 
                 <div className="bg-white border border-gray-100 rounded-2xl md:rounded-3xl p-6 md:p-8 hover:border-brand-point/30 transition-colors">
                   <div className="flex items-center gap-3 mb-4 md:mb-5">
-                    <CreditCard className="text-brand-point flex-shrink-0" size={22} />
+                    <CreditCard className="text-brand-point-ink flex-shrink-0" size={22} />
                     <h2 className="text-lg md:text-xl font-black">환불 방법</h2>
                   </div>
                   <p className="text-sm md:text-base text-gray-700 leading-relaxed">
@@ -123,7 +123,7 @@ export default function RefundPage() {
                   <ol className="list-decimal pl-5 md:pl-7 space-y-4 md:space-y-5 text-sm md:text-base text-red-900 leading-relaxed marker:font-black marker:text-red-700">
                     <li className="pl-1 md:pl-2">참가자가 프로필 카드 정보를 허위로 기재하거나 고의성이 있는 위반사항이 있는 경우</li>
                     <li className="pl-1 md:pl-2">
-                      매칭파티 신청 이후 당일취소, 노쇼, 불참, 지각, 연락두절 등의 이유가 있는 경우
+                      파티 신청 이후 당일취소, 노쇼, 불참, 지각, 연락두절 등의 이유가 있는 경우
                       <p className="mt-3 md:mt-4 text-xs md:text-sm text-red-700/85 font-medium leading-relaxed pl-3.5 md:pl-4 border-l-2 border-red-200">
                         단, 불가항력적 개인사정으로 참석이 불가능한 경우에는 응급실 내원 확인서, 경찰 출석 요구서, 사고 사실 확인원 등
                         <span className="font-bold"> 공적 서류가 확인되어야만</span> 환불이 가능합니다.
@@ -136,21 +136,21 @@ export default function RefundPage() {
               {/* ④ 환불 예외 규정 — 긍정 케이스 */}
               <section>
                 <div className="flex items-center gap-3 mb-6 md:mb-8">
-                  <ScrollText className="text-brand-point flex-shrink-0" size={24} />
+                  <ScrollText className="text-brand-point-ink flex-shrink-0" size={24} />
                   <h2 className="text-2xl md:text-3xl font-black tracking-tight">환불 예외 규정</h2>
                 </div>
                 <ul className="bg-gray-50 border border-gray-100 rounded-2xl md:rounded-3xl p-6 md:p-9 space-y-4 md:space-y-5 text-sm md:text-base text-gray-700 leading-relaxed">
                   <li className="flex gap-3">
-                    <span className="text-brand-point font-black flex-shrink-0">·</span>
+                    <span className="text-brand-point-ink font-black flex-shrink-0">·</span>
                     <span>주최측의 사정으로 파티가 취소될 경우 <span className="font-bold text-gray-900">전액 환불</span>해 드립니다.</span>
                   </li>
                   <li className="flex gap-3">
-                    <span className="text-brand-point font-black flex-shrink-0">·</span>
+                    <span className="text-brand-point-ink font-black flex-shrink-0">·</span>
                     <span>천재지변 등으로 행사가 정상 진행되지 못할 경우 <span className="font-bold text-gray-900">전액 환불</span> 대상입니다.</span>
                   </li>
                   <li className="flex gap-3">
-                    <span className="text-brand-point font-black flex-shrink-0">·</span>
-                    <span>매칭 파트너의 노쇼로 인해 파티 구성이 현저히 깨진 경우 <span className="font-bold text-gray-900">부분 환불 또는 차후 파티 초대권</span>을 제공합니다.</span>
+                    <span className="text-brand-point-ink font-black flex-shrink-0">·</span>
+                    <span>다른 참가자의 노쇼 등으로 파티 구성이 현저히 깨진 경우 <span className="font-bold text-gray-900">전액 환불</span>해 드립니다.</span>
                   </li>
                 </ul>
               </section>
@@ -164,12 +164,12 @@ export default function RefundPage() {
                 <div className="text-xs md:text-sm text-gray-500 leading-relaxed space-y-3 pl-1">
                   <p>
                     저희 <span className="font-bold text-gray-700">&ldquo;어울림&rdquo;</span>은
-                    시간과 날짜가 정해진 오프라인 매칭파티 행사로
+                    시간과 날짜가 정해진 오프라인 파티(매칭파티·솔로파티) 행사로
                     <span className="font-bold text-gray-700"> 전자상거래 제17조 제2항 제3호</span>에 따라
                     청약 철회가 제한되는 서비스입니다.
                   </p>
                   <p>
-                    결제 이후 시기별 환불 금액이 다르며, 환불 규정은 매칭파티 행사일 기준으로 계산됩니다.
+                    결제 이후 시기별 환불 금액이 다르며, 환불 규정은 파티 행사일 기준으로 계산됩니다.
                   </p>
                 </div>
               </section>

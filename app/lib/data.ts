@@ -17,6 +17,16 @@ export type LocationTag  = typeof LOCATION_TAGS[number];
 export const CATEGORY_LABELS: Record<string, string> = { "쿠킹클래스": "세션" };
 export const categoryLabel = (value: string): string => CATEGORY_LABELS[value] ?? value;
 
+/**
+ * 파티 종류 — 저장값은 영문 코드, 화면에는 라벨. 값이 없거나 허용 목록 밖이면 matching.
+ * (서버 쪽 같은 정의: api/lib.php partyTypeOf / partyTypeLabel)
+ */
+export const PARTY_TYPES = ["matching", "solo"] as const;
+export type PartyType = typeof PARTY_TYPES[number];
+export const PARTY_TYPE_LABELS: Record<PartyType, string> = { matching: "매칭파티", solo: "솔로파티" };
+export const partyTypeOf = (party: { partyType?: string | null }): PartyType =>
+  (PARTY_TYPES as readonly string[]).includes(party.partyType ?? "") ? (party.partyType as PartyType) : "matching";
+
 /** 무통장 입금 계좌 — 결제 페이지 모달 / 마이페이지 안내 가이드 공용 (v7.0) */
 export const VBANK_INFO = { bank: "신협", account: "132-137-790923", holder: "라지성" } as const;
 export const VBANK_ACCOUNT_LINE = `${VBANK_INFO.bank} ${VBANK_INFO.account} ${VBANK_INFO.holder}`;
@@ -47,6 +57,7 @@ export type Party = {
   targetGroup?: TargetGroup;   // 대상별: 싱글 / 돌싱
   theme?: Theme;               // 테마별: 티타임 / 와인파티 / 사케파티 / 쿠킹클래스
   locationTag?: LocationTag;   // 지역별: 서울 / 성남 / 수원 / 인천 / 용인 / 기타
+  partyType?: PartyType;       // 파티 종류 — 없으면 매칭파티 (partyTypeOf 로 읽는다)
 };
 
 export const PARTIES: Party[] = [

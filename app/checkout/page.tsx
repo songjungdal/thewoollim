@@ -163,7 +163,7 @@ function CheckoutContent() {
             ) : (
               <p className="text-xl font-bold mb-4">파티를 찾을 수 없습니다.</p>
             )}
-            <Link href="/#apply" className="text-brand-point underline font-bold">목록으로 돌아가기</Link>
+            <Link href="/#apply" className="text-brand-point-ink underline font-bold">목록으로 돌아가기</Link>
           </div>
         </main>
         <Footer />
@@ -315,7 +315,7 @@ function CheckoutContent() {
           {/* 결제 진입점은 항상 마이페이지 장바구니이므로 단일 경로 — #cart 앵커로 카트 섹션 직행 */}
           <Link
             href="/mypage#cart"
-            className="inline-flex items-center gap-2 text-gray-500 hover:text-brand-black mb-7 font-bold transition-colors text-sm md:text-base"
+            className="inline-flex items-center gap-2 text-gray-500 hover:text-brand-black -mt-3 py-3 mb-4 md:mt-0 md:py-0 md:mb-7 font-bold transition-colors text-sm md:text-base"
           >
             <ArrowLeft size={16} /> 장바구니로 돌아가기
           </Link>
@@ -333,7 +333,7 @@ function CheckoutContent() {
             <div className="flex items-baseline justify-between mb-5 md:mb-6">
               <h2 className="font-black text-lg md:text-xl">주문 요약</h2>
               {totalQty > 1 && (
-                <span className="text-xs md:text-sm font-black text-brand-point bg-brand-point/10 px-2.5 py-1 rounded-full">
+                <span className="text-xs md:text-sm font-black text-brand-point-ink bg-brand-point/10 px-2.5 py-1 rounded-full">
                   {totalQty}건
                 </span>
               )}
@@ -351,7 +351,7 @@ function CheckoutContent() {
                     <div className="flex items-start justify-between gap-3 mb-3 md:mb-4">
                       <h3 className="font-black text-base md:text-lg leading-snug min-w-0">{party.title}</h3>
                       {qty > 1 && (
-                        <span className="flex-shrink-0 inline-flex items-center text-[11px] md:text-xs font-black text-brand-point bg-brand-point/10 px-2 py-1 rounded-full whitespace-nowrap">
+                        <span className="flex-shrink-0 inline-flex items-center text-xs font-black text-brand-point-ink bg-brand-point/10 px-2 py-1 rounded-full whitespace-nowrap">
                           × {qty}
                         </span>
                       )}
@@ -363,26 +363,26 @@ function CheckoutContent() {
                         { label: "장소", value: party.location },
                         { label: "대상", value: party.target },
                       ].map(row => (
-                        <div key={row.label} className="flex justify-between gap-4">
-                          <dt className="text-gray-400 font-medium flex-shrink-0 w-12">{row.label}</dt>
-                          <dd className="font-bold text-right text-gray-800">{row.value}</dd>
+                        <div key={row.label} className="flex justify-between gap-3 md:gap-4">
+                          <dt className="text-gray-500 font-medium flex-shrink-0 w-12">{row.label}</dt>
+                          <dd className="min-w-0 font-bold text-right text-gray-800 break-keep md:break-normal">{row.value}</dd>
                         </div>
                       ))}
                       <div className="flex justify-between gap-4 items-baseline pt-2 border-t border-gray-200/70">
-                        <dt className="text-gray-400 font-medium flex-shrink-0 w-12">금액</dt>
+                        <dt className="text-gray-500 font-medium flex-shrink-0 w-12">금액</dt>
                         <dd className="text-right">
                           <div className="flex flex-col items-end gap-0.5">
                             {qty > 1 && (
-                              <span className="text-[11px] md:text-xs text-gray-400 font-medium tabular-nums">
+                              <span className="text-xs text-gray-500 font-medium tabular-nums">
                                 ₩{unit.toLocaleString()} × {qty}
                               </span>
                             )}
                             {couponHere ? (
                               <>
-                                <s className="text-gray-400 font-medium text-xs md:text-sm tabular-nums">₩{lineTotal.toLocaleString()}</s>
+                                <s className="text-gray-500 font-medium text-xs md:text-sm tabular-nums">₩{lineTotal.toLocaleString()}</s>
                                 <div className="flex items-baseline gap-2">
-                                  <span className="text-[10px] md:text-xs font-black text-brand-point bg-brand-point/10 px-1.5 py-0.5 rounded">할인 적용</span>
-                                  <span className="font-black text-base md:text-lg text-brand-point tabular-nums">₩{rowPrice.toLocaleString()}</span>
+                                  <span className="text-xs font-black text-brand-point-ink bg-brand-point/10 px-1.5 py-0.5 rounded">할인 적용</span>
+                                  <span className="font-black text-base md:text-lg text-brand-point-ink tabular-nums">₩{rowPrice.toLocaleString()}</span>
                                 </div>
                               </>
                             ) : (
@@ -395,9 +395,9 @@ function CheckoutContent() {
 
                     {couponHere && (
                       <div className="mt-3 md:mt-3.5 flex items-center gap-2 bg-brand-point/10 border border-brand-point/30 rounded-lg px-3 py-2 text-xs md:text-sm">
-                        <Check size={14} className="text-brand-point flex-shrink-0" />
+                        <Check size={14} className="text-brand-point-ink flex-shrink-0" />
                         <span className="font-black truncate">{effectiveCoupon!.code}</span>
-                        <span className="font-bold text-brand-point whitespace-nowrap">
+                        <span className="font-bold text-brand-point-ink whitespace-nowrap">
                           {effectiveCoupon!.discount_type === "percent"
                             ? `${effectiveCoupon!.amount}% 할인`
                             : `- ₩${effectiveCoupon!.amount.toLocaleString()}`}
@@ -411,9 +411,9 @@ function CheckoutContent() {
 
             {!effectiveCoupon && (
               <div className="mt-4 md:mt-5 flex items-start gap-2 text-xs md:text-sm bg-brand-lightgray border border-gray-100 rounded-lg p-3 text-gray-500 font-medium leading-relaxed">
-                <Tag size={13} className="text-brand-point flex-shrink-0 mt-0.5" />
+                <Tag size={13} className="text-brand-point-ink flex-shrink-0 mt-0.5" />
                 <span>
-                  쿠폰은 <Link href="/mypage" className="text-brand-point underline font-bold">마이페이지 장바구니</Link>에서 파티별로 적용할 수 있습니다.
+                  쿠폰은 <Link href="/mypage" className="py-3 text-brand-point-ink underline font-bold">마이페이지 장바구니</Link>에서 파티별로 적용할 수 있습니다.
                 </span>
               </div>
             )}
@@ -425,19 +425,19 @@ function CheckoutContent() {
               </div>
               {totalDiscount > 0 && (
                 <div className="flex justify-between items-center gap-4 text-sm md:text-base">
-                  <span className="text-brand-point font-bold">쿠폰 할인 ({effectiveCoupon?.code})</span>
-                  <span className="text-brand-point font-black tabular-nums">- ₩{totalDiscount.toLocaleString()}</span>
+                  <span className="text-brand-point-ink font-bold">쿠폰 할인 ({effectiveCoupon?.code})</span>
+                  <span className="text-brand-point-ink font-black tabular-nums">- ₩{totalDiscount.toLocaleString()}</span>
                 </div>
               )}
               <div className="flex justify-between items-center gap-4 pt-3 mt-1 border-t border-gray-100">
                 <span className="font-black text-base md:text-lg">최종 결제금액</span>
-                <span className="font-black text-2xl md:text-3xl text-brand-point tabular-nums">₩{totalAmount.toLocaleString()}</span>
+                <span className="font-black text-2xl md:text-3xl text-brand-point-ink tabular-nums">₩{totalAmount.toLocaleString()}</span>
               </div>
             </div>
           </div>
 
           {/* ── 결제 수단 선택 (v7.0) — 신용카드/간편결제 / 무통장 입금 ─────── */}
-          <div className="grid grid-cols-2 gap-2.5 md:gap-3 mb-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 md:gap-3 mb-3">
             {([
               { key: "toss",  title: "신용카드/간편결제", desc: "토스페이먼츠 결제" },
               { key: "vbank", title: "무통장 입금",       desc: "계좌이체 후 입금 확인" },
@@ -460,7 +460,7 @@ function CheckoutContent() {
                     </span>
                     <span className="font-black text-sm md:text-base text-brand-black">{opt.title}</span>
                   </div>
-                  <p className="text-[11px] md:text-xs text-gray-500 font-medium pl-6">{opt.desc}</p>
+                  <p className="text-[13px] md:text-xs text-gray-500 font-medium pl-6">{opt.desc}</p>
                 </button>
               );
             })}
@@ -481,7 +481,7 @@ function CheckoutContent() {
           {payMethod === "vbank" && (
             <div className="bg-white rounded-2xl md:rounded-3xl p-5 md:p-6 border-2 border-[#F6B26B]/60 mb-3">
               <div className="flex items-center gap-2 mb-3">
-                <CreditCard size={18} className="text-[#FF2300]" />
+                <CreditCard size={18} className="text-danger" />
                 <span className="font-black text-base md:text-lg text-brand-black">무통장 입금 안내</span>
               </div>
               <div className="text-sm md:text-base font-bold text-brand-black space-y-1.5">
@@ -494,7 +494,7 @@ function CheckoutContent() {
                   <span className="font-bold text-black tabular-nums">₩{totalAmount.toLocaleString()}</span>
                 </div>
               </div>
-              <p className="text-xs md:text-sm text-gray-500 font-medium leading-relaxed mt-3 break-keep">
+              <p className="text-[13px] md:text-sm text-gray-500 font-medium leading-relaxed mt-3 break-keep">
                 &apos;입금 신청하기&apos;를 누르면 참가 신청이 접수되며, 위 계좌로 입금해 주시면 운영팀 확인 후 확정됩니다.
                 신청 후 2시간 이내 미입금 시 자동 취소될 수 있습니다.
               </p>
@@ -509,10 +509,10 @@ function CheckoutContent() {
             className="flex items-start justify-between gap-2 w-full bg-brand-point/5 border border-brand-point/20 rounded-xl px-4 py-3 mb-3 text-sm font-bold text-gray-700 hover:bg-brand-point/10 hover:border-brand-point/40 transition-colors"
           >
             <span className="flex items-start gap-2 min-w-0">
-              <FileText size={15} className="text-brand-point flex-shrink-0 mt-0.5" />
+              <FileText size={15} className="text-brand-point-ink flex-shrink-0 mt-0.5" />
               <span className="break-keep">서비스 제공 기간 및 환불 규정 확인하기</span>
             </span>
-            <ExternalLink size={13} className="text-gray-400 flex-shrink-0 mt-0.5" />
+            <ExternalLink size={13} className="text-gray-500 flex-shrink-0 mt-0.5" />
           </Link>
 
           {/* ── 결제 버튼 — 신용카드/무통장 공통 노출 ───────────────────────── */}
@@ -531,7 +531,7 @@ function CheckoutContent() {
             return (
               <>
                 {!canPay && reason && (
-                  <p className="text-center text-xs text-gray-500 font-medium mb-3 leading-relaxed">
+                  <p className="text-center text-[13px] md:text-xs text-gray-500 font-medium mb-3 leading-relaxed">
                     {reason}
                   </p>
                 )}
@@ -539,7 +539,7 @@ function CheckoutContent() {
                   type="button"
                   onClick={handlePayment}
                   disabled={!canPay}
-                  className="w-full bg-brand-black text-white py-5 rounded-2xl font-black text-base md:text-xl hover:bg-brand-point transition-all shadow-xl hover:shadow-brand-point/30 flex items-center justify-center gap-3 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none"
+                  className="w-full bg-brand-black text-white py-5 rounded-2xl font-black text-base md:text-xl hover:bg-brand-point hover:text-black transition-all shadow-xl hover:shadow-brand-point/30 flex items-center justify-center gap-3 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none"
                 >
                   <CreditCard size={22} />
                   {paying ? "신청 처리 중..." : label}
@@ -548,7 +548,7 @@ function CheckoutContent() {
             );
           })()}
 
-          <p className="text-center text-xs text-gray-400 font-medium mt-4 flex items-center justify-center gap-1.5">
+          <p className="text-center text-xs text-gray-500 font-medium mt-4 flex items-center justify-center gap-1.5">
             <ShieldCheck size={13} /> SSL 암호화 방식으로 안전하게 처리됩니다.
           </p>
 
@@ -570,23 +570,23 @@ function CheckoutContent() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.92, y: 20 }}
               transition={{ type: "spring", stiffness: 260, damping: 22 }}
-              className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl"
+              className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl max-h-[90vh] overflow-y-auto md:max-h-none md:overflow-visible"
             >
               <div className="flex items-center gap-2 mb-4">
-                <Check size={22} className="text-brand-point" />
+                <Check size={22} className="text-brand-point-ink" />
                 <h3 className="font-black text-lg md:text-xl text-brand-black">참가 신청이 접수되었습니다</h3>
               </div>
               <p className="text-sm md:text-base text-gray-700 font-medium leading-relaxed break-keep mb-4">
-                매칭파티 참가 신청이 정상적으로 접수되었습니다. 아래 안내해 드리는 계좌로 입금해 주시면 확인 후 최종 확정해 드립니다.
+                파티 참가 신청이 정상적으로 접수되었습니다. 아래 안내해 드리는 계좌로 입금해 주시면 확인 후 최종 확정해 드립니다.
               </p>
               <div className="rounded-2xl border-2 border-[#F6B26B] bg-[#F6B26B]/10 p-4 md:p-5 space-y-1.5 mb-4">
                 <div className="flex justify-between gap-3 text-sm md:text-base font-bold text-brand-black">
                   <span className="text-gray-500 font-medium">입금 계좌</span>
-                  <span className="text-[#FF2300] text-right">{VBANK_ACCOUNT_LINE}</span>
+                  <span className="text-danger text-right">{VBANK_ACCOUNT_LINE}</span>
                 </div>
                 <div className="flex justify-between gap-3 text-sm md:text-base font-bold text-brand-black">
                   <span className="text-gray-500 font-medium">입금 금액</span>
-                  <span className="text-[#FF2300] tabular-nums">{vbankModal.amount.toLocaleString()}원</span>
+                  <span className="text-danger tabular-nums">{vbankModal.amount.toLocaleString()}원</span>
                 </div>
               </div>
               <ul className="text-xs md:text-sm text-gray-600 font-medium leading-relaxed break-keep space-y-2 mb-6 list-disc pl-4">
@@ -597,7 +597,7 @@ function CheckoutContent() {
               <button
                 type="button"
                 onClick={() => { setVbankModal(null); router.push("/mypage"); }}
-                className="w-full bg-brand-black text-white py-4 rounded-2xl font-black text-base hover:bg-brand-point transition-all"
+                className="w-full bg-brand-black text-white py-4 rounded-2xl font-black text-base hover:bg-brand-point hover:text-black transition-all"
               >
                 내 예약 현황 보기
               </button>
