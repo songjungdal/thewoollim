@@ -96,6 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // ─── action === 'confirm_vbank' — 무통장 입금 확인 (v7.0 / v5.9) ──────────────
     //  vbank_pending → (프로필 완성 여부에 따라) paid_pending_profile/pending_approval 전환 + party_counts +1.
+    //  솔로파티는 프로필 완성 여부와 상관없이 pending_approval.
     //  카드결제 success.php 와 동일 분기 — 결제완료 후 프로필 작성/자동전환 흐름을 그대로 탄다.
     //  (카드는 결제 즉시 +1, 무통장은 입금 확인된 지금 +1)
     if ($action === 'confirm_vbank') {
@@ -170,6 +171,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         } catch (Throwable $e) {}
         $newStatus = $profileComplete ? 'pending_approval' : 'paid_pending_profile';
+        // 솔로파티는 프로필 단계가 없다 — 입금 확인 즉시 확정 대기 중 (docs/specs/party-solo-guide.md 4-1)
+        if (partyTypeOf($vbankParty) === 'solo') $newStatus = 'pending_approval';
 
         $confirmedBooking = null;
         foreach ($bookings as &$b) {
