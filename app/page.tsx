@@ -424,6 +424,7 @@ export default function SmoothOnePage() {
         hasOptions: info?.hasOptions ?? false,          // 참가 구성 파티 — 남은 자리를 회차별로
         remainingLabel: info?.remainingLabel ?? "",
         time: m ? `${m[1].padStart(2, "0")}:${m[2]}` : "",
+        targetGroup: p.targetGroup ?? "",
         theme: p.theme ?? "",
         locationTag: p.locationTag ?? "",
         partyType: partyTypeOf(p),
@@ -490,7 +491,7 @@ export default function SmoothOnePage() {
     else mobileMonthGroups.push([ymd, [e]]);
   });
 
-  // #schedule 모바일 카드 — 기존 디자인 유지 + 오른쪽 위 상태 배지 + "남 N · 여 N 남음" 한 줄.
+  // #schedule 모바일 카드 — 기존 디자인 유지 + 오른쪽 위 상태·대상(싱글/돌싱) 배지 + "남 N · 여 N 남음" 한 줄.
   // 지난 일정은 연한 회색, 누르면 기존처럼 /party/{id} 로 이동.
   const renderScheduleCard = (event: ScheduleEvent) => {
     const party = PARTIES.find(p => p.id === event.id);
@@ -525,10 +526,19 @@ export default function SmoothOnePage() {
               </span>
               {event.title}
             </div>
-            {status && (
-              <span className={`flex-shrink-0 text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${SCHEDULE_STATUS_STYLE[status].tone}`}>
-                {SCHEDULE_STATUS_STYLE[status].label}
-              </span>
+            {(status || xp.targetGroup) && (
+              <div className="flex-shrink-0 flex flex-col items-end gap-1">
+                {status && (
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${SCHEDULE_STATUS_STYLE[status].tone}`}>
+                    {SCHEDULE_STATUS_STYLE[status].label}
+                  </span>
+                )}
+                {xp.targetGroup && (
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap bg-gray-100 ${isPast ? "text-gray-400" : "text-gray-600"}`}>
+                    {xp.targetGroup}
+                  </span>
+                )}
+              </div>
             )}
           </div>
           <div className={`text-sm ${isPast ? "text-gray-400" : "text-gray-500"}`}>{party?.dateString}</div>
@@ -1113,7 +1123,7 @@ export default function SmoothOnePage() {
                                     {SCHEDULE_STATUS_STYLE[status].label}
                                   </span>
                                 )}
-                                {[xp.theme && categoryLabel(xp.theme), xp.locationTag].filter(Boolean).map(tag => (
+                                {[xp.targetGroup, xp.theme && categoryLabel(xp.theme), xp.locationTag].filter(Boolean).map(tag => (
                                   <span key={tag as string} className={`text-xs font-bold px-2 py-0.5 rounded-full bg-gray-100 ${isPast ? "text-gray-400" : "text-gray-600"}`}>
                                     {tag}
                                   </span>
