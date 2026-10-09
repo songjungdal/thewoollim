@@ -268,10 +268,30 @@ function bookingOptionSnapshot(array $party, array $option): array {
     ];
 }
 
-/** 예약의 처음 참석 회차 시작 시각 ("HH:MM") — 항목 예약이 아니면 '' */
-function bookingFirstSessionTime(array $booking): string {
-    $times = (array)($booking['sessionTimes'] ?? []);
-    return isset($times[0]) ? (string)$times[0] : '';
+/**
+ * 예약의 회차 시작 시각 목록 ("HH:MM", 이른 순) — 명세 5-3.
+ * 예약의 sessionIds 로 파티의 **현재** 회차를 찾아 그 시각을 쓰고, 못 찾을 때만 예약 사본(sessionTimes)을 쓴다.
+ * (관리자가 신청자가 있는 회차 시각을 바꾸면 안내 문자·2시간 전 안내·마이페이지가 바뀐 시각을 따른다)
+ * 항목 예약이 아니면 [].
+ */
+function bookingSessionTimes(array $booking, ?array $party = null): array {
+    $sids  = array_values(array_map('strval', (array)($booking['sessionIds'] ?? [])));
+    $saved = array_values(array_map('strval', (array)($booking['sessionTimes'] ?? [])));
+    $times = [];
+    foreach ($sids as $i => $sid) {
+        $s = $party !== null ? partySessionById($party, $sid) : null;
+        $t = $s !== null ? (string)($s['startTime'] ?? '') : (string)($saved[$i] ?? '');
+        if ($t !== '') $times[] = $t;
+    }
+    if (!$sids) $times = $saved;   // 예전 형식 방어 — sessionIds 없이 시각만 있는 경우
+    sort($times, SORT_STRING);
+    return $times;
+}
+
+/** 예약의 처음 참석 회차 시작 시각 ("HH:MM") — 항목 예약이 아니면 '' (bookingSessionTimes 규칙) */
+function bookingFirstSessionTime(array $booking, ?array $party = null): string {
+    $times = bookingSessionTimes($booking, $party);
+    return $times[0] ?? '';
 }
 
 /** 회차 정원 (1 이상, 없으면 0 → 항상 마감으로 본다) */

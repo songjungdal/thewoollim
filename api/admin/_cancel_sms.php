@@ -64,10 +64,12 @@ if (!function_exists('notifyCancelSms')) {
             $partyId = (string)($booking['partyId'] ?? '');
             $loc = $dateString = '';
             $typeLabel = '매칭파티';   // 파티 종류명 (매칭파티 / 솔로파티) — 파티를 못 찾으면 기본값
+            $partyRow = null;   // 회차 시각은 파티의 현재 회차 기준 (bookingFirstSessionTime)
             $parties = json_decode((string)@file_get_contents(dataDir() . '/parties.json'), true);
             if (is_array($parties)) {
                 foreach ($parties as $p) {
                     if ((string)($p['id'] ?? '') === $partyId) {
+                        $partyRow   = $p;
                         $loc        = (string)($p['location']   ?? '');
                         $dateString = (string)($p['dateString'] ?? '');
                         $typeLabel  = partyTypeLabel($p);
@@ -81,7 +83,7 @@ if (!function_exists('notifyCancelSms')) {
 
             // 참가 구성 예약 — 항목 이름 한 줄, 시각은 처음 참석하는 회차 기준 (항목 예약이 아니면 기존 문구 그대로)
             $optLine = !empty($booking['optionName']) ? '참가: ' . (string)$booking['optionName'] . "\n" : '';
-            if (bookingFirstSessionTime($booking) !== '') $ptime = bookingFirstSessionTime($booking);
+            if (bookingFirstSessionTime($booking, $partyRow) !== '') $ptime = bookingFirstSessionTime($booking, $partyRow);
 
             // 3) 메시지 — 템플릿 (줄바꿈/특수문자 그대로 유지)
             if ($kind === 'full_refund') {
