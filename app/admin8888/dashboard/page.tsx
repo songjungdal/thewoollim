@@ -1845,7 +1845,7 @@ export default function AdminDashboard() {
                       {([["basic", "기본 정보"], ["detail", "상세페이지 안내"]] as const).map(([k, label]) => (
                         <button key={k} type="button" role="tab" aria-selected={partyModalTab === k}
                           onClick={() => setPartyModalTab(k)}
-                          className={`px-3 md:px-4 py-3 text-sm font-black -mb-px border-b-2 transition-colors ${partyModalTab === k ? "border-brand-point text-brand-black" : "border-transparent text-gray-400 hover:text-gray-600"}`}>
+                          className={`px-3 md:px-4 py-3 text-sm font-black -mb-px border-b-2 transition-colors ${partyModalTab === k ? "border-brand-point text-brand-black" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
                           {label}
                         </button>
                       ))}
@@ -2106,7 +2106,7 @@ export default function AdminDashboard() {
                               setPartyDetail(templateFor(typeSwitchPrompt)); setDetailTouched(false);
                               setPartyFormDirty(true); setTypeSwitchPrompt(null);
                             }}
-                            className="px-4 py-2.5 rounded-lg text-sm font-black bg-brand-black text-white hover:bg-brand-point">바꾸기</button>
+                            className="px-4 py-2.5 rounded-lg text-sm font-black bg-brand-black text-white hover:bg-brand-point hover:text-black">바꾸기</button>
                         </div>
                       </div>
                     </div>

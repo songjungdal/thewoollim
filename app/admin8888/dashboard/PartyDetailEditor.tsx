@@ -29,7 +29,7 @@ function move<T>(list: T[], from: number, to: number): T[] {
 }
 
 function Counter({ value, max }: { value: string; max: number }) {
-  return <span className="text-[11px] text-gray-400 tabular-nums">{value.length}/{max}</span>;
+  return <span className="text-[11px] text-gray-500 tabular-nums">{value.length}/{max}</span>;
 }
 
 export default function PartyDetailEditor({ value, onChange, partyType, usingDefault, sources, currentId }: {
@@ -100,7 +100,7 @@ export default function PartyDetailEditor({ value, onChange, partyType, usingDef
       <div className="rounded-xl border border-gray-200 p-3 md:p-4">
         <div className="flex items-center justify-between gap-2 mb-2">
           <p className="text-sm font-black text-gray-700">{DETAIL_IMAGE_SLOT_LABELS[slot]}</p>
-          <span className="text-[11px] text-gray-400">{list.length}/{DETAIL_LIMITS.imagesPerSlot}장</span>
+          <span className="text-[11px] text-gray-500">{list.length}/{DETAIL_LIMITS.imagesPerSlot}장</span>
         </div>
         {list.length > 0 ? (
           <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1">
@@ -126,15 +126,15 @@ export default function PartyDetailEditor({ value, onChange, partyType, usingDef
             ))}
           </div>
         ) : (
-          <div className="flex items-center gap-2 text-xs text-gray-400 py-2"><ImageIcon size={14} />사진 없음 — 상세페이지에서 이 위치는 표시되지 않습니다.</div>
+          <div className="flex items-center gap-2 text-xs text-gray-500 py-2"><ImageIcon size={14} />사진 없음 — 상세페이지에서 이 위치는 표시되지 않습니다.</div>
         )}
-        <label className={`mt-2 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold cursor-pointer ${busy || list.length >= DETAIL_LIMITS.imagesPerSlot ? "bg-gray-100 text-gray-400 pointer-events-none" : "bg-brand-black text-white hover:bg-brand-point"}`}>
+        <label className={`mt-2 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold cursor-pointer ${busy || list.length >= DETAIL_LIMITS.imagesPerSlot ? "bg-gray-100 text-gray-400 pointer-events-none" : "bg-brand-black text-white hover:bg-brand-point hover:text-black"}`}>
           <Plus size={12} />사진 추가
           <input type="file" multiple accept="image/jpeg,image/png,image/webp" className="hidden"
             disabled={!!upload || list.length >= DETAIL_LIMITS.imagesPerSlot}
             onChange={e => { const files = Array.from(e.target.files ?? []); e.target.value = ""; if (files.length) addPhotos(slot, files); }} />
         </label>
-        {busy && <span className="ml-2 text-xs font-bold text-brand-point">업로드 중 {upload.done}/{upload.total}</span>}
+        {busy && <span className="ml-2 text-xs font-bold text-brand-point-ink">업로드 중 {upload.done}/{upload.total}</span>}
       </div>
     );
   };
@@ -159,7 +159,7 @@ export default function PartyDetailEditor({ value, onChange, partyType, usingDef
               <option key={s.id} value={s.id}>#{s.id} {s.title} · {PARTY_TYPE_LABELS[s.partyType]} · {s.dateString}</option>
             ))}
           </select>
-          <button type="button" onClick={loadFromParty} className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-sm font-bold bg-brand-black text-white hover:bg-brand-point whitespace-nowrap">
+          <button type="button" onClick={loadFromParty} className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-sm font-bold bg-brand-black text-white hover:bg-brand-point hover:text-black whitespace-nowrap">
             <Download size={14} />다른 파티에서 불러오기
           </button>
         </div>
@@ -177,7 +177,7 @@ export default function PartyDetailEditor({ value, onChange, partyType, usingDef
 
       {/* 진행 안내 */}
       <div className="rounded-xl border border-gray-200 p-3 md:p-4 space-y-3">
-        <p className="text-sm font-black text-gray-700">진행 안내 <span className="text-gray-400 font-medium">· 단계가 없으면 상세페이지에서 진행 안내 전체가 숨겨집니다</span></p>
+        <p className="text-sm font-black text-gray-700">진행 안내 <span className="text-gray-500 font-medium">· 단계가 없으면 상세페이지에서 진행 안내 전체가 숨겨집니다</span></p>
         <div>
           <div className="flex justify-between mb-1"><label className="text-xs font-bold text-gray-500">제목</label><Counter value={value.timeline.title} max={DETAIL_LIMITS.timelineTitle} /></div>
           <input value={value.timeline.title} maxLength={DETAIL_LIMITS.timelineTitle} aria-label="진행 안내 제목"
@@ -191,7 +191,7 @@ export default function PartyDetailEditor({ value, onChange, partyType, usingDef
         {steps.map((st, i) => (
           <div key={i} className="rounded-lg bg-gray-50 border border-gray-200 p-3 space-y-2">
             <div className="flex items-center justify-between gap-2 flex-wrap">
-              <span className="text-xs font-black tracking-[0.2em] text-brand-point">STEP {String(i + 1).padStart(2, "0")}</span>
+              <span className="text-xs font-black tracking-[0.2em] text-brand-point-ink">STEP {String(i + 1).padStart(2, "0")}</span>
               <div className="flex gap-1">
                 <button type="button" className={smallBtn} disabled={i === 0} onClick={() => setSteps(move(steps, i, i - 1))}><ArrowUp size={12} />위로</button>
                 <button type="button" className={smallBtn} disabled={i === steps.length - 1} onClick={() => setSteps(move(steps, i, i + 1))}><ArrowDown size={12} />아래로</button>
@@ -231,7 +231,7 @@ export default function PartyDetailEditor({ value, onChange, partyType, usingDef
 
       {/* 소요 시간 안내 */}
       <div className="rounded-xl border border-gray-200 p-3 md:p-4 space-y-3">
-        <p className="text-sm font-black text-gray-700">소요 시간 안내 <span className="text-gray-400 font-medium">· 줄이 없으면 이 블록만 숨겨집니다</span></p>
+        <p className="text-sm font-black text-gray-700">소요 시간 안내 <span className="text-gray-500 font-medium">· 줄이 없으면 이 블록만 숨겨집니다</span></p>
         <div>
           <div className="flex justify-between mb-1"><label className="text-xs font-bold text-gray-500">제목</label><Counter value={value.durations.title} max={DETAIL_LIMITS.durationsTitle} /></div>
           <input value={value.durations.title} maxLength={DETAIL_LIMITS.durationsTitle} aria-label="소요 시간 안내 제목"

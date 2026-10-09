@@ -436,7 +436,7 @@ export default function MatchingAdminPage() {
                       <span className={`flex-shrink-0 text-xs font-black px-3 py-1.5 rounded-full ${isFinal ? "bg-black text-white" : "bg-gray-200 text-gray-600"}`}>{isFinal ? "모임종료" : "진행 전"}</span>
                     </div>
                     {p.host_name ? (
-                      <p className="text-xs font-bold text-gray-400 mb-4">담당자: {p.host_name}</p>
+                      <p className="text-xs font-bold text-gray-500 mb-4">담당자: {p.host_name}</p>
                     ) : null}
                     <div className="grid grid-cols-2 gap-2.5">
                       <button
