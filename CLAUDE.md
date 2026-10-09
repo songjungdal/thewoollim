@@ -46,3 +46,17 @@
 - 관리자 화면의 실제 URL 경로(`/admin****`처럼 가려서 표기)
 
 보안 문제는 기록하되, 실제 값 없이 문제의 종류와 파일 위치만 적는다.
+
+# 운영 배포 규칙
+
+운영 배포는 GitHub Actions 워크플로 `.github/workflows/deploy.yml`("Deploy (manual)")로만 한다. 절차와 설정은 `docs/DEPLOYMENT.md`를 따른다.
+
+- 서버에 직접 SSH·rsync 로 배포하지 않는다. 서버 접속, AWS 설정 변경은 사용자의 명시적 허락 없이는 하지 않는다.
+- 배포 대상은 PR 로 리뷰되어 `main`에 병합된 코드뿐이다.
+- "배포해 줘" 요청을 받으면 다음 순서를 지킨다.
+  1. 배포할 `main` 커밋과 대상(`frontend` / `api` / `all`)을 확인한다.
+  2. `mode=plan`으로 실행하고, 실행 요약의 변경 파일 수·삭제 예정·검사 결과를 사용자에게 보고한다.
+  3. 사용자가 그 계획을 보고 명시적으로 승인한 경우에만 `mode=deploy`, `confirm=DEPLOY`로 실행한다.
+  4. 결과(상태 확인, 백업 이름)를 보고한다. 실패하면 롤백 여부를 사용자에게 묻는다.
+- `deploy.yml`의 `DEPLOY_UNLOCKED` 값, 보호 규칙(`scripts/deploy/*.rsync-filter`)은 사용자 승인 없이 바꾸지 않는다.
+- SSH 개인키, 서버 주소, API 키 등 인증정보는 코드·문서·대화에 기록하지 않는다. GitHub Secrets 에만 둔다.
