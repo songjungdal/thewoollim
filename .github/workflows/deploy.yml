@@ -61,7 +61,7 @@ env:
   # ─── 실제 반영 잠금 ─────────────────────────────────────────────
   # "false" 인 동안 deploy / rollback 은 반드시 실패한다 (plan, rollback-list 만 동작).
   # 운영 반영을 시작하려면 PR 로 "true" 로 바꾸고 리뷰·병합한다.
-  DEPLOY_UNLOCKED: "false"
+  DEPLOY_UNLOCKED: "true"
   # ────────────────────────────────────────────────────────────────
   WEB_ROOT: ${{ vars.DEPLOY_WEB_ROOT || '/var/www/thewoollim' }}
   STAGING_ROOT: ${{ vars.DEPLOY_STAGING_DIR || '/home/admin/htdocs' }}
