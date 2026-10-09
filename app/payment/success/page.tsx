@@ -9,6 +9,7 @@ import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import { useAuth, isProfileComplete } from "../../context/AuthContext";
 import { useParties } from "../../lib/useParties";
+import { partyTypeOf } from "../../lib/data";
 
 function PaymentSuccessContent() {
   const searchParams = useSearchParams();
@@ -34,22 +35,26 @@ function PaymentSuccessContent() {
 
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const pendingHrefRef = useRef<string | null>(null);
+  // 이번 주문이 모두 솔로파티면 프로필 단계가 없다 — 프로필 박스·나가기 확인 창 대신 솔로파티 안내 (docs/specs/party-solo-guide.md 4-3).
+  //   매칭파티가 하나라도 섞여 있으면 지금과 같다.
+  const allSolo = !partiesLoading && parties.length > 0 && parties.every(p => partyTypeOf(p) === "solo");
   const profileDone = isProfileComplete(profile);
+  const guardLeave = !profileDone && !allSolo;   // 나가기 확인 창을 띄울지
 
   // 1) Browser-level beforeunload (탭 닫기/새로고침/외부이동)
   useEffect(() => {
-    if (profileDone) return;
+    if (!guardLeave) return;
     const handler = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = "";
     };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
-  }, [profileDone]);
+  }, [guardLeave]);
 
   // 2) SPA 내부 링크 가로채기 — 사이트 내 다른 페이지로 이동 시 모달
   useEffect(() => {
-    if (profileDone) return;
+    if (!guardLeave) return;
     const onClick = (e: MouseEvent) => {
       const target = (e.target as HTMLElement).closest("a") as HTMLAnchorElement | null;
       if (!target) return;
@@ -63,7 +68,7 @@ function PaymentSuccessContent() {
     };
     document.addEventListener("click", onClick, true);
     return () => document.removeEventListener("click", onClick, true);
-  }, [profileDone]);
+  }, [guardLeave]);
 
   const confirmLeave = () => {
     const href = pendingHrefRef.current ?? "/";
@@ -176,8 +181,26 @@ function PaymentSuccessContent() {
             </motion.div>
           )}
 
-          {/* Profile-required warning OR completion notice */}
-          {!profileDone ? (
+          {/* 솔로파티만 결제 — 프로필 작성 없이 참가 확정 문자를 기다린다는 안내 */}
+          {allSolo ? (
+            <motion.div
+              initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+              className="bg-white border border-gray-100 rounded-2xl md:rounded-3xl p-5 md:p-7 mb-5 md:mb-6"
+              data-testid="solo-success-notice"
+            >
+              <div className="flex items-start gap-3 md:gap-4">
+                <div className="w-10 h-10 md:w-12 md:h-12 bg-brand-point/10 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Sparkles size={20} className="text-brand-point-ink md:hidden" />
+                  <Sparkles size={24} className="text-brand-point-ink hidden md:block" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm md:text-base text-gray-600 font-medium leading-relaxed">
+                    결제가 완료되었습니다. 관리자 확인 후 <span className="font-black text-brand-point-ink">참가 확정 문자</span>를 보내드립니다. 별도의 프로필 작성은 필요 없습니다.
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          ) : !profileDone ? (
             <motion.div
               initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
               className="bg-gradient-to-br from-brand-point/10 to-brand-point/5 border-2 border-brand-point/40 rounded-2xl md:rounded-3xl p-5 md:p-7 mb-5 md:mb-6"
@@ -227,7 +250,7 @@ function PaymentSuccessContent() {
             initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
             className="space-y-3"
           >
-            {!profileDone ? (
+            {!profileDone && !allSolo ? (
               <button
                 type="button"
                 onClick={handleStartProfile}
