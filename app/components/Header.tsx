@@ -45,7 +45,7 @@ export default function Header() {
             { href: "/#gallery",      id: "gallery",      label: "현장스케치" },
             { href: "/#reviews",      id: "reviews",      label: "후기게시판" },
             { href: "/#participants", id: "participants", label: "실시간 참여자" },
-            { href: "/#schedule",     id: "schedule",     label: "매칭파티 일정" },
+            { href: "/#schedule",     id: "schedule",     label: "파티 일정" },
             { href: "/#faq",          id: "faq",          label: "FAQ" },
           ].map(item => (
             <Link
@@ -96,7 +96,7 @@ export default function Header() {
           <Link href="/#gallery" onClick={(e) => handleScroll(e, 'gallery')}>현장스케치</Link>
           <Link href="/#reviews" onClick={(e) => handleScroll(e, 'reviews')}>후기게시판</Link>
           <Link href="/#participants" onClick={(e) => handleScroll(e, 'participants')}>실시간 참여자</Link>
-          <Link href="/#schedule" onClick={(e) => handleScroll(e, 'schedule')}>매칭파티 일정</Link>
+          <Link href="/#schedule" onClick={(e) => handleScroll(e, 'schedule')}>파티 일정</Link>
           <Link href="/#faq" onClick={(e) => handleScroll(e, 'faq')}>FAQ</Link>
           {mounted && isLoggedIn ? (
             <Link href="/mypage" className="text-brand-point font-bold flex items-center gap-2" onClick={() => setIsMenuOpen(false)}>

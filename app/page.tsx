@@ -12,7 +12,7 @@ import Image from "next/image";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import ReviewBoard from "./components/ReviewBoard";
-import { PARTICIPANTS, FAQS, partyStockStatus, partyVisibility, categoryLabel } from "./lib/data";
+import { PARTICIPANTS, FAQS, partyStockStatus, partyVisibility, categoryLabel, partyTypeOf, PARTY_TYPES, PARTY_TYPE_LABELS, type PartyType } from "./lib/data";
 import { useAuth } from "./context/AuthContext";
 import { useParties } from "./lib/useParties";
 
@@ -244,6 +244,22 @@ export default function SmoothOnePage() {
     "대상별": "targetGroup", "테마별": "theme", "지역별": "locationTag",
   };
 
+  // 파티 종류 탭 [전체 / 매칭파티 / 솔로파티] — 기존 대상·테마·지역 필터와 둘 다 만족하는 파티만 보여준다.
+  //   /?type=solo#apply 로 들어오면 솔로파티 탭이 선택된 채 열리고, 탭을 바꾸면 주소만 바꾼다(history.replaceState).
+  const [typeTab, setTypeTab] = useState<"all" | PartyType>("all");
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("type");
+    if (t && (PARTY_TYPES as readonly string[]).includes(t)) setTypeTab(t as PartyType);
+  }, []);
+  const pickType = (t: "all" | PartyType) => {
+    setTypeTab(t);
+    try {
+      const url = new URL(window.location.href);
+      if (t === "all") url.searchParams.delete("type"); else url.searchParams.set("type", t);
+      window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    } catch { /* 주소 갱신 실패는 무시 */ }
+  };
+
   const pickAxis = (axis: Axis) => {
     if (axis === activeAxis) {
       // 같은 축 다시 클릭 → 전체로 복귀
@@ -299,7 +315,7 @@ export default function SmoothOnePage() {
   // 카테고리 탭(상위 축/세부 값) 전환 시 더보기 상태 초기화 → 새 탭은 항상 접힌 채 처음부터 노출
   useEffect(() => {
     setApplyMoreOpen(false);
-  }, [activeAxis, filterValue]);
+  }, [activeAxis, filterValue, typeTab]);
 
   // 모바일 일정 섹션 — 마운트 1회, 현재 날짜 기준 연/월 초기화
   useEffect(() => {
@@ -310,6 +326,7 @@ export default function SmoothOnePage() {
 
   const sortedParties = useMemo(() => {
     const filtered = [...PARTIES].filter(p => {
+      if (typeTab !== "all" && partyTypeOf(p) !== typeTab) return false;
       if (!activeAxis || !filterValue) return true;
       return p[AXIS_FIELD[activeAxis]] === filterValue;
     });
@@ -326,7 +343,7 @@ export default function SmoothOnePage() {
         return a.calendarDate.localeCompare(b.calendarDate);     // 그룹 내부는 기존 날짜 오름차순 유지
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeAxis, filterValue, PARTIES, now]);
+  }, [activeAxis, filterValue, typeTab, PARTIES, now]);
 
   // 신청 섹션 렌더용 slice — 위 sortedParties(필터/정렬 완료)를 가로채 노출 개수만 제한
   const applyLimit = isDesktop ? APPLY_LIMIT_DESKTOP : APPLY_LIMIT_MOBILE;
@@ -345,7 +362,8 @@ export default function SmoothOnePage() {
       id: p.id,
       title: p.title,
       start,
-      classNames: past ? ["fc-event-ended"] : [],
+      // 솔로파티는 색을 구분 (지난 일정 표시가 항상 우선 — CSS 에서 ended 가 이긴다)
+      classNames: [...(past ? ["fc-event-ended"] : []), ...(partyTypeOf(p) === "solo" ? ["fc-event-solo"] : [])],
       extendedProps: { location: p.location, target: p.target, price: p.price },
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -437,7 +455,7 @@ export default function SmoothOnePage() {
         <section id="apply" className="py-16 md:py-32 px-4 md:px-6 bg-white rounded-t-3xl md:rounded-t-[3rem] shadow-[0_-20px_40px_rgba(0,0,0,0.02)]">
           <div className="max-w-7xl mx-auto">
             <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="text-center mb-10 md:mb-16">
-              <h2 className="text-4xl md:text-6xl font-bold mb-4 md:mb-6 tracking-tight">매칭파티 신청</h2>
+              <h2 className="text-4xl md:text-6xl font-bold mb-4 md:mb-6 tracking-tight">파티 신청</h2>
               <p className="text-sm md:text-lg text-gray-500 max-w-2xl mx-auto leading-relaxed break-keep px-2">
                 돌싱부터 싱글까지, 원하는 테마와 지역을 선택하여 새로운 연결을 시작해보세요.
               </p>
@@ -446,6 +464,27 @@ export default function SmoothOnePage() {
             {/* v8.0 — 카테고리 필터 + 카드 그리드 영역을 mounted 게이트 + opacity 트랜지션으로 감싸서
                 seed → live 데이터 swap 깜빡임 방지. 컨테이너 레이아웃은 유지되어 layout shift 없음. */}
             <div className={`transition-opacity duration-500 ease-out ${contentReady ? "opacity-100" : "opacity-0"}`}>
+
+            {/* 파티 종류 탭 — 밑줄형 텍스트 탭. 선택: 검정 굵은 글씨 + 터쿼이즈 밑줄 2px / 미선택: 회색. 모바일 한 줄 */}
+            <div className="flex justify-center gap-6 md:gap-10 mb-6 md:mb-8" role="tablist" aria-label="파티 종류">
+              {(["all", ...PARTY_TYPES] as const).map(t => {
+                const isActive = typeTab === t;
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    role="tab"
+                    aria-selected={isActive}
+                    onClick={() => pickType(t)}
+                    className={`pb-1.5 text-base md:text-xl whitespace-nowrap border-b-2 transition-colors ${
+                      isActive ? "text-brand-black font-black border-brand-point" : "text-gray-400 font-bold border-transparent hover:text-gray-600"
+                    }`}
+                  >
+                    {t === "all" ? "전체" : PARTY_TYPE_LABELS[t]}
+                  </button>
+                );
+              })}
+            </div>
 
             {/* 계층형 카테고리 — 중앙 정렬, 상위 축 클릭 → 세부 옵션 전개 */}
             <div className="mb-10 md:mb-16 border-b border-gray-100 pb-6 md:pb-8">
@@ -523,7 +562,7 @@ export default function SmoothOnePage() {
 
             {sortedParties.length === 0 ? (
               <div className="bg-white border border-gray-100 rounded-2xl md:rounded-3xl p-10 md:p-16 text-center">
-                <p className="text-gray-400 font-bold text-sm md:text-base">선택한 조건에 맞는 매칭파티가 없습니다.</p>
+                <p className="text-gray-400 font-bold text-sm md:text-base">선택한 조건에 맞는 파티가 없습니다.</p>
                 <p className="text-xs md:text-sm text-gray-400 mt-2">다른 카테고리를 선택하거나 조건을 초기화해주세요.</p>
               </div>
             ) : (
@@ -561,6 +600,12 @@ export default function SmoothOnePage() {
                       alt=""
                       className="block max-w-none w-[calc(100%+2.5rem)] md:w-[calc(100%+4rem)] h-20 md:h-24 object-cover -ml-5 -mt-5 md:-ml-8 md:-mt-8 mb-4 md:mb-5"
                     />
+                    {/* 좌측 상단 — 파티 종류 배지 (기존 배지와 같은 크기, 검정 배경·흰 글자, 모집 종료 카드에도 표시) */}
+                    <div className="absolute top-4 left-4 md:top-5 md:left-5 z-10">
+                      <span className="bg-gray-900 text-white text-[11px] md:text-xs font-black px-2.5 py-1 rounded-full shadow-md whitespace-nowrap">
+                        {PARTY_TYPE_LABELS[partyTypeOf(card)]}
+                      </span>
+                    </div>
                     {/* 우측 상단 배지 영역 — 종료 시 [모집종료] 단일 배지, 아니면 대상(싱글/돌싱) + 모집마감 스택 */}
                     <div className="absolute top-4 right-4 md:top-5 md:right-5 flex flex-col items-end gap-1.5 z-10">
                       {isEnded ? (
@@ -607,7 +652,7 @@ export default function SmoothOnePage() {
                               : "bg-brand-black text-white hover:bg-brand-point"
                         }`}
                       >
-                        {isEnded ? "모집 종료된 매칭파티" : stock.allFull ? "모집 마감 · 상세보기" : "신청하기"}
+                        {isEnded ? "모집 종료된 파티" : stock.allFull ? "모집 마감 · 상세보기" : "신청하기"}
                       </Link>
                     </div>
                   </motion.div>
@@ -668,8 +713,8 @@ export default function SmoothOnePage() {
         <section id="schedule" className="py-16 md:py-32 px-4 md:px-6 bg-white shadow-[0_-20px_40px_rgba(0,0,0,0.02)]">
           <div className="max-w-7xl mx-auto">
             <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="text-center mb-10 md:mb-16">
-              <h2 className="text-4xl md:text-6xl font-bold mb-4 md:mb-6 tracking-tight">매칭파티 일정</h2>
-              <p className="text-base md:text-lg text-gray-500 max-w-2xl mx-auto">신청 가능한 매칭파티 일정을 확인하세요.</p>
+              <h2 className="text-4xl md:text-6xl font-bold mb-4 md:mb-6 tracking-tight">파티 일정</h2>
+              <p className="text-base md:text-lg text-gray-500 max-w-2xl mx-auto">신청 가능한 파티 일정을 확인하세요.</p>
             </motion.div>
 
             {/* Mobile: 연/월 내비게이션 + 월별 일정 리스트 */}
@@ -730,7 +775,14 @@ export default function SmoothOnePage() {
                           <div className={`text-[11px] font-semibold ${isPast ? "text-[#9a3a47]/70" : "text-gray-400"}`}>{dayName}요일</div>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className={`font-bold text-[15px] mb-1 leading-snug ${isPast ? "text-[#7a2c37]" : "text-brand-black"}`}>{event.title}</div>
+                          <div className={`font-bold text-[15px] mb-1 leading-snug ${isPast ? "text-[#7a2c37]" : "text-brand-black"}`}>
+                            {party && (
+                              <span className="inline-block align-middle mr-1.5 -mt-0.5 bg-gray-900 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">
+                                {PARTY_TYPE_LABELS[partyTypeOf(party)]}
+                              </span>
+                            )}
+                            {event.title}
+                          </div>
                           <div className={`text-sm ${isPast ? "text-[#9a3a47]/85" : "text-gray-500"}`}>{party?.dateString}</div>
                           <div className={`text-xs mt-0.5 truncate ${isPast ? "text-[#9a3a47]/70" : "text-gray-400"}`}>{party?.location} · {party?.target}</div>
                         </div>
@@ -785,6 +837,10 @@ export default function SmoothOnePage() {
                   .fc-event.fc-event-ended { background-color: #f8d8dd !important; border-left-color: rgba(154, 58, 71, 0.4) !important; }
                   .fc-event.fc-event-ended, .fc-event.fc-event-ended * { color: #7a2c37 !important; }
                   .fc-event.fc-event-ended:hover { background-color: #f4c5cd !important; box-shadow: 0 4px 12px rgba(248, 216, 221, 0.55) !important; }
+                  /* 솔로파티 — 검정 톤으로 구분. :not(.fc-event-ended) 로 지난 일정 표시가 항상 우선 */
+                  .fc-event.fc-event-solo:not(.fc-event-ended) { background-color: #111827 !important; border-left-color: rgba(64, 224, 208, 0.8) !important; }
+                  .fc-event.fc-event-solo:not(.fc-event-ended), .fc-event.fc-event-solo:not(.fc-event-ended) * { color: #ffffff !important; }
+                  .fc-event.fc-event-solo:not(.fc-event-ended):hover { background-color: #374151 !important; }
                   .fc-daygrid-event-dot { display: none !important; }
                 `}} />
                 <FullCalendar

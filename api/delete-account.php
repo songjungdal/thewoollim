@@ -57,8 +57,8 @@ if (file_exists($bookingsFile)) {
             $cal = (string)($partyMap[(string)($b['partyId'] ?? '')]['calendarDate'] ?? '');
             if ($cal === '' || $cal < $today) continue;
             jsonFail(
-                "잠시만요! 아직 진행 중인 매칭 파티가 남아있어요.\n" .
-                "현재 진행 대기 중인 매칭 파티가 있습니다.\n" .
+                "잠시만요! 아직 진행 중인 파티가 남아있어요.\n" .
+                "현재 진행 대기 중인 파티가 있습니다.\n" .
                 "탈퇴 버튼 바로 옆에 있는 [취소요청] 버튼을 눌러 먼저 정리를 마쳐주세요.\n" .
                 "모든 신청 내역이 취소된 후에 회원 탈퇴가 가능합니다.",
                 409

@@ -27,7 +27,7 @@ export default function RefundPage() {
               <AlertCircle className="text-red-500 mt-0.5 flex-shrink-0" size={22} />
               <div className="space-y-1.5">
                 <h3 className="text-red-900 font-black text-base md:text-lg leading-snug">꼭 확인해주세요!</h3>
-                <p className="text-red-800 text-sm md:text-base leading-relaxed">파티 매칭 확정 이후에는 스케줄 조율 및 노쇼 방지를 위해 환불이 제한될 수 있습니다.</p>
+                <p className="text-red-800 text-sm md:text-base leading-relaxed">파티 참가 확정 이후에는 스케줄 조율 및 노쇼 방지를 위해 환불이 제한될 수 있습니다.</p>
               </div>
             </div>
 
@@ -123,7 +123,7 @@ export default function RefundPage() {
                   <ol className="list-decimal pl-5 md:pl-7 space-y-4 md:space-y-5 text-sm md:text-base text-red-900 leading-relaxed marker:font-black marker:text-red-700">
                     <li className="pl-1 md:pl-2">참가자가 프로필 카드 정보를 허위로 기재하거나 고의성이 있는 위반사항이 있는 경우</li>
                     <li className="pl-1 md:pl-2">
-                      매칭파티 신청 이후 당일취소, 노쇼, 불참, 지각, 연락두절 등의 이유가 있는 경우
+                      파티 신청 이후 당일취소, 노쇼, 불참, 지각, 연락두절 등의 이유가 있는 경우
                       <p className="mt-3 md:mt-4 text-xs md:text-sm text-red-700/85 font-medium leading-relaxed pl-3.5 md:pl-4 border-l-2 border-red-200">
                         단, 불가항력적 개인사정으로 참석이 불가능한 경우에는 응급실 내원 확인서, 경찰 출석 요구서, 사고 사실 확인원 등
                         <span className="font-bold"> 공적 서류가 확인되어야만</span> 환불이 가능합니다.
@@ -150,7 +150,7 @@ export default function RefundPage() {
                   </li>
                   <li className="flex gap-3">
                     <span className="text-brand-point font-black flex-shrink-0">·</span>
-                    <span>매칭 파트너의 노쇼로 인해 파티 구성이 현저히 깨진 경우 <span className="font-bold text-gray-900">부분 환불 또는 차후 파티 초대권</span>을 제공합니다.</span>
+                    <span>다른 참가자의 노쇼 등으로 파티 구성이 현저히 깨진 경우 <span className="font-bold text-gray-900">전액 환불</span>해 드립니다.</span>
                   </li>
                 </ul>
               </section>
@@ -164,12 +164,12 @@ export default function RefundPage() {
                 <div className="text-xs md:text-sm text-gray-500 leading-relaxed space-y-3 pl-1">
                   <p>
                     저희 <span className="font-bold text-gray-700">&ldquo;어울림&rdquo;</span>은
-                    시간과 날짜가 정해진 오프라인 매칭파티 행사로
+                    시간과 날짜가 정해진 오프라인 파티(매칭파티·솔로파티) 행사로
                     <span className="font-bold text-gray-700"> 전자상거래 제17조 제2항 제3호</span>에 따라
                     청약 철회가 제한되는 서비스입니다.
                   </p>
                   <p>
-                    결제 이후 시기별 환불 금액이 다르며, 환불 규정은 매칭파티 행사일 기준으로 계산됩니다.
+                    결제 이후 시기별 환불 금액이 다르며, 환불 규정은 파티 행사일 기준으로 계산됩니다.
                   </p>
                 </div>
               </section>

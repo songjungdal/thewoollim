@@ -186,7 +186,7 @@ function PaymentSuccessContent() {
                   </h3>
                   <p className="text-sm md:text-base text-gray-700 font-medium leading-relaxed mb-1">
                     <span className="text-brand-point font-black">프로필 카드 작성</span>을 완료해야
-                    매칭파티 <span className="font-black">참가 확정</span>을 받을 수 있습니다.
+                    파티 <span className="font-black">참가 확정</span>을 받을 수 있습니다.
                   </p>
                   <p className="text-xs md:text-sm text-gray-500 leading-relaxed">
                     프로필이 미완성이면 매칭이 어려워 참가가 자동 취소될 수 있어요.
