@@ -134,6 +134,7 @@ foreach ($users as $u) {
             }
 
             $party = $targetParties[$partyId];
+            $typeLabel = partyTypeLabel($party);   // 매칭파티 / 솔로파티 (글자 수 같아 단문·장문 구분 영향 없음)
             $title = (string)($party['title']    ?? '');
             $loc   = (string)($party['location'] ?? '');
             $dt    = _d1SplitDate((string)($party['dateString'] ?? ''));
@@ -141,7 +142,7 @@ foreach ($users as $u) {
             $ptime = $dt['time'] !== '' ? $dt['time'] : '추후 안내';
 
             $msg =
-                "{$name}님, 내일은 설레는 만남이 있는 매칭파티 날입니다!\n\n" .
+                "{$name}님, 내일은 설레는 만남이 있는 {$typeLabel} 날입니다!\n\n" .
                 "{$title}\n" .
                 "일시: {$pdate}\n" .
                 "시간: {$ptime}\n" .
@@ -160,7 +161,7 @@ foreach ($users as $u) {
                 'msg_type'    => $msgType,
                 'testmode_yn' => 'N',
             ];
-            if ($msgType === 'LMS') $params['title'] = '[어울림] 매칭파티 D-Day 안내';
+            if ($msgType === 'LMS') $params['title'] = "[어울림] {$typeLabel} D-Day 안내";
 
             $ch = curl_init('https://apis.aligo.in/send/');
             curl_setopt_array($ch, [

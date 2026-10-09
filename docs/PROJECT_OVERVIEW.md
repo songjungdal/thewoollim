@@ -548,6 +548,7 @@ thewoollim/
 
 - **문자가 나가지 않는 경우**: 무통장 신청 접수, 회원 취소요청 접수, 관리자 환불 승인
 - 테스트 계정과 관리자 계정에는 발송하지 않습니다. 90바이트를 넘는 문자는 장문(LMS)으로 보냅니다.
+- 파티 전날 안내와 취소 안내 문자는 파티 종류에 맞춰 "매칭파티" 또는 "솔로파티"로 적습니다(장문 제목 포함). 두 이름은 글자 수가 같아서 단문/장문 구분은 달라지지 않습니다. (`api/cron/d1_reminder.php`, `api/admin/_cancel_sms.php`)
 - `api/cron/` 의 자동 작업이 실제 서버에 예약되어 있는지는 [코드상 확인 불가]입니다. 주기는 코드 주석에만 적혀 있습니다.
 
 ### 4-9. 매칭 투표
@@ -559,6 +560,10 @@ thewoollim/
 - **서로를 선택한 이성끼리 매칭**됩니다. 매칭되면 서로의 이름·생년월일·연락처를 보여줍니다(`api/matching/results.php`).
 - 투표를 종료하면 해당 파티의 "참가확정" 예약이 모두 "모임종료"로 바뀝니다.
 - [초기화]를 누르면 투표 기록을 지우고 상태를 되돌립니다.
+- **솔로파티는 매칭 투표가 없습니다.**
+  - 서버는 솔로파티의 투표 시작, 투표, 결과 조회 요청을 "솔로파티는 매칭 투표가 없습니다."로 거절합니다(`api/admin/matching.php`, `api/matching/vote.php`, `api/matching/results.php`).
+  - 참가자 투표 화면의 파티 목록에도 솔로파티는 나오지 않습니다(`api/matching/state.php`).
+  - 솔로파티도 모임종료 처리(`end`, "참가확정" → "모임종료")와 되돌리기(`reset`)는 그대로 씁니다. 모임종료 때 담당자가 비어 있으면 누른 관리자 아이디를 담당자로 기록합니다.
 
 ### 4-10. 데이터 저장 위치
 
@@ -566,7 +571,7 @@ thewoollim/
 |---|---|
 | 회원 정보 | DB `users` 테이블 |
 | 후기 / 현장스케치 / 관리자 메모 / 매칭 투표 | DB `reviews`, `review_gallery`, `admin_memos`, `match_votes` 테이블 (생성 SQL은 저장소에 없음) |
-| 파티 목록 | `api/data/parties.json` |
+| 파티 목록 | `api/data/parties.json` (파티 종류 `partyType`, 상세페이지 안내 `detail` 포함) |
 | 파티별 신청 인원 | `api/data/party_counts.json` |
 | 예약 | `api/data/bookings_<이메일 해시>.json` (회원별 파일) |
 | 장바구니 | `api/data/cart_<이메일 해시>.json` |
@@ -720,7 +725,8 @@ thewoollim/
 | 헤더 / 푸터 | `app/components/Header.tsx`, `Footer.tsx` | `api/admin/company.php` (회사정보) |
 | 메인 | `app/page.tsx` | `api/parties.php`, `api/party-counts.php`, `api/gallery.php`, `api/participants.php` |
 | 파티 데이터 규칙·FAQ | `app/lib/data.ts`, `app/lib/useParties.ts` | `api/parties.php`, `api/admin/parties.php` |
-| 파티 상세 | `app/party/[id]/page.tsx`, `PartyClientView.tsx` | `api/party-participants.php` |
+| 파티 상세 | `app/party/[id]/page.tsx`, `PartyClientView.tsx` | `api/party-participants.php`, `api/party-detail.php` (상세페이지 안내) |
+| 파티 종류·상세페이지 안내(기본 내용·입력 제한) | `app/lib/data.ts` (`PARTY_TYPES`, `partyTypeOf`), `app/lib/partyDetailTemplates.ts` | `api/lib.php` (`partyTypeOf`, `sanitizePartyDetail`) |
 | 참가 자격 검사 | `app/lib/eligibility.ts` | (서버 검사 없음, 7장 참고) |
 | 회원가입·본인인증 | `app/login/page.tsx` | `api/register.php`, `api/auth/verify-identity.php` |
 | 로그인·세션 | `app/login/page.tsx`, `AuthContext.tsx` | `api/auth/login.php`, `api/auth/_session.php`, `api/auth/logout.php` |
