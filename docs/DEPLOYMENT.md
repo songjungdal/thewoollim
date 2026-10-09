@@ -49,10 +49,10 @@
 | `plan` (production 환경에 서버 Secret 미등록) | 없음 | 없음 | 없음 |
 | `plan` (서버 Secret 등록, 승인 후) | **있음** — 접속 확인, `sudo -n true`, `rsync --dry-run` (읽기만) | 없음 | `aws-sg-temporary` 일 때만 실행기 IP 를 **임시로 추가했다가 제거** |
 | `rollback-list` (승인 후) | **있음** — 백업 폴더 목록 읽기 | 없음 | 위와 같음 |
-| `deploy` (잠금) | 없음 — 빌드 첫 단계에서 실패, 승인 요청도 생기지 않음 | 없음 | 없음 |
-| `rollback` (잠금) | 없음 — 승인 후 첫 단계에서 실패 | 없음 | 없음 |
+| `deploy` (잠금 시) | 없음 — 빌드 첫 단계에서 실패, 승인 요청도 생기지 않음 | 없음 | 없음 |
+| `rollback` (잠금 시) | 없음 — 승인 후 첫 단계에서 실패 | 없음 | 없음 |
 
-**지금은 잠금 상태**입니다(`deploy.yml` 의 `DEPLOY_UNLOCKED: "false"`). `plan`과 `rollback-list`만 동작하고(둘 다 production 승인 필요), `deploy`·`rollback`은 첫 단계에서 실패합니다. 잠금을 풀려면 이 값을 `"true"`로 바꾸는 PR 을 상대방이 승인한 뒤 병합해야 합니다.
+**지금은 잠금 해제 상태**입니다(`deploy.yml` 의 `DEPLOY_UNLOCKED: "true"`). `deploy`·`rollback`도 동작하며, 위 조건(main 브랜치, 확인 문구, production 승인)을 모두 거쳐야 합니다. 다시 잠그려면 이 값을 `"false"`로 바꾸는 PR 을 상대방이 승인한 뒤 병합합니다. 잠금 상태에서는 `plan`과 `rollback-list`만 동작하고, `deploy`·`rollback`은 첫 단계에서 실패합니다.
 
 **배포 대상(target)**
 
