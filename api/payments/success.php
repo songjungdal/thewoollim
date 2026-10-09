@@ -10,6 +10,7 @@
  *  3) Toss confirm API 호출 (시크릿 키 Basic auth)
  *  4) 결제 승인 성공 시:
  *     - 파티별 정원(maleStock/femaleStock) 검사 — 초과면 토스 결제 전액 자동 취소 후 실패 redirect
+ *       (참가 구성이 있는 솔로파티는 고른 항목에 포함된 회차마다 정원 검사·증가. 항목이 사라졌거나 바뀌었으면 자동 취소)
  *       (파티 없음·쿠폰 검증 실패 등 승인 뒤 실패도 같은 autoCancelAndFail() 로 자동 취소)
  *     - party_counts atomic +1
  *     - 쿠폰 atomic consume
@@ -221,6 +222,21 @@ foreach ((array)$partiesJson as $p) {
 
 $DEFAULT_COUNTS = [];
 
+// ── 참가 항목 확인 (참가 구성이 있는 솔로파티) — 결제 준비 때 고른 항목이 지금도 그 파티에 있는지
+$pendingOptionIds = is_array($pending['optionIds'] ?? null) ? $pending['optionIds'] : [];
+$pendingLines     = is_array($pending['lines'] ?? null) ? $pending['lines'] : [];
+$resolvedOptions  = []; // partyId => option (항목이 있는 파티만)
+foreach (array_unique($partyIds) as $pid) {
+    if (!isset($partyMap[$pid])) continue; // 파티 없음은 아래 정원 검사 블록에서 기존대로 자동 취소
+    $oid = (string)($pendingOptionIds[$pid] ?? '');
+    if (!partyHasOptions($partyMap[$pid]) && $oid === '') continue;
+    $opt = partyOptionById($partyMap[$pid], $oid);
+    if ($opt === null) {
+        autoCancelAndFail('참가 항목 정보가 바뀌어 결제를 진행할 수 없습니다', '참가 항목 변경으로 자동 취소', 'OPTION_CHANGED', "partyId=$pid optionId=$oid");
+    }
+    $resolvedOptions[$pid] = $opt;
+}
+
 // 정원 검증 + 차감 (flock atomic)
 // 회복력 강화: counts 파일 fopen 실패 시 결제는 이미 Toss 가 확정한 상태이므로,
 // 결제 취소 대신 booking 만 생성하고 admin 수동 확인 큐에 기록 (사용자 중복 결제 방어).
@@ -260,7 +276,13 @@ if (!$fp) {
         }
         $cur = $counts[$pid] ?? $DEFAULT_COUNTS[$pid] ?? ['male' => 0, 'female' => 0];
         $effective[$pid] = $cur;
-        if ($cur[$genderKey] + $reqQty > partyStockLimit($partyMap[$pid], $genderKey)) $soldOut[] = $pid;
+        if (isset($resolvedOptions[$pid])) {
+            // 항목에 포함된 회차 중 하나라도 차 있으면 마감 (회차별 정원)
+            $over = optionSessionsOverStock($partyMap[$pid], $resolvedOptions[$pid], (array)$cur, $genderKey, $reqQty);
+            if ($over) $soldOut[] = "$pid(" . implode('/', $over) . ')';
+        } elseif ((int)($cur[$genderKey] ?? 0) + $reqQty > partyStockLimit($partyMap[$pid], $genderKey)) {
+            $soldOut[] = $pid;
+        }
     }
     if (!empty($soldOut)) {
         flock($fp, LOCK_UN); fclose($fp);
@@ -292,8 +314,10 @@ if ($couponCode !== '') {
         autoCancelAndFail(($maleOk ? '남성' : '여성') . ' 회원만 사용할 수 있는 쿠폰입니다', '쿠폰 사용 불가로 자동 취소', 'COUPON_GENDER', "coupon=$couponCode gender=$gender");
     }
     // 쿠폰 적용 대상 파티의 단가 기준으로 할인 금액 계산
-    // 쿠폰 대상 파티의 성별별 가격 기준 — pending.php 와 동일 규칙으로 amount 검증 일치 보장
-    $linePrice      = priceForGender($partyMap[$couponPartyId], $gender);
+    // 결제 준비(pending.php) 때 저장한 줄 가격 기준 — amount 검증 일치 보장 (예전 pending 은 성별 가격으로 다시 계산)
+    $linePrice      = isset($pendingLines[$couponPartyId])
+        ? (int)$pendingLines[$couponPartyId]
+        : (int)priceForGender($partyMap[$couponPartyId] ?? [], $gender, (string)($pendingOptionIds[$couponPartyId] ?? ''));
     $couponDiscount = calcCouponDiscount($found, $linePrice);
 
     $cfp = fopen($usagesFile, 'c+');
@@ -338,12 +362,12 @@ if ($couponCode !== '') {
 
 // 정원 증가 + 저장 — counts 파일 정상 열린 경우만 (skipCounts 시 booking 만 생성)
 if (!$skipCounts && $fp) {
-    foreach ($partyIds as $pid) {
-        if (!isset($effective[$pid])) $effective[$pid] = ['male' => 0, 'female' => 0];
-        $effective[$pid][$genderKey]++;
-    }
+    // 파티 신청 인원 +1, 항목이 있으면 포함 회차마다 +1 (1부+2부 신청자는 s1·s2 각각 +1)
     $merged = $counts;
-    foreach ($effective as $pid => $c) $merged[$pid] = $c;
+    foreach ($partyIds as $pid) {
+        $sids = isset($resolvedOptions[$pid]) ? array_map('strval', (array)$resolvedOptions[$pid]['sessionIds']) : [];
+        countsAdjust($merged, $pid, $genderKey, $sids, 1);
+    }
     ftruncate($fp, 0); rewind($fp); fwrite($fp, json_encode($merged));
     fflush($fp); flock($fp, LOCK_UN); fclose($fp);
 }
@@ -372,8 +396,10 @@ $now = date('c');
 $couponApplied = false;
 $newBookings = []; // 확정 대기중(pending_approval) 알림 문자 발송용 — 이번 요청에서 새로 생성된 booking만 추적
 foreach ($partyIds as $pid) {
-    // 회원 성별 기반 가격 — pending.php 와 동일 규칙
-    $partyPrice  = priceForGender($partyMap[$pid] ?? [], $gender);
+    // 결제 준비 때 저장한 줄 가격 (예전 pending 은 회원 성별 기반 가격 — pending.php 와 동일 규칙)
+    $partyPrice  = isset($pendingLines[$pid])
+        ? (int)$pendingLines[$pid]
+        : (int)priceForGender($partyMap[$pid] ?? [], $gender, (string)($pendingOptionIds[$pid] ?? ''));
     $isCouponHit = ($couponCode !== '' && $pid === $couponPartyId && !$couponApplied);
     $rowDiscount = $isCouponHit ? $couponDiscount : 0;
     if ($isCouponHit) $couponApplied = true;
@@ -391,6 +417,10 @@ foreach ($partyIds as $pid) {
         'createdAt'   => $now,
         'updatedAt'   => $now,
     ];
+    if (isset($resolvedOptions[$pid])) {
+        // 결제 시점 사본 — 나중에 항목 이름·회차가 바뀌어도 이 예약은 결제 당시 내용으로 남는다
+        $newBooking += bookingOptionSnapshot($partyMap[$pid], $resolvedOptions[$pid]);
+    }
     if ($initialStatus === 'paid_pending_profile') {
         // 1차(즉시) 프로필작성 안내 발송 플래그 — 실제 발송은 파일 저장 이후 아래에서 수행
         $newBooking['profileNotifiedAt'] = $now;

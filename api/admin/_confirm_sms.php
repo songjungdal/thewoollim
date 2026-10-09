@@ -78,11 +78,16 @@ if (!function_exists('notifyConfirmSms')) {
             $pdate = $dt['date'] !== '' ? $dt['date'] : '추후 안내';
             $ptime = $dt['time'] !== '' ? $dt['time'] : '추후 안내';
 
+            // 참가 구성 예약 — 항목 이름 한 줄, 시각은 처음 참석하는 회차 기준 (항목 예약이 아니면 기존 문구 그대로)
+            $optLine = !empty($booking['optionName']) ? '참가: ' . (string)$booking['optionName'] . "\n" : '';
+            if (bookingFirstSessionTime($booking) !== '') $ptime = bookingFirstSessionTime($booking);
+
             // 3) 메시지 — 템플릿 (줄바꿈/특수문자 그대로 유지)
             $msg =
                 "[어울림] 참가확정 안내\n" .
                 "{$name}님, [어울림] 파티 참가가 최종 확정되었습니다.\n\n" .
                 "{$title}\n" .
+                $optLine .
                 "{$pdate} {$ptime}\n" .
                 "{$loc}\n\n" .
                 "첫인상을 더욱 빛내줄 깔끔하고 단정한 복장으로 늦지 않게 도착해 주시기 바랍니다.\n" .

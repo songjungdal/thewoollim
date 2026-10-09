@@ -3,7 +3,7 @@
  * 회원 본인 예약 목록 조회 (마이페이지).
  *
  * GET ?email=<x> → Booking[]
- *   { id, partyId, status, paymentId?, total?, createdAt, updatedAt }
+ *   { id, partyId, status, paymentId?, total?, createdAt, updatedAt, optionId?, optionName?, sessionIds?, sessionTimes? }
  *
  * 본인 데이터만 — email 파라미터가 세션 이메일과 일치해야 함.
  *
@@ -45,5 +45,14 @@ foreach ($d as $b) {
         'createdAt' => (string)($b['createdAt']  ?? ''),
         'updatedAt' => (string)($b['updatedAt']  ?? ''),
     ];
+    // 참가 구성 예약 — 결제 시점 사본 (항목 이름·포함 회차·회차 시작 시각)
+    if (!empty($b['optionId'])) {
+        $row = &$out[count($out) - 1];
+        $row['optionId']     = (string)$b['optionId'];
+        $row['optionName']   = (string)($b['optionName'] ?? '');
+        $row['sessionIds']   = array_values(array_map('strval', (array)($b['sessionIds'] ?? [])));
+        $row['sessionTimes'] = array_values(array_map('strval', (array)($b['sessionTimes'] ?? [])));
+        unset($row);
+    }
 }
 echo json_encode($out, JSON_UNESCAPED_UNICODE);
