@@ -18,6 +18,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { partyTypeOf, type PartyType } from "../../../lib/data";
 
 type Party = {
   id: string;
@@ -26,6 +27,7 @@ type Party = {
   calendarDate: string;   // 'YYYY-MM-DD' — 월별 필터 분류 기준
   voting_status: "closed" | "open" | "finalized";
   host_name?: string;
+  partyType: PartyType;   // 솔로파티는 매칭 투표 없이 [모임종료]/[종료 취소]만
 };
 
 type MatchVote = {
@@ -47,6 +49,7 @@ type Detail = {
   voting_status: "closed" | "open" | "finalized";
   participants: { male: number; female: number };
   startBlocking: number;   // cancelled/confirmed 외 미완료 참가자 수 — >0 이면 투표시작 차단
+  confirmedCount: number;  // '참가확정' 인원 — 솔로파티 [모임종료] 확인창
   votes: MatchVote[];
   matches: MatchPair[];
 };
@@ -103,6 +106,7 @@ export default function MatchingAdminPage() {
             voting_status: d.voting_status ?? "closed",
             participants: d.participants ?? { male: 0, female: 0 },
             startBlocking: Number(d.start_blocking ?? 0),
+            confirmedCount: Number(d.confirmed_count ?? 0),
             votes: Array.isArray(d.votes) ? d.votes : [],
             matches: Array.isArray(d.matches) ? d.matches : [],
           },
@@ -124,6 +128,7 @@ export default function MatchingAdminPage() {
             calendarDate: String(p.calendarDate ?? ""),
             voting_status: (String(p.voting_status ?? "closed") as Party["voting_status"]),
             host_name: String(p.host_name ?? ""),
+            partyType: partyTypeOf({ partyType: typeof p.partyType === "string" ? p.partyType : undefined }),
           }))
         : [];
       setParties(items);
@@ -180,12 +185,12 @@ export default function MatchingAdminPage() {
     setParties([]); setDetails({});
   };
 
-  const doAction = async (partyId: string, action: "start" | "end" | "reset") => {
-    const confirmMsg = action === "start"
+  const doAction = async (partyId: string, action: "start" | "end" | "reset", customConfirm?: string) => {
+    const confirmMsg = customConfirm ?? (action === "start"
       ? "투표를 시작하시겠습니까?"
       : action === "end"
         ? "투표를 종료하시겠습니까?"
-        : "정말 초기화를 진행하시겠습니까?";
+        : "정말 초기화를 진행하시겠습니까?");
     if (!window.confirm(confirmMsg)) return;
     setBusy(`${partyId}:${action}`);
     try {
@@ -203,6 +208,8 @@ export default function MatchingAdminPage() {
         : p));
       await loadDetail(partyId);
       if (action === "reset") setExpanded(prev => ({ ...prev, [partyId]: false }));
+      // 솔로파티 [모임종료]는 비어 있던 담당자를 기록하므로 목록을 다시 읽어 담당자 표시를 갱신
+      if (action === "end" && parties.find(x => x.id === partyId)?.partyType === "solo") await loadParties();
     } catch {
       alert("네트워크 오류가 발생했습니다.");
     } finally {
@@ -414,6 +421,44 @@ export default function MatchingAdminPage() {
                 }
                 doAction(p.id, "start");
               };
+
+              if (p.partyType === "solo") {
+                // 솔로파티 — 매칭 투표 없음. 투표 현황 숨김, [모임종료] [종료 취소]만 (서버 end/reset 그대로 사용)
+                const confirmed = d?.confirmedCount ?? 0;
+                return (
+                  <div key={p.id} className="bg-white/97 rounded-3xl shadow-xl p-6">
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <div className="min-w-0">
+                        <h2 className="text-lg font-black text-black break-keep">{p.title}</h2>
+                        <p className="text-sm font-bold text-gray-500 mt-0.5">{p.dateString}</p>
+                        <p className="text-xs font-black text-gray-700 mt-1.5">솔로파티 · 매칭 투표 없음</p>
+                      </div>
+                      <span className={`flex-shrink-0 text-xs font-black px-3 py-1.5 rounded-full ${isFinal ? "bg-black text-white" : "bg-gray-200 text-gray-600"}`}>{isFinal ? "모임종료" : "진행 전"}</span>
+                    </div>
+                    {p.host_name ? (
+                      <p className="text-xs font-bold text-gray-400 mb-4">담당자: {p.host_name}</p>
+                    ) : null}
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => doAction(p.id, "end", `참가확정 ${confirmed}명이 '모임종료'로 바뀝니다.`)}
+                        disabled={!!busy || isFinal}
+                        className={`px-2 py-4 rounded-2xl font-black text-sm active:scale-[0.97] transition-transform ${isFinal ? "bg-red-600 text-white" : "bg-black text-white disabled:bg-gray-100 disabled:text-gray-300"}`}
+                      >
+                        모임종료
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => doAction(p.id, "reset", "모임종료를 취소하고 '참가확정'으로 되돌리시겠습니까?")}
+                        disabled={!!busy || !isFinal}
+                        className="px-2 py-4 rounded-2xl font-black text-sm bg-white border-2 border-gray-300 text-gray-700 active:scale-[0.97] transition-transform disabled:opacity-40"
+                      >
+                        종료 취소
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
 
               return (
                 <div key={p.id} className="bg-white/97 rounded-3xl shadow-xl p-6">
