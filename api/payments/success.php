@@ -10,6 +10,7 @@
  *  3) Toss confirm API 호출 (시크릿 키 Basic auth)
  *  4) 결제 승인 성공 시:
  *     - 파티별 정원(maleStock/femaleStock) 검사 — 초과면 토스 결제 전액 자동 취소 후 실패 redirect
+ *       (파티 정보 없음 · 쿠폰 검사 실패도 같은 방식으로 자동 취소 — $failAfterApproval)
  *     - party_counts atomic +1
  *     - 쿠폰 atomic consume
  *     - booking 생성 (status: 프로필 완성도에 따라 paid_pending_profile / pending_approval)
@@ -30,6 +31,40 @@ $amount     = (int)         ($_GET['amount']    ?? 0);
 function redirectFail(string $msg): void {
     header('Location: https://thewoollim.com/checkout/?error=' . urlencode($msg));
     exit;
+}
+
+/**
+ * 토스 결제 전액 취소 — 승인 뒤 예약을 만들 수 없을 때 사용. admin/bookings.php(cancel_full_refund)와 같은 방식.
+ * 이미 취소된 결제(ALREADY_CANCELED_PAYMENT)는 성공으로 간주.
+ * toss-config.php 의 payments_api_base 는 선택 항목 (로컬 mock 검증용, 없으면 토스 운영 API).
+ * 반환: ['ok' => bool, 'http' => int, 'body' => string]
+ */
+function tossCancelFull(array $cfg, string $paymentKey, int $amount, string $cancelReason): array {
+    $base = rtrim((string)($cfg['payments_api_base'] ?? 'https://api.tosspayments.com/v1/payments'), '/');
+    $http = 0; $body = '';
+    try {
+        $ch = curl_init($base . '/' . urlencode($paymentKey) . '/cancel');
+        curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => json_encode(['cancelReason' => $cancelReason, 'cancelAmount' => $amount], JSON_UNESCAPED_UNICODE),
+            CURLOPT_HTTPHEADER     => [
+                'Authorization: Basic ' . base64_encode($cfg['secret_key'] . ':'),
+                'Content-Type: application/json',
+            ],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_TIMEOUT        => 20,
+        ]);
+        $res  = curl_exec($ch);
+        $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $body = is_string($res) ? $res : ('curl_errno=' . curl_errno($ch) . ' ' . curl_error($ch));
+    } catch (Throwable $e) {
+        $body = $e->getMessage();
+    }
+    $json = json_decode($body, true);
+    $ok = $http === 200
+        || ($http === 400 && is_array($json) && (string)($json['code'] ?? '') === 'ALREADY_CANCELED_PAYMENT');
+    return ['ok' => $ok, 'http' => $http, 'body' => $body];
 }
 
 if ($paymentKey === '' || $orderId === '' || $amount <= 0) redirectFail('잘못된 결제 응답');
@@ -154,6 +189,32 @@ $partyIds  = array_map('strval', $pending['partyIds']);
 $couponCode    = (string)$pending['couponCode'];
 $couponPartyId = (string)$pending['couponPartyId'];
 
+// ── 토스 승인 뒤 · 예약 생성 전 실패 처리 — 결제 전액 자동 취소 후 실패 redirect.
+//    이 아래 실패 분기는 모두 이것을 거친다 (승인된 결제가 예약 없이 남지 않도록).
+//    호출 전에 잡고 있던 파일 잠금은 호출하는 쪽에서 푼다. 쿠폰 사용 이력·정원 +1 은 모든 실패 분기 뒤에 기록되므로 되돌릴 것 없음.
+//    $tag: 로그 구분자, $okMsg: 취소 성공 시 회원 안내, $failReason: 취소 실패 시 안내 앞부분, $detail: 로그 추가 정보
+$failAfterApproval = function (string $tag, string $cancelReason, string $okMsg, string $failReason, string $detail)
+    use ($cfg, $paymentKey, $amount, $orderId, $email, $gender, $dataDir, $pendingFile): void {
+    $cancel = tossCancelFull($cfg, $paymentKey, $amount, $cancelReason);
+
+    // 같은 주문이 다시 처리되지 않도록 pending 정리 (새로고침 시 재승인·예약 생성 방지)
+    @unlink($pendingFile);
+
+    if ($cancel['ok']) {
+        @file_put_contents("$dataDir/_counts_failure_alert.log", sprintf(
+            "[%s] %s_AUTO_CANCEL orderId=%s email=%s gender=%s %s amount=%d http=%d\n",
+            date('c'), $tag, $orderId, $email, $gender, $detail, $amount, $cancel['http']
+        ), FILE_APPEND);
+        redirectFail($okMsg);
+    }
+    @file_put_contents("$dataDir/_counts_failure_alert.log", sprintf(
+        "[%s] CRITICAL %s_AUTO_CANCEL_FAILED orderId=%s email=%s gender=%s %s amount=%d http=%d body=%s — 토스 결제 승인 상태, 예약 미생성. 수동 환불 필요.\n",
+        date('c'), $tag, $orderId, $email, $gender, $detail, $amount, $cancel['http'], substr($cancel['body'], 0, 400)
+    ), FILE_APPEND);
+    error_log("[payments/success] CRITICAL {$tag} auto cancel failed: orderId={$orderId}");
+    redirectFail($failReason . '. 결제 취소 처리 중 문제가 발생해 운영팀이 확인 후 환불해드립니다. 고객센터로 문의해주세요');
+};
+
 // ── parties.json 로드 → partyMap (counts 검증 / 쿠폰 / booking row 모두에서 사용) ─
 $partiesJson = file_exists("$dataDir/parties.json") ? json_decode(file_get_contents("$dataDir/parties.json"), true) : [];
 $partyMap = [];
@@ -194,11 +255,9 @@ if (!$fp) {
         // partyId 가 parties.json 에 실재하는지 추가 검증 (다중 ids 모두)
         if (!isset($partyMap[$pid])) {
             flock($fp, LOCK_UN); fclose($fp);
-            @file_put_contents("$dataDir/_counts_failure_alert.log", sprintf(
-                "[%s] INVALID_PARTY orderId=%s email=%s missing_partyId=%s\n",
-                date('c'), $orderId, $email, $pid
-            ), FILE_APPEND);
-            redirectFail("파티를 찾을 수 없습니다: $pid");
+            $failAfterApproval('INVALID_PARTY', '파티 정보 없음으로 자동 취소',
+                "파티를 찾을 수 없어 결제가 자동 취소되었습니다: $pid", "파티를 찾을 수 없습니다: $pid",
+                "missing_partyId=$pid");
         }
         $cur = $counts[$pid] ?? $DEFAULT_COUNTS[$pid] ?? ['male' => 0, 'female' => 0];
         $effective[$pid] = $cur;
@@ -206,48 +265,9 @@ if (!$fp) {
     }
     if (!empty($soldOut)) {
         flock($fp, LOCK_UN); fclose($fp);
-        // 토스 승인은 이미 끝난 상태 → 전액 자동 취소. 쿠폰 사용 처리는 이 분기 뒤에 있으므로 되돌릴 쿠폰 이력 없음.
-        // 취소 호출은 admin/bookings.php(cancel_full_refund)와 같은 방식.
-        $cancelHttp = 0; $cancelBody = '';
-        try {
-            $ch = curl_init('https://api.tosspayments.com/v1/payments/' . urlencode($paymentKey) . '/cancel');
-            curl_setopt_array($ch, [
-                CURLOPT_POST           => true,
-                CURLOPT_POSTFIELDS     => json_encode(['cancelReason' => '정원 마감으로 자동 취소', 'cancelAmount' => $amount]),
-                CURLOPT_HTTPHEADER     => [
-                    'Authorization: Basic ' . base64_encode($cfg['secret_key'] . ':'),
-                    'Content-Type: application/json',
-                ],
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT        => 20,
-            ]);
-            $cancelBody = (string)curl_exec($ch);
-            $cancelHttp = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
-        } catch (Throwable $e) {
-            $cancelBody = $e->getMessage();
-        }
-        $cancelJson = json_decode($cancelBody, true) ?: [];
-        // 이미 취소된 결제(ALREADY_CANCELED)는 성공으로 간주
-        $canceled = $cancelHttp === 200
-            || ($cancelHttp === 400 && (string)($cancelJson['code'] ?? '') === 'ALREADY_CANCELED_PAYMENT');
-
-        // 같은 주문이 다시 처리되지 않도록 pending 정리 (새로고침 시 재승인·예약 생성 방지)
-        @unlink($pendingFile);
-
-        if ($canceled) {
-            @file_put_contents("$dataDir/_counts_failure_alert.log", sprintf(
-                "[%s] SOLD_OUT_AUTO_CANCEL orderId=%s email=%s gender=%s soldOut=%s amount=%d http=%d\n",
-                date('c'), $orderId, $email, $gender, implode(',', $soldOut), $amount, $cancelHttp
-            ), FILE_APPEND);
-            redirectFail('정원이 마감되어 결제가 자동 취소되었습니다');
-        }
-        @file_put_contents("$dataDir/_counts_failure_alert.log", sprintf(
-            "[%s] CRITICAL SOLD_OUT_AUTO_CANCEL_FAILED orderId=%s email=%s gender=%s soldOut=%s amount=%d http=%d body=%s — 토스 결제 승인 상태, 예약 미생성. 수동 환불 필요.\n",
-            date('c'), $orderId, $email, $gender, implode(',', $soldOut), $amount, $cancelHttp, substr($cancelBody, 0, 400)
-        ), FILE_APPEND);
-        error_log('[payments/success] CRITICAL sold-out auto cancel failed: orderId=' . $orderId);
-        redirectFail('정원이 마감되었습니다. 결제 취소 처리 중 문제가 발생해 운영팀이 확인 후 환불해드립니다. 고객센터로 문의해주세요');
+        $failAfterApproval('SOLD_OUT', '정원 마감으로 자동 취소',
+            '정원이 마감되어 결제가 자동 취소되었습니다', '정원이 마감되었습니다',
+            'soldOut=' . implode(',', $soldOut));
     }
 }
 
@@ -264,13 +284,18 @@ if ($couponCode !== '') {
     }
     if (!$found || empty($found['active']) ||
         (!empty($found['expiresAt']) && strtotime($found['expiresAt']) < strtotime(date('Y-m-d')))) {
-        flock($fp, LOCK_UN); fclose($fp);
-        redirectFail('쿠폰이 유효하지 않습니다');
+        if ($fp) { flock($fp, LOCK_UN); fclose($fp); }
+        $failAfterApproval('COUPON_INVALID', '쿠폰 사용 불가로 자동 취소',
+            '쿠폰이 유효하지 않아 결제가 자동 취소되었습니다', '쿠폰이 유효하지 않습니다',
+            "coupon=$couponCode");
     }
     if (!couponAllowsGender($found, $gender)) {
-        flock($fp, LOCK_UN); fclose($fp);
+        if ($fp) { flock($fp, LOCK_UN); fclose($fp); }
         $maleOk = !array_key_exists('maleAllowed', $found) || !empty($found['maleAllowed']);
-        redirectFail(($maleOk ? '남성' : '여성') . ' 회원만 사용할 수 있는 쿠폰입니다');
+        $genderOnly = ($maleOk ? '남성' : '여성') . ' 회원만 사용할 수 있는 쿠폰입니다';
+        $failAfterApproval('COUPON_GENDER', '쿠폰 사용 불가로 자동 취소',
+            "{$genderOnly}. 결제가 자동 취소되었습니다", $genderOnly,
+            "coupon=$couponCode");
     }
     // 쿠폰 적용 대상 파티의 단가 기준으로 할인 금액 계산
     // 쿠폰 대상 파티의 성별별 가격 기준 — pending.php 와 동일 규칙으로 amount 검증 일치 보장
@@ -288,16 +313,20 @@ if ($couponCode !== '') {
         if (strtoupper((string)($u['code'] ?? '')) === strtoupper($couponCode) &&
             strtolower((string)($u['email'] ?? '')) === strtolower($email)) {
             flock($cfp, LOCK_UN); fclose($cfp);
-            flock($fp, LOCK_UN);  fclose($fp);
-            redirectFail('이미 사용한 쿠폰입니다');
+            if ($fp) { flock($fp, LOCK_UN); fclose($fp); }
+            $failAfterApproval('COUPON_ALREADY_USED', '쿠폰 사용 불가로 자동 취소',
+                '이미 사용한 쿠폰이라 결제가 자동 취소되었습니다', '이미 사용한 쿠폰입니다',
+                "coupon=$couponCode");
         }
     }
     // 2) 총 발급 수량 한도 atomic enforce — 잠금 안에서 카운트 조회 후 비교
     $maxCount = max(0, (int)($found['max_count'] ?? 0));
     if ($maxCount > 0 && countCouponUsages($usages, $couponCode) >= $maxCount) {
         flock($cfp, LOCK_UN); fclose($cfp);
-        flock($fp, LOCK_UN);  fclose($fp);
-        redirectFail('쿠폰 발급 수량이 모두 소진되었습니다');
+        if ($fp) { flock($fp, LOCK_UN); fclose($fp); }
+        $failAfterApproval('COUPON_EXHAUSTED', '쿠폰 사용 불가로 자동 취소',
+            '쿠폰 발급 수량이 모두 소진되어 결제가 자동 취소되었습니다', '쿠폰 발급 수량이 모두 소진되었습니다',
+            "coupon=$couponCode maxCount=$maxCount");
     }
 
     $usages[] = [

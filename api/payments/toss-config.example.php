@@ -11,4 +11,6 @@ return [
     'client_key' => '<TOSS_CLIENT_KEY>',
     'secret_key' => '<TOSS_SECRET_KEY>',
     'confirm_url'=> 'https://api.tosspayments.com/v1/payments/confirm',
+    // (선택) success.php 승인 후 자동 취소에 쓰는 API 주소. 없으면 아래 운영 주소. 로컬 mock 검증 때만 바꾼다.
+    // 'payments_api_base' => 'https://api.tosspayments.com/v1/payments',
 ];
