@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Heart, Clock, ShoppingBag, X, ClipboardList, Users as UsersIcon, ShieldCheck, Info } from "lucide-react";
+import { ArrowLeft, Heart, Clock, ShoppingBag, X, ClipboardList, Users as UsersIcon, ShieldCheck, Info, BookOpen } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Header from "../../components/Header";
@@ -10,7 +10,7 @@ import Footer from "../../components/Footer";
 import { partyStockStatus, withLiveCounts, dateOnly, partyHasOptions, partyTypeOf, PARTY_TYPE_LABELS, PARTIES as SEED_PARTIES, type PartyType } from "../../lib/data";
 import PartyOptionPicker, { optionClosedFor } from "./PartyOptionPicker";
 import { PARTY_GUIDES, visibleNotices } from "../../lib/partyGuides";
-import { templateFor, normalizeDetail, type PartyDetail, type PartyDetailImage, type DetailImageSlot } from "../../lib/partyDetailTemplates";
+import { templateFor, normalizeDetail, DEFAULT_ABOUT_TITLE, type PartyDetail, type PartyDetailImage, type DetailImageSlot } from "../../lib/partyDetailTemplates";
 import { useAuth } from "../../context/AuthContext";
 import { useParties } from "../../lib/useParties";
 import { checkEligibility, eligibilitySummary, calculateAge } from "../../lib/eligibility";
@@ -260,9 +260,10 @@ export default function PartyClientView({ id }: { id: string }) {
   //   요청이 실패해 종류를 모르면 실시간 파티 목록을 받은 뒤에 그 종류로 템플릿을 고른다(빌드 시점 샘플로 오판 방지).
   const detailReady = !!detailRes && detailRes.id === id && (detailRes.detail !== null || detailRes.partyType !== null || partiesLoaded);
   const shownDetail: PartyDetail | null = detailReady && detailRes ? (detailRes.detail ?? templateFor(partyType)) : null;
-  // 고정 안내 문구(신청 전 확인·참가 신청 방법·필수 확인 사항) — 상세 안내와 같은 판단으로 종류가 확인된 뒤에만 그린다
-  //   (솔로파티에 매칭파티 문구가 잠깐 비치지 않도록). app/lib/partyGuides.ts
-  const guide = detailReady ? PARTY_GUIDES[partyType] : null;
+  // 고정 안내 문구(신청 전 확인·참가 신청 방법·필수 확인 사항) — 종류가 확인된 뒤에만 그린다
+  //   (솔로파티에 매칭파티 문구가 잠깐 비치지 않도록). 상세 안내 응답이나 실시간 파티 목록 중 먼저 온 쪽으로 확인한다
+  //   (빌드 시점 샘플 목록만 있을 때는 종류를 믿지 않는다). app/lib/partyGuides.ts
+  const guide = detailReady || partiesLoaded ? PARTY_GUIDES[partyType] : null;
   const renderDetailImage = (img: PartyDetailImage, i: number) => (
     // eslint-disable-next-line @next/next/no-img-element
     <img key={`${img.url}-${i}`} src={img.url} alt={img.alt} className="block w-full h-auto object-contain" />
@@ -644,6 +645,30 @@ export default function PartyClientView({ id }: { id: string }) {
               );
             })()}
           </div>
+
+          {/* 소개글 — 참가 항목·버튼 바로 아래, 실시간 참가 인원 위 (docs/specs/party-solo-guide.md 7-2).
+               묶음이 0개면 영역 전체를 그리지 않는다. 본문은 글자 그대로(줄바꿈 유지), 사진은 폭에 맞춰 비율 유지 */}
+          {shownDetail && shownDetail.about.sections.length > 0 && (
+            <div className="max-w-4xl mx-auto mb-10 md:mb-16" data-testid="party-about">
+              <div className="flex items-center gap-3 mb-5 md:mb-7">
+                <BookOpen size={20} className="text-brand-point-ink flex-shrink-0" />
+                <h3 className="text-xl md:text-3xl font-bold tracking-tight break-keep">{shownDetail.about.title.trim() || DEFAULT_ABOUT_TITLE}</h3>
+              </div>
+              <div className="space-y-10 md:space-y-16">
+                {shownDetail.about.sections.map((sec, i) => (
+                  <section key={i} data-testid="party-about-section">
+                    {sec.heading && <h4 className="text-lg md:text-2xl font-black text-brand-black leading-snug mb-2 md:mb-3 break-keep">{sec.heading}</h4>}
+                    {sec.body && <p className="text-sm md:text-base text-gray-700 font-medium leading-relaxed whitespace-pre-line break-keep">{sec.body}</p>}
+                    {sec.images.length > 0 && (
+                      <div className={`space-y-3 md:space-y-4 ${sec.heading || sec.body ? "mt-4 md:mt-6" : ""}`}>
+                        {sec.images.map(renderDetailImage)}
+                      </div>
+                    )}
+                  </section>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* PARTICIPANTS PANEL — 다른 섹션들(참가 신청 방법/Party Timeline 등)과 동일 폭 max-w-4xl */}
           {(participants.male.length > 0 || participants.female.length > 0) && (

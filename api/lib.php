@@ -593,6 +593,45 @@ function detailTextField(array $src, string $key, int $max, bool $multiline, str
     return $s;
 }
 
+// 사진 한 장 — /uploads/parties/파일명 또는 /images/파일명 만 허용 (외부 주소 불가). '.', '..' 같은 이름도 막는다.
+function detailImageField($img, string $label, int $n): array {
+    if (!is_array($img)) throw new RuntimeException("{$label}: 사진 형식이 올바르지 않습니다.");
+    $url = trim((string)($img['url'] ?? ''));
+    if (!preg_match('#^/(uploads/parties|images)/[A-Za-z0-9._-]+$#', $url) || preg_match('#/\.+$#', $url)) {
+        throw new RuntimeException("{$label}: 허용되지 않은 사진 주소입니다.");
+    }
+    return ['url' => $url, 'alt' => detailTextField($img, 'alt', 100, false, "{$label} {$n}번째 사진 대체 텍스트")];
+}
+
+/**
+ * 소개글(about) — 소제목·본문·사진 묶음 0~10개 (docs/specs/party-solo-guide.md 7-1).
+ * 영역 제목 40자, 소제목 40자, 본문 2,000자(줄바꿈 유지, 글자로만 다룸), 묶음당 사진 10장. 셋 다 빈 묶음은 거절.
+ */
+function sanitizePartyAbout($ab): array {
+    $ab = is_array($ab) ? $ab : [];
+    $secIn = is_array($ab['sections'] ?? null) ? array_values($ab['sections']) : [];
+    if (count($secIn) > 10) throw new RuntimeException('소개 묶음은 10개까지 넣을 수 있습니다.');
+    $sections = [];
+    foreach ($secIn as $i => $sec) {
+        $n = $i + 1;
+        if (!is_array($sec)) throw new RuntimeException("소개 묶음 {$n} 형식이 올바르지 않습니다.");
+        $imgsIn = is_array($sec['images'] ?? null) ? array_values($sec['images']) : [];
+        if (count($imgsIn) > 10) throw new RuntimeException("소개 묶음 {$n}: 사진은 10장까지 넣을 수 있습니다.");
+        $images = [];
+        foreach ($imgsIn as $j => $img) $images[] = detailImageField($img, "소개 묶음 {$n}", $j + 1);
+        $row = [
+            'heading' => detailTextField($sec, 'heading', 40,   false, "소개 묶음 {$n} 소제목"),
+            'body'    => detailTextField($sec, 'body',    2000, true,  "소개 묶음 {$n} 본문"),
+            'images'  => $images,
+        ];
+        if ($row['heading'] === '' && $row['body'] === '' && !$images) {
+            throw new RuntimeException("소개 묶음 {$n}에 소제목·본문·사진 중 하나 이상을 입력해주세요.");
+        }
+        $sections[] = $row;
+    }
+    return ['title' => detailTextField($ab, 'title', 40, false, '소개글 제목'), 'sections' => $sections];
+}
+
 /**
  * 관리자 입력 detail 정규화 + 입력 제한 검사. 알려진 필드만 남긴다.
  * 넘치거나 허용되지 않은 값이면 RuntimeException (저장 거절).
@@ -638,19 +677,11 @@ function sanitizePartyDetail($d): array {
         $label = PARTY_DETAIL_IMAGE_SLOT_LABELS[$slot];
         if (count($list) > 10) throw new RuntimeException("{$label}: 사진은 10장까지 넣을 수 있습니다.");
         $out = [];
-        foreach ($list as $i => $img) {
-            if (!is_array($img)) throw new RuntimeException("{$label}: 사진 형식이 올바르지 않습니다.");
-            $url = trim((string)($img['url'] ?? ''));
-            // /uploads/parties/파일명 또는 /images/파일명 만 허용 (외부 주소 불가). '.', '..' 같은 이름도 막는다.
-            if (!preg_match('#^/(uploads/parties|images)/[A-Za-z0-9._-]+$#', $url) || preg_match('#/\.+$#', $url)) {
-                throw new RuntimeException("{$label}: 허용되지 않은 사진 주소입니다.");
-            }
-            $out[] = ['url' => $url, 'alt' => detailTextField($img, 'alt', 100, false, "{$label} " . ($i + 1) . "번째 사진 대체 텍스트")];
-        }
+        foreach ($list as $i => $img) $out[] = detailImageField($img, $label, $i + 1);
         $images[$slot] = $out;
     }
 
-    return [
+    $out = [
         'timeline'  => [
             'title' => detailTextField($tl, 'title', 60,  false, '진행 안내 제목'),
             'intro' => detailTextField($tl, 'intro', 200, false, '소개 문구'),
@@ -662,6 +693,10 @@ function sanitizePartyDetail($d): array {
         ],
         'images'    => $images,
     ];
+    // 소개글은 묶음이 있을 때만 저장한다 — 없던 예전 파티를 그대로 다시 저장해도 detail 이 바뀌지 않도록 (묶음 0개 = about 없음)
+    $about = sanitizePartyAbout($d['about'] ?? null);
+    if ($about['sections']) $out['about'] = $about;
+    return $out;
 }
 
 // 관리자 활동 기록용 요약 — detail 전체 대신 개수만 남긴다.
@@ -669,7 +704,9 @@ function partyDetailCounts(array $detail): string {
     $steps  = count($detail['timeline']['steps'] ?? []);
     $photos = 0;
     foreach (PARTY_DETAIL_IMAGE_SLOTS as $slot) $photos += count($detail['images'][$slot] ?? []);
-    return "단계 {$steps}개, 사진 {$photos}장";
+    $about = (array)($detail['about']['sections'] ?? []);
+    foreach ($about as $sec) $photos += count($sec['images'] ?? []);
+    return "단계 {$steps}개, " . ($about ? '소개 묶음 ' . count($about) . '개, ' : '') . "사진 {$photos}장";
 }
 
 // ─── 쿠폰 할인 계산 ────────────────────────────────────────────────
