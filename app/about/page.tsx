@@ -22,7 +22,7 @@ export default function AboutPage() {
         <section className="py-12 md:py-24 px-4 md:px-6">
           <div className="max-w-4xl mx-auto">
             <div className="text-gray-600 leading-relaxed font-medium text-base md:text-lg">
-              <h2 className="text-3xl md:text-4xl font-black text-gray-900 mb-8 md:mb-10 tracking-tight leading-tight">세상을 울리는 새로운 <span className="text-brand-point">연결</span>,<br />어울림(The Woollim)입니다.</h2>
+              <h2 className="text-3xl md:text-4xl font-black text-gray-900 mb-8 md:mb-10 tracking-tight leading-tight">세상을 울리는 새로운 <span className="text-brand-point-ink">연결</span>,<br />어울림(The Woollim)입니다.</h2>
               <p className="mb-12 md:mb-20 text-gray-700 leading-relaxed">
                 어울림은 서로 다른 사람들이 자연스럽게 만나 특별한 인연이 되는
                 <span className="font-bold text-gray-900"> 매칭 파티 플랫폼</span>입니다.
@@ -34,7 +34,7 @@ export default function AboutPage() {
               <div className="mb-14 md:mb-24">
                 <div className="flex items-center gap-3 mb-6 md:mb-8">
                   <div className="w-1 h-5 md:h-6 bg-brand-point rounded-full"></div>
-                  <h3 className="text-xs md:text-sm font-black tracking-[0.2em] text-brand-point uppercase">Brand Identity</h3>
+                  <h3 className="text-xs md:text-sm font-black tracking-[0.2em] text-brand-point-ink uppercase">Brand Identity</h3>
                 </div>
 
                 <div className="space-y-5 md:space-y-7">
@@ -54,14 +54,14 @@ export default function AboutPage() {
                   {/* Description Box — 아래 */}
                   <div className="bg-white border border-gray-100 rounded-3xl p-6 md:p-10">
                     <h4 className="text-lg md:text-2xl font-black text-gray-900 mb-4 md:mb-5 leading-snug">
-                      기분 좋은 <span className="text-brand-point">울림</span>을 시각화한 로고
+                      기분 좋은 <span className="text-brand-point-ink">울림</span>을 시각화한 로고
                     </h4>
                     <p className="text-sm md:text-base text-gray-600 leading-relaxed mb-5 md:mb-6">
                       사람과 사람 사이의 유연한
-                      <span className="font-bold text-brand-point"> 연결</span>과 만남에서 시작되는
-                      기분 좋은 <span className="font-bold text-brand-point">&lsquo;울림&rsquo;</span>을 시각화했습니다.
+                      <span className="font-bold text-brand-point-ink"> 연결</span>과 만남에서 시작되는
+                      기분 좋은 <span className="font-bold text-brand-point-ink">&lsquo;울림&rsquo;</span>을 시각화했습니다.
                       포인트 요소는 연결의 시작점과
-                      <span className="font-bold text-brand-point"> 설렘</span>을 상징합니다.
+                      <span className="font-bold text-brand-point-ink"> 설렘</span>을 상징합니다.
                     </p>
                     <div className="flex flex-wrap gap-2">
                       {[
@@ -70,7 +70,7 @@ export default function AboutPage() {
                         { label: "설렘", desc: "새로운 시작" },
                       ].map(k => (
                         <div key={k.label} className="flex items-center gap-1.5 bg-brand-point/10 border border-brand-point/20 px-3 py-1.5 rounded-full">
-                          <span className="text-xs md:text-sm font-black text-brand-point">#{k.label}</span>
+                          <span className="text-xs md:text-sm font-black text-brand-point-ink">#{k.label}</span>
                           <span className="hidden md:inline text-xs text-gray-500 font-medium">· {k.desc}</span>
                         </div>
                       ))}
@@ -81,21 +81,21 @@ export default function AboutPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12 mb-14 md:mb-24">
                 <div className="space-y-4">
-                  <div className="w-12 h-12 bg-brand-point/10 rounded-2xl flex items-center justify-center text-brand-point">
+                  <div className="w-12 h-12 bg-brand-point/10 rounded-2xl flex items-center justify-center text-brand-point-ink">
                     <Star size={24} />
                   </div>
                   <h3 className="text-xl font-black text-gray-900">감성적 연결</h3>
                   <p className="text-sm md:text-base">단순한 매칭을 넘어 서로의 색깔이 어우러지는 시간을 디자인합니다.</p>
                 </div>
                 <div className="space-y-4">
-                  <div className="w-12 h-12 bg-brand-point/10 rounded-2xl flex items-center justify-center text-brand-point">
+                  <div className="w-12 h-12 bg-brand-point/10 rounded-2xl flex items-center justify-center text-brand-point-ink">
                     <Users size={24} />
                   </div>
                   <h3 className="text-xl font-black text-gray-900">검증된 커뮤니티</h3>
                   <p className="text-sm md:text-base">신뢰할 수 있는 사람들이 모여 건강한 네트워킹 문화를 만들어갑니다.</p>
                 </div>
                 <div className="space-y-4">
-                  <div className="w-12 h-12 bg-brand-point/10 rounded-2xl flex items-center justify-center text-brand-point">
+                  <div className="w-12 h-12 bg-brand-point/10 rounded-2xl flex items-center justify-center text-brand-point-ink">
                     <Zap size={24} />
                   </div>
                   <h3 className="text-xl font-black text-gray-900">새로운 경험</h3>

@@ -26,7 +26,7 @@ export default function NotFound() {
           
           <Link 
             href="/" 
-            className="inline-flex items-center justify-center bg-brand-point text-white px-10 py-5 rounded-full text-lg font-bold hover:brightness-110 transition-all shadow-lg hover:shadow-brand-point/30"
+            className="inline-flex items-center justify-center bg-brand-point text-black px-10 py-5 rounded-full text-lg font-bold hover:brightness-110 transition-all shadow-lg hover:shadow-brand-point/30"
           >
             메인으로 돌아가기
           </Link>

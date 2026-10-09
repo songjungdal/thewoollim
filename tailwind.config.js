@@ -9,7 +9,6 @@ module.exports = {
     extend: {
       colors: {
         brand: {
-          orange: '#FF5A00',
           white: '#ffffff',
           lightgray: '#f5f5f7', // apple style light gray
           black: '#000000',
