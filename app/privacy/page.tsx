@@ -90,7 +90,7 @@ export default function PrivacyPage() {
 
               <section className="bg-gray-50 p-5 md:p-8 rounded-xl md:rounded-2xl border border-gray-100">
                 <h2 className="text-lg md:text-xl font-bold text-black mb-3 md:mb-4">부칙</h2>
-                <p className="text-gray-700">본 방침은 사이트 개설일부터 시행합니다.</p>
+                <p className="text-gray-700">본 방침은 2026년 10월 9일부터 시행합니다. (이전 방침: 사이트 개설일부터 시행)</p>
               </section>
             </div>
           </div>
