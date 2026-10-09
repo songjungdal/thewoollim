@@ -38,7 +38,7 @@ export default function PrivacyPage() {
                 <div className="space-y-3 md:space-y-4 text-gray-800">
                   <p>사이트는 수집한 개인정보를 다음의 목적을 위해 활용합니다.</p>
                   <ul className="list-disc pl-5 md:pl-6 space-y-3 md:space-y-4">
-                    <li><span className="font-bold">서비스 제공:</span> 매칭파티 예약, 콘텐츠 제공, 본인 인증 등</li>
+                    <li><span className="font-bold">서비스 제공:</span> 매칭파티·솔로파티 등 파티 예약, 콘텐츠 제공, 본인 인증 등</li>
                     <li><span className="font-bold">회원 관리:</span> 회원제 서비스 이용에 따른 본인확인, 불량회원의 부정 이용 방지와 비인가 사용 방지, 가입 의사 확인, 불만 처리 등 민원 처리</li>
                     <li><span className="font-bold">마케팅 및 광고에 활용:</span> 신규 서비스 개발 및 맞춤 서비스 제공, 이벤트 및 광고성 정보 전달 및 참여 기회 제공</li>
                   </ul>

@@ -113,7 +113,7 @@ export default function OnboardingPage() {
           </div>
           <h1 className="text-2xl md:text-3xl font-black mb-2 tracking-tight">필수 회원정보</h1>
           <p className="text-gray-500 font-medium text-sm md:text-base leading-relaxed">
-            매칭파티 신청 전,<br className="sm:hidden" /> 아래 정보를 한 번만 입력해주세요.
+            파티 신청 전,<br className="sm:hidden" /> 아래 정보를 한 번만 입력해주세요.
           </p>
         </div>
 
@@ -234,7 +234,7 @@ export default function OnboardingPage() {
             type="button"
             onClick={() => {
               // 알림 최우선 → [확인] 후 마이페이지로 이동 (목적지 / → /mypage 변경)
-              alert("프로필 정보를 입력하셔야 어울림 매칭파티에 참가하실 수 있습니다. 마이페이지 [정보수정]을 통해 프로필 정보를 완성해 주세요.");
+              alert("프로필 정보를 입력하셔야 어울림 파티에 참가하실 수 있습니다. 마이페이지 [정보수정]을 통해 프로필 정보를 완성해 주세요.");
               snoozeOnboarding();
               router.push("/mypage");
             }}
