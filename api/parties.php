@@ -6,7 +6,7 @@
  *        maleStock,femaleStock,maleBooked,femaleBooked,
  *        minAge?,maxAge?,allowedMaritalStatus?,
  *        imageUrl?,description?,
- *        targetGroup?,theme?,locationTag?}]
+ *        targetGroup?,theme?,locationTag?,partyType}]
  *
  * 데이터 소스: /api/data/parties.json (관리자 폼이 편집)
  * - 파일이 비어있거나 손상 시 빈 배열 반환 (UI 측 fallback 처리)
@@ -70,6 +70,8 @@ foreach ($parties as $p) {
         'targetGroup'          => $p['targetGroup'] ?? null,
         'theme'                => $p['theme']       ?? null,
         'locationTag'          => $p['locationTag'] ?? null,
+        // 파티 종류 — 상세페이지 안내(detail)는 10초 폴링 응답을 키우지 않도록 넣지 않는다 (/api/party-detail.php 로 따로 조회)
+        'partyType'            => partyTypeOf($p),
     ];
 }
 

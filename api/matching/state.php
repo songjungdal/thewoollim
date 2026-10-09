@@ -67,6 +67,7 @@ if (file_exists($dir . '/parties.json')) {
         foreach ($allParties as $p) {
             $pid = (string)($p['id'] ?? '');
             if ($pid === '' || !isset($myConfirmedPartyIds[$pid])) continue;
+            if (partyTypeOf($p) === 'solo') continue;   // 솔로파티는 매칭 투표가 없어 참가자 투표 화면에 보이지 않음
             $parties[] = [
                 'id'             => $pid,
                 'title'          => (string)($p['title']       ?? ''),

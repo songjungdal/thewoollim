@@ -1,6 +1,6 @@
 <?php
 /**
- * 관리자 매칭파티 CRUD.
+ * 관리자 파티(매칭파티·솔로파티) CRUD.
  *
  * GET   → { ok: true, items: [...] }   (관리자 전용 — host_name 등 내부 필드 포함)
  *
@@ -13,7 +13,10 @@
  *   id, title, dateString, calendarDate, location, target, price, tag,
  *   maleStock, femaleStock, maleBooked, femaleBooked,
  *   minAge?, maxAge?, allowedMaritalStatus?,
- *   imageUrl?, description?, targetGroup?, theme?, locationTag?, host_name?
+ *   imageUrl?, description?, targetGroup?, theme?, locationTag?, host_name?,
+ *   partyType ('matching'|'solo', create 시 필수), detail? (상세페이지 안내 — lib.php sanitizePartyDetail)
+ *
+ * update: 요청에 없는 host_name·partyType·detail·voting_status·status 는 기존 값을 그대로 둔다.
  *
  * 보안:
  *   - host_name 은 본 엔드포인트(GET / update_host) 에서만 노출/수정
@@ -91,15 +94,21 @@ if ($action === 'update_host') {
 }
 
 // ─── 기존 CRUD (create / update / delete) ────────────────────────
+$logInfo = ['id' => '', 'row' => null, 'detailChanged' => false];
 try {
-    withFileLock($file, function (array $parties) use ($body, $action): array {
+    withFileLock($file, function (array $parties) use ($body, $action, &$logInfo): array {
         switch ($action) {
             case 'create': {
                 $p = $body['party'] ?? null;
                 if (!is_array($p)) throw new RuntimeException('party required');
+                if (!isset(PARTY_TYPE_LABELS[(string)($p['partyType'] ?? '')])) {
+                    throw new RuntimeException('파티 종류를 선택해주세요.');
+                }
                 $newId = ((int)max(0, ...array_map(fn($x) => (int)($x['id'] ?? 0), $parties))) + 1;
                 $p['id'] = (string)$newId;
-                $parties[] = sanitizeParty($p);
+                $row = sanitizeParty($p);
+                $parties[] = $row;
+                $logInfo = ['id' => $row['id'], 'row' => $row, 'detailChanged' => isset($row['detail'])];
                 return $parties;
             }
             case 'update': {
@@ -108,11 +117,20 @@ try {
                 $found = false;
                 foreach ($parties as &$row) {
                     if ((string)($row['id'] ?? '') === (string)$p['id']) {
-                        // host_name 보존 — sanitizeParty 가 명시 입력 없으면 기존 값 유지
-                        if (!array_key_exists('host_name', $p)) {
-                            $p['host_name'] = $row['host_name'] ?? '';
+                        // 요청에 없는 필드는 기존 값 유지 — 관리자 폼이 보내지 않는 값(투표 상태·모임종료 표시·담당자)이
+                        // 저장 때마다 초기화되지 않도록. partyType·detail 도 요청에 없으면 그대로 둔다.
+                        foreach (['host_name', 'partyType', 'detail', 'voting_status', 'status'] as $keep) {
+                            if (!array_key_exists($keep, $p) && array_key_exists($keep, $row)) {
+                                $p[$keep] = $row[$keep];
+                            }
                         }
+                        $before = $row;
                         $row = sanitizeParty($p);
+                        $logInfo = [
+                            'id'            => $row['id'],
+                            'row'           => $row,
+                            'detailChanged' => ($before['detail'] ?? null) !== ($row['detail'] ?? null),
+                        ];
                         $found = true;
                         break;
                     }
@@ -142,16 +160,26 @@ try {
     FILE_APPEND
 );
 
-$pid     = (string)($body['party']['id'] ?? $body['id'] ?? '');
-$pTitle  = (string)($body['party']['title'] ?? '');
+$pid     = $logInfo['id'] !== '' ? $logInfo['id'] : (string)($body['party']['id'] ?? $body['id'] ?? '');
+$pTitle  = (string)($logInfo['row']['title'] ?? $body['party']['title'] ?? '');
+$pType   = $logInfo['row'] ? '[' . partyTypeLabel($logInfo['row']) . '] ' : '';
 $summary = match ($action) {
-    'create' => "매칭파티 생성 — #{$pid} {$pTitle}",
-    'update' => "매칭파티 수정 — #{$pid} {$pTitle}",
-    'delete' => "매칭파티 삭제 — #{$pid}",
-    default  => "매칭파티 {$action}"
+    'create' => "파티 생성 — {$pType}#{$pid} {$pTitle}",
+    'update' => "파티 수정 — {$pType}#{$pid} {$pTitle}",
+    'delete' => "파티 삭제 — #{$pid}",
+    default  => "파티 {$action}"
 };
+// 기록에는 detail 전체 대신 개수만 남긴다 (변경·등록된 경우에만).
+$afterValue = $body['party'] ?? null;
+if (is_array($afterValue)) {
+    unset($afterValue['detail']);
+    if ($logInfo['detailChanged'] && isset($logInfo['row']['detail'])) {
+        $afterValue['detail'] = ($action === 'create' ? '상세 안내 등록됨(' : '상세 안내 변경됨(')
+            . partyDetailCounts($logInfo['row']['detail']) . ')';
+    }
+}
 logAdminActivity($action === 'delete' ? 'delete' : ($action === 'create' ? 'create' : 'update'),
-    'party', $pid, $summary, null, $body['party'] ?? null);
+    'party', $pid, $summary, null, $afterValue);
 
 jsonOut(['ok' => true]);
 
@@ -222,6 +250,14 @@ function sanitizeParty(array $p): array {
     // 일반 파티 폼 저장 시에도 기존 값 보존되도록 화이트리스트에 포함.
     if (isset($p['status']) && $p['status'] === 'completed') {
         $clean['status'] = 'completed';
+    }
+
+    // 파티 종류 — 허용 목록 밖이면 matching (create 의 필수 검사는 위 핸들러에서)
+    $clean['partyType'] = isset(PARTY_TYPE_LABELS[(string)($p['partyType'] ?? '')]) ? (string)$p['partyType'] : 'matching';
+
+    // 상세페이지 안내 — 있으면 검증 후 저장 (입력 제한 위반 시 RuntimeException → 저장 거절)
+    if (array_key_exists('detail', $p) && $p['detail'] !== null) {
+        $clean['detail'] = sanitizePartyDetail($p['detail']);
     }
 
     return $clean;
