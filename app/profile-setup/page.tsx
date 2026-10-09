@@ -189,7 +189,7 @@ function ProfileSetupContent() {
     </div>
   );
 
-  const inputBase = "w-full px-4 py-4 rounded-xl border bg-gray-50 focus:bg-white focus:ring-2 focus:ring-brand-point focus:border-brand-point transition-all outline-none font-medium text-sm";
+  const inputBase = "w-full px-4 py-4 rounded-xl border bg-gray-50 focus:bg-white focus:ring-2 focus:ring-brand-point focus:border-brand-point transition-all outline-none font-medium text-base md:text-sm";
   const inputOk  = "border-gray-100";
   const inputErr = "border-red-300 bg-red-50";
   const inp = (f: keyof Profile) => `${inputBase} ${errors[f] ? inputErr : inputOk}`;
@@ -210,7 +210,7 @@ function ProfileSetupContent() {
             className="text-center mb-8 md:mb-10"
           >
             <div className="w-16 h-16 bg-brand-point rounded-full flex items-center justify-center mx-auto mb-4 shadow-xl">
-              <CheckCircle2 size={32} className="text-white" />
+              <CheckCircle2 size={32} className="text-black" />
             </div>
             <h1 className="text-3xl md:text-4xl font-black text-white mb-2 tracking-tight">환영합니다!</h1>
             <p className="text-gray-400 font-medium text-sm md:text-base leading-relaxed">
@@ -220,7 +220,7 @@ function ProfileSetupContent() {
         ) : (
           <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} className="mb-7 md:mb-9">
             <button onClick={() => router.push("/mypage")}
-              className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors font-bold text-sm mb-5 md:mb-6"
+              className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors font-bold text-sm py-3 -mt-3 mb-2 md:py-0 md:mt-0 md:mb-6"
             >
               <ArrowLeft size={16} /> 마이페이지로 돌아가기
             </button>
@@ -240,9 +240,9 @@ function ProfileSetupContent() {
               {/* 본인인증 안내 — 5종 중 하나라도 이미 잠겨 있을 때 노출 */}
               {(isLocked("name") || isLocked("gender") || isLocked("phone") || isLocked("birthDate") || isLocked("maritalStatus")) && (
                 <div className="flex items-start gap-2.5 bg-brand-point/5 border border-brand-point/20 rounded-xl p-3.5">
-                  <Lock size={15} className="text-brand-point flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-gray-600 leading-relaxed">
-                    <span className="font-bold text-brand-point">본인인증 정보</span>(이름·성별·연락처·생년월일·혼인여부)는
+                  <Lock size={15} className="text-brand-point-ink flex-shrink-0 mt-0.5" />
+                  <p className="text-[13px] md:text-xs text-gray-600 leading-relaxed">
+                    <span className="font-bold text-brand-point-ink">본인인증 정보</span>(이름·성별·연락처·생년월일·혼인여부)는
                     최초 저장 후 보안상 수정이 제한됩니다. 변경이 필요하면 고객센터로 문의해주세요.
                   </p>
                 </div>
@@ -250,8 +250,8 @@ function ProfileSetupContent() {
 
               {testUser && (
                 <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl p-3.5">
-                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-white text-[11px] font-black flex-shrink-0 mt-0.5">T</span>
-                  <p className="text-xs text-gray-700 leading-relaxed">
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-white text-xs font-black flex-shrink-0 mt-0.5">T</span>
+                  <p className="text-[13px] md:text-xs text-gray-700 leading-relaxed">
                     <span className="font-bold text-amber-700">테스트 계정</span>으로 로그인되어 있어 본인인증 정보(이름·성별·연락처·생년월일·혼인여부)를 자유롭게 수정할 수 있습니다.
                   </p>
                 </div>
@@ -260,11 +260,11 @@ function ProfileSetupContent() {
               {/* Name */}
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-1.5">
-                  이름 <span className="text-brand-point">*</span>
-                  {isLocked("name") && <Lock size={12} className="text-gray-400" />}
+                  이름 <span className="text-brand-point-ink">*</span>
+                  {isLocked("name") && <Lock size={12} className="text-gray-500" />}
                 </label>
                 <div className="relative">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={17} />
                   <input
                     type="text"
                     value={form.name}
@@ -281,8 +281,8 @@ function ProfileSetupContent() {
               {/* Gender */}
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-1.5">
-                  성별 <span className="text-brand-point">*</span>
-                  {isLocked("gender") && <Lock size={12} className="text-gray-400" />}
+                  성별 <span className="text-brand-point-ink">*</span>
+                  {isLocked("gender") && <Lock size={12} className="text-gray-500" />}
                 </label>
                 <div className="flex gap-2 md:gap-3">
                   {["남성", "여성"].map(g => {
@@ -315,11 +315,11 @@ function ProfileSetupContent() {
               {/* Phone */}
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-1.5">
-                  연락처 <span className="text-brand-point">*</span>
-                  {isLocked("phone") && <Lock size={12} className="text-gray-400" />}
+                  연락처 <span className="text-brand-point-ink">*</span>
+                  {isLocked("phone") && <Lock size={12} className="text-gray-500" />}
                 </label>
                 <div className="relative">
-                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
+                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={17} />
                   <input
                     type="tel"
                     value={form.phone}
@@ -336,11 +336,11 @@ function ProfileSetupContent() {
               {/* Birth Date — onboarding에서 입력된 값은 lock */}
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-1.5">
-                  생년월일 <span className="text-brand-point">*</span>
-                  {isLocked("birthDate") && <Lock size={12} className="text-gray-400" />}
+                  생년월일 <span className="text-brand-point-ink">*</span>
+                  {isLocked("birthDate") && <Lock size={12} className="text-gray-500" />}
                 </label>
                 <div className="relative">
-                  <Cake className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={17} />
+                  <Cake className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" size={17} />
                   <input
                     type="date"
                     value={form.birthDate}
@@ -359,8 +359,8 @@ function ProfileSetupContent() {
               {/* Marital status — 최초 입력은 허용, 저장된 값은 read-only로 lock */}
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-1.5">
-                  혼인여부 <span className="text-brand-point">*</span>
-                  {isLocked("maritalStatus") && <Lock size={12} className="text-gray-400" />}
+                  혼인여부 <span className="text-brand-point-ink">*</span>
+                  {isLocked("maritalStatus") && <Lock size={12} className="text-gray-500" />}
                 </label>
                 <div className="flex gap-2 md:gap-3">
                   {(["싱글", "돌싱"] as const).map(m => {
@@ -388,7 +388,7 @@ function ProfileSetupContent() {
                   })}
                 </div>
                 {!isLocked("maritalStatus") && (
-                  <p className="text-xs text-gray-400 mt-1.5 ml-1 leading-relaxed">
+                  <p className="text-[13px] md:text-xs text-gray-500 mt-1.5 ml-1 leading-relaxed">
                     혼인여부는 최초 1회만 선택 가능하며, 저장 후에는 변경이 제한됩니다.
                   </p>
                 )}
@@ -397,11 +397,11 @@ function ProfileSetupContent() {
               {/* Location — cascading 시/도 → 시/군/구 */}
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">
-                  거주 지역 <span className="text-brand-point">*</span>
+                  거주 지역 <span className="text-brand-point-ink">*</span>
                 </label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3">
                   <div className="relative">
-                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={17} />
+                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" size={17} />
                     <select
                       value={sido}
                       onChange={e => { setSido(e.target.value); setSigungu(""); }}
@@ -439,10 +439,10 @@ function ProfileSetupContent() {
               {/* Job */}
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">
-                  직업 <span className="text-brand-point">*</span>
+                  직업 <span className="text-brand-point-ink">*</span>
                 </label>
                 <div className="relative">
-                  <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
+                  <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={17} />
                   <input type="text" value={form.job} onChange={e => set("job")(e.target.value)}
                     placeholder="예: 소프트웨어 엔지니어, 마케터 등" className={inp("job") + " pl-11"} />
                 </div>
@@ -452,7 +452,7 @@ function ProfileSetupContent() {
               {/* MBTI */}
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">
-                  MBTI <span className="text-brand-point">*</span>
+                  MBTI <span className="text-brand-point-ink">*</span>
                 </label>
                 <select value={form.mbti} onChange={e => set("mbti")(e.target.value)}
                   className={inp("mbti") + " cursor-pointer"}
@@ -490,10 +490,10 @@ function ProfileSetupContent() {
                   <div>
                     <label className="block text-sm font-bold text-gray-700 mb-2 flex items-center justify-between">
                       <span>
-                        관심사 <span className="text-brand-point">*</span>
+                        관심사 <span className="text-brand-point-ink">*</span>
                       </span>
                       <span className={`text-xs font-bold ${
-                        selectedInterests.size >= MAX_INTERESTS ? "text-brand-point" : "text-gray-400"
+                        selectedInterests.size >= MAX_INTERESTS ? "text-brand-point-ink" : "text-gray-500"
                       }`}>
                         {selectedInterests.size} / {MAX_INTERESTS}
                       </span>
@@ -506,10 +506,10 @@ function ProfileSetupContent() {
                             key={tag}
                             type="button"
                             onClick={() => toggleInterest(tag)}
-                            className={`px-3.5 md:px-4 py-2.5 md:py-3 rounded-full text-sm md:text-base font-bold transition-all min-h-[40px] ${
+                            className={`px-3.5 md:px-4 py-3 rounded-full text-sm md:text-base font-bold transition-all min-h-11 md:min-h-[40px] ${
                               sel
                                 ? "bg-brand-point text-brand-black shadow-md"
-                                : "bg-white text-gray-500 border border-gray-200 hover:border-brand-point hover:text-brand-point"
+                                : "bg-white text-gray-500 border border-gray-200 hover:border-brand-point hover:text-brand-point-ink"
                             }`}
                           >
                             {tag}
@@ -517,7 +517,7 @@ function ProfileSetupContent() {
                         );
                       })}
                     </div>
-                    <p className="text-xs text-gray-400 mt-1.5 ml-1 leading-relaxed">
+                    <p className="text-[13px] md:text-xs text-gray-500 mt-1.5 ml-1 leading-relaxed">
                       마음에 드는 키워드를 1~{MAX_INTERESTS}개 선택해주세요. 매칭 추천에 활용됩니다.
                     </p>
                     {errors.interests && (
@@ -530,14 +530,14 @@ function ProfileSetupContent() {
               {/* Ideal Type */}
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">
-                  이상형 <span className="text-brand-point">*</span>
+                  이상형 <span className="text-brand-point-ink">*</span>
                 </label>
                 <div className="relative">
-                  <Heart className="absolute left-4 top-4 text-gray-400" size={17} />
+                  <Heart className="absolute left-4 top-4 text-gray-500" size={17} />
                   <textarea value={form.idealType} onChange={e => set("idealType")(e.target.value)}
                     placeholder="이상형을 자유롭게 적어주세요. (예: 유머 감각 있고 대화가 잘 통하는 분)"
                     rows={3}
-                    className={`w-full pl-11 pr-4 py-4 rounded-xl border ${errors.idealType ? "border-red-300 bg-red-50" : "border-gray-100 bg-gray-50"} focus:bg-white focus:ring-2 focus:ring-brand-point focus:border-brand-point transition-all outline-none font-medium text-sm resize-none`}
+                    className={`w-full pl-11 pr-4 py-4 rounded-xl border ${errors.idealType ? "border-red-300 bg-red-50" : "border-gray-100 bg-gray-50"} focus:bg-white focus:ring-2 focus:ring-brand-point focus:border-brand-point transition-all outline-none font-medium text-base md:text-sm resize-none`}
                   />
                 </div>
                 {errors.idealType && <p className="text-xs text-red-500 mt-1 ml-1">{errors.idealType}</p>}
@@ -555,10 +555,10 @@ function ProfileSetupContent() {
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="font-bold text-gray-900 text-sm">
                       개인정보 수집 및 이용 동의{" "}
-                      <span className="text-brand-point">(필수)</span>
+                      <span className="text-brand-point-ink">(필수)</span>
                     </h4>
                     <button type="button" onClick={() => setConsentExpanded(v => !v)}
-                      className="flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-gray-800 transition-colors"
+                      className="flex flex-shrink-0 items-center gap-1 whitespace-nowrap px-1 -mx-1 py-3.5 -my-3.5 text-xs font-medium text-gray-500 hover:text-gray-800 transition-colors"
                     >
                       {consentExpanded ? <>접기 <ChevronUp size={13} /></> : <>자세히 보기 <ChevronDown size={13} /></>}
                     </button>
@@ -573,19 +573,19 @@ function ProfileSetupContent() {
                     </motion.div>
                   )}
 
-                  <label className="flex items-start gap-3 cursor-pointer">
+                  <label className="flex items-start gap-3 py-3 -my-3 cursor-pointer">
                     <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)}
                       className="mt-0.5 w-5 h-5 rounded accent-brand-point cursor-pointer flex-shrink-0"
                     />
                     <span className="text-sm text-gray-700 font-medium leading-snug">
-                      개인정보 수집 및 이용에 동의합니다. <span className="text-brand-point font-bold">(필수)</span>
+                      개인정보 수집 및 이용에 동의합니다. <span className="text-brand-point-ink font-bold">(필수)</span>
                     </span>
                   </label>
                 </div>
               </div>
 
               <button type="submit" disabled={submitting}
-                className="mt-5 w-full bg-brand-black text-white py-4 md:py-5 rounded-2xl font-black text-base md:text-lg hover:bg-brand-point transition-all shadow-xl hover:shadow-brand-point/30 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                className="mt-5 w-full bg-brand-black text-white py-4 md:py-5 rounded-2xl font-black text-base md:text-lg hover:bg-brand-point hover:text-black transition-all shadow-xl hover:shadow-brand-point/30 disabled:bg-gray-300 disabled:cursor-not-allowed"
               >
                 {submitting ? "저장 중..." : isEditMode ? "수정 완료" : "프로필 완성하기"}
               </button>

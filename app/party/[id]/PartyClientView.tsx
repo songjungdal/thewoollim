@@ -26,28 +26,28 @@ type Participant = {
 function StatusMiniBadge({ status }: { status?: string }) {
   if (status === "paid_pending_profile") {
     return (
-      <span className="inline-flex items-center text-[9px] md:text-[10px] font-black px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 whitespace-nowrap">
+      <span className="inline-flex items-center text-xs font-black px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 whitespace-nowrap">
         결제완료(프로필 대기)
       </span>
     );
   }
   if (status === "confirmed") {
     return (
-      <span className="inline-flex items-center text-[9px] md:text-[10px] font-black px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 whitespace-nowrap">
+      <span className="inline-flex items-center text-xs font-black px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 whitespace-nowrap">
         참가확정
       </span>
     );
   }
   if (status === "pending_approval") {
     return (
-      <span className="inline-flex items-center text-[9px] md:text-[10px] font-black px-1.5 py-0.5 rounded-full bg-[#F5F5DC] text-[#5D4037] whitespace-nowrap">
+      <span className="inline-flex items-center text-xs font-black px-1.5 py-0.5 rounded-full bg-[#F5F5DC] text-[#5D4037] whitespace-nowrap">
         확정 대기 중
       </span>
     );
   }
   if (status === "completed") {
     return (
-      <span className="inline-flex items-center text-[9px] md:text-[10px] font-black px-1.5 py-0.5 rounded-full bg-gray-200 text-black whitespace-nowrap">
+      <span className="inline-flex items-center text-xs font-black px-1.5 py-0.5 rounded-full bg-gray-200 text-black whitespace-nowrap">
         모임종료
       </span>
     );
@@ -72,12 +72,12 @@ function ParticipantColumn({
           <UsersIcon size={13} className={toneAccent} />
         </span>
         <span className={`font-black text-sm ${toneAccent}`}>{label}</span>
-        <span className={`ml-auto text-[10px] md:text-[11px] font-black px-2 py-0.5 rounded-full ${toneBadge}`}>
+        <span className={`ml-auto text-xs font-black px-2 py-0.5 rounded-full ${toneBadge}`}>
           {list.length}명
         </span>
       </div>
       {list.length === 0 ? (
-        <p className="text-xs text-gray-400 font-medium py-4 text-center">
+        <p className="text-xs text-gray-500 font-medium py-4 text-center">
           아직 신청한 {label} 참가자가 없습니다.
         </p>
       ) : (
@@ -90,7 +90,7 @@ function ParticipantColumn({
               <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
                 <span className={`font-black text-sm ${toneAccent}`}>{p.maskedName}</span>
                 {p.ageBand && (
-                  <span className={`text-[10px] md:text-[11px] font-bold px-1.5 py-0.5 rounded-full ${toneBadge}`}>
+                  <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${toneBadge}`}>
                     {p.ageBand}
                   </span>
                 )}
@@ -99,12 +99,12 @@ function ParticipantColumn({
               </div>
               <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap">
                 {p.mbti && (
-                  <span className="text-[10px] md:text-[11px] font-black text-brand-point bg-brand-point/10 px-1.5 py-0.5 rounded-full">
+                  <span className="text-xs font-black text-brand-point-ink bg-brand-point/10 px-1.5 py-0.5 rounded-full">
                     {p.mbti}
                   </span>
                 )}
                 {p.job && (
-                  <span className="text-[11px] md:text-xs font-medium text-gray-500 truncate max-w-[7rem]">
+                  <span className="text-xs font-medium text-gray-500 truncate max-w-[7rem]">
                     {p.job}
                   </span>
                 )}
@@ -218,7 +218,7 @@ export default function PartyClientView({ id }: { id: string }) {
         <main className="flex-1 flex items-center justify-center px-4">
           <div className="text-center">
             <h1 className="text-3xl md:text-4xl font-bold mb-4">파티를 찾을 수 없습니다.</h1>
-            <Link href="/#apply" className="text-brand-point underline">목록으로 돌아가기</Link>
+            <Link href="/#apply" className="text-brand-point-ink underline">목록으로 돌아가기</Link>
           </div>
         </main>
         <Footer />
@@ -355,7 +355,7 @@ export default function PartyClientView({ id }: { id: string }) {
           className="max-w-7xl mx-auto px-4 md:px-6 py-10 md:py-24 min-h-[85vh]"
         >
           <div className="max-w-4xl mx-auto">
-            <Link href="/#apply" className="inline-flex items-center gap-2 text-gray-500 hover:text-brand-black mb-7 md:mb-12 font-bold transition-colors text-sm md:text-base">
+            <Link href="/#apply" className="inline-flex items-center gap-2 text-gray-500 hover:text-brand-black -mt-3 py-3 mb-4 md:mt-0 md:py-0 md:mb-12 font-bold transition-colors text-sm md:text-base">
               <ArrowLeft size={18} /> 목록으로 돌아가기
             </Link>
           </div>
@@ -376,7 +376,7 @@ export default function PartyClientView({ id }: { id: string }) {
                 const status: "ended" | "full" | "open" =
                   isExpired ? "ended" : stock.allFull ? "full" : "open";
                 const badge = {
-                  ended: { label: "모집종료", cls: "bg-[#FF0000] text-white" },
+                  ended: { label: "모집종료", cls: "bg-danger text-white" },
                   full:  { label: "모집마감", cls: "bg-gray-300 text-black" },
                   open:  { label: "모집중",   cls: "bg-brand-point text-black" },
                 }[status];
@@ -393,7 +393,7 @@ export default function PartyClientView({ id }: { id: string }) {
                 );
               })()}
               {/* 남녀 인원 — 이미지 우측 하단 오버레이 (아이콘 + 남성 파랑 / 여성 분홍), 가독성을 위해 흰색 pill 배경 */}
-              <div className="absolute bottom-3 right-3 md:bottom-4 md:right-4 flex items-center gap-2 bg-white/95 px-2.5 py-1 md:px-3 md:py-1.5 rounded-full shadow-lg z-10 text-[11px] md:text-xs font-bold">
+              <div className="absolute bottom-3 right-3 md:bottom-4 md:right-4 flex items-center gap-2 bg-white/95 px-2.5 py-1 md:px-3 md:py-1.5 rounded-full shadow-lg z-10 text-xs font-bold">
                 <span className="flex items-center gap-1 text-blue-400">
                   <UsersIcon size={12} className="flex-shrink-0" />
                   남성 {detailItem.maleBooked}/{detailItem.maleStock}
@@ -409,7 +409,7 @@ export default function PartyClientView({ id }: { id: string }) {
             {/* 제목 — 중앙정렬 */}
             <h1 className="text-2xl md:text-3xl font-black tracking-tight mb-2 leading-snug text-center">{detailItem.title}</h1>
             {/* 내용(소개) — 관리자가 등록한 소개(description) 우선 노출, 없으면 기본 카피 — 중앙정렬 */}
-            <p className="text-xs md:text-sm text-gray-500 mb-4 md:mb-5 font-medium leading-relaxed whitespace-pre-line break-keep text-center">
+            <p className="text-[13px] md:text-sm text-gray-500 mb-4 md:mb-5 font-medium leading-relaxed whitespace-pre-line break-keep text-center">
               {detailItem.description?.trim()
                 ? detailItem.description
                 : "단순한 만남을 넘어 감성을 향유하는 시간.\n어울림이 큐레이션한 프리미엄 네트워킹에 초대합니다."}
@@ -423,7 +423,7 @@ export default function PartyClientView({ id }: { id: string }) {
                 { label: "대상 (Target)", value: detailItem.target },
               ].map((row) => (
                 <div key={row.label} className="flex items-center justify-between py-2.5 border-b border-gray-200 text-xs md:text-sm gap-2">
-                  <span className="text-gray-400 font-medium flex-shrink-0">{row.label}</span>
+                  <span className="text-gray-500 font-medium flex-shrink-0">{row.label}</span>
                   <span className={`font-bold text-right ${row.label === "일시 (Date)" ? "text-sm md:text-base" : ""}`}>{row.value}</span>
                 </div>
               ))}
@@ -436,16 +436,16 @@ export default function PartyClientView({ id }: { id: string }) {
                 const femaleAmt = pf && pf > 0 ? pf : detailItem.price;
                 return (
                   <div className="flex items-center justify-between py-2.5 border-b border-gray-200 text-xs md:text-sm gap-2">
-                    <span className="text-gray-400 font-medium flex-shrink-0">참가비 (Price)</span>
+                    <span className="text-gray-500 font-medium flex-shrink-0">참가비 (Price)</span>
                     {hasSplit ? (
                       <span className="font-black text-brand-black flex flex-wrap items-baseline justify-end gap-x-2 gap-y-0.5">
                         <span className="inline-flex items-baseline gap-1">
-                          <span className="text-[11px] md:text-xs text-gray-500 font-bold">남성</span>
+                          <span className="text-xs text-gray-500 font-bold">남성</span>
                           <span className="text-base md:text-lg tabular-nums">₩{maleAmt.toLocaleString()}</span>
                         </span>
-                        <span className="text-gray-300">/</span>
+                        <span className="text-gray-500">/</span>
                         <span className="inline-flex items-baseline gap-1">
-                          <span className="text-[11px] md:text-xs text-gray-500 font-bold">여성</span>
+                          <span className="text-xs text-gray-500 font-bold">여성</span>
                           <span className="text-base md:text-lg tabular-nums">₩{femaleAmt.toLocaleString()}</span>
                         </span>
                       </span>
@@ -460,9 +460,9 @@ export default function PartyClientView({ id }: { id: string }) {
             {/* 신청 전 꼭 확인해주세요 */}
             <div className="bg-white p-3.5 rounded-xl border border-gray-200 mb-3">
               <h4 className="font-bold mb-1.5 flex items-center gap-1.5 text-xs md:text-sm">
-                <Heart size={14} className="text-brand-point" /> 신청 전 꼭 확인해주세요.
+                <Heart size={14} className="text-brand-point-ink" /> 신청 전 꼭 확인해주세요.
               </h4>
-              <p className="text-[11px] md:text-xs text-gray-500 leading-relaxed break-keep">
+              <p className="text-[13px] md:text-xs text-gray-500 leading-relaxed break-keep">
                 어울림은 진정성 있는 만남을 위해 <strong className="font-bold text-brand-black">100% 사전 승인제</strong>로 운영됩니다.
                 결제 후 프로필 정보를 입력해 주시면 <strong className="font-bold text-brand-black">[확정 대기 중]</strong> 상태가 되며,
                 관리자의 꼼꼼한 확인을 거쳐 최종 <strong className="font-bold text-brand-black">[참가 확정]</strong>이 이루어집니다.
@@ -472,10 +472,10 @@ export default function PartyClientView({ id }: { id: string }) {
 
             {/* 참가 대상 표시 — 자격 제한이 설정된 경우 노출 (기존 로직 그대로) */}
             {eligibilityLabel && (
-              <div className={`mb-4 px-3.5 py-2 rounded-xl text-[11px] md:text-xs font-bold border ${
+              <div className={`mb-4 px-3.5 py-2 rounded-xl text-xs font-bold border ${
                 isLoggedIn && !eligibility.ok
                   ? "bg-red-50 border-red-100 text-red-700"
-                  : "bg-brand-point/10 border-brand-point/20 text-brand-point"
+                  : "bg-brand-point/10 border-brand-point/20 text-brand-point-ink"
               }`}>
                 <span className="font-black">참가 대상</span> · {eligibilityLabel}
                 {isLoggedIn && !eligibility.ok && (
@@ -492,7 +492,7 @@ export default function PartyClientView({ id }: { id: string }) {
               <div
                 role="status"
                 aria-disabled="true"
-                className="w-full px-5 py-3 rounded-xl text-sm font-bold shadow-xl text-center bg-[#FF0000] text-white pointer-events-none select-none"
+                className="w-full px-5 py-3 rounded-xl text-sm font-bold shadow-xl text-center bg-danger text-white pointer-events-none select-none"
               >
                 모집 종료된 파티
               </div>
@@ -525,8 +525,8 @@ export default function PartyClientView({ id }: { id: string }) {
                     disabled={hardDisabled}
                     className={`flex-[2] px-5 py-3 rounded-xl text-sm font-bold transition-all shadow-xl ${
                       grayedOut
-                        ? `bg-gray-200 text-gray-400 shadow-none ${alreadyBooked && !hardDisabled ? "cursor-pointer hover:bg-gray-300" : "cursor-not-allowed"}`
-                        : "bg-brand-black text-white hover:bg-brand-point hover:shadow-brand-point/30"
+                        ? `bg-gray-200 text-gray-500 shadow-none ${alreadyBooked && !hardDisabled ? "cursor-pointer hover:bg-gray-300" : "cursor-not-allowed"}`
+                        : "bg-brand-black text-white hover:bg-brand-point hover:text-black hover:shadow-brand-point/30"
                     }`}
                   >
                     {label}
@@ -537,8 +537,8 @@ export default function PartyClientView({ id }: { id: string }) {
                     disabled={hardDisabled}
                     className={`flex-1 px-5 py-3 rounded-xl text-sm font-bold transition-all shadow-xl ${
                       grayedOut
-                        ? `bg-gray-200 text-gray-400 shadow-none ${alreadyBooked && !hardDisabled ? "cursor-pointer hover:bg-gray-300" : "cursor-not-allowed"}`
-                        : "bg-brand-black text-white hover:bg-brand-point"
+                        ? `bg-gray-200 text-gray-500 shadow-none ${alreadyBooked && !hardDisabled ? "cursor-pointer hover:bg-gray-300" : "cursor-not-allowed"}`
+                        : "bg-brand-black text-white hover:bg-brand-point hover:text-black"
                     }`}
                   >
                     장바구니
@@ -553,9 +553,9 @@ export default function PartyClientView({ id }: { id: string }) {
             <div className="max-w-4xl mx-auto mb-10 md:mb-16">
               {/* 안내 헤드라인 — 청록 포인트 컬러 */}
               <div className="flex items-center gap-3 mb-5 md:mb-7">
-                <UsersIcon size={20} className="text-brand-point flex-shrink-0" />
+                <UsersIcon size={20} className="text-brand-point-ink flex-shrink-0" />
                 <h3 className="text-xl md:text-3xl font-bold tracking-tight break-keep">
-                  <span className="text-brand-point">{detailItem.title}</span>
+                  <span className="text-brand-point-ink">{detailItem.title}</span>
                   <span className="text-brand-black">의 실시간 참가 인원</span>
                 </h3>
               </div>
@@ -574,7 +574,7 @@ export default function PartyClientView({ id }: { id: string }) {
                       return `${get("year")}년 ${get("month")}월 ${get("day")}일 ${get("hour")}:${get("minute")} 실시간 참가자 명단`;
                     })()}
                   </span>
-                  <span className="text-[11px] md:text-xs font-black text-brand-point bg-brand-point/10 px-2.5 py-1 rounded-full whitespace-nowrap">
+                  <span className="text-xs font-black text-brand-point-ink bg-brand-point/10 px-2.5 py-1 rounded-full whitespace-nowrap">
                     총 {participants.male.length + participants.female.length}명
                   </span>
                 </header>
@@ -585,8 +585,8 @@ export default function PartyClientView({ id }: { id: string }) {
                       label="남성"
                       list={participants.male}
                       toneBg="bg-[#E3F2FD]"
-                      toneAccent="text-[#3a85d9]"
-                      toneBadge="bg-[#E3F2FD] text-[#3a85d9]"
+                      toneAccent="text-info"
+                      toneBadge="bg-[#E3F2FD] text-info"
                     />
                   </div>
                   <div className="flex-1">
@@ -627,20 +627,20 @@ export default function PartyClientView({ id }: { id: string }) {
                       <div className="flex gap-3 md:gap-4">
                         <div className="flex-shrink-0">
                           <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-brand-point/15 flex items-center justify-center">
-                            <ShieldCheck size={20} className="text-brand-point md:hidden" />
-                            <ShieldCheck size={24} className="text-brand-point hidden md:block" />
+                            <ShieldCheck size={20} className="text-brand-point-ink md:hidden" />
+                            <ShieldCheck size={24} className="text-brand-point-ink hidden md:block" />
                           </div>
                         </div>
                         <div className="flex-1 min-w-0 pt-0.5">
-                          <p className="text-[11px] md:text-xs font-black tracking-[0.2em] text-brand-point mb-1.5 md:mb-2 uppercase">
+                          <p className="text-xs font-black tracking-[0.2em] text-brand-point-ink mb-1.5 md:mb-2 uppercase">
                             Singles Only
                           </p>
                           <p className="text-sm md:text-base text-gray-700 leading-relaxed break-keep">
                             해당 파티는 법적 혼인 이력이 없는 <strong className="font-black text-brand-black">&apos;싱글&apos;</strong> 회원님만을 대상으로 진행되는 {typeLabel}입니다.{" "}
                             <strong className="font-black text-brand-black">&apos;싱글&apos;</strong>이 아님이 확인될 경우, 즉시{" "}
-                            <strong className="font-black text-brand-point">회원탈퇴</strong>와 함께 블랙리스트 조치되며,
+                            <strong className="font-black text-brand-point-ink">회원탈퇴</strong>와 함께 블랙리스트 조치되며,
                             허위 정보 기재에 따른 민·형사상의{" "}
-                            <strong className="font-black text-brand-point">강력한 법적 책임</strong>을 물을 수 있음을 고지합니다.
+                            <strong className="font-black text-brand-point-ink">강력한 법적 책임</strong>을 물을 수 있음을 고지합니다.
                           </p>
                         </div>
                       </div>
@@ -650,17 +650,17 @@ export default function PartyClientView({ id }: { id: string }) {
                       <div className="flex gap-3 md:gap-4">
                         <div className="flex-shrink-0">
                           <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-brand-point/15 flex items-center justify-center">
-                            <Info size={20} className="text-brand-point md:hidden" />
-                            <Info size={24} className="text-brand-point hidden md:block" />
+                            <Info size={20} className="text-brand-point-ink md:hidden" />
+                            <Info size={24} className="text-brand-point-ink hidden md:block" />
                           </div>
                         </div>
                         <div className="flex-1 min-w-0 pt-0.5">
-                          <p className="text-[11px] md:text-xs font-black tracking-[0.2em] text-brand-point mb-1.5 md:mb-2 uppercase">
+                          <p className="text-xs font-black tracking-[0.2em] text-brand-point-ink mb-1.5 md:mb-2 uppercase">
                             Open Matching
                           </p>
                           <p className="text-sm md:text-base text-gray-700 leading-relaxed break-keep">
                             해당 파티는 새로운 시작을 꿈꾸는 <strong className="font-black text-brand-black">&apos;돌싱&apos;</strong> 회원님까지 참여하실 수 있는{" "}
-                            <strong className="font-black text-brand-point">열린 {typeLabel}</strong>입니다.
+                            <strong className="font-black text-brand-point-ink">열린 {typeLabel}</strong>입니다.
                             물론 <strong className="font-black text-brand-black">&apos;싱글&apos;</strong> 회원님도 제한 없이 자유롭게 신청 및 참여가 가능하오니,
                             넓은 마음으로 소중한 인연을 만나보세요.
                           </p>
@@ -681,8 +681,8 @@ export default function PartyClientView({ id }: { id: string }) {
             <div className="max-w-4xl mx-auto">
               <div className="bg-white p-6 md:p-20 rounded-2xl md:rounded-[3rem] shadow-sm border border-gray-100">
                 <div className="flex items-center gap-3 md:gap-4 mb-7 md:mb-12">
-                  <ClipboardList size={26} className="text-brand-point md:hidden" />
-                  <ClipboardList size={32} className="text-brand-point hidden md:block" />
+                  <ClipboardList size={26} className="text-brand-point-ink md:hidden" />
+                  <ClipboardList size={32} className="text-brand-point-ink hidden md:block" />
                   <h3 className="text-xl md:text-3xl font-bold tracking-tight">참가 신청 방법</h3>
                 </div>
 
@@ -705,15 +705,15 @@ export default function PartyClientView({ id }: { id: string }) {
                     },
                   ].map((item, idx) => (
                     <div key={idx} className="relative pl-12 md:pl-14">
-                      <div className="absolute left-0 top-0 w-7 h-7 md:w-8 md:h-8 bg-brand-point text-white rounded-full border-4 border-white shadow-md flex items-center justify-center font-black text-xs md:text-sm">
+                      <div className="absolute left-0 top-0 w-7 h-7 md:w-8 md:h-8 bg-brand-point text-black rounded-full border-4 border-white shadow-md flex items-center justify-center font-black text-xs md:text-sm">
                         {idx + 1}
                       </div>
-                      <div className="text-brand-point font-black text-xs md:text-sm tracking-[0.15em] mb-1 md:mb-1.5">STEP {idx + 1}</div>
+                      <div className="text-brand-point-ink font-black text-xs md:text-sm tracking-[0.15em] mb-1 md:mb-1.5">STEP {idx + 1}</div>
                       <div className="font-bold text-base md:text-xl mb-1.5 md:mb-2 text-brand-black leading-snug">{item.title}</div>
                       <div className="text-gray-600 font-medium text-sm md:text-base leading-relaxed">{item.desc}</div>
                       {item.note && (
                         <div className="mt-2.5 md:mt-3 bg-brand-point/5 border-l-2 border-brand-point/40 pl-3 md:pl-4 py-2 md:py-2.5 rounded-r-lg">
-                          <p className="text-xs md:text-sm text-gray-600 leading-relaxed">{item.note}</p>
+                          <p className="text-[13px] md:text-sm text-gray-600 leading-relaxed">{item.note}</p>
                         </div>
                       )}
                     </div>
@@ -744,8 +744,8 @@ export default function PartyClientView({ id }: { id: string }) {
                 {shownDetail && shownDetail.timeline.steps.length > 0 && (
                 <div className="bg-white p-6 md:p-20 rounded-2xl md:rounded-[3rem] shadow-sm border border-gray-100">
                   <div className="flex items-center gap-3 md:gap-4 mb-3 md:mb-4">
-                    <Clock size={26} className="text-brand-point md:hidden" />
-                    <Clock size={32} className="text-brand-point hidden md:block" />
+                    <Clock size={26} className="text-brand-point-ink md:hidden" />
+                    <Clock size={32} className="text-brand-point-ink hidden md:block" />
                     <h3 className="text-xl md:text-3xl font-bold tracking-tight">{shownDetail.timeline.title}</h3>
                   </div>
                   {shownDetail.timeline.intro && (
@@ -762,15 +762,15 @@ export default function PartyClientView({ id }: { id: string }) {
                         className="relative pl-12 md:pl-16 pb-5 md:pb-7 border-b border-gray-100 last:border-b-0 last:pb-0"
                       >
                         {/* STEP 번호 — 청록 #008080 (brand-point) */}
-                        <div className="absolute left-0 top-0 w-9 h-9 md:w-11 md:h-11 rounded-full bg-brand-point text-white shadow-md flex items-center justify-center font-black text-xs md:text-sm">
+                        <div className="absolute left-0 top-0 w-9 h-9 md:w-11 md:h-11 rounded-full bg-brand-point text-black shadow-md flex items-center justify-center font-black text-xs md:text-sm">
                           {String(idx + 1).padStart(2, "0")}
                         </div>
                         <div className="flex items-baseline flex-wrap gap-x-2 gap-y-1 mb-1.5 md:mb-2">
-                          <span className="text-[11px] md:text-xs font-black tracking-[0.2em] text-brand-point">
+                          <span className="text-xs font-black tracking-[0.2em] text-brand-point-ink">
                             {`STEP ${String(idx + 1).padStart(2, "0")}`}
                           </span>
                           {item.time && (
-                            <span className="inline-flex items-center text-[11px] md:text-xs font-bold text-brand-point bg-brand-point/10 px-2 py-0.5 rounded-full">
+                            <span className="inline-flex items-center text-xs font-bold text-brand-point-ink bg-brand-point/10 px-2 py-0.5 rounded-full">
                               {item.time}
                             </span>
                           )}
@@ -782,7 +782,7 @@ export default function PartyClientView({ id }: { id: string }) {
                           {item.desc}
                         </p>
                         {item.note && (
-                          <p className="mt-2.5 md:mt-3 text-[11px] md:text-xs text-gray-500 italic bg-brand-point/5 border-l-2 border-brand-point/40 pl-3 py-2 rounded-r-md leading-relaxed whitespace-pre-line">
+                          <p className="mt-2.5 md:mt-3 text-[13px] md:text-xs text-gray-500 italic bg-brand-point/5 border-l-2 border-brand-point/40 pl-3 py-2 rounded-r-md leading-relaxed whitespace-pre-line">
                             &ldquo;{item.note}&rdquo;
                           </p>
                         )}
@@ -807,7 +807,7 @@ export default function PartyClientView({ id }: { id: string }) {
                             <span className="w-1.5 h-1.5 rounded-full bg-brand-point flex-shrink-0" />
                             <span className="font-black text-base text-brand-black break-keep">{row.label}</span>
                           </div>
-                          <span className="font-black text-lg md:text-xl text-brand-point tabular-nums break-keep">{row.total}</span>
+                          <span className="font-black text-lg md:text-xl text-brand-point-ink tabular-nums break-keep">{row.total}</span>
                         </div>
                       ))}
                     </div>
@@ -822,8 +822,8 @@ export default function PartyClientView({ id }: { id: string }) {
                 {/* ── 필수 확인 사항 — Final CTA 직전, 참가 신청 방법/Party Timeline 과 동일 톤 ── */}
                 <div className="bg-white p-6 md:p-20 rounded-2xl md:rounded-[3rem] shadow-sm border border-gray-100">
                   <div className="flex items-center gap-3 md:gap-4 mb-3 md:mb-4">
-                    <ShieldCheck size={26} className="text-brand-point md:hidden" />
-                    <ShieldCheck size={32} className="text-brand-point hidden md:block" />
+                    <ShieldCheck size={26} className="text-brand-point-ink md:hidden" />
+                    <ShieldCheck size={32} className="text-brand-point-ink hidden md:block" />
                     <h3 className="text-xl md:text-3xl font-bold tracking-tight">필수 확인 사항</h3>
                   </div>
                   <p className="text-sm md:text-base text-gray-500 font-medium mb-7 md:mb-12 leading-relaxed">
@@ -859,14 +859,14 @@ export default function PartyClientView({ id }: { id: string }) {
                       },
                     ].map((item, idx) => (
                       <div key={idx} className="relative pl-12 md:pl-14">
-                        <div className="absolute left-0 top-0 w-7 h-7 md:w-8 md:h-8 bg-brand-point text-white rounded-full border-4 border-white shadow-md flex items-center justify-center font-black text-xs md:text-sm">
+                        <div className="absolute left-0 top-0 w-7 h-7 md:w-8 md:h-8 bg-brand-point text-black rounded-full border-4 border-white shadow-md flex items-center justify-center font-black text-xs md:text-sm">
                           {idx + 1}
                         </div>
                         <div className="font-bold text-base md:text-xl mb-1.5 md:mb-2 text-brand-black leading-snug">{item.title}</div>
                         <div className="text-gray-600 font-medium text-sm md:text-base leading-relaxed break-keep">{item.desc}</div>
                         {item.warn && (
                           <div className="mt-2.5 md:mt-3 bg-red-50 border-l-2 border-red-400/60 pl-3 md:pl-4 py-2 md:py-2.5 rounded-r-lg">
-                            <p className="text-xs md:text-sm text-red-700 font-bold leading-relaxed break-keep">⚠ {item.warn}</p>
+                            <p className="text-[13px] md:text-sm text-red-700 font-bold leading-relaxed break-keep">⚠ {item.warn}</p>
                           </div>
                         )}
                       </div>
@@ -901,12 +901,12 @@ export default function PartyClientView({ id }: { id: string }) {
               exit={{ opacity: 0, scale: 0.92, y: 20 }}
               transition={{ type: "spring", stiffness: 260, damping: 22 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-3xl shadow-2xl w-full max-w-sm md:max-w-md p-7 md:p-9 relative"
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-sm md:max-w-md p-7 md:p-9 relative max-h-[90vh] overflow-y-auto md:max-h-none md:overflow-visible"
             >
               <button
                 type="button"
                 onClick={() => setShowCartModal(false)}
-                className="absolute top-4 right-4 text-gray-300 hover:text-gray-600 transition-colors"
+                className="absolute top-4 right-4 -m-[11px] p-[11px] text-gray-500 hover:text-gray-600 transition-colors"
                 aria-label="닫기"
               >
                 <X size={22} />
@@ -914,8 +914,8 @@ export default function PartyClientView({ id }: { id: string }) {
 
               <div className="flex flex-col items-center text-center">
                 <div className="w-16 h-16 md:w-20 md:h-20 bg-brand-point/10 rounded-full flex items-center justify-center mb-5">
-                  <ShoppingBag size={32} className="text-brand-point md:hidden" />
-                  <ShoppingBag size={38} className="text-brand-point hidden md:block" />
+                  <ShoppingBag size={32} className="text-brand-point-ink md:hidden" />
+                  <ShoppingBag size={38} className="text-brand-point-ink hidden md:block" />
                 </div>
 
                 <h3 className="text-xl md:text-2xl font-black mb-2 tracking-tight">
@@ -929,7 +929,7 @@ export default function PartyClientView({ id }: { id: string }) {
                   <button
                     type="button"
                     onClick={() => router.push("/mypage")}
-                    className="w-full bg-brand-black text-white py-4 rounded-xl font-black text-sm md:text-base hover:bg-brand-point transition-all shadow-lg hover:shadow-brand-point/30 flex items-center justify-center gap-2"
+                    className="w-full bg-brand-black text-white py-4 rounded-xl font-black text-sm md:text-base hover:bg-brand-point hover:text-black transition-all shadow-lg hover:shadow-brand-point/30 flex items-center justify-center gap-2"
                   >
                     <ShoppingBag size={17} /> 장바구니로 가기
                   </button>

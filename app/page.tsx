@@ -16,6 +16,33 @@ import { PARTICIPANTS, FAQS, partyStockStatus, partyVisibility, categoryLabel, p
 import { useAuth } from "./context/AuthContext";
 import { useParties } from "./lib/useParties";
 
+/* ── #schedule(파티 일정) 섹션 전용 — 일정 상태별 표시 스타일 ──────────────
+ * 우선순위: 지난 일정 > 마감 > 마감임박 > 모집중 (계산은 컴포넌트의 scheduleStatus 참고) */
+type ScheduleStatus = "open" | "soon" | "full" | "past";
+const SCHEDULE_STATUS_ORDER: ScheduleStatus[] = ["open", "soon", "full", "past"];
+const SCHEDULE_STATUS_STYLE: Record<ScheduleStatus, { label: string; tone: string; dot: string }> = {
+  open: { label: "모집중",    tone: "bg-[#40E0D0]/15 text-brand-point-ink",             dot: "bg-brand-point" },
+  soon: { label: "마감임박",  tone: "bg-amber-50 text-amber-800",                       dot: "bg-amber-500" },
+  full: { label: "마감",      tone: "bg-gray-200 text-gray-600",                        dot: "bg-gray-500" },
+  past: { label: "지난 일정", tone: "bg-gray-50 text-gray-400 border border-gray-200",  dot: "bg-gray-300" },
+};
+/** 일정 카드·패널의 파티 종류 배지 — 지난 일정은 다른 표시처럼 흐리게 */
+const scheduleTypeBadgeTone = (isPast: boolean) => (isPast ? "bg-gray-200 text-gray-500" : "bg-gray-900 text-white");
+const SCHEDULE_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+/** Date → 로컬 기준 "YYYY-MM-DD" */
+const toYmd = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+/** "YYYY-MM-DD" → "10.17 토" */
+const scheduleShortLabel = (ymd: string) => {
+  const d = new Date(ymd + "T00:00:00");
+  return `${d.getMonth() + 1}.${d.getDate()} ${SCHEDULE_WEEKDAYS[d.getDay()]}`;
+};
+/** "YYYY-MM-DD" → "10월 17일 (토)" */
+const scheduleLongLabel = (ymd: string) => {
+  const d = new Date(ymd + "T00:00:00");
+  return `${d.getMonth() + 1}월 ${d.getDate()}일 (${SCHEDULE_WEEKDAYS[d.getDay()]})`;
+};
+
 /**
  * 후기 갤러리 가로 슬라이더 — 페이지당 6장 (PC 2x3 / 모바일 3x2).
  * 마우스 드래그 + 터치 스와이프로 페이지 전환. 클릭 vs 드래그 구분.
@@ -56,7 +83,7 @@ function GallerySlider({
   // 화살표 공통 스타일 — 원형/사각형 박스 X, 화살표 기호만.
   // 이미지 위에 오버레이되므로 기본 흰색(밝은 가독성) + hover 시 brand-point 청록.
   const arrowBase =
-    "absolute top-1/2 -translate-y-1/2 z-10 p-2 text-white hover:text-[#008080] " +
+    "absolute top-1/2 -translate-y-1/2 z-10 p-2 text-white hover:text-brand-point " +
     "transition-colors disabled:text-white/30 disabled:cursor-not-allowed " +
     "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#008080]/40 rounded-md " +
     "drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]";
@@ -136,7 +163,7 @@ function GallerySlider({
               type="button"
               onClick={() => setCurrentPage(() => i)}
               aria-label={`갤러리 ${i + 1} 페이지`}
-              className={`h-2 rounded-full transition-all ${
+              className={`relative h-2 rounded-full transition-all before:absolute before:-inset-x-1 before:-inset-y-[18px] ${
                 i === safePage ? "w-6 bg-[#008080]" : "w-2 bg-white/30 hover:bg-white/50"
               }`}
             />
@@ -302,6 +329,9 @@ export default function SmoothOnePage() {
   const [scheduleMoreOpen, setScheduleMoreOpen] = useState(false); // 일정(모바일) 더보기 펼침
   const [mobileYear, setMobileYear]   = useState(0);  // 모바일 일정 선택 연도 (0=미초기화)
   const [mobileMonth, setMobileMonth] = useState(0);  // 모바일 일정 선택 월  (0=미초기화)
+  const [scheduleSelected, setScheduleSelected] = useState<string | null>(null);     // PC·태블릿 달력에서 고른 날짜 (null=기본값)
+  const [mobilePicked, setMobilePicked] = useState<string | null>(null);             // 모바일 작은 달력에서 고른 날짜
+  const [mobileListMode, setMobileListMode] = useState<"day" | "month" | null>(null); // 모바일 리스트 보기 (null=자동)
 
   // 해상도 → 초기 노출 개수(12/10) 실시간 동기화
   useEffect(() => {
@@ -350,24 +380,56 @@ export default function SmoothOnePage() {
   const visibleParties = applyMoreOpen ? sortedParties : sortedParties.slice(0, applyLimit);
   const showApplyMore = !applyMoreOpen && sortedParties.length > applyLimit;
 
+  // #schedule 전용 — 파티별 일정 상태(지난 일정 > 마감 > 마감임박 > 모집중)와 남은 자리.
+  // 남은 자리는 신청 카드와 같은 실시간 결제 인원(partyCounts, 없으면 0)으로 계산.
+  // now 가 없으면(마운트 전) 상태 계산을 건너뜀 → 하이드레이션 안전 (기존 방식과 동일).
+  const scheduleStatus = useMemo(() => {
+    const map: Record<string, { status: ScheduleStatus | null; maleRemaining: number; femaleRemaining: number }> = {};
+    PARTIES.forEach(p => {
+      const live = partyCounts[p.id];
+      const stock = partyStockStatus({ ...p, maleBooked: live?.male ?? 0, femaleBooked: live?.female ?? 0 });
+      let status: ScheduleStatus | null = null;
+      if (now) {
+        const left = stock.maleRemaining + stock.femaleRemaining;
+        if (partyVisibility(p, now) !== "active") status = "past";
+        else if (stock.allFull) status = "full";
+        else if (left >= 1 && left <= 3) status = "soon";
+        else status = "open";
+      }
+      map[p.id] = { status, maleRemaining: stock.maleRemaining, femaleRemaining: stock.femaleRemaining };
+    });
+    return map;
+  }, [PARTIES, partyCounts, now]);
+
   // 일정 섹션(모바일 리스트 + 데스크탑 캘린더) — 행사 일시 경과한 이벤트에 'fc-event-ended' 클래스
-  // 부여해 파스텔 빨강(#f8d8dd) 톤으로 표시. 다른 카테고리 탭/필터·데이터 쿼리에는 무영향.
+  // 부여해 연한 회색 톤으로 표시. 다른 카테고리 탭/필터·데이터 쿼리에는 무영향.
   const CALENDAR_EVENTS = useMemo(() => PARTIES.map(p => {
     const past = now ? partyVisibility(p, now) !== "active" : false;
     const m = (p.dateString ?? "").match(/(\d{1,2}):(\d{2})/);
     const start = m
       ? `${p.calendarDate}T${m[1].padStart(2, "0")}:${m[2]}:00`
       : p.calendarDate;
+    const info = scheduleStatus[p.id];
     return {
       id: p.id,
       title: p.title,
       start,
-      // 솔로파티는 색을 구분 (지난 일정 표시가 항상 우선 — CSS 에서 ended 가 이긴다)
+      // 솔로파티는 fc-event-solo 클래스 + 칩 안 "솔로" 표시로 구분 (색은 상태 범례 그대로 — 지난 일정 표시가 우선)
       classNames: [...(past ? ["fc-event-ended"] : []), ...(partyTypeOf(p) === "solo" ? ["fc-event-solo"] : [])],
-      extendedProps: { location: p.location, target: p.target, price: p.price },
+      extendedProps: {
+        location: p.location, target: p.target, price: p.price,
+        // #schedule 상태 표시용 (추가 필드)
+        status: info?.status ?? null,
+        maleRemaining: info?.maleRemaining ?? 0,
+        femaleRemaining: info?.femaleRemaining ?? 0,
+        time: m ? `${m[1].padStart(2, "0")}:${m[2]}` : "",
+        theme: p.theme ?? "",
+        locationTag: p.locationTag ?? "",
+        partyType: partyTypeOf(p),
+      },
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [PARTIES, now]);
+  }), [PARTIES, now, scheduleStatus]);
 
   // 일정 섹션 모바일 리스트용 정렬 배열 (PC 캘린더는 CALENDAR_EVENTS 를 그대로 사용 — 무영향)
   // start 가 ISO datetime(YYYY-MM-DDThh:mm:ss)이므로 그대로 비교하면 날짜·시간 모두 오름차순
@@ -398,6 +460,84 @@ export default function SmoothOnePage() {
   }, [sortedSchedule, mobileYear, mobileMonth]);
 
   const showScheduleMore = !scheduleMoreOpen && mobileSchedule.length > SCHEDULE_LIMIT_MOBILE;
+
+  // #schedule — 날짜 선택. 기본값은 "오늘 이후 가장 가까운 일정 날짜" (now 전에는 계산 생략)
+  type ScheduleEvent = (typeof CALENDAR_EVENTS)[number];
+  const isUpcoming = (e: ScheduleEvent) => !!e.extendedProps.status && e.extendedProps.status !== "past";
+  const todayYmd = now ? toYmd(now) : null;
+  const nextScheduleDate = sortedSchedule.find(isUpcoming)?.start.slice(0, 10) ?? null;
+  // PC·태블릿: 달력에서 고른 날짜 → 없으면 가장 가까운 일정 날짜 → 없으면 오늘
+  const pcSelectedDate = scheduleSelected ?? nextScheduleDate ?? todayYmd;
+  const pcSelectedEvents = pcSelectedDate ? sortedSchedule.filter(e => e.start.startsWith(pcSelectedDate)) : [];
+  // 모바일: 보고 있는 달 안에서 고른 날짜 → 없으면 그 달의 가장 가까운 일정 날짜 → 없으면 "이번 달 전체"
+  const monthPrefix = mobileYear ? `${mobileYear}-${String(mobileMonth).padStart(2, "0")}` : "";
+  const mobileDate = mobilePicked && monthPrefix && mobilePicked.startsWith(monthPrefix)
+    ? mobilePicked
+    : mobileSchedule.find(isUpcoming)?.start.slice(0, 10) ?? null;
+  const mobileMode: "day" | "month" = mobileListMode === "month" || !mobileDate ? "month" : "day";
+  const mobileDayEvents = mobileDate ? mobileSchedule.filter(e => e.start.startsWith(mobileDate)) : [];
+  const mobileEventsByDay: Record<string, ScheduleEvent[]> = {};
+  mobileSchedule.forEach(e => { (mobileEventsByDay[e.start.slice(0, 10)] ??= []).push(e); });
+  const mobileFirstDow = mobileYear ? new Date(mobileYear, mobileMonth - 1, 1).getDay() : 0;
+  const mobileDaysInMonth = mobileYear ? new Date(mobileYear, mobileMonth, 0).getDate() : 0;
+  // "이번 달 전체" — 기존 더보기(SCHEDULE_LIMIT_MOBILE) 적용 후 날짜별로 묶음
+  const mobileMonthGroups: [string, ScheduleEvent[]][] = [];
+  (scheduleMoreOpen ? mobileSchedule : mobileSchedule.slice(0, SCHEDULE_LIMIT_MOBILE)).forEach(e => {
+    const ymd = e.start.slice(0, 10);
+    const last = mobileMonthGroups[mobileMonthGroups.length - 1];
+    if (last && last[0] === ymd) last[1].push(e);
+    else mobileMonthGroups.push([ymd, [e]]);
+  });
+
+  // #schedule 모바일 카드 — 기존 디자인 유지 + 오른쪽 위 상태 배지 + "남 N · 여 N 남음" 한 줄.
+  // 지난 일정은 연한 회색, 누르면 기존처럼 /party/{id} 로 이동.
+  const renderScheduleCard = (event: ScheduleEvent) => {
+    const party = PARTIES.find(p => p.id === event.id);
+    const xp = event.extendedProps;
+    const status = xp.status;
+    const isPast = status === "past";
+    const dateObj = new Date(event.start.substring(0, 10) + "T00:00:00");
+    const month = dateObj.getMonth() + 1;
+    const day = dateObj.getDate();
+    const dayName = SCHEDULE_WEEKDAYS[dateObj.getDay()];
+    return (
+      <button
+        key={event.id}
+        type="button"
+        onClick={() => router.push(`/party/${event.id}`)}
+        className={`w-full text-left rounded-2xl p-4 flex items-center gap-4 transition-all shadow-sm active:scale-[0.98] cursor-pointer ${
+          isPast
+            ? "bg-gray-50 border border-gray-200 hover:bg-gray-100"
+            : "bg-gray-50 border border-gray-100 hover:border-brand-point hover:bg-white"
+        }`}
+      >
+        <div className={`flex-shrink-0 w-14 rounded-xl py-2 text-center ${isPast ? "bg-gray-100" : "bg-[#40E0D0]/15"}`}>
+          <div className={`text-xs font-bold ${isPast ? "text-gray-400" : "text-brand-point-ink"}`}>{month}월</div>
+          <div className={`text-2xl font-black leading-none ${isPast ? "text-gray-400" : "text-brand-black"}`}>{day}</div>
+          <div className={`text-xs font-semibold ${isPast ? "text-gray-400" : "text-gray-500"}`}>{dayName}요일</div>
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2 mb-1">
+            <div className={`font-bold text-[15px] leading-snug min-w-0 ${isPast ? "text-gray-400" : "text-brand-black"} ${status === "full" ? "line-through" : ""}`}>
+              <span className={`inline-block align-middle mr-1.5 -mt-0.5 text-xs font-black px-1.5 py-0.5 rounded-full no-underline ${scheduleTypeBadgeTone(isPast)}`}>
+                {PARTY_TYPE_LABELS[xp.partyType]}
+              </span>
+              {event.title}
+            </div>
+            {status && (
+              <span className={`flex-shrink-0 text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${SCHEDULE_STATUS_STYLE[status].tone}`}>
+                {SCHEDULE_STATUS_STYLE[status].label}
+              </span>
+            )}
+          </div>
+          <div className={`text-sm ${isPast ? "text-gray-400" : "text-gray-500"}`}>{party?.dateString}</div>
+          <div className={`text-xs mt-0.5 truncate ${isPast ? "text-gray-400" : "text-gray-500"}`}>{party?.location} · {party?.target}</div>
+          <div className={`text-xs mt-1 font-bold ${isPast ? "text-gray-400" : "text-gray-600"}`}>남 {xp.maleRemaining} · 여 {xp.femaleRemaining} 남음</div>
+        </div>
+        <ArrowRight size={16} className={`flex-shrink-0 ${isPast ? "text-gray-400" : "text-gray-500"}`} />
+      </button>
+    );
+  };
 
   void activeTab; // 기존 useState는 호환을 위해 유지 (warning 회피용 reference)
 
@@ -443,7 +583,7 @@ export default function SmoothOnePage() {
                   e.preventDefault();
                   document.getElementById('apply')?.scrollIntoView({ behavior: 'smooth' });
                 }}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-3 bg-brand-black text-white px-7 py-4 md:px-10 md:py-6 rounded-full text-base md:text-lg font-bold hover:bg-brand-point hover:-translate-y-1 transition-all shadow-xl hover:shadow-brand-point/30 cursor-pointer border border-white/20"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-3 bg-brand-black text-white px-7 py-4 md:px-10 md:py-6 rounded-full text-base md:text-lg font-bold hover:bg-brand-point hover:text-black hover:-translate-y-1 transition-all shadow-xl hover:shadow-brand-point/30 cursor-pointer border border-white/20"
               >
                 어울림 매칭파티 신청하기 <ArrowRight size={20} />
               </button>
@@ -476,8 +616,8 @@ export default function SmoothOnePage() {
                     role="tab"
                     aria-selected={isActive}
                     onClick={() => pickType(t)}
-                    className={`pb-1.5 text-base md:text-xl whitespace-nowrap border-b-2 transition-colors ${
-                      isActive ? "text-brand-black font-black border-brand-point" : "text-gray-400 font-bold border-transparent hover:text-gray-600"
+                    className={`pt-3 pb-1.5 text-base md:text-xl whitespace-nowrap border-b-2 transition-colors ${
+                      isActive ? "text-brand-black font-black border-brand-point" : "text-gray-500 font-bold border-transparent hover:text-gray-700"
                     }`}
                   >
                     {t === "all" ? "전체" : PARTY_TYPE_LABELS[t]}
@@ -499,7 +639,7 @@ export default function SmoothOnePage() {
                       onClick={() => pickAxis(axis)}
                       className={`px-5 md:px-7 py-2.5 md:py-3 text-base md:text-lg font-black rounded-full transition-all whitespace-nowrap ${
                         isActive
-                          ? "bg-brand-point text-white shadow-md"
+                          ? "bg-brand-point text-black shadow-md"
                           : "bg-gray-50 text-gray-500 hover:bg-gray-100 border border-gray-200"
                       }`}
                     >
@@ -526,7 +666,7 @@ export default function SmoothOnePage() {
                         onClick={() => setFilterValue(null)}
                         className={`px-3.5 md:px-5 py-1.5 md:py-2 text-xs md:text-sm font-bold rounded-full transition-all ${
                           !filterValue
-                            ? "bg-brand-point/10 text-brand-point border border-brand-point/30"
+                            ? "bg-brand-point/10 text-brand-point-ink border border-brand-point/30"
                             : "bg-white text-gray-500 hover:bg-gray-50 border border-gray-200"
                         }`}
                       >
@@ -541,7 +681,7 @@ export default function SmoothOnePage() {
                             onClick={() => setFilterValue(opt)}
                             className={`px-3.5 md:px-5 py-1.5 md:py-2 text-xs md:text-sm font-bold rounded-full transition-all ${
                               isSelected
-                                ? "bg-brand-point text-white shadow-md"
+                                ? "bg-brand-point text-black shadow-md"
                                 : "bg-white text-gray-500 hover:bg-gray-50 border border-gray-200"
                             }`}
                           >
@@ -551,8 +691,8 @@ export default function SmoothOnePage() {
                       })}
                     </div>
                     {filterValue && (
-                      <p className="text-center text-xs md:text-sm text-gray-400 font-medium mt-3">
-                        {activeAxis} · <span className="text-brand-point font-bold">{categoryLabel(filterValue)}</span> · {sortedParties.length}건
+                      <p className="text-center text-xs md:text-sm text-gray-500 font-medium mt-3">
+                        {activeAxis} · <span className="text-brand-point-ink font-bold">{categoryLabel(filterValue)}</span> · {sortedParties.length}건
                       </p>
                     )}
                   </motion.div>
@@ -562,8 +702,8 @@ export default function SmoothOnePage() {
 
             {sortedParties.length === 0 ? (
               <div className="bg-white border border-gray-100 rounded-2xl md:rounded-3xl p-10 md:p-16 text-center">
-                <p className="text-gray-400 font-bold text-sm md:text-base">선택한 조건에 맞는 파티가 없습니다.</p>
-                <p className="text-xs md:text-sm text-gray-400 mt-2">다른 카테고리를 선택하거나 조건을 초기화해주세요.</p>
+                <p className="text-gray-500 font-bold text-sm md:text-base">선택한 조건에 맞는 파티가 없습니다.</p>
+                <p className="text-xs md:text-sm text-gray-500 mt-2">다른 카테고리를 선택하거나 조건을 초기화해주세요.</p>
               </div>
             ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
@@ -602,25 +742,25 @@ export default function SmoothOnePage() {
                     />
                     {/* 좌측 상단 — 파티 종류 배지 (기존 배지와 같은 크기, 검정 배경·흰 글자, 모집 종료 카드에도 표시) */}
                     <div className="absolute top-4 left-4 md:top-5 md:left-5 z-10">
-                      <span className="bg-gray-900 text-white text-[11px] md:text-xs font-black px-2.5 py-1 rounded-full shadow-md whitespace-nowrap">
+                      <span className="bg-gray-900 text-white text-xs font-black px-2.5 py-1 rounded-full shadow-md whitespace-nowrap">
                         {PARTY_TYPE_LABELS[partyTypeOf(card)]}
                       </span>
                     </div>
                     {/* 우측 상단 배지 영역 — 종료 시 [모집종료] 단일 배지, 아니면 대상(싱글/돌싱) + 모집마감 스택 */}
                     <div className="absolute top-4 right-4 md:top-5 md:right-5 flex flex-col items-end gap-1.5 z-10">
                       {isEnded ? (
-                        <span className="bg-[#f8d8dd] text-[#9a3a47] text-[11px] md:text-xs font-black px-2.5 py-1 rounded-full shadow-md whitespace-nowrap tracking-tight">
+                        <span className="bg-[#f8d8dd] text-danger text-xs font-black px-2.5 py-1 rounded-full shadow-md whitespace-nowrap tracking-tight">
                           모집종료
                         </span>
                       ) : (
                         <>
                           {(card.targetGroup === "싱글" || card.targetGroup === "돌싱") && (
-                            <span className={`${card.targetGroup === "돌싱" ? "bg-[#b4a7d6]" : "bg-brand-point"} text-black text-[11px] md:text-xs font-black px-2.5 py-1 rounded-full shadow-md whitespace-nowrap`}>
+                            <span className={`${card.targetGroup === "돌싱" ? "bg-[#b4a7d6]" : "bg-brand-point"} text-black text-xs font-black px-2.5 py-1 rounded-full shadow-md whitespace-nowrap`}>
                               {card.targetGroup}
                             </span>
                           )}
                           {stock.allFull && (
-                            <span className="bg-gray-900 text-white text-[11px] md:text-xs font-black px-2.5 py-1 rounded-full shadow-md whitespace-nowrap">
+                            <span className="bg-gray-900 text-white text-xs font-black px-2.5 py-1 rounded-full shadow-md whitespace-nowrap">
                               모집 마감
                             </span>
                           )}
@@ -628,13 +768,13 @@ export default function SmoothOnePage() {
                       )}
                     </div>
                     {/* 제목 → 내용(소개) → 일시 → 장소 순서, 전체적으로 폰트 축소 — 우측 상단 배지가 가리지 않도록 우측 패딩 확보 */}
-                    <h3 className="text-base md:text-lg font-bold mb-1 group-hover:text-brand-point transition-colors leading-snug pr-16 md:pr-20">{card.title}</h3>
+                    <h3 className="text-base md:text-lg font-bold mb-1 group-hover:text-brand-point-ink transition-colors leading-snug pr-16 md:pr-20">{card.title}</h3>
                     {card.description && (
                       <p className="text-xs md:text-sm text-gray-500 font-medium mb-2.5 md:mb-3 line-clamp-2 break-keep">{card.description}</p>
                     )}
                     <div className="space-y-1.5 mb-4 md:mb-5 text-gray-600 font-medium flex-1 text-xs md:text-sm">
-                      <div className="flex items-center gap-2"><Calendar size={13} className="text-gray-400 group-hover:text-brand-point transition-colors flex-shrink-0" /> <span className="font-bold">{card.dateString}</span></div>
-                      <div className="flex items-center gap-2"><MapPin size={13} className="text-gray-400 group-hover:text-brand-point transition-colors flex-shrink-0" /> {card.location}</div>
+                      <div className="flex items-center gap-2"><Calendar size={13} className="text-gray-500 group-hover:text-brand-point-ink transition-colors flex-shrink-0" /> <span className="font-bold">{card.dateString}</span></div>
+                      <div className="flex items-center gap-2"><MapPin size={13} className="text-gray-500 group-hover:text-brand-point-ink transition-colors flex-shrink-0" /> {card.location}</div>
                     </div>
 
                     {/* 대상 + 신청 버튼 — 한 줄에 좌(대상) · 우(버튼) 배치, 신청하기와 동일한 가로 레이아웃 유지 */}
@@ -644,12 +784,12 @@ export default function SmoothOnePage() {
                       {/* 종료 카드는 파스텔 빨강(#f8d8dd) 버튼, disabled/pointer-events 적용 X (링크 정상 동작) */}
                       <Link
                         href={`/party/${card.id}`}
-                        className={`flex-shrink-0 text-center font-bold px-4 py-2 text-xs md:text-sm rounded-xl transition-colors duration-300 whitespace-nowrap ${
+                        className={`relative flex-shrink-0 text-center font-bold px-4 py-2 text-xs md:text-sm rounded-xl transition-colors duration-300 whitespace-nowrap before:absolute before:inset-x-0 before:-inset-y-1.5 ${
                           isEnded
-                            ? "bg-[#f8d8dd] text-[#9a3a47] hover:bg-[#f4c5cd]"
+                            ? "bg-[#f8d8dd] text-danger hover:bg-[#f4c5cd]"
                             : stock.allFull
                               ? "bg-gray-200 text-gray-500 hover:bg-gray-300"
-                              : "bg-brand-black text-white hover:bg-brand-point"
+                              : "bg-brand-black text-white hover:bg-brand-point hover:text-black"
                         }`}
                       >
                         {isEnded ? "모집 종료된 파티" : stock.allFull ? "모집 마감 · 상세보기" : "신청하기"}
@@ -668,7 +808,7 @@ export default function SmoothOnePage() {
                 <button
                   type="button"
                   onClick={() => setApplyMoreOpen(true)}
-                  className="inline-flex items-center justify-center gap-2 h-12 px-8 md:px-10 rounded-full border border-gray-300 text-gray-700 font-bold text-sm md:text-base hover:border-brand-point hover:text-brand-point transition-colors"
+                  className="inline-flex items-center justify-center gap-2 h-12 px-8 md:px-10 rounded-full border border-gray-300 text-gray-700 font-bold text-sm md:text-base hover:border-brand-point hover:text-brand-point-ink transition-colors"
                 >
                   더보기 <ChevronDown size={18} />
                 </button>
@@ -709,15 +849,24 @@ export default function SmoothOnePage() {
 
         <ReviewBoard />
 
-        {/* Matching Schedule Section (Calendar Implementation) */}
+        {/* Matching Schedule Section — PC(lg↑): 달력 + 오른쪽 상세 패널 / 태블릿(md~lg): 달력 + 아래 패널 / 모바일: 작은 달력 + 날짜별 리스트 */}
         <section id="schedule" className="py-16 md:py-32 px-4 md:px-6 bg-white shadow-[0_-20px_40px_rgba(0,0,0,0.02)]">
           <div className="max-w-7xl mx-auto">
-            <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="text-center mb-10 md:mb-16">
+            <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="text-center mb-8 md:mb-12">
               <h2 className="text-4xl md:text-6xl font-bold mb-4 md:mb-6 tracking-tight">파티 일정</h2>
               <p className="text-base md:text-lg text-gray-500 max-w-2xl mx-auto">신청 가능한 파티 일정을 확인하세요.</p>
+              {/* 상태 범례 (한 줄) */}
+              <ul aria-label="일정 상태 안내" className="mt-5 md:mt-6 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 md:gap-x-5 text-[13px] md:text-sm font-bold text-gray-600">
+                {SCHEDULE_STATUS_ORDER.map(s => (
+                  <li key={s} className="inline-flex items-center gap-1.5">
+                    <span aria-hidden="true" className={`w-3 h-3 rounded-[4px] ring-1 ring-black/5 ${SCHEDULE_STATUS_STYLE[s].tone}`} />
+                    {SCHEDULE_STATUS_STYLE[s].label}
+                  </li>
+                ))}
+              </ul>
             </motion.div>
 
-            {/* Mobile: 연/월 내비게이션 + 월별 일정 리스트 */}
+            {/* Mobile: 연/월 내비게이션 + 작은 달력 + 날짜별 리스트 */}
             <div className="md:hidden">
 
               {/* 연도·월 내비게이션 바 */}
@@ -726,7 +875,7 @@ export default function SmoothOnePage() {
                   type="button"
                   onClick={goPrevMonth}
                   aria-label="이전 달"
-                  className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-100 text-brand-black hover:bg-brand-point hover:text-white active:scale-95 transition-all"
+                  className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-100 text-brand-black hover:bg-brand-point hover:text-black active:scale-95 transition-all"
                 >
                   <ChevronLeft size={22} strokeWidth={2.5} />
                 </button>
@@ -737,67 +886,108 @@ export default function SmoothOnePage() {
                   type="button"
                   onClick={goNextMonth}
                   aria-label="다음 달"
-                  className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-100 text-brand-black hover:bg-brand-point hover:text-white active:scale-95 transition-all"
+                  className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-100 text-brand-black hover:bg-brand-point hover:text-black active:scale-95 transition-all"
                 >
                   <ChevronRight size={22} strokeWidth={2.5} />
                 </button>
               </div>
 
-              {/* 선택 월 일정 리스트 */}
+              {/* 작은 달력 — 일정 있는 날짜 아래 상태 색 점(최대 3개, 4개 이상이면 +) */}
+              {mobileYear > 0 && (
+                <div className="mb-5 rounded-2xl border border-gray-100 bg-white p-2 shadow-sm">
+                  <div className="grid grid-cols-7">
+                    {SCHEDULE_WEEKDAYS.map(w => (
+                      <div key={w} className="h-8 flex items-center justify-center text-xs font-bold text-gray-500">{w}</div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-7">
+                    {Array.from({ length: mobileFirstDow }).map((_, i) => <div key={`blank-${i}`} aria-hidden="true" />)}
+                    {Array.from({ length: mobileDaysInMonth }, (_, i) => {
+                      const day = i + 1;
+                      const ymd = `${monthPrefix}-${String(day).padStart(2, "0")}`;
+                      const dayEvents = mobileEventsByDay[ymd] ?? [];
+                      const isSelected = mobileMode === "day" && ymd === mobileDate;
+                      const isToday = ymd === todayYmd;
+                      return (
+                        <button
+                          key={ymd}
+                          type="button"
+                          onClick={() => { setMobilePicked(ymd); setMobileListMode("day"); }}
+                          aria-pressed={isSelected}
+                          aria-label={`${mobileMonth}월 ${day}일${dayEvents.length ? `, 일정 ${dayEvents.length}개` : ""}`}
+                          className="h-12 flex flex-col items-center justify-start gap-0.5 pt-1 rounded-xl active:bg-gray-100 transition-colors"
+                        >
+                          <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm ${
+                            isSelected ? "bg-brand-black text-white font-black"
+                              : isToday ? "text-brand-point-ink font-black"
+                              : "text-gray-800 font-bold"
+                          }`}>
+                            {day}
+                          </span>
+                          <span aria-hidden="true" className="h-2.5 flex items-center gap-0.5">
+                            {dayEvents.slice(0, 3).map(e => (
+                              <span key={e.id} className={`w-1.5 h-1.5 rounded-full ${SCHEDULE_STATUS_STYLE[e.extendedProps.status ?? "open"].dot}`} />
+                            ))}
+                            {dayEvents.length > 3 && <span className="text-xs leading-none font-black text-gray-500">+</span>}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* 보기 전환 — 선택한 날짜 | 이번 달 전체 */}
+              <div role="group" aria-label="일정 보기 방식" className="flex items-center gap-2 mb-4">
+                {([
+                  { mode: "day" as const,   label: "선택한 날짜" },
+                  { mode: "month" as const, label: "이번 달 전체" },
+                ]).map(opt => (
+                  <button
+                    key={opt.mode}
+                    type="button"
+                    onClick={() => setMobileListMode(opt.mode)}
+                    disabled={opt.mode === "day" && !mobileDate}
+                    aria-pressed={mobileMode === opt.mode}
+                    className={`h-11 px-4 rounded-full text-sm font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                      mobileMode === opt.mode ? "bg-brand-black text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:hover:bg-gray-100"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* 일정 리스트 */}
               <div className="space-y-3">
-                {mobileSchedule.length === 0 ? (
-                  <p className="text-center text-gray-400 py-12">
+                {mobileMode === "day" && mobileDate ? (
+                  <>
+                    <p className="px-1 text-sm font-black text-gray-500">{scheduleShortLabel(mobileDate)}</p>
+                    {mobileDayEvents.length === 0 ? (
+                      <p className="text-center text-gray-500 py-10">선택한 날짜에는 일정이 없습니다.</p>
+                    ) : (
+                      mobileDayEvents.map(event => renderScheduleCard(event))
+                    )}
+                  </>
+                ) : mobileSchedule.length === 0 ? (
+                  <p className="text-center text-gray-500 py-12">
                     {mobileYear > 0 ? `${mobileMonth}월에 등록된 일정이 없습니다.` : ""}
                   </p>
                 ) : (
-                  (scheduleMoreOpen ? mobileSchedule : mobileSchedule.slice(0, SCHEDULE_LIMIT_MOBILE)).map((event) => {
-                    const party = PARTIES.find(p => p.id === event.id);
-                    const dateObj = new Date(event.start.substring(0, 10) + "T00:00:00");
-                    const month = dateObj.getMonth() + 1;
-                    const day = dateObj.getDate();
-                    const dayName = ["일", "월", "화", "수", "목", "금", "토"][dateObj.getDay()];
-                    // 행사 일시 경과 → 파스텔 빨강(#f8d8dd) 톤으로 표시 (링크/클릭 동작은 그대로)
-                    const isPast = now && party ? partyVisibility(party, now) !== "active" : false;
-                    return (
-                      <button
-                        key={event.id}
-                        type="button"
-                        onClick={() => router.push(`/party/${event.id}`)}
-                        className={`w-full text-left rounded-2xl p-4 flex items-center gap-4 transition-all shadow-sm active:scale-[0.98] cursor-pointer ${
-                          isPast
-                            ? "bg-[#fdeef0] border border-[#f8d8dd] hover:border-[#e9a8b1] hover:bg-[#fbe3e7]"
-                            : "bg-gray-50 border border-gray-100 hover:border-brand-point hover:bg-white"
-                        }`}
-                      >
-                        <div className={`flex-shrink-0 w-14 rounded-xl py-2 text-center ${isPast ? "bg-[#f8d8dd]" : "bg-[#40E0D0]/15"}`}>
-                          <div className={`text-[11px] font-bold ${isPast ? "text-[#9a3a47]" : "text-[#008080]"}`}>{month}월</div>
-                          <div className={`text-2xl font-black leading-none ${isPast ? "text-[#7a2c37]" : "text-brand-black"}`}>{day}</div>
-                          <div className={`text-[11px] font-semibold ${isPast ? "text-[#9a3a47]/70" : "text-gray-400"}`}>{dayName}요일</div>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className={`font-bold text-[15px] mb-1 leading-snug ${isPast ? "text-[#7a2c37]" : "text-brand-black"}`}>
-                            {party && (
-                              <span className="inline-block align-middle mr-1.5 -mt-0.5 bg-gray-900 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">
-                                {PARTY_TYPE_LABELS[partyTypeOf(party)]}
-                              </span>
-                            )}
-                            {event.title}
-                          </div>
-                          <div className={`text-sm ${isPast ? "text-[#9a3a47]/85" : "text-gray-500"}`}>{party?.dateString}</div>
-                          <div className={`text-xs mt-0.5 truncate ${isPast ? "text-[#9a3a47]/70" : "text-gray-400"}`}>{party?.location} · {party?.target}</div>
-                        </div>
-                        <ArrowRight size={16} className={`flex-shrink-0 ${isPast ? "text-[#9a3a47]/50" : "text-gray-300"}`} />
-                      </button>
-                    );
-                  })
+                  mobileMonthGroups.map(([ymd, events]) => (
+                    <div key={ymd} className="space-y-3">
+                      <p className="px-1 pt-2 text-sm font-black text-gray-500">{scheduleShortLabel(ymd)}</p>
+                      {events.map(event => renderScheduleCard(event))}
+                    </div>
+                  ))
                 )}
 
-                {/* 더보기 — 선택 월 일정이 10개 초과 시 (PC 캘린더 무영향) */}
-                {showScheduleMore && (
+                {/* 더보기 — "이번 달 전체"에서 선택 월 일정이 10개 초과 시 (PC 캘린더 무영향) */}
+                {mobileMode === "month" && showScheduleMore && (
                   <button
                     type="button"
                     onClick={() => setScheduleMoreOpen(true)}
-                    className="mt-2 w-full h-12 inline-flex items-center justify-center gap-2 rounded-full border border-gray-300 text-gray-700 font-bold text-sm hover:border-brand-point hover:text-brand-point transition-colors"
+                    className="mt-2 w-full h-12 inline-flex items-center justify-center gap-2 rounded-full border border-gray-300 text-gray-700 font-bold text-sm hover:border-brand-point hover:text-brand-point-ink transition-colors"
                   >
                     더보기 <ChevronDown size={18} />
                   </button>
@@ -805,66 +995,153 @@ export default function SmoothOnePage() {
               </div>
             </div>
 
-            {/* Desktop: Calendar View */}
-            <div className="hidden md:block bg-white p-10 rounded-3xl shadow-lg border border-gray-100">
-              <div className="calendar-container w-full h-[1200px]">
-                <style dangerouslySetInnerHTML={{__html: `
-                  .fc-theme-standard .fc-scrollgrid { border-color: #f3f4f6; }
-                  .fc-theme-standard th, .fc-theme-standard td { border-color: #f3f4f6; }
-                  .fc-daygrid-day-frame { min-height: 160px !important; display: flex !important; flex-direction: column !important; }
-                  .fc-daygrid-day-top { flex-direction: row !important; justify-content: flex-start !important; padding: 12px 14px 8px !important; }
-                  .fc-daygrid-day-number { font-weight: 800; color: #111; padding: 0 !important; font-size: 1.2rem; opacity: 0.9; margin-bottom: 4px; }
-                  .fc-daygrid-day-events { display: flex !important; flex-direction: column !important; gap: 5px !important; padding: 0 4px 8px 4px !important; }
-                  .fc-event { cursor: pointer; border-radius: 4px !important; padding: 4px 8px !important; font-weight: 800; font-size: 0.85rem; border: none; background-color: #40E0D0; margin: 0 !important; border-left: 4px solid rgba(0,0,0,0.15) !important; transition: all 0.2s ease !important; box-shadow: 0 1px 3px rgba(0,0,0,0.05); width: 100% !important; box-sizing: border-box; }
-                  .fc-event, .fc-event * { color: #000000 !important; }
-                  .fc-event:hover { background-color: #38C8BA !important; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(64, 224, 208, 0.4); opacity: 1 !important; z-index: 5; position: relative; }
-                  .fc-event:active { transform: translateY(0) scale(0.98); box-shadow: 0 1px 2px rgba(64, 224, 208, 0.2); }
-                  .fc-event-title, .fc-event-main { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; padding: 0 !important; margin: 0 !important; background: transparent !important; }
-                  .fc-toolbar-title { font-weight: 900; font-size: 1.85rem !important; letter-spacing: -0.02em; }
-                  .fc-button-primary { background-color: #000 !important; border: none !important; border-radius: 12px !important; padding: 8px 16px !important; font-size: 0.9rem !important; display: flex !important; align-items: center !important; justify-content: center !important; transition: all 0.2s !important; }
-                  .fc-button-primary:hover { background-color: #40E0D0 !important; transform: translateY(-1px); }
-                  .fc-button-group { gap: 10px !important; }
-                  .fc-button-group > .fc-button { border-radius: 12px !important; margin-left: 0 !important; }
-                  .fc-toolbar-chunk { display: flex; align-items: center; }
-                  .fc-toolbar { display: flex !important; align-items: center !important; justify-content: space-between !important; margin-bottom: 2.5rem !important; }
-                  .fc-icon { font-size: 1.2em !important; font-weight: bold; }
-                  .fc-today-button { font-weight: 800 !important; text-transform: uppercase !important; letter-spacing: 0.05em !important; padding-left: 20px !important; padding-right: 20px !important; }
-                  .fc-view-harness { background-color: #fff; }
-                  .fc-col-header-cell { padding: 12px 0 !important; background-color: #fafafa; }
-                  .fc-col-header-cell-cushion { color: #666; font-weight: 700; font-size: 0.9rem; }
-                  .fc-daygrid-more-link { font-weight: 800; color: #40E0D0 !important; font-size: 0.8rem; margin-top: 2px; padding-left: 4px; }
-                  /* 행사 일시 경과한 이벤트 — 파스텔 빨강(#f8d8dd) 톤. 위쪽 .fc-event/* 색상 규칙보다 specificity 가 높아 안전하게 override 됨 */
-                  .fc-event.fc-event-ended { background-color: #f8d8dd !important; border-left-color: rgba(154, 58, 71, 0.4) !important; }
-                  .fc-event.fc-event-ended, .fc-event.fc-event-ended * { color: #7a2c37 !important; }
-                  .fc-event.fc-event-ended:hover { background-color: #f4c5cd !important; box-shadow: 0 4px 12px rgba(248, 216, 221, 0.55) !important; }
-                  /* 솔로파티 — 검정 톤으로 구분. :not(.fc-event-ended) 로 지난 일정 표시가 항상 우선 */
-                  .fc-event.fc-event-solo:not(.fc-event-ended) { background-color: #111827 !important; border-left-color: rgba(64, 224, 208, 0.8) !important; }
-                  .fc-event.fc-event-solo:not(.fc-event-ended), .fc-event.fc-event-solo:not(.fc-event-ended) * { color: #ffffff !important; }
-                  .fc-event.fc-event-solo:not(.fc-event-ended):hover { background-color: #374151 !important; }
-                  .fc-daygrid-event-dot { display: none !important; }
-                `}} />
-                <FullCalendar
-                  plugins={[dayGridPlugin, interactionPlugin]}
-                  initialView="dayGridMonth"
-                  // 초기 노출 월 = 접속한 사용자의 현재 날짜. initialDate 생략 시 FullCalendar 가
-                  // init 시점(브라우저)에서 new Date() 를 사용 → 빌드 날짜 고정/하이드레이션 불일치 없음.
-                  locale="ko"
-                  buttonText={{ today: 'TODAY' }}
-                  events={CALENDAR_EVENTS}
-                  eventClick={(info) => router.push(`/party/${info.event.id}`)}
-                  eventTextColor="#000000"
-                  height="100%"
-                  headerToolbar={{
-                    left: 'prev,next',
-                    center: 'title',
-                    right: 'today'
-                  }}
-                  titleFormat={{ year: 'numeric', month: 'long' }}
-                  dayMaxEvents={5}
-                  displayEventTime={false}
-                  dayCellContent={(arg) => arg.dayNumberText.replace('일', '')}
-                />
+            {/* PC·태블릿: 달력 + 상세 패널 (lg 이상 2열 65:35 / md~lg 는 달력 아래에 패널) */}
+            <div className="hidden md:grid grid-cols-1 lg:grid-cols-[minmax(0,65fr)_minmax(0,35fr)] gap-6 xl:gap-8 items-start">
+              <div className="min-w-0 bg-white p-6 lg:p-5 xl:p-6 rounded-3xl shadow-lg border border-gray-100">
+                <div className="calendar-container w-full">
+                  <style dangerouslySetInnerHTML={{__html: `
+                    .fc-theme-standard .fc-scrollgrid { border-color: #f3f4f6; }
+                    .fc-theme-standard th, .fc-theme-standard td { border-color: #f3f4f6; }
+                    .fc-daygrid-day-frame { min-height: 120px !important; display: flex !important; flex-direction: column !important; cursor: pointer; }
+                    .fc-daygrid-day-top { flex-direction: row !important; justify-content: flex-start !important; padding: 10px 10px 6px !important; }
+                    .fc-daygrid-day-number { font-weight: 800; color: #111; padding: 0 !important; font-size: 1.1rem; opacity: 0.9; margin-bottom: 2px; }
+                    .fc-daygrid-day-events { display: flex !important; flex-direction: column !important; gap: 4px !important; padding: 0 3px 6px 3px !important; }
+                    /* 일정 칩 — 색은 eventContent 의 상태별 클래스가 담당 (왼쪽 굵은 테두리 없음) */
+                    .fc-event { cursor: pointer; border: none !important; background: transparent !important; box-shadow: none; padding: 0 !important; margin: 0 !important; width: 100% !important; box-sizing: border-box; transition: transform 0.2s ease !important; }
+                    .fc-event:hover { transform: translateY(-1px); opacity: 1 !important; z-index: 5; position: relative; }
+                    .fc-event:hover .sch-chip { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); }
+                    .fc-event:active { transform: translateY(0) scale(0.98); }
+                    .fc-event-title, .fc-event-main { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; padding: 0 !important; margin: 0 !important; background: transparent !important; }
+                    .fc-toolbar-title { font-weight: 900; font-size: 1.85rem !important; letter-spacing: -0.02em; }
+                    .fc-button-primary { background-color: #000 !important; border: none !important; border-radius: 12px !important; padding: 8px 16px !important; font-size: 0.9rem !important; display: flex !important; align-items: center !important; justify-content: center !important; transition: all 0.2s !important; }
+                    .fc-button-primary:hover { background-color: #40E0D0 !important; color: #000 !important; transform: translateY(-1px); }
+                    .fc-button-group { gap: 10px !important; }
+                    .fc-button-group > .fc-button { border-radius: 12px !important; margin-left: 0 !important; }
+                    .fc-toolbar-chunk { display: flex; align-items: center; }
+                    .fc-toolbar { display: flex !important; align-items: center !important; justify-content: space-between !important; margin-bottom: 2rem !important; }
+                    .fc-icon { font-size: 1.2em !important; font-weight: bold; }
+                    .fc-today-button { font-weight: 800 !important; text-transform: uppercase !important; letter-spacing: 0.05em !important; padding-left: 20px !important; padding-right: 20px !important; }
+                    .fc-view-harness { background-color: #fff; }
+                    .fc-col-header-cell { padding: 12px 0 !important; background-color: #fafafa; }
+                    .fc-col-header-cell-cushion { color: #666; font-weight: 700; font-size: 0.9rem; }
+                    .fc-daygrid-more-link { font-weight: 800; color: #00807A !important; font-size: 0.8rem; margin-top: 2px; padding-left: 4px; }
+                    /* 지난 일정 — 연한 회색 (예전 분홍 톤 대체) */
+                    .fc-event.fc-event-ended .sch-chip { background-color: #f9fafb; color: #99a1af; border: 1px solid #e5e7eb; }
+                    /* 선택한 날짜 — 검정 2px 테두리 */
+                    .fc .sch-day-selected .fc-daygrid-day-frame { box-shadow: inset 0 0 0 2px #000; border-radius: 4px; }
+                    .fc-daygrid-event-dot { display: none !important; }
+                  `}} />
+                  <FullCalendar
+                    plugins={[dayGridPlugin, interactionPlugin]}
+                    initialView="dayGridMonth"
+                    // 초기 노출 월 = 접속한 사용자의 현재 날짜. initialDate 생략 시 FullCalendar 가
+                    // init 시점(브라우저)에서 new Date() 를 사용 → 빌드 날짜 고정/하이드레이션 불일치 없음.
+                    locale="ko"
+                    buttonText={{ today: 'TODAY' }}
+                    events={CALENDAR_EVENTS}
+                    eventClick={(info) => router.push(`/party/${info.event.id}`)}
+                    height="auto"
+                    headerToolbar={{
+                      left: 'prev,next',
+                      center: 'title',
+                      right: 'today'
+                    }}
+                    titleFormat={{ year: 'numeric', month: 'long' }}
+                    dayMaxEvents={3}
+                    moreLinkText={(n) => `+${n}개`}
+                    displayEventTime={false}
+                    // 늦은 밤(예: 23:30) 일정이 기본 1시간 길이 때문에 다음 날 칸까지 이어지지 않도록
+                    nextDayThreshold="06:00:00"
+                    dayCellContent={(arg) => arg.dayNumberText.replace('일', '')}
+                    // 날짜 칸 클릭 → 그날 선택 (오른쪽 패널에 그날 일정)
+                    dateClick={(info) => setScheduleSelected(info.dateStr)}
+                    // "+N개" → 팝오버 없이 날짜만 선택. 함수가 아무것도 반환하지 않으면 FullCalendar 가
+                    // 팝오버를 열기 때문에 현재 보기(dayGridMonth)를 반환 → 같은 달 그대로 유지.
+                    moreLinkClick={(info) => { setScheduleSelected(toYmd(info.date)); return "dayGridMonth"; }}
+                    dayCellClassNames={(arg) => (toYmd(arg.date) === pcSelectedDate ? ["sch-day-selected"] : [])}
+                    eventContent={(arg) => {
+                      const xp = arg.event.extendedProps as { time?: string; theme?: string; status?: ScheduleStatus | null; partyType?: PartyType };
+                      const tone = SCHEDULE_STATUS_STYLE[xp.status ?? "open"].tone;
+                      return (
+                        <div
+                          title={`${xp.time ? xp.time + " " : ""}${arg.event.title}`}
+                          className={`sch-chip w-full truncate rounded-md px-1 xl:px-1.5 py-1 text-xs font-bold leading-tight ${tone} ${xp.status === "full" ? "line-through" : ""}`}
+                        >
+                          {xp.partyType === "solo" && (
+                            <span className={`mr-1 rounded px-1 ${scheduleTypeBadgeTone(xp.status === "past")}`}>솔로</span>
+                          )}
+                          {xp.time && <span className="tabular-nums mr-1">{xp.time}</span>}
+                          {xp.theme ? categoryLabel(xp.theme) : arg.event.title}
+                        </div>
+                      );
+                    }}
+                  />
+                </div>
               </div>
+
+              {/* 선택한 날짜의 일정 패널 (lg 이상은 오른쪽에 고정) */}
+              <aside aria-live="polite" className="bg-white rounded-3xl shadow-lg border border-gray-100 p-6 xl:p-7 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto">
+                <div className="flex items-baseline justify-between gap-3 mb-4">
+                  <h3 className="text-xl font-black tracking-tight text-brand-black">
+                    {pcSelectedDate ? scheduleLongLabel(pcSelectedDate) : "날짜를 선택하세요"}
+                  </h3>
+                  {pcSelectedDate && <span className="text-sm font-bold text-gray-500 whitespace-nowrap">일정 {pcSelectedEvents.length}개</span>}
+                </div>
+                {pcSelectedEvents.length === 0 ? (
+                  <p className="py-10 text-center text-gray-500">
+                    이 날짜에는 일정이 없습니다.
+                    <span className="block mt-1 text-sm">달력에서 일정이 있는 날짜를 눌러 보세요.</span>
+                  </p>
+                ) : (
+                  <ul className="space-y-3">
+                    {pcSelectedEvents.map(event => {
+                      const xp = event.extendedProps;
+                      const status = xp.status;
+                      const isPast = status === "past";
+                      return (
+                        <li key={event.id}>
+                          <button
+                            type="button"
+                            onClick={() => router.push(`/party/${event.id}`)}
+                            className={`group w-full text-left rounded-2xl p-4 flex items-center gap-3 border transition-all ${
+                              isPast ? "bg-gray-50 border-gray-200 hover:bg-gray-100" : "bg-white border-gray-200 hover:border-brand-point hover:shadow-md"
+                            }`}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                                <span className={`text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${scheduleTypeBadgeTone(isPast)}`}>
+                                  {PARTY_TYPE_LABELS[xp.partyType]}
+                                </span>
+                                {status && (
+                                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${SCHEDULE_STATUS_STYLE[status].tone}`}>
+                                    {SCHEDULE_STATUS_STYLE[status].label}
+                                  </span>
+                                )}
+                                {[xp.theme && categoryLabel(xp.theme), xp.locationTag].filter(Boolean).map(tag => (
+                                  <span key={tag as string} className={`text-xs font-bold px-2 py-0.5 rounded-full bg-gray-100 ${isPast ? "text-gray-400" : "text-gray-600"}`}>
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
+                              <div className={`font-black text-base leading-snug ${isPast ? "text-gray-400" : "text-brand-black"} ${status === "full" ? "line-through" : ""}`}>
+                                {xp.time && <span className="tabular-nums mr-1.5">{xp.time}</span>}
+                                {event.title}
+                              </div>
+                              <div className={`text-sm mt-1 truncate ${isPast ? "text-gray-400" : "text-gray-500"}`}>
+                                {xp.location} · {xp.target}
+                              </div>
+                              <div className={`text-sm mt-1 font-bold ${isPast ? "text-gray-400" : "text-gray-700"}`}>
+                                남 {xp.maleRemaining}석 · 여 {xp.femaleRemaining}석 남음
+                              </div>
+                            </div>
+                            <ArrowRight size={18} className={`flex-shrink-0 transition-transform group-hover:translate-x-0.5 ${isPast ? "text-gray-400" : "text-gray-500"}`} />
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </aside>
             </div>
           </div>
         </section>
@@ -900,11 +1177,11 @@ export default function SmoothOnePage() {
                   </div>
                   <h3 className="text-sm md:text-2xl font-black mb-1.5 md:mb-3 text-gray-900 leading-tight">{p.job}</h3>
                   {p.age && (
-                    <p className="text-brand-point font-bold text-xs md:text-lg mb-3 md:mb-8 whitespace-nowrap">{p.age}</p>
+                    <p className="text-brand-point-ink font-bold text-xs md:text-lg mb-3 md:mb-8 whitespace-nowrap">{p.age}</p>
                   )}
                   <div className="flex flex-wrap justify-center gap-1.5 md:gap-2">
                     {p.keywords.map((k, kIdx) => (
-                      <span key={kIdx} className="bg-gray-50 text-gray-500 text-[10px] md:text-sm font-bold px-2.5 md:px-4 py-1 md:py-1.5 rounded-full border border-gray-100">#{k}</span>
+                      <span key={kIdx} className="bg-gray-50 text-gray-500 text-xs md:text-sm font-bold px-2.5 md:px-4 py-1 md:py-1.5 rounded-full border border-gray-100">#{k}</span>
                     ))}
                   </div>
                 </motion.div>
@@ -936,7 +1213,7 @@ export default function SmoothOnePage() {
                       className="w-full px-5 md:px-8 py-5 md:py-6 flex justify-between items-center text-left bg-white hover:bg-brand-lightgray transition-colors"
                     >
                       <span className="text-base md:text-lg font-bold pr-4">{faq.q}</span>
-                      <ChevronDown className={`transform transition-transform duration-300 text-brand-point ${isOpen ? 'rotate-180' : ''}`} />
+                      <ChevronDown className={`shrink-0 transform transition-transform duration-300 text-brand-point-ink ${isOpen ? 'rotate-180' : ''}`} />
                     </button>
                     <AnimatePresence>
                       {isOpen && (

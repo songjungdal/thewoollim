@@ -27,12 +27,12 @@ export default function PartnershipPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 mb-12 md:mb-20">
                 <div className="p-6 md:p-10 bg-gray-50 rounded-2xl md:rounded-[2.5rem] border border-gray-100">
-                  <Briefcase className="text-brand-point mb-4 md:mb-6" size={28} />
+                  <Briefcase className="text-brand-point-ink mb-4 md:mb-6" size={28} />
                   <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-3">공간/장소 제휴</h3>
                   <p className="text-sm md:text-base">오프라인 매칭 파티를 위한 감각적인 라운지, 카페, 다이닝 공간을 찾고 있습니다.</p>
                 </div>
                 <div className="p-6 md:p-10 bg-gray-50 rounded-2xl md:rounded-[2.5rem] border border-gray-100">
-                  <Handshake className="text-brand-point mb-4 md:mb-6" size={28} />
+                  <Handshake className="text-brand-point-ink mb-4 md:mb-6" size={28} />
                   <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-3">브랜드 협업</h3>
                   <p className="text-sm md:text-base">어울림 회원들에게 새로운 가치를 전달할 수 있는 브랜드와의 프로모션을 환영합니다.</p>
                 </div>
@@ -44,11 +44,11 @@ export default function PartnershipPage() {
 
                 <div className="flex flex-col items-center gap-3 md:gap-6">
                   <a href="mailto:info@thewoollim.com" className="flex items-center gap-3 bg-white w-full md:w-auto px-5 md:px-8 py-3.5 md:py-4 rounded-2xl shadow-sm border border-gray-200 justify-center hover:border-brand-point transition-colors no-underline">
-                    <Mail className="text-brand-point flex-shrink-0" size={18} />
+                    <Mail className="text-brand-point-ink flex-shrink-0" size={18} />
                     <span className="font-bold text-gray-900 text-sm md:text-base">info@thewoollim.com</span>
                   </a>
                   <div className="flex items-center gap-3 bg-white w-full md:w-auto px-5 md:px-8 py-3.5 md:py-4 rounded-2xl shadow-sm border border-gray-200 justify-center">
-                    <MessageSquare className="text-brand-point flex-shrink-0" size={18} />
+                    <MessageSquare className="text-brand-point-ink flex-shrink-0" size={18} />
                     <span className="font-bold text-gray-900 text-sm md:text-base">카카오톡 @어울림톡</span>
                   </div>
                 </div>
