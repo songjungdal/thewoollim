@@ -4,7 +4,7 @@
 #
 # 필요한 환경변수 (워크플로가 넘겨줌)
 #   서버 접속 값 3개는 production 환경 Secret 이다. environment: production 을 지정하고
-#   승인을 거친 작업(plan·deploy·rollback-list·rollback)에서만 값이 채워진다.
+#   main 브랜치에서 실행된 작업(plan·deploy·rollback-list·rollback)에서만 값이 채워진다.
 #   DEPLOY_SSH_PRIVATE_KEY  배포 전용 SSH 개인키 (production 환경 Secret)
 #   DEPLOY_SSH_KNOWN_HOSTS  서버 호스트 키 한 줄 이상 (production 환경 Secret) — 가짜 서버 접속 방지
 #   DEPLOY_SSH_HOST         서버 주소 (production 환경 Secret)
