@@ -119,8 +119,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $gender    = (string)($target['gender']  ?? '');
         $genderKey = $gender === '남성' ? 'male' : 'female';
 
-        // party_counts +1 (atomic) + 정원(12/성별) 초과 검증 — 카드결제 success.php 와 동일 상한.
-        $STOCK_PER_SIDE = 12;
+        // party_counts +1 (atomic) + 파티별 정원 초과 검증 — 카드결제 success.php 와 동일 상한(partyStockLimit).
+        $partiesJson = json_decode((string)@file_get_contents("$dataDir/parties.json"), true);
+        $vbankParty  = [];
+        foreach ((array)$partiesJson as $p) {
+            if (isset($p['id']) && (string)$p['id'] === $partyId) { $vbankParty = $p; break; }
+        }
+        $stockLimit = partyStockLimit($vbankParty, $genderKey);
         $countsFile = "$dataDir/party_counts.json";
         $fp = fopen($countsFile, 'c+');
         if ($fp) {
@@ -131,7 +136,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!isset($counts[$partyId]) || !is_array($counts[$partyId])) {
                 $counts[$partyId] = ['male' => 0, 'female' => 0];
             }
-            if ((int)($counts[$partyId][$genderKey] ?? 0) + 1 > $STOCK_PER_SIDE) {
+            if ((int)($counts[$partyId][$genderKey] ?? 0) + 1 > $stockLimit) {
                 flock($fp, LOCK_UN); fclose($fp);
                 echo json_encode(['ok' => false, 'error' => '잔여 정원을 초과하여 입금 확인을 진행할 수 없습니다.']); exit;
             }
