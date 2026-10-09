@@ -9,7 +9,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useAuth, calcCouponDiscount } from "../context/AuthContext";
 import { useParties } from "../lib/useParties";
-import { priceForGender, VBANK_ACCOUNT_LINE } from "../lib/data";
+import { linePriceFor, partyHasOptions, partyOptionById, VBANK_ACCOUNT_LINE } from "../lib/data";
 
 // ── Toss Payments v2 SDK 타입 선언 ────────────────────────────────────────
 declare global {
@@ -46,7 +46,7 @@ function emailToCustomerKey(email: string): string {
 function CheckoutContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { mounted, isLoggedIn, userEmail, profile, appliedCoupon, bookings, refreshBookings } = useAuth();
+  const { mounted, isLoggedIn, userEmail, profile, appliedCoupon, bookings, refreshBookings, cart } = useAuth();
   const PARTIES = useParties();
 
   // Toss redirect 실패 시 ?error=... 로 돌아옴 — 사용자에게 안내
@@ -83,8 +83,17 @@ function CheckoutContent() {
       ? Math.max(0, originalPrice - calcCouponDiscount(effectiveCoupon, originalPrice))
       : originalPrice;
 
-  // 회원 성별 기반 단가 — priceMale/priceFemale 우선, 미설정 시 price 폴백
-  const unitPrice = (p: typeof PARTIES[number]) => priceForGender(p, profile?.gender);
+  // 솔로파티 참가 구성 — 장바구니에 담긴 항목 (파티당 한 줄). 결제 요청에 optionIds 로 보낸다
+  const optionIds: Record<string, string> = {};
+  parties.forEach(p => {
+    const oid = cart.find(c => c.partyId === p.id)?.optionId;
+    if (partyHasOptions(p) && oid && partyOptionById(p, oid)) optionIds[p.id] = oid;
+  });
+  // 참가 구성 파티인데 항목이 없거나 바뀐 경우 — 결제 불가 (상세에서 다시 고르도록 안내)
+  const missingOptionParties = parties.filter(p => partyHasOptions(p) && !optionIds[p.id]);
+
+  // 회원 성별 기반 단가 — priceMale/priceFemale 우선, 미설정 시 price 폴백. 참가 구성 파티는 고른 항목의 내 성별 가격
+  const unitPrice = (p: typeof PARTIES[number]) => linePriceFor(p, profile?.gender, optionIds[p.id]) ?? 0;
   const originalTotal = parties.reduce((s, p) => s + unitPrice(p) * (qtyByPartyId[p.id] ?? 1), 0);
   const totalAmount   = parties.reduce((s, p) => s + computeRowPrice(p.id, unitPrice(p) * (qtyByPartyId[p.id] ?? 1)), 0);
   const totalDiscount = originalTotal - totalAmount;
@@ -180,6 +189,7 @@ function CheckoutContent() {
     if (paying)           { console.warn("[checkout] paying=true 이미 진행 중 — 중단"); return; }
     if (!userEmail)       { console.warn("[checkout] userEmail 없음 — 중단"); alert("로그인이 필요합니다."); router.push("/login"); return; }
     if (!profile?.gender) { console.warn("[checkout] 프로필 성별 미설정 — 중단"); alert("프로필 카드에서 성별을 먼저 등록해주세요."); router.push("/profile-setup/"); return; }
+    if (missingOptionParties.length > 0) { alert(`참가 항목을 선택해주세요.\n파티 상세에서 항목을 다시 골라 장바구니에 담아주세요.\n\n· ${missingOptionParties.map(p => p.title).join(", ")}`); return; }
     if (totalAmount <= 0) { console.error("[checkout] totalAmount=0 — 결제 금액 비정상", { partyIds, totalAmount }); alert("결제 금액이 비정상입니다. 장바구니를 다시 확인해주세요."); return; }
 
     // 중복 신청 차단 — 결제완료/확정 상태의 booking 이 cart 의 partyId 와 겹치면 안 됨
@@ -208,6 +218,7 @@ function CheckoutContent() {
           credentials: "include",
           body: JSON.stringify({
             partyIds,
+            optionIds,
             couponCode:    effectiveCoupon?.code ?? "",
             couponPartyId: effectiveCoupon?.partyId ?? "",
           }),
@@ -246,6 +257,7 @@ function CheckoutContent() {
         body: JSON.stringify({
           email:         userEmail,
           partyIds,
+          optionIds,
           couponCode:    effectiveCoupon?.code ?? "",
           couponPartyId: effectiveCoupon?.partyId ?? "",
           total:         totalAmount,
@@ -349,7 +361,15 @@ function CheckoutContent() {
                 return (
                   <div key={party.id} className="bg-gray-50/70 rounded-xl md:rounded-2xl p-4 md:p-5 border border-gray-100">
                     <div className="flex items-start justify-between gap-3 mb-3 md:mb-4">
-                      <h3 className="font-black text-base md:text-lg leading-snug min-w-0">{party.title}</h3>
+                      <h3 className="font-black text-base md:text-lg leading-snug min-w-0">
+                        {party.title}
+                        {/* 솔로파티 참가 구성 — 고른 항목 이름 */}
+                        {optionIds[party.id] && (
+                          <span className="ml-1.5 align-middle inline-flex text-xs font-black text-brand-point-ink bg-brand-point/10 px-2 py-0.5 rounded-full whitespace-nowrap" data-testid="option-name">
+                            {partyOptionById(party, optionIds[party.id])?.name}
+                          </span>
+                        )}
+                      </h3>
                       {qty > 1 && (
                         <span className="flex-shrink-0 inline-flex items-center text-xs font-black text-brand-point-ink bg-brand-point/10 px-2 py-1 rounded-full whitespace-nowrap">
                           × {qty}
@@ -519,8 +539,10 @@ function CheckoutContent() {
           {(() => {
             const amountValid   = totalAmount > 0;
             const partyIdsValid = partyIds.length > 0;
-            const canPay        = amountValid && partyIdsValid && !paying;
+            const optionsValid  = missingOptionParties.length === 0;   // 참가 구성 파티는 항목이 있어야 결제
+            const canPay        = amountValid && partyIdsValid && optionsValid && !paying;
             const reason        =
+              !optionsValid  ? `참가 항목을 선택해주세요 (${missingOptionParties.map(p => p.title).join(", ")}). 파티 상세에서 항목을 골라 다시 담아주세요.` :
               !amountValid   ? "결제 금액이 비정상입니다." :
               !partyIdsValid ? "주문 항목이 비어있습니다." :
               "";

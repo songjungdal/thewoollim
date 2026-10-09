@@ -9,7 +9,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useAuth, calcCouponDiscount, type BookingStatus } from "../context/AuthContext";
 import { useParties } from "../lib/useParties";
-import { partyStockStatus, priceForGender, VBANK_ACCOUNT_LINE, PARTIES as SEED_PARTIES } from "../lib/data";
+import { partyStockStatus, linePriceFor, partyHasOptions, partyOptionById, dateOnly, VBANK_ACCOUNT_LINE, PARTIES as SEED_PARTIES } from "../lib/data";
 
 // 관리자 페이지의 신청자 상태 배지 규격과 동일한 색상 조합 사용 (admin8888/dashboard STATUS_LABEL)
 const STATUS_DISPLAY: Record<BookingStatus, { label: string; tone: string; stripe: string; icon: typeof Clock; sub?: string }> = {
@@ -267,8 +267,10 @@ export default function MyPage() {
   };
 
   const selectedParties = cartParties.filter(p => selectedIds.has(p.id));
-  // 회원 성별 기반 단가 — priceMale/priceFemale 우선, 미설정 시 price 폴백 (priceForGender)
-  const unitPrice = (p: typeof PARTIES[number]) => priceForGender(p, profile?.gender);
+  // 회원 성별 기반 단가 — priceMale/priceFemale 우선, 미설정 시 price 폴백 (priceForGender).
+  // 참가 구성 파티는 장바구니에 담긴 항목의 내 성별 가격 (항목이 없거나 바뀌었으면 0 — 결제 화면에서 막힘)
+  const cartOptionOf = (partyId: string) => cart.find(c => c.partyId === partyId)?.optionId;
+  const unitPrice = (p: typeof PARTIES[number]) => linePriceFor(p, profile?.gender, cartOptionOf(p.id)) ?? 0;
   const cartTotalQty          = cartParties.reduce((sum, p) => sum + qtyOf(p.id), 0);
   const selectedOriginalTotal = selectedParties.reduce((sum, p) => sum + unitPrice(p) * qtyOf(p.id), 0);
   const selectedTotal         = selectedParties.reduce((sum, p) => sum + computeRowPrice(p.id, unitPrice(p) * qtyOf(p.id)), 0);
@@ -388,6 +390,12 @@ export default function MyPage() {
                               {party.title}
                             </Link>
                           ) : `파티 #${b.partyId}`}
+                          {/* 솔로파티 참가 구성 — 결제 당시 항목 이름 */}
+                          {b.optionName && (
+                            <span className="ml-2 align-middle inline-flex text-xs md:text-sm font-black text-brand-point-ink bg-brand-point/10 px-2.5 py-1 rounded-full whitespace-nowrap" data-testid="booking-option">
+                              {b.optionName}
+                            </span>
+                          )}
                         </h3>
 
                         {/* Meta info */}
@@ -395,7 +403,10 @@ export default function MyPage() {
                           <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:gap-x-5 sm:gap-y-1.5 text-sm md:text-base text-gray-700 font-bold">
                             <span className="flex items-center gap-2">
                               <Calendar size={15} className="text-brand-point-ink flex-shrink-0" />
-                              {party.dateString}
+                              {/* 참가 구성 예약 — 날짜 + 내 회차 시각 (파티의 현재 회차 시각, api/bookings.php sessionTimes) */}
+                              {b.sessionTimes && b.sessionTimes.length > 0
+                                ? `${dateOnly(party.dateString)} ${b.sessionTimes.join(" · ")}`
+                                : party.dateString}
                             </span>
                             <span className="flex items-center gap-2">
                               <MapPin size={15} className="text-brand-point-ink flex-shrink-0" />
@@ -514,6 +525,14 @@ export default function MyPage() {
                       <Link href={`/party/${party.id}`} className="block group">
                         <h3 className="font-black text-lg md:text-2xl mb-3 md:mb-4 leading-snug group-hover:text-brand-point-ink transition-colors break-keep">
                           {party.title}
+                          {/* 솔로파티 참가 구성 — 담은 항목 이름 / 항목이 없거나 바뀌었으면 다시 고르도록 안내 */}
+                          {partyHasOptions(party) && (partyOptionById(party, cartOptionOf(party.id)) ? (
+                            <span className="ml-2 align-middle inline-flex text-xs md:text-sm font-black text-brand-point-ink bg-brand-point/10 px-2.5 py-1 rounded-full whitespace-nowrap" data-testid="cart-option">
+                              {partyOptionById(party, cartOptionOf(party.id))?.name}
+                            </span>
+                          ) : (
+                            <span className="block mt-1.5 text-xs md:text-sm font-bold text-danger">참가 항목을 다시 선택해주세요 (상세에서 항목을 골라 담기)</span>
+                          ))}
                         </h3>
                         <div className="flex flex-col gap-2 md:gap-2.5 text-sm md:text-base text-gray-600 font-medium">
                           <span className="flex items-center gap-2"><Calendar size={15} className="text-brand-point-ink flex-shrink-0" /> {party.dateString}</span>
