@@ -460,7 +460,7 @@ export default function MyPage() {
                   href="/#apply"
                   className="inline-block bg-brand-black text-white px-8 py-3.5 rounded-xl font-bold hover:bg-brand-point hover:text-black transition-colors text-sm md:text-base"
                 >
-                  매칭파티 보러가기
+                  파티 보러가기
                 </Link>
               </div>
             ) : (
@@ -705,8 +705,8 @@ export default function MyPage() {
                 });
                 if (blocking) {
                   alert(
-                    "잠시만요! 아직 진행 중인 매칭 파티가 남아있어요.\n" +
-                    "현재 진행 대기 중인 매칭 파티가 있습니다.\n" +
+                    "잠시만요! 아직 진행 중인 파티가 남아있어요.\n" +
+                    "현재 진행 대기 중인 파티가 있습니다.\n" +
                     "탈퇴 버튼 바로 옆에 있는 [취소요청] 버튼을 눌러 먼저 정리를 마쳐주세요.\n" +
                     "모든 신청 내역이 취소된 후에 회원 탈퇴가 가능합니다."
                   );

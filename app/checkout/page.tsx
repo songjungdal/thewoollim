@@ -577,7 +577,7 @@ function CheckoutContent() {
                 <h3 className="font-black text-lg md:text-xl text-brand-black">참가 신청이 접수되었습니다</h3>
               </div>
               <p className="text-sm md:text-base text-gray-700 font-medium leading-relaxed break-keep mb-4">
-                매칭파티 참가 신청이 정상적으로 접수되었습니다. 아래 안내해 드리는 계좌로 입금해 주시면 확인 후 최종 확정해 드립니다.
+                파티 참가 신청이 정상적으로 접수되었습니다. 아래 안내해 드리는 계좌로 입금해 주시면 확인 후 최종 확정해 드립니다.
               </p>
               <div className="rounded-2xl border-2 border-[#F6B26B] bg-[#F6B26B]/10 p-4 md:p-5 space-y-1.5 mb-4">
                 <div className="flex justify-between gap-3 text-sm md:text-base font-bold text-brand-black">

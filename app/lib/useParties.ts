@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PARTIES as DEFAULT_PARTIES, TARGET_GROUPS, THEMES, LOCATION_TAGS, type Party, type TargetGroup, type Theme, type LocationTag } from "./data";
+import { PARTIES as DEFAULT_PARTIES, TARGET_GROUPS, THEMES, LOCATION_TAGS, partyTypeOf, type Party, type TargetGroup, type Theme, type LocationTag } from "./data";
 
 const CHANNEL_NAME = "woollim_parties";
 const STORAGE_KEY  = "woollim_parties_updated_at";
@@ -68,6 +68,8 @@ export function useParties(): Party[] {
               targetGroup: TARGET_GROUPS.includes(p.targetGroup as TargetGroup) ? (p.targetGroup as TargetGroup) : undefined,
               theme:       THEMES.includes(p.theme as Theme)                   ? (p.theme       as Theme)       : undefined,
               locationTag: LOCATION_TAGS.includes(p.locationTag as LocationTag) ? (p.locationTag as LocationTag) : undefined,
+              // 파티 종류 (없거나 잘못된 값은 matching)
+              partyType:   partyTypeOf({ partyType: typeof p.partyType === "string" ? p.partyType : undefined }),
             };
           });
           setParties(normalized);
