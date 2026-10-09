@@ -3,7 +3,7 @@
  * 회원 본인 예약 목록 조회 (마이페이지).
  *
  * GET ?email=<x> → Booking[]
- *   { id, partyId, status, paymentId?, total?, createdAt, updatedAt }
+ *   { id, partyId, status, paymentId?, total?, createdAt, updatedAt, optionId?, optionName?, sessionIds?, sessionTimes? }
  *
  * 본인 데이터만 — email 파라미터가 세션 이메일과 일치해야 함.
  *
@@ -29,6 +29,12 @@ if (!file_exists($file)) jsonOut([]);
 $d = json_decode((string)file_get_contents($file), true);
 if (!is_array($d)) jsonOut([]);
 
+// 파티 정보 — 참가 구성 예약의 회차 시각은 파티의 현재 회차 기준 (못 찾으면 예약 사본)
+$partyMap = [];
+foreach ((array)json_decode((string)@file_get_contents(dataDir() . '/parties.json'), true) as $p) {
+    if (is_array($p) && isset($p['id'])) $partyMap[(string)$p['id']] = $p;
+}
+
 // 최신순 정렬
 usort($d, fn($a, $b) => strcmp((string)($b['createdAt'] ?? ''), (string)($a['createdAt'] ?? '')));
 
@@ -45,5 +51,14 @@ foreach ($d as $b) {
         'createdAt' => (string)($b['createdAt']  ?? ''),
         'updatedAt' => (string)($b['updatedAt']  ?? ''),
     ];
+    // 참가 구성 예약 — 결제 시점 사본 (항목 이름·포함 회차·회차 시작 시각)
+    if (!empty($b['optionId'])) {
+        $row = &$out[count($out) - 1];
+        $row['optionId']     = (string)$b['optionId'];
+        $row['optionName']   = (string)($b['optionName'] ?? '');
+        $row['sessionIds']   = array_values(array_map('strval', (array)($b['sessionIds'] ?? [])));
+        $row['sessionTimes'] = bookingSessionTimes($b, $partyMap[(string)($b['partyId'] ?? '')] ?? null);
+        unset($row);
+    }
 }
 echo json_encode($out, JSON_UNESCAPED_UNICODE);

@@ -15,8 +15,10 @@
  *   minAge?, maxAge?, allowedMaritalStatus?,
  *   imageUrl?, description?, targetGroup?, theme?, locationTag?, host_name?,
  *   partyType ('matching'|'solo', create 시 필수), detail? (상세페이지 안내 — lib.php sanitizePartyDetail)
+ *   sessions?·options? (솔로파티 참가 구성 — lib.php sanitizePartyOptions, docs/specs/party-options-solo.md)
  *
- * update: 요청에 없는 host_name·partyType·detail·voting_status·status 는 기존 값을 그대로 둔다.
+ * update: 요청에 없는 host_name·partyType·detail·voting_status·status·sessions·options 는 기존 값을 그대로 둔다.
+ * GET: 참가 구성이 있는 파티에는 applicants(취소되지 않은 예약 기준 항목별·회차별 신청자 수)를 덧붙인다.
  *
  * 보안:
  *   - host_name 은 본 엔드포인트(GET / update_host) 에서만 노출/수정
@@ -37,10 +39,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     if (file_exists($file)) {
         $d = json_decode((string)file_get_contents($file), true);
         if (is_array($d)) {
+            $withOptions = array_values(array_map(fn($p) => (string)$p['id'], array_filter($d, fn($p) => is_array($p) && partyHasOptions($p))));
+            $stats = $withOptions ? partyApplicantStats($withOptions) : [];
             foreach ($d as $p) {
                 if (!is_array($p)) continue;
                 // host_name 항상 노출 (없으면 빈 문자열)
                 $p['host_name'] = (string)($p['host_name'] ?? '');
+                if (partyHasOptions($p)) {
+                    $st = $stats[(string)$p['id']] ?? ['options' => [], 'sessions' => []];
+                    $p['applicants'] = ['options' => (object)$st['options'], 'sessions' => (object)$st['sessions']];
+                }
                 $items[] = $p;
             }
         }
@@ -106,7 +114,7 @@ try {
                 }
                 $newId = ((int)max(0, ...array_map(fn($x) => (int)($x['id'] ?? 0), $parties))) + 1;
                 $p['id'] = (string)$newId;
-                $row = sanitizeParty($p);
+                $row = sanitizePartyOptions($p, null, sanitizeParty($p));
                 $parties[] = $row;
                 $logInfo = ['id' => $row['id'], 'row' => $row, 'detailChanged' => isset($row['detail'])];
                 return $parties;
@@ -125,7 +133,8 @@ try {
                             }
                         }
                         $before = $row;
-                        $row = sanitizeParty($p);
+                        // 참가 구성(sessions·options)은 요청에 없으면 sanitizePartyOptions 가 기존 값을 유지한다
+                        $row = sanitizePartyOptions($p, $before, sanitizeParty($p));
                         $logInfo = [
                             'id'            => $row['id'],
                             'row'           => $row,

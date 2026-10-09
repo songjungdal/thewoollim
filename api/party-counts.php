@@ -2,7 +2,8 @@
 /**
  * 파티별 실시간 결제완료 인원 조회 (공개).
  *
- * GET → { "<partyId>": { "male": N, "female": N }, ... }
+ * GET → { "<partyId>": { "male": N, "female": N, "sessions"?: { "<회차id>": { "male": N, "female": N } } }, ... }
+ *   sessions: 참가 구성이 있는 솔로파티의 회차별 인원 (1부+2부 신청자는 두 회차에 각각 1명)
  *
  * 데이터 소스: /api/data/party_counts.json
  *  - 결제완료(payments/success.php) 시점에만 atomic 증가
@@ -39,5 +40,12 @@ foreach ($d as $pid => $row) {
         'male'   => (int)($row['male']   ?? 0),
         'female' => (int)($row['female'] ?? 0),
     ];
+    if (!empty($row['sessions']) && is_array($row['sessions'])) {
+        $ss = [];
+        foreach ($row['sessions'] as $sid => $c) {
+            if (is_array($c)) $ss[(string)$sid] = ['male' => (int)($c['male'] ?? 0), 'female' => (int)($c['female'] ?? 0)];
+        }
+        $out[(string)$pid]['sessions'] = (object)$ss;
+    }
 }
 echo json_encode($out, JSON_UNESCAPED_UNICODE);

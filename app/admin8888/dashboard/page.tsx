@@ -11,6 +11,11 @@ import { formatKST } from "../../lib/datetime";
 import { partyVisibility, partyTypeOf, PARTY_TYPES, PARTY_TYPE_LABELS, type Party, type PartyType } from "../../lib/data";
 import { templateFor, normalizeDetail, type PartyDetail } from "../../lib/partyDetailTemplates";
 import PartyDetailEditor, { validateDetail, type DetailSourceParty } from "./PartyDetailEditor";
+import PartyOptionsEditor from "./PartyOptionsEditor";
+import {
+  EMPTY_OPTIONS_DRAFT, draftFromParty, draftToPayload, validateOptionsDraft, optionsMinPrice, normalizeSessions, normalizeOptions,
+  type OptionsDraft, type OptionApplicants, type PartySession, type PartyOption,
+} from "../../lib/partyOptions";
 
 type AdminUser = {
   id: number; email: string; name: string; gender: string; phone: string;
@@ -27,6 +32,8 @@ type BookingRow = {
   userMbti?: string; userJob?: string; userBirthDate?: string;
   userStatus?: string;       // 'active' | 'withdrawn' — 회원 탈퇴 여부
   userInterests?: string; userIdealType?: string;
+  optionName?: string;       // 솔로파티 참가 구성 예약 — 결제 당시 항목 이름
+  sessionIds?: string[];     // 포함 회차 (예약 사본)
 };
 type TabKey = "members" | "bookings" | "parties" | "coupons" | "company" | "gallery" | "reviews" | "logs" | "cancel_requests" | "memos";
 
@@ -96,6 +103,9 @@ type PartyForm = {
   targetGroup: "" | "싱글" | "돌싱";
   theme: "" | "티타임" | "와인파티" | "사케파티" | "쿠킹클래스";
   locationTag: "" | "서울" | "성남" | "수원" | "인천" | "용인" | "기타";
+  // 솔로파티 참가 구성 (명세 docs/specs/party-options-solo.md 7-1) — "options" 면 남/여 참가비·정원 대신 회차·항목을 쓴다
+  optionMode: "single" | "options";
+  optionsDraft: OptionsDraft;
 };
 const EMPTY_PARTY: PartyForm = {
   partyType: "",
@@ -104,9 +114,11 @@ const EMPTY_PARTY: PartyForm = {
   maleStock: 12, femaleStock: 12, imageUrl: "",
   minAge: "", maxAge: "", allowedMaritalStatus: "all",
   targetGroup: "", theme: "", locationTag: "",
+  optionMode: "single", optionsDraft: EMPTY_OPTIONS_DRAFT,
 };
 
-function BookingTable({ label, toneClass, rows, party, remarks, onApprove, onCancel, onConfirmVBank, onFullRefund }: {
+function BookingTable({ label, toneClass, rows, party, remarks, onApprove, onCancel, onConfirmVBank, onFullRefund, showOption = false }: {
+  showOption?: boolean;   // 참가 구성이 있는 솔로파티 — 신청자 줄마다 항목 이름 열
   label: string;
   toneClass: string;
   rows: BookingRow[];
@@ -128,14 +140,14 @@ function BookingTable({ label, toneClass, rows, party, remarks, onApprove, onCan
         <table className="w-full text-xs md:text-sm whitespace-nowrap">
           <thead className="bg-gray-50 text-gray-500 font-bold">
             <tr>
-              {["취소", "이름", "연락처", "생년월일", "직업", "결제금액", "상태", "관리", "결제일", "이메일", "비고"].map(h => (
+              {["취소", "이름", ...(showOption ? ["항목"] : []), "연락처", "생년월일", "직업", "결제금액", "상태", "관리", "결제일", "이메일", "비고"].map(h => (
                 <th key={h} className="text-left px-3 py-2.5 first:pl-5 md:first:pl-7">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
-              <tr><td colSpan={11} className="text-center text-gray-500 py-6 text-xs">신청자 없음</td></tr>
+              <tr><td colSpan={showOption ? 12 : 11} className="text-center text-gray-500 py-6 text-xs">신청자 없음</td></tr>
             )}
             {rows.map(b => {
               const isCancelled = b.status === "cancelled";
@@ -190,6 +202,7 @@ function BookingTable({ label, toneClass, rows, party, remarks, onApprove, onCan
                     )}
                   </td>
                   <td className={`px-3 py-2.5 font-bold ${isCancelled ? "line-through" : ""}`}>{b.userName}</td>
+                  {showOption && <td className={`px-3 py-2.5 font-bold ${isCancelled ? "line-through" : ""}`}>{b.optionName || "-"}</td>}
                   <td className="px-3 py-2.5 tabular-nums">{formatPhoneKR(b.userPhone)}</td>
                   <td className="px-3 py-2.5 text-gray-600 tabular-nums" title="프로필 카드 기반 (수정 불가)">{birth}</td>
                   <td className="px-3 py-2.5">{b.userJob || "-"}</td>
@@ -251,9 +264,9 @@ function PartyTypeBadge({ type }: { type: PartyType }) {
   );
 }
 
-function FormField({ label, value, onChange, placeholder, textarea }: {
+function FormField({ label, value, onChange, placeholder, textarea, hint }: {
   label: string; value: string; onChange: (v: string) => void;
-  placeholder?: string; textarea?: boolean;
+  placeholder?: string; textarea?: boolean; hint?: string;
 }) {
   return (
     <div>
@@ -265,6 +278,7 @@ function FormField({ label, value, onChange, placeholder, textarea }: {
         <input type="text" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
           className="w-full px-4 py-3 rounded-lg border border-gray-200 text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none" />
       )}
+      {hint && <p className="mt-1.5 text-xs font-bold text-gray-600">{hint}</p>}
     </div>
   );
 }
@@ -281,16 +295,42 @@ const STATUS_LABEL: Record<string, { label: string; tone: string }> = {
   cancelled: { label: "취소됨", tone: "bg-gray-200 text-gray-600" },
 };
 
-/** 관리자 GET 응답 → 파티별 종류·상세페이지 안내 */
-function buildAdminPartyRows(items: unknown[]): Record<string, { partyType: PartyType; detail: PartyDetail | null }> {
-  const out: Record<string, { partyType: PartyType; detail: PartyDetail | null }> = {};
+/** 관리자 GET 응답의 파티별 값 — 종류·상세페이지 안내·참가 구성(회차·항목·신청자 수) */
+type AdminPartyRow = {
+  partyType: PartyType;
+  detail: PartyDetail | null;
+  sessions: PartySession[];
+  options: PartyOption[];
+  applicants: OptionApplicants | null;
+};
+
+/** 관리자 GET 응답 → 파티별 AdminPartyRow */
+function buildAdminPartyRows(items: unknown[]): Record<string, AdminPartyRow> {
+  const out: Record<string, AdminPartyRow> = {};
   for (const it of items) {
     if (!it || typeof it !== "object") continue;
-    const r = it as { id?: unknown; partyType?: string; detail?: unknown };
+    const r = it as { id?: unknown; partyType?: string; detail?: unknown; sessions?: unknown; options?: unknown; applicants?: unknown };
     if (r.id == null) continue;
-    out[String(r.id)] = { partyType: partyTypeOf(r), detail: normalizeDetail(r.detail) };
+    const type = partyTypeOf(r);
+    const options = type === "solo" ? normalizeOptions(r.options) : [];
+    const sessions = options.length ? normalizeSessions(r.sessions) : [];
+    const ap = (r.applicants && typeof r.applicants === "object") ? r.applicants as { options?: Record<string, number>; sessions?: Record<string, { male: number; female: number }> } : null;
+    out[String(r.id)] = {
+      partyType: type, detail: normalizeDetail(r.detail), sessions, options,
+      applicants: ap ? { options: ap.options ?? {}, sessions: ap.sessions ?? {} } : null,
+    };
   }
   return out;
+}
+
+/** 회차별 인원/정원 한 줄 — "1부 남 9/20 · 여 8/20 | 2부 남 7/15 · 여 6/15" (취소되지 않은 신청 기준, 위 남/여 숫자와 같은 규칙) */
+function sessionCountsLine(sessions: PartySession[], rows: BookingRow[]): string {
+  return sessions.map(s => {
+    const active = rows.filter(r => r.status !== "cancelled" && (r.sessionIds ?? []).includes(s.id));
+    const m = active.filter(r => r.userGender === "남성").length;
+    const f = active.filter(r => r.userGender === "여성").length;
+    return `${s.name} 남 ${m}/${s.maleStock} · 여 ${f}/${s.femaleStock}`;
+  }).join(" | ");
 }
 
 export default function AdminDashboard() {
@@ -476,7 +516,7 @@ export default function AdminDashboard() {
   const [partyEditMode, setPartyEditMode] = useState<"create" | "edit" | null>(null);
   const [uploading, setUploading] = useState(false);
   // 상세페이지 안내 편집 — 관리자 전용 GET(/api/admin/parties.php)의 저장값(detail)을 쓴다. 공개 목록 API 에는 detail 이 없다.
-  const [adminPartyRows, setAdminPartyRows] = useState<Record<string, { partyType: PartyType; detail: PartyDetail | null }>>({});
+  const [adminPartyRows, setAdminPartyRows] = useState<Record<string, AdminPartyRow>>({});
   const [partyDetail, setPartyDetail] = useState<PartyDetail | null>(null);
   const [detailUsingDefault, setDetailUsingDefault] = useState(false);   // 수정 모드 — 저장된 detail 없는 파티
   const [detailTouched, setDetailTouched] = useState(false);             // 템플릿을 채운 뒤 내용을 고쳤는지
@@ -500,11 +540,16 @@ export default function AdminDashboard() {
   const selectPartyType = (t: PartyType) => {
     const prevType = partyForm.partyType;
     if (prevType === t) return;
+    if (t === "matching" && partyHasOptionApplicants()) {
+      alert("신청자가 있는 참가 구성은 지울 수 없어 매칭파티로 바꿀 수 없습니다.");
+      return;
+    }
     if (partyEditMode === "edit" && partyForm.id && prevType) {
       const n = activeApplicantCount(partyForm.id);
       if (n > 0 && !confirm(`신청자 ${n}명이 있는 파티의 종류를 변경합니다. 안내 문자와 투표 관리 방식이 바뀝니다. 계속하시겠습니까?`)) return;
     }
-    setPartyForm(p => ({ ...p, partyType: t }));
+    // 매칭파티는 단일 가격만. 신규 솔로파티는 참가 구성 사용을 기본으로 (기존 파티는 저장된 방식 유지)
+    setPartyForm(p => ({ ...p, partyType: t, ...(t === "matching" ? { optionMode: "single" as const } : partyEditMode === "create" ? { optionMode: "options" as const } : {}) }));
     setPartyFormDirty(true);
     if (!partyDetail) {
       // 신규 등록에서 종류를 처음 고르면 그 종류의 기본 내용으로 채운다
@@ -515,6 +560,21 @@ export default function AdminDashboard() {
     } else {
       setPartyDetail(templateFor(t)); setDetailTouched(false);
     }
+  };
+
+  // 수정 중인 파티의 저장된 참가 구성에 신청자가 있는지 (있으면 구성 삭제·단일 가격·매칭파티 전환 불가)
+  const partyHasOptionApplicants = () => {
+    const ap = partyForm.id ? adminPartyRows[partyForm.id]?.applicants : null;
+    return !!ap && Object.values(ap.options).some(n => n > 0);
+  };
+  const selectOptionMode = (m: "single" | "options") => {
+    if (partyForm.optionMode === m) return;
+    if (m === "single" && partyHasOptionApplicants()) {
+      alert("신청자가 있는 참가 구성은 지울 수 없습니다.");
+      return;
+    }
+    setPartyForm(p => ({ ...p, optionMode: m }));
+    setPartyFormDirty(true);
   };
 
   const openPartyCreate = () => { setPartyForm(EMPTY_PARTY); resetPartyModal(); setPartyEditMode("create"); setPartyFormDirty(false); };
@@ -552,6 +612,8 @@ export default function AdminDashboard() {
       theme: (th === "티타임" || th === "와인파티" || th === "사케파티" || th === "쿠킹클래스") ? th : "",
       locationTag: (lt === "서울" || lt === "성남" || lt === "수원" || lt === "인천" || lt === "용인" || lt === "기타") ? lt : "",
       partyType: type,
+      optionMode: row?.options?.length ? "options" : "single",
+      optionsDraft: row?.options?.length ? draftFromParty(row.sessions, row.options) : EMPTY_OPTIONS_DRAFT,
     });
     resetPartyModal();
     setPartyDetail(row?.detail ?? templateFor(type));
@@ -598,10 +660,17 @@ export default function AdminDashboard() {
     if (!String(f.dateString).trim() || !String(f.calendarDate).trim()) missing.push("행사 일시");
     if (!String(f.location).trim())                       missing.push("장소");
     if (!String(f.target).trim())                         missing.push("대상");
-    if (!Number.isFinite(f.priceMale)   || f.priceMale   <= 0) missing.push("남성 참가비");
-    if (!Number.isFinite(f.priceFemale) || f.priceFemale <= 0) missing.push("여성 참가비");
-    if (!Number.isFinite(f.maleStock)   || f.maleStock   <= 0) missing.push("모집 인원(남성)");
-    if (!Number.isFinite(f.femaleStock) || f.femaleStock <= 0) missing.push("모집 인원(여성)");
+    const useOptions = f.partyType === "solo" && f.optionMode === "options";
+    if (useOptions) {
+      // [참가 구성 사용] — 남/여 참가비·모집 인원 대신 회차·항목을 검사 (명세 7-1)
+      const ap = f.id ? adminPartyRows[f.id]?.applicants : null;
+      for (const e of validateOptionsDraft(f.optionsDraft, ap)) missing.push(`참가 구성: ${e}`);
+    } else {
+      if (!Number.isFinite(f.priceMale)   || f.priceMale   <= 0) missing.push("남성 참가비");
+      if (!Number.isFinite(f.priceFemale) || f.priceFemale <= 0) missing.push("여성 참가비");
+      if (!Number.isFinite(f.maleStock)   || f.maleStock   <= 0) missing.push("모집 인원(남성)");
+      if (!Number.isFinite(f.femaleStock) || f.femaleStock <= 0) missing.push("모집 인원(여성)");
+    }
 
     if (missing.length > 0) {
       setPartyModalTab("basic");
@@ -620,7 +689,7 @@ export default function AdminDashboard() {
       const res = await fetch("/api/admin/parties.php", {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, party: { ...f, detail } }),
+        body: JSON.stringify({ action, party: partySavePayload(f, detail, useOptions) }),
       });
       const d = await res.json();
       if (!d?.ok) {
@@ -645,6 +714,16 @@ export default function AdminDashboard() {
     } catch {
       alert("수정 중 오류가 발생했습니다.");
     }
+  };
+
+  /** 저장 요청 — 참가 구성 사용이면 sessions·options 를 보내고, 구성을 끄면(단일 가격) 빈 목록으로 지운다 */
+  const partySavePayload = (f: PartyForm, detail: PartyDetail, useOptions: boolean) => {
+    const { optionMode: _mode, optionsDraft, ...rest } = f;
+    void _mode;
+    const hadOptions = !!(f.id && adminPartyRows[f.id]?.options?.length);
+    if (useOptions) return { ...rest, detail, ...draftToPayload(optionsDraft) };
+    if (f.partyType === "solo" && hadOptions) return { ...rest, detail, sessions: [], options: [] };
+    return { ...rest, detail };
   };
 
   const deleteParty = async (id: string) => {
@@ -1662,6 +1741,10 @@ export default function AdminDashboard() {
                               />
                             </span>
                           </div>
+                          {/* 참가 구성 파티 — 회차별 남/여 인원/정원 (명세 7-2) */}
+                          {(adminPartyRows[pid]?.sessions?.length ?? 0) > 0 && (
+                            <p className="mt-1.5 text-xs md:text-sm font-bold text-gray-700 break-keep" data-testid="session-counts">{sessionCountsLine(adminPartyRows[pid].sessions, partyRows)}</p>
+                          )}
                         </div>
 
                         {/* 신청자 명단 인라인 확장 패널 — 카드 하단으로 슬라이드 다운 (duration-300, height + opacity) */}
@@ -1695,8 +1778,8 @@ export default function AdminDashboard() {
                                 </button>
                               </div>
                               {/* 본문 — 기존 BookingTable 그대로 (취소/참가확정 핸들러 무변경) */}
-                              <BookingTable label="남성 신청자" toneClass="bg-info/10 text-info" rows={males} party={party} remarks={remarksByBookingId}onApprove={approveBooking} onCancel={cancelBooking} onConfirmVBank={confirmVBankBooking} onFullRefund={cancelBookingFullRefund} />
-                              <BookingTable label="여성 신청자" toneClass="bg-rose-100 text-rose-700" rows={females} party={party} remarks={remarksByBookingId}onApprove={approveBooking} onCancel={cancelBooking} onConfirmVBank={confirmVBankBooking} onFullRefund={cancelBookingFullRefund} />
+                              <BookingTable label="남성 신청자" toneClass="bg-info/10 text-info" rows={males} party={party} remarks={remarksByBookingId}onApprove={approveBooking} onCancel={cancelBooking} onConfirmVBank={confirmVBankBooking} onFullRefund={cancelBookingFullRefund} showOption={(adminPartyRows[pid]?.options?.length ?? 0) > 0} />
+                              <BookingTable label="여성 신청자" toneClass="bg-rose-100 text-rose-700" rows={females} party={party} remarks={remarksByBookingId}onApprove={approveBooking} onCancel={cancelBooking} onConfirmVBank={confirmVBankBooking} onFullRefund={cancelBookingFullRefund} showOption={(adminPartyRows[pid]?.options?.length ?? 0) > 0} />
                             </motion.div>
                           )}
                         </AnimatePresence>
@@ -1797,8 +1880,20 @@ export default function AdminDashboard() {
                         <td className="px-3 py-2.5 text-gray-600">{p.dateString}</td>
                         <td className="px-3 py-2.5 text-gray-600">{p.location}</td>
                         <td className="px-3 py-2.5 text-gray-600">{p.target}</td>
-                        <td className="px-3 py-2.5 font-black text-brand-point-ink">₩{p.price.toLocaleString()}</td>
-                        <td className="px-3 py-2.5 text-gray-600">{p.maleStock}명 / {p.femaleStock}명</td>
+                        {(() => {
+                          // 참가 구성이 있으면 "항목 3개 · ₩30,000~" / 회차별 정원 "1부 20/20명 · 2부 15/15명" (명세 7-2)
+                          const ar = adminPartyRows[p.id];
+                          if (ar?.options?.length) {
+                            return (<>
+                              <td className="px-3 py-2.5 font-black text-brand-point-ink">항목 {ar.options.length}개 · ₩{optionsMinPrice(ar.options).toLocaleString()}~</td>
+                              <td className="px-3 py-2.5 text-gray-600">{ar.sessions.map(s => `${s.name} ${s.maleStock}/${s.femaleStock}명`).join(" · ")}</td>
+                            </>);
+                          }
+                          return (<>
+                            <td className="px-3 py-2.5 font-black text-brand-point-ink">₩{p.price.toLocaleString()}</td>
+                            <td className="px-3 py-2.5 text-gray-600">{p.maleStock}명 / {p.femaleStock}명</td>
+                          </>);
+                        })()}
                         <td className="px-3 py-2.5">
                           <div className="flex gap-1.5">
                             <a href={`/party/${p.id}/`} target="_blank" rel="noopener noreferrer" className="bg-white border border-gray-200 text-brand-black px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-gray-50 transition-all">
@@ -1919,7 +2014,12 @@ export default function AdminDashboard() {
                       <FormField label="내용 (소개)" value={partyForm.description} onChange={v => setPartyForm(p => ({ ...p, description: v }))} textarea />
                       {/* 일시 */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <FormField label="일시 (표시용 텍스트) *" value={partyForm.dateString} onChange={v => setPartyForm(p => ({ ...p, dateString: v }))} placeholder="2026. 8. 1 (토) 19:00" />
+                        {partyForm.partyType === "solo" && partyForm.optionMode === "options" ? (
+                          <FormField label="일시 (표시용 텍스트) *" value={partyForm.dateString} onChange={v => setPartyForm(p => ({ ...p, dateString: v }))}
+                            placeholder="2026. 8. 1 (토) 19:00 — 시각은 24시간 형식" hint="시각은 첫 회차 시각으로 자동 저장됩니다" />
+                        ) : (
+                          <FormField label="일시 (표시용 텍스트) *" value={partyForm.dateString} onChange={v => setPartyForm(p => ({ ...p, dateString: v }))} placeholder="2026. 8. 1 (토) 19:00" />
+                        )}
                         <div>
                           <label className="block text-sm font-bold text-gray-700 mb-1.5">달력 날짜 *</label>
                           <input type="date" value={partyForm.calendarDate} onChange={e => setPartyForm(p => ({ ...p, calendarDate: e.target.value }))}
@@ -1929,6 +2029,28 @@ export default function AdminDashboard() {
                       {/* 장소/대상 */}
                       <FormField label="장소 *" value={partyForm.location} onChange={v => setPartyForm(p => ({ ...p, location: v }))} />
                       <FormField label="대상 *" value={partyForm.target} onChange={v => setPartyForm(p => ({ ...p, target: v }))} placeholder="만 25-35세 / 남녀비율 1:1" />
+                      {/* 솔로파티 — 참가 구성 사용 / 단일 가격 (명세 7-1) */}
+                      {partyForm.partyType === "solo" && (
+                        <div>
+                          <label className="block text-sm font-bold text-gray-700 mb-1.5">참가비·정원 방식 *</label>
+                          <div className="grid grid-cols-2 gap-3" role="group" aria-label="참가비·정원 방식">
+                            {([["options", "참가 구성 사용"], ["single", "단일 가격"]] as const).map(([m, label]) => (
+                              <button key={m} type="button" onClick={() => selectOptionMode(m)} aria-pressed={partyForm.optionMode === m}
+                                className={`py-3 rounded-xl border-2 text-sm md:text-base font-black transition-all ${partyForm.optionMode === m ? "border-brand-point bg-brand-point/15 text-brand-black" : "border-gray-200 text-gray-500 hover:border-gray-300"}`}>
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-xs text-gray-500 mt-2">참가 구성: 1부·2부 같은 회차와 1부만·2부만·1부+2부 같은 참가 항목을 정합니다. 단일 가격: 남/여 참가비와 정원 하나씩.</p>
+                        </div>
+                      )}
+                      {partyForm.partyType === "solo" && partyForm.optionMode === "options" ? (
+                        <PartyOptionsEditor
+                          value={partyForm.optionsDraft}
+                          onChange={next => { setPartyForm(p => ({ ...p, optionsDraft: next })); setPartyFormDirty(true); }}
+                          applicants={partyForm.id ? adminPartyRows[partyForm.id]?.applicants ?? null : null}
+                        />
+                      ) : (<>
                       {/* 참가비 — 성별별 분리 입력 */}
                       <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -1981,6 +2103,7 @@ export default function AdminDashboard() {
                         </div>
                         <p className="col-span-2 -mt-2 text-xs text-gray-500">입력한 정원이 결제 마감 기준이 됩니다.</p>
                       </div>
+                      </>)}
 
                       {/* 참가 자격 제한 — 신규 섹션 */}
                       <div className="pt-2 mt-1 border-t border-gray-100">

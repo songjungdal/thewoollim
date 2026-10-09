@@ -12,7 +12,7 @@ import Image from "next/image";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import ReviewBoard from "./components/ReviewBoard";
-import { PARTICIPANTS, FAQS, partyStockStatus, partyVisibility, categoryLabel, partyTypeOf, PARTY_TYPES, PARTY_TYPE_LABELS, type PartyType } from "./lib/data";
+import { PARTICIPANTS, FAQS, partyStockStatus, withLiveCounts, partyVisibility, categoryLabel, partyTypeOf, PARTY_TYPES, PARTY_TYPE_LABELS, type PartyType } from "./lib/data";
 import { useAuth } from "./context/AuthContext";
 import { useParties } from "./lib/useParties";
 
@@ -382,21 +382,20 @@ export default function SmoothOnePage() {
 
   // #schedule 전용 — 파티별 일정 상태(지난 일정 > 마감 > 마감임박 > 모집중)와 남은 자리.
   // 남은 자리는 신청 카드와 같은 실시간 결제 인원(partyCounts, 없으면 0)으로 계산.
+  // 마감·마감임박·남은 자리는 partyStockStatus 결과 그대로 (참가 구성 파티는 회차 기준, 명세 8-3).
   // now 가 없으면(마운트 전) 상태 계산을 건너뜀 → 하이드레이션 안전 (기존 방식과 동일).
   const scheduleStatus = useMemo(() => {
-    const map: Record<string, { status: ScheduleStatus | null; maleRemaining: number; femaleRemaining: number }> = {};
+    const map: Record<string, { status: ScheduleStatus | null; maleRemaining: number; femaleRemaining: number; hasOptions: boolean; remainingLabel: string }> = {};
     PARTIES.forEach(p => {
-      const live = partyCounts[p.id];
-      const stock = partyStockStatus({ ...p, maleBooked: live?.male ?? 0, femaleBooked: live?.female ?? 0 });
+      const stock = partyStockStatus(withLiveCounts(p, partyCounts[p.id]));
       let status: ScheduleStatus | null = null;
       if (now) {
-        const left = stock.maleRemaining + stock.femaleRemaining;
         if (partyVisibility(p, now) !== "active") status = "past";
         else if (stock.allFull) status = "full";
-        else if (left >= 1 && left <= 3) status = "soon";
+        else if (stock.nearlyFull) status = "soon";
         else status = "open";
       }
-      map[p.id] = { status, maleRemaining: stock.maleRemaining, femaleRemaining: stock.femaleRemaining };
+      map[p.id] = { status, maleRemaining: stock.maleRemaining, femaleRemaining: stock.femaleRemaining, hasOptions: stock.hasOptions, remainingLabel: stock.remainingLabel };
     });
     return map;
   }, [PARTIES, partyCounts, now]);
@@ -422,6 +421,8 @@ export default function SmoothOnePage() {
         status: info?.status ?? null,
         maleRemaining: info?.maleRemaining ?? 0,
         femaleRemaining: info?.femaleRemaining ?? 0,
+        hasOptions: info?.hasOptions ?? false,          // 참가 구성 파티 — 남은 자리를 회차별로
+        remainingLabel: info?.remainingLabel ?? "",
         time: m ? `${m[1].padStart(2, "0")}:${m[2]}` : "",
         theme: p.theme ?? "",
         locationTag: p.locationTag ?? "",
@@ -532,7 +533,7 @@ export default function SmoothOnePage() {
           </div>
           <div className={`text-sm ${isPast ? "text-gray-400" : "text-gray-500"}`}>{party?.dateString}</div>
           <div className={`text-xs mt-0.5 truncate ${isPast ? "text-gray-400" : "text-gray-500"}`}>{party?.location} · {party?.target}</div>
-          <div className={`text-xs mt-1 font-bold ${isPast ? "text-gray-400" : "text-gray-600"}`}>남 {xp.maleRemaining} · 여 {xp.femaleRemaining} 남음</div>
+          <div className={`text-xs mt-1 font-bold break-keep ${isPast ? "text-gray-400" : "text-gray-600"}`}>{xp.hasOptions ? `${xp.remainingLabel} 남음` : `남 ${xp.maleRemaining} · 여 ${xp.femaleRemaining} 남음`}</div>
         </div>
         <ArrowRight size={16} className={`flex-shrink-0 ${isPast ? "text-gray-400" : "text-gray-500"}`} />
       </button>
@@ -710,13 +711,8 @@ export default function SmoothOnePage() {
               <AnimatePresence mode="popLayout">
                 {visibleParties.map(card => {
                   // 실시간 결제완료 인원만 노출 — 카운트 없으면 0으로 강제 (시드/테스트 데이터 무시)
-                  const live = partyCounts[card.id];
-                  const liveCard = {
-                    ...card,
-                    maleBooked:   live?.male   ?? 0,
-                    femaleBooked: live?.female ?? 0,
-                  };
-                  const stock = partyStockStatus(liveCard);
+                  // 모집 마감은 partyStockStatus 결과 (참가 구성 파티는 모든 항목이 마감일 때, 명세 8-3)
+                  const stock = partyStockStatus(withLiveCounts(card, partyCounts[card.id]));
                   // 행사 일시 경과 → 모집 종료 카드 UI (배지/버튼 색·문구만 교체, 링크 동작은 유지)
                   const isEnded = now ? partyVisibility(card, now) === "ended" : false;
                   return (
@@ -1131,7 +1127,7 @@ export default function SmoothOnePage() {
                                 {xp.location} · {xp.target}
                               </div>
                               <div className={`text-sm mt-1 font-bold ${isPast ? "text-gray-400" : "text-gray-700"}`}>
-                                남 {xp.maleRemaining}석 · 여 {xp.femaleRemaining}석 남음
+                                {xp.hasOptions ? `${xp.remainingLabel} 남음` : `남 ${xp.maleRemaining}석 · 여 ${xp.femaleRemaining}석 남음`}
                               </div>
                             </div>
                             <ArrowRight size={18} className={`flex-shrink-0 transition-transform group-hover:translate-x-0.5 ${isPast ? "text-gray-400" : "text-gray-500"}`} />

@@ -7,7 +7,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
-import { partyStockStatus, partyTypeOf, PARTY_TYPE_LABELS, PARTIES as SEED_PARTIES, type PartyType } from "../../lib/data";
+import { partyStockStatus, withLiveCounts, dateOnly, partyTypeOf, PARTY_TYPE_LABELS, PARTIES as SEED_PARTIES, type PartyType } from "../../lib/data";
+import PartyOptionPicker, { optionClosedFor } from "./PartyOptionPicker";
 import { templateFor, normalizeDetail, type PartyDetail, type PartyDetailImage, type DetailImageSlot } from "../../lib/partyDetailTemplates";
 import { useAuth } from "../../context/AuthContext";
 import { useParties } from "../../lib/useParties";
@@ -20,6 +21,7 @@ type Participant = {
   mbti: string;
   job: string;
   status?: "confirmed" | "pending_approval" | "completed" | "paid_pending_profile" | string;
+  optionName?: string;   // 솔로파티 참가 구성 — 신청한 항목 이름
 };
 
 /** 상태 미니 배지 — 마이페이지 STATUS_DISPLAY 와 동일 색상/라벨, 사이즈만 컴팩트 */
@@ -96,6 +98,12 @@ function ParticipantColumn({
                 )}
                 {/* 상태 미니 배지 — 연령대 바로 우측 */}
                 <StatusMiniBadge status={p.status} />
+                {/* 솔로파티 참가 구성 — 신청한 항목 이름 (명세 10-2 기본안) */}
+                {p.optionName && (
+                  <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-white border border-gray-200 text-gray-600 whitespace-nowrap">
+                    {p.optionName}
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap">
                 {p.mbti && (
@@ -135,6 +143,8 @@ export default function PartyClientView({ id }: { id: string }) {
     ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date())
     : "";
   const [showCartModal, setShowCartModal] = useState(false);
+  // 솔로파티 참가 구성 — 고른 참가 항목 id (명세 8-1)
+  const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
   const [participants, setParticipants] = useState<{ male: Participant[]; female: Participant[] }>({ male: [], female: [] });
 
   // 참가 확정자 fetch — 마운트 + 30초 폴링 + focus 갱신
@@ -184,14 +194,8 @@ export default function PartyClientView({ id }: { id: string }) {
   }, [id]);
 
   // 실시간 결제완료 인원만 노출 — DB 카운트가 없으면 0/12로 표시 (시드/테스트 데이터 무시)
-  const live = partyCounts[id];
-  const detailItem = baseItem
-    ? {
-        ...baseItem,
-        maleBooked:   live?.male   ?? 0,
-        femaleBooked: live?.female ?? 0,
-      }
-    : undefined;
+  // 참가 구성 파티는 회차별 인원도 함께 (withLiveCounts)
+  const detailItem = baseItem ? withLiveCounts(baseItem, partyCounts[id]) : undefined;
 
   if (!detailItem) {
     // 실시간 파티 데이터 최초 fetch가 아직 끝나지 않은 구간 — 빌드 시점 샘플 목록만 있어
@@ -226,7 +230,26 @@ export default function PartyClientView({ id }: { id: string }) {
     );
   }
 
+  // 남은 자리·마감 — 메인 카드·일정 섹션과 같은 계산 (참가 구성 파티는 회차 기준, 명세 8-3)
   const stock = partyStockStatus(detailItem);
+  // 회차별 남/여 인원/정원 한 묶음 (상세 상단 현황 — PC·모바일 같은 내용)
+  const sessionCounts = (
+    <div className="flex flex-wrap justify-end items-center gap-x-3 gap-y-0.5 bg-white/95 px-2.5 py-1 md:px-3 md:py-1.5 rounded-2xl shadow-lg text-xs font-bold border border-gray-100 md:border-0">
+      {stock.sessions.map(s => (
+        <span key={s.id} className="inline-flex items-center gap-1 whitespace-nowrap" data-testid="session-count">
+          <UsersIcon size={12} className="flex-shrink-0 text-gray-500" />
+          <span className="text-brand-black">{s.name}</span>
+          <span className="text-blue-400">남 {s.maleBooked ?? 0}/{s.maleStock}</span>
+          <span className="text-gray-400">·</span>
+          <span className="text-pink-400">여 {s.femaleBooked ?? 0}/{s.femaleStock}</span>
+        </span>
+      ))}
+    </div>
+  );
+  // 고른 참가 항목 — 그사이 내 성별 기준으로 마감됐으면 고르지 않은 것으로 본다
+  const selectedOption = stock.hasOptions
+    ? stock.options.find(o => o.id === selectedOptionId && !optionClosedFor(o, profile?.gender)) ?? null
+    : null;
   const partyType: PartyType = detailRes?.partyType ?? partyTypeOf(detailItem);
   const typeLabel = PARTY_TYPE_LABELS[partyType];
   // 화면에 그릴 안내 — detail ?? 종류별 템플릿. 응답 전(null)이면 편집 영역을 그리지 않는다.
@@ -284,6 +307,14 @@ export default function PartyClientView({ id }: { id: string }) {
     return true; // alreadyBooked 인 경우는 confirm 결과 무관 후속 로직 차단
   };
 
+  // 참가 구성 파티 — 같은 파티가 다른 항목으로 장바구니에 있으면 항목을 바꿀지 묻는다 (장바구니는 파티당 한 줄)
+  const confirmOptionChange = (oldOptionId: string | undefined, newName: string): boolean => {
+    const oldName = stock.options.find(o => o.id === oldOptionId)?.name;
+    return confirm(oldName
+      ? `장바구니에 담긴 참가 항목(${oldName})을 ${newName}(으)로 바꿀까요?`
+      : `장바구니에 담긴 이 파티의 참가 항목을 ${newName}(으)로 바꿀까요?`);
+  };
+
   // 참가신청 — 카트에 담고 마이페이지로 이동 (중복 신청/카트 시 차단)
   const handleCheckout = async () => {
     // 세션 만료 방어 (v5.1) — 미로그인/만료 시 이후 로직(중복체크·카트·결제) 전부 차단
@@ -304,13 +335,16 @@ export default function PartyClientView({ id }: { id: string }) {
     }
     const blocked = checkBlockedReason();
     if (blocked) { alert(blocked); return; }
+    if (stock.hasOptions && !selectedOption) { alert("참가 항목을 선택해주세요"); return; }
 
-    if (cart.some(c => c.partyId === id)) {
+    const inCart = cart.find(c => c.partyId === id);
+    if (inCart && !(selectedOption && inCart.optionId !== selectedOption.id)) {
       alert("이미 장바구니에 담겨 있습니다. 마이페이지에서 결제를 진행해주세요.");
       router.push("/mypage");
       return;
     }
-    addToCart(id);
+    if (inCart && selectedOption && !confirmOptionChange(inCart.optionId, selectedOption.name)) return;
+    addToCart(id, selectedOption?.id);
     router.push("/mypage");
   };
 
@@ -334,12 +368,15 @@ export default function PartyClientView({ id }: { id: string }) {
     }
     const blocked = checkBlockedReason();
     if (blocked) { alert(blocked); return; }
+    if (stock.hasOptions && !selectedOption) { alert("참가 항목을 선택해주세요"); return; }
 
-    if (cart.some(c => c.partyId === id)) {
+    const inCart = cart.find(c => c.partyId === id);
+    if (inCart && !(selectedOption && inCart.optionId !== selectedOption.id)) {
       alert("이미 장바구니에 담긴 파티입니다.");
       return;
     }
-    addToCart(id);
+    if (inCart && selectedOption && !confirmOptionChange(inCart.optionId, selectedOption.name)) return;
+    addToCart(id, selectedOption?.id);
     setShowCartModal(true);
   };
 
@@ -393,6 +430,12 @@ export default function PartyClientView({ id }: { id: string }) {
                 );
               })()}
               {/* 남녀 인원 — 이미지 우측 하단 오버레이 (아이콘 + 남성 파랑 / 여성 분홍), 가독성을 위해 흰색 pill 배경 */}
+              {stock.hasOptions ? (
+                // 참가 구성 파티 — 회차별 남/여 인원/정원 (명세 8-1). PC 는 이미지 오른쪽 아래, 모바일은 이미지 바로 아래(아래 sessionCounts)
+                <div className="hidden md:flex absolute bottom-4 right-4 left-4 justify-end z-10 pointer-events-none" data-testid="session-counts">
+                  {sessionCounts}
+                </div>
+              ) : (
               <div className="absolute bottom-3 right-3 md:bottom-4 md:right-4 flex items-center gap-2 bg-white/95 px-2.5 py-1 md:px-3 md:py-1.5 rounded-full shadow-lg z-10 text-xs font-bold">
                 <span className="flex items-center gap-1 text-blue-400">
                   <UsersIcon size={12} className="flex-shrink-0" />
@@ -403,8 +446,15 @@ export default function PartyClientView({ id }: { id: string }) {
                   여성 {detailItem.femaleBooked}/{detailItem.femaleStock}
                 </span>
               </div>
+              )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent pointer-events-none" />
             </div>
+            {/* 참가 구성 파티 — 모바일 회차별 현황 (납작한 배너에서 왼쪽 위 배지와 겹치지 않게 이미지 아래) */}
+            {stock.hasOptions && (
+              <div className="md:hidden flex justify-end -mt-4 mb-5" data-testid="session-counts-mobile">
+                {sessionCounts}
+              </div>
+            )}
 
             {/* 제목 — 중앙정렬 */}
             <h1 className="text-2xl md:text-3xl font-black tracking-tight mb-2 leading-snug text-center">{detailItem.title}</h1>
@@ -418,7 +468,18 @@ export default function PartyClientView({ id }: { id: string }) {
             {/* Info rows — 일시/장소/대상 */}
             <div className="space-y-0 mb-4 md:mb-5">
               {[
-                { label: "일시 (Date)", value: detailItem.dateString },
+                {
+                  label: "일시 (Date)",
+                  // 참가 구성 파티 — 날짜 + 회차 시간표 ("1부 19:00 · 2부 21:30")
+                  value: stock.hasOptions ? (
+                    <>
+                      {dateOnly(detailItem.dateString)}
+                      <span className="block text-xs md:text-sm text-gray-600 mt-0.5" data-testid="session-timetable">
+                        {stock.sessions.map(s => `${s.name} ${s.startTime}`).join(" · ")}
+                      </span>
+                    </>
+                  ) : detailItem.dateString,
+                },
                 { label: "장소 (Location)", value: detailItem.location },
                 { label: "대상 (Target)", value: detailItem.target },
               ].map((row) => (
@@ -427,8 +488,26 @@ export default function PartyClientView({ id }: { id: string }) {
                   <span className={`font-bold text-right ${row.label === "일시 (Date)" ? "text-sm md:text-base" : ""}`}>{row.value}</span>
                 </div>
               ))}
+              {/* 참가비 — 참가 구성 파티는 항목별 남/여 가격 목록 */}
+              {stock.hasOptions ? (
+                <div className="py-2.5 border-b border-gray-200 text-xs md:text-sm" data-testid="option-prices">
+                  <span className="text-gray-500 font-medium">참가비 (Price)</span>
+                  <ul className="mt-1.5 space-y-1">
+                    {stock.options.map(o => (
+                      <li key={o.id} className="flex items-baseline justify-between gap-2">
+                        <span className="font-bold break-keep">{o.name}</span>
+                        <span className="font-black text-brand-black flex flex-wrap items-baseline justify-end gap-x-2 tabular-nums">
+                          <span><span className="text-xs text-gray-500 font-bold">남성</span> ₩{o.priceMale.toLocaleString()}</span>
+                          <span className="text-gray-500">/</span>
+                          <span><span className="text-xs text-gray-500 font-bold">여성</span> ₩{o.priceFemale.toLocaleString()}</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
               {/* 참가비 — 성별별 분리 표시 (남성 / 여성). 미설정 시 price 폴백 단일 표시 */}
-              {(() => {
+              {!stock.hasOptions && (() => {
                 const pm = (detailItem as { priceMale?: number }).priceMale;
                 const pf = (detailItem as { priceFemale?: number }).priceFemale;
                 const hasSplit = (pm && pm > 0) || (pf && pf > 0);
@@ -485,6 +564,16 @@ export default function PartyClientView({ id }: { id: string }) {
                   </span>
                 )}
               </div>
+            )}
+
+            {/* 참가 항목 선택 — 참가 구성 파티만, 모집 중일 때 (명세 8-1) */}
+            {stock.hasOptions && !isExpired && (
+              <PartyOptionPicker
+                stock={stock}
+                gender={isLoggedIn ? profile?.gender : null}
+                selectedId={selectedOption?.id ?? null}
+                onSelect={setSelectedOptionId}
+              />
             )}
 
             {/* 참가하기 / 장바구니 버튼 — 조건/비활성화 로직은 기존 그대로, 기본 문구만 "참가신청"→"참가하기" */}

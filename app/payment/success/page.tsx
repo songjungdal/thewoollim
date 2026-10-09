@@ -13,7 +13,7 @@ import { useParties } from "../../lib/useParties";
 function PaymentSuccessContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { mounted, isLoggedIn, profile, userEmail, refreshBookings } = useAuth();
+  const { mounted, isLoggedIn, profile, userEmail, refreshBookings, bookings } = useAuth();
   const PARTIES = useParties();
   const [checkingProfile, setCheckingProfile] = useState(false);
 
@@ -159,12 +159,19 @@ function PaymentSuccessContent() {
             >
               <p className="text-xs md:text-sm font-bold text-gray-500 mb-3 tracking-wider">결제 내역</p>
               <div className="space-y-2.5">
-                {parties.map(p => (
-                  <div key={p.id} className="flex justify-between items-center gap-4">
-                    <span className="font-bold text-sm md:text-base truncate">{p.title}</span>
-                    <span className="font-black text-sm md:text-base text-brand-point-ink whitespace-nowrap">₩{p.price.toLocaleString()}</span>
-                  </div>
-                ))}
+                {parties.map(p => {
+                  // 솔로파티 참가 구성 — 이 파티의 예약(취소 제외)에서 항목 이름과 결제 금액을 쓴다
+                  const ob = bookings.find(b => b.partyId === p.id && b.status !== "cancelled" && b.optionName);
+                  return (
+                    <div key={p.id} className="flex justify-between items-center gap-4">
+                      <span className="font-bold text-sm md:text-base truncate">
+                        {p.title}
+                        {ob && <span className="ml-1.5 text-xs md:text-sm font-black text-brand-point-ink" data-testid="option-name">{ob.optionName}</span>}
+                      </span>
+                      <span className="font-black text-sm md:text-base text-brand-point-ink whitespace-nowrap">₩{(ob?.total ?? p.price).toLocaleString()}</span>
+                    </div>
+                  );
+                })}
               </div>
             </motion.div>
           )}

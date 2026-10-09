@@ -2,8 +2,9 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from "react";
 import { clearOnboardingSnooze } from "../lib/onboardingSnooze";
+import type { LivePartyCount } from "../lib/data";
 
-export type CartItem = { partyId: string; quantity: number };
+export type CartItem = { partyId: string; quantity: number; optionId?: string };  // optionId: 참가 구성 파티에서 고른 항목
 
 export type AppliedCoupon = {
   code: string;
@@ -47,6 +48,11 @@ export type Booking = {
   paymentId?: string | null;
   paymentMethod?: string | null; // 'vbank' = 무통장 입금 (v7.0). 미설정/그 외 = 카드/간편결제
   total?: number;
+  // 솔로파티 참가 구성 예약 — 결제 당시 항목 이름·포함 회차, 회차 시각(파티의 현재 회차 시각, api/bookings.php)
+  optionId?: string;
+  optionName?: string;
+  sessionIds?: string[];
+  sessionTimes?: string[];
   createdAt: string;
   updatedAt: string;
 };
@@ -99,7 +105,7 @@ async function fetchSessionEmail(): Promise<string | null> {
   return info?.email ?? null;
 }
 
-export type PartyCount = { male: number; female: number };
+export type PartyCount = LivePartyCount;   // { male, female, sessions?: 회차별 인원 }
 export type PartyCounts = Record<string, PartyCount>;
 
 async function fetchPartyCounts(): Promise<PartyCounts | null> {
@@ -157,7 +163,8 @@ function normalizeCart(raw: unknown): CartItem[] {
       const i = item as Record<string, unknown>;
       const qRaw = Number(i.quantity);
       const q = Number.isFinite(qRaw) && qRaw >= 1 ? Math.floor(qRaw) : 1;
-      return { partyId: String(i.partyId), quantity: q };
+      const oid = typeof i.optionId === "string" && i.optionId !== "" ? i.optionId : undefined;
+      return { partyId: String(i.partyId), quantity: q, ...(oid ? { optionId: oid } : {}) };
     });
 }
 
@@ -208,7 +215,7 @@ type AuthContextType = {
   logout: () => void;
   verifySession: () => Promise<boolean>; // 서버 세션(me.php) 실시간 유효성 검사 (v5.1)
   cart: CartItem[];
-  addToCart: (partyId: string) => void;
+  addToCart: (partyId: string, optionId?: string) => void;
   removeFromCart: (partyId: string) => void;
   setItemQuantity: (partyId: string, quantity: number) => void;
   refreshCart: () => Promise<void>;
@@ -606,9 +613,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // 동일 partyId 가 이미 있으면 no-op — 중복 추가 차단, quantity 항상 1.
   // (수량 개념 제거 — 한 사용자는 같은 파티에 1회만 신청)
-  const addToCart = useCallback(async (partyId: string) => {
-    if (cartRef.current.some(i => i.partyId === partyId)) return;
-    const updated = [...cartRef.current, { partyId, quantity: 1 }];
+  // 참가 구성 파티는 고른 항목(optionId)을 함께 담고, 같은 파티를 다른 항목으로 다시 담으면 항목만 바꾼다(파티당 한 줄).
+  const addToCart = useCallback(async (partyId: string, optionId?: string) => {
+    const existing = cartRef.current.find(i => i.partyId === partyId);
+    if (existing && (!optionId || existing.optionId === optionId)) return;
+    const row: CartItem = { partyId, quantity: 1, ...(optionId ? { optionId } : {}) };
+    const updated = existing
+      ? cartRef.current.map(i => i.partyId === partyId ? row : i)
+      : [...cartRef.current, row];
     await persistCart(updated);
   }, [persistCart]);
 

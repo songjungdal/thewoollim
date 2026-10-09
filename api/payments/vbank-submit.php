@@ -2,7 +2,8 @@
 /**
  * 무통장 입금 신청 접수 (vbank).  v7.0
  *
- * POST { partyIds: ["1",...], couponCode?, couponPartyId? }
+ * POST { partyIds: ["1",...], optionIds?: { "<partyId>": "<optionId>" }, couponCode?, couponPartyId? }
+ *   optionIds: 참가 구성이 있는 솔로파티는 필수 (pending.php 와 같은 규칙). 예약에 항목 사본을 저장한다.
  *   → { ok:true, amount, orderName }
  *
  * 카드결제(Toss success.php)와의 차이:
@@ -36,6 +37,7 @@ $partyIds = array_values(array_filter(array_map('strval', $body['partyIds'] ?? [
 if (empty($partyIds)) jsonFail('파티를 선택해주세요.');
 $partyIds = array_values(array_unique($partyIds)); // 수량 개념 없음 — unique 화
 
+$optionIdsIn   = is_array($body['optionIds'] ?? null) ? $body['optionIds'] : [];
 $couponCode    = strtoupper(trim((string)($body['couponCode']    ?? '')));
 $couponPartyId = trim((string)        ($body['couponPartyId'] ?? ''));
 
@@ -81,16 +83,34 @@ if (!empty($dupTitles)) {
     jsonFail('이미 신청이 완료된 파티입니다. 마이페이지에서 예약 현황을 확인해주세요. (' . implode(', ', array_unique($dupTitles)) . ')', 409);
 }
 
-// ── 3) 성별 단가 합산 ─────────────────────────────────────────────────
+// ── 3) 성별 단가 합산 (항목이 있는 파티는 고른 항목의 성별 가격) ─────────────────
 $total = 0; $orderTitles = [];
+$lines = []; $resolvedOptions = []; $plainIds = [];
+$counts = json_decode((string)@file_get_contents($dataDir . '/party_counts.json'), true);
+if (!is_array($counts)) $counts = [];
 foreach ($partyIds as $pid) {
     if (!isset($partyMap[$pid])) jsonFail("파티를 찾을 수 없습니다: $pid", 404);
-    $total += priceForGender($partyMap[$pid], $gender);
-    $orderTitles[] = (string)($partyMap[$pid]['title'] ?? '파티');
+    $oidIn = $optionIdsIn[$pid] ?? '';
+    $resolved = resolvePartyOption($partyMap[$pid], $gender, is_scalar($oidIn) ? (string)$oidIn : '');
+    if (is_string($resolved)) jsonFail($resolved);
+    $lines[$pid] = $resolved['price'];
+    $total += $resolved['price'];
+    $title = (string)($partyMap[$pid]['title'] ?? '파티');
+    if ($resolved['option'] !== null) {
+        $resolvedOptions[$pid] = $resolved['option'];
+        $title .= ' · ' . (string)$resolved['option']['name'];
+        // 정원 사전 검사 — 항목에 포함된 회차 모두 (최종 판정은 입금 확인 시 confirm_vbank)
+        if (optionSessionsOverStock($partyMap[$pid], $resolved['option'], (array)($counts[$pid] ?? []), $genderKey)) {
+            jsonFail('정원이 마감되었습니다.');
+        }
+    } else {
+        $plainIds[] = $pid;
+    }
+    $orderTitles[] = $title;
 }
 
 // 정원 사전 검사 — 쿠폰 사용 처리 전에 파티마다 확인 (최종 판정은 입금 확인 시 confirm_vbank)
-if (!empty(partiesOverStock($partyIds, $partyMap, $genderKey))) {
+if (!empty(partiesOverStock($plainIds, $partyMap, $genderKey))) {
     jsonFail('정원이 마감되었습니다.');
 }
 
@@ -116,7 +136,7 @@ if ($couponCode !== '') {
     if (!in_array($couponPartyId, $partyIds, true)) jsonFail('쿠폰 적용 파티를 선택해주세요.');
     if (!isset($partyMap[$couponPartyId]))          jsonFail('쿠폰 적용 파티를 찾을 수 없습니다.');
 
-    $linePrice      = priceForGender($partyMap[$couponPartyId], $gender);
+    $linePrice      = (int)$lines[$couponPartyId];   // 항목이 있으면 고른 항목 가격 기준
     $couponDiscount = calcCouponDiscount($found, $linePrice);
 
     $cfp = fopen($usagesFile, 'c+');
@@ -166,12 +186,12 @@ if ($amount <= 0) jsonFail('결제 금액이 0원 이하입니다.');
 $now = date('c');
 $couponApplied = false;
 foreach ($partyIds as $pid) {
-    $partyPrice  = priceForGender($partyMap[$pid] ?? [], $gender);
+    $partyPrice  = (int)$lines[$pid];
     $isCouponHit = ($couponCode !== '' && $pid === $couponPartyId && !$couponApplied);
     $rowDiscount = $isCouponHit ? $couponDiscount : 0;
     if ($isCouponHit) $couponApplied = true;
     $rowTotal = max(0, $partyPrice - $rowDiscount);
-    $bookings[] = [
+    $row = [
         'id'            => bin2hex(random_bytes(8)),
         'partyId'       => $pid,
         'status'        => 'vbank_pending',
@@ -184,6 +204,9 @@ foreach ($partyIds as $pid) {
         'createdAt'     => $now,
         'updatedAt'     => $now,
     ];
+    // 결제 시점 사본 (참가 구성이 있는 파티) — 입금 확인(confirm_vbank)도 이 회차 기준으로 검사·증가
+    if (isset($resolvedOptions[$pid])) $row += bookingOptionSnapshot($partyMap[$pid], $resolvedOptions[$pid]);
+    $bookings[] = $row;
 }
 file_put_contents($bookingsFile, json_encode($bookings, JSON_UNESCAPED_UNICODE));
 
