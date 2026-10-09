@@ -1822,6 +1822,7 @@ export default function AdminDashboard() {
                             }}
                             className="w-full px-4 py-3 rounded-lg border border-gray-200 text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none" aria-label="여성 정원" />
                         </div>
+                        <p className="col-span-2 -mt-2 text-xs text-gray-400">입력한 정원이 결제 마감 기준이 됩니다.</p>
                       </div>
 
                       {/* 참가 자격 제한 — 신규 섹션 */}

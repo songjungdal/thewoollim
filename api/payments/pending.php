@@ -83,6 +83,11 @@ foreach ($partyIds as $pid) {
     $orderTitles[] = (string)($partyMap[$pid]['title'] ?? '파티');
 }
 
+// 정원 사전 검사 — 결제창을 열기 전에 회원 성별 기준으로 파티마다 확인 (최종 판정은 success.php)
+if (!empty(partiesOverStock($partyIds, $partyMap, $userGender === '남성' ? 'male' : 'female'))) {
+    jsonFail('정원이 마감되었습니다.');
+}
+
 // 쿠폰 적용 가능 검사 (실 차감은 success 에서)
 $couponDiscount = 0;
 if ($couponCode !== '') {

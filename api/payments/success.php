@@ -9,6 +9,7 @@
  *  2) Toss로 받은 amount === pending.expectedAmount 검증 (위변조 방어)
  *  3) Toss confirm API 호출 (시크릿 키 Basic auth)
  *  4) 결제 승인 성공 시:
+ *     - 파티별 정원(maleStock/femaleStock) 검사 — 초과면 토스 결제 전액 자동 취소 후 실패 redirect
  *     - party_counts atomic +1
  *     - 쿠폰 atomic consume
  *     - booking 생성 (status: 프로필 완성도에 따라 paid_pending_profile / pending_approval)
@@ -160,7 +161,6 @@ foreach ((array)$partiesJson as $p) {
     if (isset($p['id'])) $partyMap[(string)$p['id']] = $p;
 }
 
-$STOCK_PER_SIDE = 12;
 $DEFAULT_COUNTS = [];
 
 // 정원 검증 + 차감 (flock atomic)
@@ -202,11 +202,52 @@ if (!$fp) {
         }
         $cur = $counts[$pid] ?? $DEFAULT_COUNTS[$pid] ?? ['male' => 0, 'female' => 0];
         $effective[$pid] = $cur;
-        if ($cur[$genderKey] + $reqQty > $STOCK_PER_SIDE) $soldOut[] = $pid;
+        if ($cur[$genderKey] + $reqQty > partyStockLimit($partyMap[$pid], $genderKey)) $soldOut[] = $pid;
     }
     if (!empty($soldOut)) {
         flock($fp, LOCK_UN); fclose($fp);
-        redirectFail('잔여 정원을 초과했습니다');
+        // 토스 승인은 이미 끝난 상태 → 전액 자동 취소. 쿠폰 사용 처리는 이 분기 뒤에 있으므로 되돌릴 쿠폰 이력 없음.
+        // 취소 호출은 admin/bookings.php(cancel_full_refund)와 같은 방식.
+        $cancelHttp = 0; $cancelBody = '';
+        try {
+            $ch = curl_init('https://api.tosspayments.com/v1/payments/' . urlencode($paymentKey) . '/cancel');
+            curl_setopt_array($ch, [
+                CURLOPT_POST           => true,
+                CURLOPT_POSTFIELDS     => json_encode(['cancelReason' => '정원 마감으로 자동 취소', 'cancelAmount' => $amount]),
+                CURLOPT_HTTPHEADER     => [
+                    'Authorization: Basic ' . base64_encode($cfg['secret_key'] . ':'),
+                    'Content-Type: application/json',
+                ],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT        => 20,
+            ]);
+            $cancelBody = (string)curl_exec($ch);
+            $cancelHttp = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+        } catch (Throwable $e) {
+            $cancelBody = $e->getMessage();
+        }
+        $cancelJson = json_decode($cancelBody, true) ?: [];
+        // 이미 취소된 결제(ALREADY_CANCELED)는 성공으로 간주
+        $canceled = $cancelHttp === 200
+            || ($cancelHttp === 400 && (string)($cancelJson['code'] ?? '') === 'ALREADY_CANCELED_PAYMENT');
+
+        // 같은 주문이 다시 처리되지 않도록 pending 정리 (새로고침 시 재승인·예약 생성 방지)
+        @unlink($pendingFile);
+
+        if ($canceled) {
+            @file_put_contents("$dataDir/_counts_failure_alert.log", sprintf(
+                "[%s] SOLD_OUT_AUTO_CANCEL orderId=%s email=%s gender=%s soldOut=%s amount=%d http=%d\n",
+                date('c'), $orderId, $email, $gender, implode(',', $soldOut), $amount, $cancelHttp
+            ), FILE_APPEND);
+            redirectFail('정원이 마감되어 결제가 자동 취소되었습니다');
+        }
+        @file_put_contents("$dataDir/_counts_failure_alert.log", sprintf(
+            "[%s] CRITICAL SOLD_OUT_AUTO_CANCEL_FAILED orderId=%s email=%s gender=%s soldOut=%s amount=%d http=%d body=%s — 토스 결제 승인 상태, 예약 미생성. 수동 환불 필요.\n",
+            date('c'), $orderId, $email, $gender, implode(',', $soldOut), $amount, $cancelHttp, substr($cancelBody, 0, 400)
+        ), FILE_APPEND);
+        error_log('[payments/success] CRITICAL sold-out auto cancel failed: orderId=' . $orderId);
+        redirectFail('정원이 마감되었습니다. 결제 취소 처리 중 문제가 발생해 운영팀이 확인 후 환불해드립니다. 고객센터로 문의해주세요');
     }
 }
 

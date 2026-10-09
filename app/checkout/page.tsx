@@ -155,7 +155,14 @@ function CheckoutContent() {
         <Header />
         <main className="flex-1 flex items-center justify-center px-4">
           <div className="text-center">
-            <p className="text-xl font-bold mb-4">파티를 찾을 수 없습니다.</p>
+            {/* 결제 실패 redirect(?error=...)는 파티 id 없이 돌아오므로 이 화면에서 실패 사유를 안내 */}
+            {errorMsg ? (
+              <p className="mb-4 bg-red-50 border-2 border-red-200 rounded-xl p-4 text-sm md:text-base text-red-700 font-bold">
+                결제 실패: {errorMsg}
+              </p>
+            ) : (
+              <p className="text-xl font-bold mb-4">파티를 찾을 수 없습니다.</p>
+            )}
             <Link href="/#apply" className="text-brand-point underline font-bold">목록으로 돌아가기</Link>
           </div>
         </main>

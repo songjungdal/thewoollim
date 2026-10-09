@@ -186,6 +186,27 @@ function priceForGender(array $party, string $gender): int {
     return (int)($party['price'] ?? 0);
 }
 
+// ─── 파티별 성별 정원 ──────────────────────────────────────────────
+// 결제 마감 기준 — parties.json 의 maleStock / femaleStock. 값이 없거나 0 이하면 12.
+//   사용처: payments/pending.php · vbank-submit.php (결제창 열기 전 사전 검사),
+//           payments/success.php (토스 승인 뒤 atomic 검사), admin/bookings.php (confirm_vbank).
+function partyStockLimit(array $party, string $genderKey): int {
+    $stock = (int)($party[$genderKey === 'male' ? 'maleStock' : 'femaleStock'] ?? 0);
+    return $stock > 0 ? $stock : 12;
+}
+
+// 결제 전 사전 검사 — 현재 인원 + 1 이 상한을 넘는 partyId 목록. (잠금 없는 읽기: 최종 판정은 success.php / confirm_vbank)
+function partiesOverStock(array $partyIds, array $partyMap, string $genderKey): array {
+    $counts = json_decode((string)@file_get_contents(dataDir() . '/party_counts.json'), true);
+    if (!is_array($counts)) $counts = [];
+    $over = [];
+    foreach ($partyIds as $pid) {
+        $cur = (int)($counts[$pid][$genderKey] ?? 0);
+        if ($cur + 1 > partyStockLimit($partyMap[$pid] ?? [], $genderKey)) $over[] = $pid;
+    }
+    return $over;
+}
+
 // ─── 쿠폰 할인 계산 ────────────────────────────────────────────────
 //   amount  : KRW 정액 차감 (lineTotal 초과 안 함)
 //   percent : lineTotal × (amount/100), max_discount 가 양수면 그 한도로 캡, 0원 미만 방지.
