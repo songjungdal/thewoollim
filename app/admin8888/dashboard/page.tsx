@@ -8,7 +8,9 @@ import { useParties, broadcastPartiesUpdated } from "../../lib/useParties";
 import { formatPhoneKR } from "../../lib/phone";
 import { calculateRefund } from "../../lib/refund";
 import { formatKST } from "../../lib/datetime";
-import { partyVisibility, type Party } from "../../lib/data";
+import { partyVisibility, partyTypeOf, PARTY_TYPES, PARTY_TYPE_LABELS, type Party, type PartyType } from "../../lib/data";
+import { templateFor, normalizeDetail, type PartyDetail } from "../../lib/partyDetailTemplates";
+import PartyDetailEditor, { validateDetail, type DetailSourceParty } from "./PartyDetailEditor";
 
 type AdminUser = {
   id: number; email: string; name: string; gender: string; phone: string;
@@ -72,6 +74,7 @@ type AdminLogRow = {
 
 type PartyForm = {
   id?: string;
+  partyType: "" | PartyType;   // 파티 종류 — 신규 등록은 기본값 없음 (고르지 않으면 저장 불가)
   title: string;
   description: string;
   dateString: string;
@@ -95,6 +98,7 @@ type PartyForm = {
   locationTag: "" | "서울" | "성남" | "수원" | "인천" | "용인" | "기타";
 };
 const EMPTY_PARTY: PartyForm = {
+  partyType: "",
   title: "", description: "", dateString: "", calendarDate: "",
   location: "", target: "", price: 0, priceMale: 0, priceFemale: 0, tag: "주제별",
   maleStock: 12, femaleStock: 12, imageUrl: "",
@@ -238,6 +242,15 @@ function BookingTable({ label, toneClass, rows, party, remarks, onApprove, onCan
   );
 }
 
+/** 파티 종류 배지 — 목록·예약 현황 공용 */
+function PartyTypeBadge({ type }: { type: PartyType }) {
+  return (
+    <span className={`inline-block text-[11px] font-black px-2 py-0.5 rounded-full whitespace-nowrap ${type === "solo" ? "bg-gray-900 text-white" : "bg-brand-point/20 text-brand-black"}`}>
+      {PARTY_TYPE_LABELS[type]}
+    </span>
+  );
+}
+
 function FormField({ label, value, onChange, placeholder, textarea }: {
   label: string; value: string; onChange: (v: string) => void;
   placeholder?: string; textarea?: boolean;
@@ -267,6 +280,18 @@ const STATUS_LABEL: Record<string, { label: string; tone: string }> = {
   refund_completed: { label: "환불 완료", tone: "bg-gray-200 text-gray-600" },
   cancelled: { label: "취소됨", tone: "bg-gray-200 text-gray-600" },
 };
+
+/** 관리자 GET 응답 → 파티별 종류·상세페이지 안내 */
+function buildAdminPartyRows(items: unknown[]): Record<string, { partyType: PartyType; detail: PartyDetail | null }> {
+  const out: Record<string, { partyType: PartyType; detail: PartyDetail | null }> = {};
+  for (const it of items) {
+    if (!it || typeof it !== "object") continue;
+    const r = it as { id?: unknown; partyType?: string; detail?: unknown };
+    if (r.id == null) continue;
+    out[String(r.id)] = { partyType: partyTypeOf(r), detail: normalizeDetail(r.detail) };
+  }
+  return out;
+}
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -446,15 +471,67 @@ export default function AdminDashboard() {
   const [memberMaritalFilter, setMemberMaritalFilter] = useState<"all" | "싱글" | "돌싱" | "empty">("all");
   const [memberSearch, setMemberSearch] = useState("");   // 이름/연락처/이메일 통합 검색
 
-  // 매칭파티 CRUD state
+  // 파티 CRUD state
   const [partyForm, setPartyForm] = useState<PartyForm>(EMPTY_PARTY);
   const [partyEditMode, setPartyEditMode] = useState<"create" | "edit" | null>(null);
   const [uploading, setUploading] = useState(false);
+  // 상세페이지 안내 편집 — 관리자 전용 GET(/api/admin/parties.php)의 저장값(detail)을 쓴다. 공개 목록 API 에는 detail 이 없다.
+  const [adminPartyRows, setAdminPartyRows] = useState<Record<string, { partyType: PartyType; detail: PartyDetail | null }>>({});
+  const [partyDetail, setPartyDetail] = useState<PartyDetail | null>(null);
+  const [detailUsingDefault, setDetailUsingDefault] = useState(false);   // 수정 모드 — 저장된 detail 없는 파티
+  const [detailTouched, setDetailTouched] = useState(false);             // 템플릿을 채운 뒤 내용을 고쳤는지
+  const [partyModalTab, setPartyModalTab] = useState<"basic" | "detail">("basic");
+  const [typeSwitchPrompt, setTypeSwitchPrompt] = useState<PartyType | null>(null);
+  const [partyTypeFilter, setPartyTypeFilter] = useState<"all" | PartyType>("all");
 
-  const openPartyCreate = () => { setPartyForm(EMPTY_PARTY); setPartyEditMode("create"); setPartyFormDirty(false); };
-  const openPartyEdit = (id: string) => {
+  const resetPartyModal = () => {
+    setPartyDetail(null); setDetailUsingDefault(false); setDetailTouched(false);
+    setPartyModalTab("basic"); setTypeSwitchPrompt(null);
+  };
+  const updatePartyDetail = (next: PartyDetail | ((prev: PartyDetail) => PartyDetail)) => {
+    setPartyDetail(prev => (typeof next === "function" ? (prev ? next(prev) : prev) : next));
+    setDetailTouched(true);
+    setPartyFormDirty(true);
+  };
+  // 파티별 신청자 수 (취소·환불완료 제외) — 수정 모드에서 종류를 바꿀 때 확인창에 쓴다
+  const activeApplicantCount = (partyId: string) =>
+    bookings.filter(b => b.partyId === partyId && b.status !== "cancelled" && b.status !== "refund_completed").length;
+
+  const selectPartyType = (t: PartyType) => {
+    const prevType = partyForm.partyType;
+    if (prevType === t) return;
+    if (partyEditMode === "edit" && partyForm.id && prevType) {
+      const n = activeApplicantCount(partyForm.id);
+      if (n > 0 && !confirm(`신청자 ${n}명이 있는 파티의 종류를 변경합니다. 안내 문자와 투표 관리 방식이 바뀝니다. 계속하시겠습니까?`)) return;
+    }
+    setPartyForm(p => ({ ...p, partyType: t }));
+    setPartyFormDirty(true);
+    if (!partyDetail) {
+      // 신규 등록에서 종류를 처음 고르면 그 종류의 기본 내용으로 채운다
+      setPartyDetail(templateFor(t)); setDetailTouched(false);
+    } else if (detailTouched || (partyEditMode === "edit" && !detailUsingDefault)) {
+      // 고친 내용(또는 이 파티 전용으로 저장된 내용)이 있으면 바꿀지 묻는다
+      setTypeSwitchPrompt(t);
+    } else {
+      setPartyDetail(templateFor(t)); setDetailTouched(false);
+    }
+  };
+
+  const openPartyCreate = () => { setPartyForm(EMPTY_PARTY); resetPartyModal(); setPartyEditMode("create"); setPartyFormDirty(false); };
+  const openPartyEdit = async (id: string) => {
     const p = PARTIES.find(x => x.id === id);
     if (!p) return;
+    // 수정 창을 열 때 저장된 상세페이지 안내를 새로 읽는다 (실패하면 마지막으로 불러온 값 사용)
+    let row = adminPartyRows[id];
+    try {
+      const r = await fetch("/api/admin/parties.php", { cache: "no-store", credentials: "include" }).then(x => x.json());
+      if (Array.isArray(r?.items)) {
+        const rows = buildAdminPartyRows(r.items);
+        setAdminPartyRows(rows);
+        row = rows[id] ?? row;
+      }
+    } catch { /* 마지막 값 사용 */ }
+    const type = row?.partyType ?? partyTypeOf(p);
     const ams = p.allowedMaritalStatus;
     const tg = p.targetGroup;
     const th = p.theme;
@@ -474,7 +551,11 @@ export default function AdminDashboard() {
       targetGroup: (tg === "싱글" || tg === "돌싱") ? tg : "",
       theme: (th === "티타임" || th === "와인파티" || th === "사케파티" || th === "쿠킹클래스") ? th : "",
       locationTag: (lt === "서울" || lt === "성남" || lt === "수원" || lt === "인천" || lt === "용인" || lt === "기타") ? lt : "",
+      partyType: type,
     });
+    resetPartyModal();
+    setPartyDetail(row?.detail ?? templateFor(type));
+    setDetailUsingDefault(!row?.detail);
     setPartyEditMode("edit");
     setPartyFormDirty(false);
   };
@@ -484,6 +565,7 @@ export default function AdminDashboard() {
     }
     setPartyEditMode(null);
     setPartyForm(EMPTY_PARTY);
+    resetPartyModal();
     setPartyFormDirty(false);
   };
 
@@ -510,6 +592,7 @@ export default function AdminDashboard() {
     const f = partyForm;
     // 7가지 필수 항목 검증 — 누락 항목명을 alert 에 명시
     const missing: string[] = [];
+    if (!f.partyType)                                     missing.push("파티 종류");
     if (!String(f.title).trim())                          missing.push("제목");
     if (!String(f.description ?? "").trim())              missing.push("내용/소개");
     if (!String(f.dateString).trim() || !String(f.calendarDate).trim()) missing.push("행사 일시");
@@ -521,7 +604,15 @@ export default function AdminDashboard() {
     if (!Number.isFinite(f.femaleStock) || f.femaleStock <= 0) missing.push("모집 인원(여성)");
 
     if (missing.length > 0) {
+      setPartyModalTab("basic");
       alert(`모든 항목을 입력해야 등록이 가능합니다.\n[${missing.join(", ")}]을 확인해주세요.`);
+      return;
+    }
+    const detail = partyDetail ?? templateFor(f.partyType || "matching");
+    const detailErrors = validateDetail(detail);
+    if (detailErrors.length > 0) {
+      setPartyModalTab("detail");
+      alert(`상세페이지 안내에서 다음 항목을 입력해주세요.\n[${detailErrors.join(", ")}]`);
       return;
     }
     const action = partyEditMode === "create" ? "create" : "update";
@@ -529,7 +620,7 @@ export default function AdminDashboard() {
       const res = await fetch("/api/admin/parties.php", {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, party: f }),
+        body: JSON.stringify({ action, party: { ...f, detail } }),
       });
       const d = await res.json();
       if (!d?.ok) {
@@ -548,14 +639,16 @@ export default function AdminDashboard() {
       alert(wasCreate ? "등록되었습니다." : "수정되었습니다.");
       setPartyEditMode(null);
       setPartyForm(EMPTY_PARTY);
+      resetPartyModal();
       setTab("parties");
+      loadAll();
     } catch {
       alert("수정 중 오류가 발생했습니다.");
     }
   };
 
   const deleteParty = async (id: string) => {
-    if (!confirm("이 매칭파티를 삭제하시겠습니까?\n(예약된 회원이 있으면 데이터가 어긋날 수 있습니다.)")) return;
+    if (!confirm("이 파티를 삭제하시겠습니까?\n(예약된 회원이 있으면 데이터가 어긋날 수 있습니다.)")) return;
     try {
       const res = await fetch("/api/admin/parties.php", {
         method: "POST", credentials: "include",
@@ -635,6 +728,7 @@ export default function AdminDashboard() {
         }
       }
       setHostMap(hMap);
+      setAdminPartyRows(buildAdminPartyRows(p.items));
     }
   }, []);
 
@@ -1156,7 +1250,7 @@ export default function AdminDashboard() {
   const TABS: { key: TabKey; label: string; icon: typeof Users }[] = [
     { key: "members", label: "회원 관리", icon: Users },
     { key: "bookings", label: "예약 / 신청 현황", icon: Ticket },
-    { key: "parties", label: "매칭파티", icon: Calendar },
+    { key: "parties", label: "파티 관리", icon: Calendar },
     { key: "coupons", label: "쿠폰 관리", icon: Tag },
     { key: "company", label: "기업 정보", icon: Building2 },
     { key: "gallery", label: "현장스케치 관리", icon: ImageIcon },
@@ -1399,7 +1493,7 @@ export default function AdminDashboard() {
                   <div>
                     <h2 className="text-xl md:text-2xl font-black">예약 / 신청 현황</h2>
                     <p className="text-sm text-gray-500 font-medium mt-1">
-                      <span className="font-bold text-brand-point-ink">{labelMonth(monthFilter)}</span> · 매칭파티 {orderedPartyIds.length}개 · 전체 {monthBookings.length}건
+                      <span className="font-bold text-brand-point-ink">{labelMonth(monthFilter)}</span> · 파티 {orderedPartyIds.length}개 · 전체 {monthBookings.length}건
                     </p>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
@@ -1444,7 +1538,7 @@ export default function AdminDashboard() {
 
                 {orderedPartyIds.length === 0 && (
                   <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center text-gray-500">
-                    등록된 매칭파티가 없습니다. [매칭파티] 탭에서 먼저 등록해주세요.
+                    등록된 파티가 없습니다. [파티 관리] 탭에서 먼저 등록해주세요.
                   </div>
                 )}
 
@@ -1497,6 +1591,7 @@ export default function AdminDashboard() {
                               · flex-wrap         : 좁은 데스크톱에서 자연 wrap (호스트 그룹 영역 보호)
                             */}
                             <div className="flex items-center gap-x-3 gap-y-1 flex-wrap min-w-0 md:flex-1">
+                              {party && <PartyTypeBadge type={partyTypeOf(party)} />}
                               <h3 className="text-lg md:text-2xl font-black text-brand-black break-keep">{party?.title ?? `파티 #${pid}`}</h3>
                               <span className="text-xs md:text-sm text-gray-500 font-bold whitespace-nowrap">{party?.dateString ?? ""}</span>
                               <span className="text-base md:text-xl font-black text-brand-black whitespace-nowrap">
@@ -1613,7 +1708,7 @@ export default function AdminDashboard() {
             );
           })()}
 
-          {/* === 매칭파티 관리 === */}
+          {/* === 파티 관리 === */}
           {tab === "parties" && (() => {
             // 월 옵션 — PARTIES.calendarDate 에서 unique YYYY-MM 추출 (DESC, 최신 월 먼저)
             const monthSet = new Set<string>();
@@ -1630,6 +1725,7 @@ export default function AdminDashboard() {
             };
             // 월 필터 적용 + calendarDate ASC 정렬 (빈 값은 맨 뒤)
             const filteredParties = [...PARTIES]
+              .filter(p => partyTypeFilter === "all" || partyTypeOf(p) === partyTypeFilter)
               .filter(p => partyMonthFilter === "all" || (p.calendarDate || "").startsWith(partyMonthFilter))
               .sort((a, b) => {
                 const ac = a.calendarDate || "";
@@ -1643,17 +1739,26 @@ export default function AdminDashboard() {
             <section>
               <div className="flex items-end justify-between mb-4 md:mb-5 flex-wrap gap-3">
                 <div className="min-w-0">
-                  <h2 className="text-xl md:text-2xl font-black">매칭파티 관리</h2>
+                  <h2 className="text-xl md:text-2xl font-black">파티 관리</h2>
                   <p className="text-sm text-gray-500 font-medium mt-1">
                     <span className="font-bold text-brand-point-ink">{labelMonth(partyMonthFilter)}</span> · 노출 {filteredParties.length}건 · 전체 {PARTIES.length}건 · 등록/수정/삭제 시 메인페이지·달력 즉시 반영
                   </p>
                 </div>
-                {/* 우측 컨트롤 — 월 필터(좌) + 신규 등록(우). 모바일에서 자연 wrap, 갭 일정 유지 */}
+                {/* 우측 컨트롤 — 종류 필터 + 월 필터 + 신규 등록. 모바일에서 자연 wrap, 갭 일정 유지 */}
                 <div className="flex items-center gap-2 flex-wrap justify-end">
+                  <select
+                    value={partyTypeFilter}
+                    onChange={e => setPartyTypeFilter(e.target.value as "all" | PartyType)}
+                    aria-label="파티 종류 필터"
+                    className="px-3 py-2.5 rounded-lg border border-gray-200 text-sm font-bold bg-white text-brand-black focus:ring-2 focus:ring-brand-point outline-none"
+                  >
+                    <option value="all">전체</option>
+                    {PARTY_TYPES.map(t => <option key={t} value={t}>{PARTY_TYPE_LABELS[t]}</option>)}
+                  </select>
                   <select
                     value={partyMonthFilter}
                     onChange={e => setPartyMonthFilter(e.target.value)}
-                    aria-label="매칭파티 월 필터"
+                    aria-label="파티 월 필터"
                     className="px-3 py-2.5 rounded-lg border border-gray-200 text-sm font-bold bg-white text-brand-black focus:ring-2 focus:ring-brand-point outline-none"
                   >
                     <option value="all">전체 월</option>
@@ -1673,7 +1778,7 @@ export default function AdminDashboard() {
                     <tr>
                       {/* '태그' 컬럼 제거 — 주제별/일정별/지역별 등 카테고리 태그는 UI 노출 X.
                           데이터(p.tag)는 보존 — 파티 등록/수정 폼 / 홈 카테고리 필터에서 계속 활용. */}
-                      {["#", "이미지", "제목", "일시", "장소", "대상", "참가비", "정원(남/여)", "액션"].map(h => (
+                      {["#", "종류", "이미지", "제목", "일시", "장소", "대상", "참가비", "정원(남/여)", "액션"].map(h => (
                         <th key={h} className="text-left px-3 py-3">{h}</th>
                       ))}
                     </tr>
@@ -1682,6 +1787,7 @@ export default function AdminDashboard() {
                     {filteredParties.map(p => (
                       <tr key={p.id} className="border-t border-gray-100 hover:bg-gray-50">
                         <td className="px-3 py-2.5 font-bold text-gray-500">{p.id}</td>
+                        <td className="px-3 py-2.5"><PartyTypeBadge type={partyTypeOf(p)} /></td>
                         <td className="px-3 py-2.5">
                           {p.imageUrl
                             ? <img src={p.imageUrl} alt="" className="w-12 h-9 object-cover rounded" />
@@ -1695,6 +1801,9 @@ export default function AdminDashboard() {
                         <td className="px-3 py-2.5 text-gray-600">{p.maleStock}명 / {p.femaleStock}명</td>
                         <td className="px-3 py-2.5">
                           <div className="flex gap-1.5">
+                            <a href={`/party/${p.id}/`} target="_blank" rel="noopener noreferrer" className="bg-white border border-gray-200 text-brand-black px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-gray-50 transition-all">
+                              보기
+                            </a>
                             <button onClick={() => openPartyEdit(p.id)} className="bg-brand-black text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-brand-point hover:text-black transition-all">
                               <Pencil size={11} className="inline mr-1" />수정
                             </button>
@@ -1706,10 +1815,10 @@ export default function AdminDashboard() {
                       </tr>
                     ))}
                     {filteredParties.length === 0 && (
-                      <tr><td colSpan={9} className="text-center text-gray-500 py-8">
+                      <tr><td colSpan={10} className="text-center text-gray-500 py-8">
                         {PARTIES.length === 0
-                          ? "등록된 매칭파티 없음"
-                          : `${labelMonth(partyMonthFilter)}에 등록된 매칭파티 없음`}
+                          ? "등록된 파티 없음"
+                          : `${labelMonth(partyMonthFilter)}${partyTypeFilter !== "all" ? ` · ${PARTY_TYPE_LABELS[partyTypeFilter]}` : ""}에 등록된 파티 없음`}
                       </td></tr>
                     )}
                   </tbody>
@@ -1728,11 +1837,59 @@ export default function AdminDashboard() {
                   >
                     {/* 고정 헤더 */}
                     <div className="bg-white border-b border-gray-200 px-5 md:px-7 py-4 flex items-center justify-between flex-shrink-0">
-                      <h3 className="font-black text-base md:text-lg">{partyEditMode === "create" ? "신규 매칭파티 등록" : `매칭파티 수정 #${partyForm.id}`}</h3>
+                      <h3 className="font-black text-base md:text-lg">{partyEditMode === "create" ? "신규 파티 등록" : `파티 수정 #${partyForm.id}`}</h3>
                       <button onClick={closePartyForm} className="text-gray-500 hover:text-gray-700 p-1 -mr-1" aria-label="닫기"><X size={20} /></button>
+                    </div>
+                    {/* 탭 — [기본 정보] [상세페이지 안내]. 저장 버튼은 하나로 두 탭 내용을 함께 저장 */}
+                    <div className="flex border-b border-gray-200 px-5 md:px-7 flex-shrink-0" role="tablist">
+                      {([["basic", "기본 정보"], ["detail", "상세페이지 안내"]] as const).map(([k, label]) => (
+                        <button key={k} type="button" role="tab" aria-selected={partyModalTab === k}
+                          onClick={() => setPartyModalTab(k)}
+                          className={`px-3 md:px-4 py-3 text-sm font-black -mb-px border-b-2 transition-colors ${partyModalTab === k ? "border-brand-point text-brand-black" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
+                          {label}
+                        </button>
+                      ))}
                     </div>
                     {/* 스크롤 가능한 본문 */}
                     <div className="flex-1 overflow-y-auto overscroll-contain p-5 md:p-7 space-y-4">
+                      {partyModalTab === "detail" ? (
+                        partyDetail && partyForm.partyType ? (
+                          <PartyDetailEditor
+                            value={partyDetail}
+                            onChange={updatePartyDetail}
+                            partyType={partyForm.partyType}
+                            usingDefault={partyEditMode === "edit" && detailUsingDefault}
+                            currentId={partyForm.id}
+                            sources={[...PARTIES]
+                              .sort((a, b) => Number(b.id) - Number(a.id))
+                              .map<DetailSourceParty>(p => ({
+                                id: p.id, title: p.title, dateString: p.dateString,
+                                partyType: adminPartyRows[p.id]?.partyType ?? partyTypeOf(p),
+                                detail: adminPartyRows[p.id]?.detail ?? null,
+                              }))}
+                          />
+                        ) : (
+                          <p className="text-sm font-bold text-gray-500 bg-gray-50 rounded-xl p-6 text-center">
+                            [기본 정보] 탭에서 파티 종류를 먼저 선택해주세요.
+                          </p>
+                        )
+                      ) : (<>
+                      {/* 파티 종류 */}
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-1.5">파티 종류 *</label>
+                        <div className="grid grid-cols-2 gap-3">
+                          {PARTY_TYPES.map(t => (
+                            <button key={t} type="button" onClick={() => selectPartyType(t)} aria-pressed={partyForm.partyType === t}
+                              className={`py-4 rounded-xl border-2 text-base md:text-lg font-black transition-all ${partyForm.partyType === t ? "border-brand-point bg-brand-point/15 text-brand-black" : "border-gray-200 text-gray-500 hover:border-gray-300"}`}>
+                              {PARTY_TYPE_LABELS[t]}
+                            </button>
+                          ))}
+                        </div>
+                        {partyForm.partyType === "solo" && (
+                          <p className="text-xs font-bold text-gray-600 mt-2">솔로파티는 매칭 투표가 없습니다.</p>
+                        )}
+                      </div>
+
                       {/* 대표 이미지 */}
                       <div>
                         <label className="block text-sm font-bold text-gray-700 mb-1.5">대표 이미지</label>
@@ -1746,7 +1903,7 @@ export default function AdminDashboard() {
                             <input type="file" accept="image/*" aria-label="대표 이미지"
                               onChange={e => { const f = e.target.files?.[0]; if (f) uploadImage(f); }}
                               className="block w-full text-xs file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-brand-black file:text-white file:font-bold file:cursor-pointer hover:file:bg-brand-point" />
-                            <p className="text-xs text-gray-500 mt-1.5">JPG/PNG/WebP, 최대 5MB. 메인페이지 카드·상세페이지 상단에 공통 노출 — 가로로 넓은 배너형 권장 (예: 1200×300)</p>
+                            <p className="text-xs text-gray-500 mt-1.5">JPG/PNG/WebP, 최대 10MB. 메인페이지 카드·상세페이지 상단에 공통 노출 — 가로로 넓은 배너형 권장 (예: 1200×300)</p>
                             {uploading && <p className="text-xs text-brand-point-ink mt-1">업로드 중...</p>}
                             {partyForm.imageUrl && (
                               <button onClick={() => setPartyForm(p => ({ ...p, imageUrl: "" }))}
@@ -1925,6 +2082,7 @@ export default function AdminDashboard() {
                           </div>
                         </div>
                       </div>
+                      </>)}
                     </div>
                     {/* 고정 푸터 */}
                     <div className="bg-white border-t border-gray-200 px-5 md:px-7 py-4 flex gap-2 justify-end flex-shrink-0">
@@ -1934,6 +2092,25 @@ export default function AdminDashboard() {
                       </button>
                     </div>
                   </div>
+                  {/* 종류를 바꿀 때 — 상세페이지 안내를 새 종류의 기본 내용으로 바꿀지 확인 */}
+                  {typeSwitchPrompt && (
+                    <div className="fixed inset-0 z-[210] bg-black/40 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+                      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5 md:p-6">
+                        <p className="font-black text-base md:text-lg text-brand-black break-keep">
+                          상세페이지 안내를 {PARTY_TYPE_LABELS[typeSwitchPrompt]} 기본 내용으로 바꿀까요?
+                        </p>
+                        <div className="flex gap-2 justify-end mt-5">
+                          <button type="button" onClick={() => setTypeSwitchPrompt(null)}
+                            className="px-4 py-2.5 rounded-lg text-sm font-bold border border-gray-200 hover:bg-gray-50">지금 내용 유지</button>
+                          <button type="button" onClick={() => {
+                              setPartyDetail(templateFor(typeSwitchPrompt)); setDetailTouched(false);
+                              setPartyFormDirty(true); setTypeSwitchPrompt(null);
+                            }}
+                            className="px-4 py-2.5 rounded-lg text-sm font-black bg-brand-black text-white hover:bg-brand-point hover:text-black">바꾸기</button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

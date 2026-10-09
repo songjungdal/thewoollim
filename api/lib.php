@@ -207,6 +207,125 @@ function partiesOverStock(array $partyIds, array $partyMap, string $genderKey): 
     return $over;
 }
 
+// ─── 파티 종류 (매칭파티 / 솔로파티) ───────────────────────────────
+// 저장값은 영문 코드. 값이 없거나 허용 목록 밖이면 matching (기존 파티는 데이터 변환 없이 매칭파티).
+//   화면 쪽 같은 정의: app/lib/data.ts (PARTY_TYPES, partyTypeOf)
+const PARTY_TYPE_LABELS = ['matching' => '매칭파티', 'solo' => '솔로파티'];
+
+function partyTypeOf(array $party): string {
+    $t = (string)($party['partyType'] ?? '');
+    return isset(PARTY_TYPE_LABELS[$t]) ? $t : 'matching';
+}
+
+function partyTypeLabel(array $party): string {
+    return PARTY_TYPE_LABELS[partyTypeOf($party)];
+}
+
+// ─── 상세페이지 안내 (detail) 검증 ──────────────────────────────────
+// 구조·기본 내용: app/lib/partyDetailTemplates.ts. 입력 제한은 같은 파일의 DETAIL_LIMITS 와 일치해야 한다.
+const PARTY_DETAIL_IMAGE_SLOTS = ['beforeApply', 'afterApply', 'beforeTimeline', 'beforeNotice', 'afterNotice'];
+const PARTY_DETAIL_IMAGE_SLOT_LABELS = [
+    'beforeApply'    => '사진 ① 참가 신청 방법 위',
+    'afterApply'     => '사진 ② 참가 신청 방법 아래',
+    'beforeTimeline' => '사진 ③ 진행 안내 위',
+    'beforeNotice'   => '사진 ④ 필수 확인 사항 위',
+    'afterNotice'    => '사진 ⑤ 필수 확인 사항 아래',
+];
+
+// 제어문자 제거 — 줄바꿈 허용 필드($multiline)는 줄바꿈만 남기고, 한 줄 필드는 공백으로 바꾼다.
+function cleanDetailText($v, bool $multiline): string {
+    $s = str_replace(["\r\n", "\r"], "\n", (string)$v);
+    $s = (string)preg_replace('/[\x00-\x09\x0B-\x1F\x7F]/u', '', $s);
+    if (!$multiline) $s = str_replace("\n", ' ', $s);
+    return trim($s);
+}
+
+// 길이 초과 시 RuntimeException(한국어 사유) — 관리자 저장 요청에서 jsonFail 로 전달된다.
+function detailTextField(array $src, string $key, int $max, bool $multiline, string $label): string {
+    $s = cleanDetailText($src[$key] ?? '', $multiline);
+    if (mb_strlen($s) > $max) throw new RuntimeException("{$label}은(는) {$max}자 이하로 입력해주세요. (현재 " . mb_strlen($s) . "자)");
+    return $s;
+}
+
+/**
+ * 관리자 입력 detail 정규화 + 입력 제한 검사. 알려진 필드만 남긴다.
+ * 넘치거나 허용되지 않은 값이면 RuntimeException (저장 거절).
+ */
+function sanitizePartyDetail($d): array {
+    if (!is_array($d)) throw new RuntimeException('상세페이지 안내 형식이 올바르지 않습니다.');
+    $tl   = is_array($d['timeline'] ?? null)  ? $d['timeline']  : [];
+    $du   = is_array($d['durations'] ?? null) ? $d['durations'] : [];
+    $imgs = is_array($d['images'] ?? null)    ? $d['images']    : [];
+
+    $stepsIn = is_array($tl['steps'] ?? null) ? array_values($tl['steps']) : [];
+    if (count($stepsIn) > 10) throw new RuntimeException('진행 단계는 10개까지 입력할 수 있습니다.');
+    $steps = [];
+    foreach ($stepsIn as $i => $st) {
+        if (!is_array($st)) throw new RuntimeException('진행 단계 형식이 올바르지 않습니다.');
+        $n = $i + 1;
+        $step = [
+            'title' => detailTextField($st, 'title', 60,  false, "단계 {$n} 제목"),
+            'time'  => detailTextField($st, 'time',  20,  false, "단계 {$n} 소요시간"),
+            'desc'  => detailTextField($st, 'desc',  500, true,  "단계 {$n} 설명"),
+            'note'  => detailTextField($st, 'note',  200, true,  "단계 {$n} 참고 문구"),
+        ];
+        if ($step['title'] === '') throw new RuntimeException("단계 {$n}의 제목을 입력해주세요.");
+        if ($step['desc'] === '')  throw new RuntimeException("단계 {$n}의 설명을 입력해주세요.");
+        $steps[] = $step;
+    }
+
+    $rowsIn = is_array($du['rows'] ?? null) ? array_values($du['rows']) : [];
+    if (count($rowsIn) > 6) throw new RuntimeException('소요 시간 안내는 6줄까지 입력할 수 있습니다.');
+    $rows = [];
+    foreach ($rowsIn as $i => $r) {
+        if (!is_array($r)) throw new RuntimeException('소요 시간 안내 형식이 올바르지 않습니다.');
+        $n = $i + 1;
+        $rows[] = [
+            'label' => detailTextField($r, 'label', 30, false, "소요 시간 {$n}번째 줄 구분"),
+            'total' => detailTextField($r, 'total', 30, false, "소요 시간 {$n}번째 줄 시간"),
+        ];
+    }
+
+    $images = [];
+    foreach (PARTY_DETAIL_IMAGE_SLOTS as $slot) {
+        $list = is_array($imgs[$slot] ?? null) ? array_values($imgs[$slot]) : [];
+        $label = PARTY_DETAIL_IMAGE_SLOT_LABELS[$slot];
+        if (count($list) > 10) throw new RuntimeException("{$label}: 사진은 10장까지 넣을 수 있습니다.");
+        $out = [];
+        foreach ($list as $i => $img) {
+            if (!is_array($img)) throw new RuntimeException("{$label}: 사진 형식이 올바르지 않습니다.");
+            $url = trim((string)($img['url'] ?? ''));
+            // /uploads/parties/파일명 또는 /images/파일명 만 허용 (외부 주소 불가). '.', '..' 같은 이름도 막는다.
+            if (!preg_match('#^/(uploads/parties|images)/[A-Za-z0-9._-]+$#', $url) || preg_match('#/\.+$#', $url)) {
+                throw new RuntimeException("{$label}: 허용되지 않은 사진 주소입니다.");
+            }
+            $out[] = ['url' => $url, 'alt' => detailTextField($img, 'alt', 100, false, "{$label} " . ($i + 1) . "번째 사진 대체 텍스트")];
+        }
+        $images[$slot] = $out;
+    }
+
+    return [
+        'timeline'  => [
+            'title' => detailTextField($tl, 'title', 60,  false, '진행 안내 제목'),
+            'intro' => detailTextField($tl, 'intro', 200, false, '소개 문구'),
+            'steps' => $steps,
+        ],
+        'durations' => [
+            'title' => detailTextField($du, 'title', 60, false, '소요 시간 안내 제목'),
+            'rows'  => $rows,
+        ],
+        'images'    => $images,
+    ];
+}
+
+// 관리자 활동 기록용 요약 — detail 전체 대신 개수만 남긴다.
+function partyDetailCounts(array $detail): string {
+    $steps  = count($detail['timeline']['steps'] ?? []);
+    $photos = 0;
+    foreach (PARTY_DETAIL_IMAGE_SLOTS as $slot) $photos += count($detail['images'][$slot] ?? []);
+    return "단계 {$steps}개, 사진 {$photos}장";
+}
+
 // ─── 쿠폰 할인 계산 ────────────────────────────────────────────────
 //   amount  : KRW 정액 차감 (lineTotal 초과 안 함)
 //   percent : lineTotal × (amount/100), max_discount 가 양수면 그 한도로 캡, 0원 미만 방지.

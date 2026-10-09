@@ -71,6 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     //    start_blocking = 'cancelled'/'confirmed' 이외(취소요청·확정대기·결제완료 등) 참가자 수.
     //      → 1명이라도 있으면 프런트에서 [투표시작] 차단. (read-only 스캔, 쓰기 X)
     $participants  = ['male' => 0, 'female' => 0];
+    $confirmedCount = 0;   // '참가확정'(confirmed)만 — 솔로파티 [모임종료] 확인창 "참가확정 N명" 용
     $startBlocking = 0;
     foreach (glob(dataDir() . '/bookings_*.json') ?: [] as $bf) {
         $raw = @file_get_contents($bf);
@@ -83,6 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             $st = (string)($b['status'] ?? '');
             // 차단 카운트 — cancelled/confirmed 만 통과, 그 외 미완료 상태는 차단 대상
             if ($st !== 'cancelled' && $st !== 'confirmed') $startBlocking++;
+            if ($st === 'confirmed') $confirmedCount++;
             // 참가자 총원 — confirmed + completed 만 합산
             if ($st !== 'confirmed' && $st !== 'completed') continue;
             $g = (string)($b['gender'] ?? '');
@@ -119,7 +121,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         'partyId'       => $partyId,
         'partyTitle'    => (string)($found['title'] ?? ''),
         'voting_status' => (string)($found['voting_status'] ?? 'closed'),
+        'partyType'     => partyTypeOf($found),
         'participants'  => $participants,
+        'confirmed_count' => $confirmedCount,
         'start_blocking'=> $startBlocking,
         'votes'         => $votes,
         'matches'       => $matches,
@@ -147,6 +151,11 @@ try {
         $found = false;
         foreach ($parties as &$p) {
             if ((string)($p['id'] ?? '') === $partyId) {
+                // 솔로파티는 매칭 투표가 없다 — 투표 시작 거절. [모임종료](end)·[종료 취소](reset)는 그대로 사용.
+                $isSolo = partyTypeOf($p) === 'solo';
+                if ($isSolo && $action === 'start') {
+                    throw new RuntimeException('솔로파티는 매칭 투표가 없습니다.');
+                }
                 $p['voting_status'] = $nextStatus;
                 // end 액션 → 파티 자체 상태를 'completed' (모임종료) 로 전환.
                 // start/reset 시 이전 'completed' 가 있었다면 해제(삭제).
@@ -158,6 +167,10 @@ try {
                 // [투표시작] → 호스트(담당자) 컬럼에 버튼을 누른 관리자 아이디를 로그 형태로 자동 기록.
                 //   현장에서 투표를 오픈한 담당자를 추적하기 위함. (host_name = '관리자아이디')
                 if ($action === 'start') {
+                    $p['host_name'] = $adminId;
+                }
+                // 솔로파티 [모임종료] → 담당자가 비어 있을 때만 누른 관리자 아이디를 기록 (기존 담당자는 유지).
+                if ($isSolo && $action === 'end' && trim((string)($p['host_name'] ?? '')) === '') {
                     $p['host_name'] = $adminId;
                 }
                 $found = true;

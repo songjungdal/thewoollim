@@ -69,6 +69,7 @@ foreach ((array)$parties as $p) {
     if ((string)($p['id'] ?? '') === $partyId) { $found = $p; break; }
 }
 if (!$found) jsonFail('파티를 찾을 수 없습니다.', 404);
+if (partyTypeOf($found) === 'solo') jsonFail('솔로파티는 매칭 투표가 없습니다.', 403);
 if (($found['voting_status'] ?? 'closed') !== 'open') {
     jsonFail('현재 투표가 열려있지 않습니다.', 403);
 }
