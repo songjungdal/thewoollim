@@ -7,7 +7,7 @@
  *
  * 흐름:
  *  1) 현재(Asia/Seoul) 시각이 '시작 2시간 전 ~ 그 후 10분' 구간인 예약만 대상
- *     - 시작 시각 = calendarDate + 예약의 처음 참석 회차 시각(참가 구성 예약, sessionTimes[0]) 또는 dateString 시각
+ *     - 시작 시각 = calendarDate + 예약의 처음 참석 회차 시각(참가 구성 예약 — 파티의 현재 회차 시각, 못 찾으면 예약 사본) 또는 dateString 시각
  *     - 2부만 신청한 회원은 2부 시작 2시간 전에, 1부+2부 신청자는 1부 기준으로 한 번만 받는다
  *  2) status==='confirmed' 예약 중 start2hNotifiedAt 이 없는 건만 발송 (회원은 파티당 예약 1건 → 예약당 1번)
  *  3) 발송 성공(result_code==='1') 시에만 해당 booking 에 start2hNotifiedAt 기록 → 같은 구간 재실행돼도 중복 발송 없음
@@ -129,7 +129,7 @@ foreach ($users as $u) {
         if (!isset($targets[$partyId])) continue;
         if (!empty($b['start2hNotifiedAt'])) continue;
         // 예약마다 처음 참석하는 회차 기준 (참가 구성 예약이 아니면 파티 시작 시각)
-        $firstTime = bookingFirstSessionTime($b);
+        $firstTime = bookingFirstSessionTime($b, $targets[$partyId]['party']);
         $bookingStart = $firstTime !== ''
             ? _s2hAt((string)($targets[$partyId]['party']['calendarDate'] ?? ''), $firstTime)
             : _s2hPartyStart($targets[$partyId]['party']);

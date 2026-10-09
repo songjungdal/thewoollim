@@ -29,6 +29,12 @@ if (!file_exists($file)) jsonOut([]);
 $d = json_decode((string)file_get_contents($file), true);
 if (!is_array($d)) jsonOut([]);
 
+// 파티 정보 — 참가 구성 예약의 회차 시각은 파티의 현재 회차 기준 (못 찾으면 예약 사본)
+$partyMap = [];
+foreach ((array)json_decode((string)@file_get_contents(dataDir() . '/parties.json'), true) as $p) {
+    if (is_array($p) && isset($p['id'])) $partyMap[(string)$p['id']] = $p;
+}
+
 // 최신순 정렬
 usort($d, fn($a, $b) => strcmp((string)($b['createdAt'] ?? ''), (string)($a['createdAt'] ?? '')));
 
@@ -51,7 +57,7 @@ foreach ($d as $b) {
         $row['optionId']     = (string)$b['optionId'];
         $row['optionName']   = (string)($b['optionName'] ?? '');
         $row['sessionIds']   = array_values(array_map('strval', (array)($b['sessionIds'] ?? [])));
-        $row['sessionTimes'] = array_values(array_map('strval', (array)($b['sessionTimes'] ?? [])));
+        $row['sessionTimes'] = bookingSessionTimes($b, $partyMap[(string)($b['partyId'] ?? '')] ?? null);
         unset($row);
     }
 }

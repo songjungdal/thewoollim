@@ -142,7 +142,7 @@ foreach ($users as $u) {
             $ptime = $dt['time'] !== '' ? $dt['time'] : '추후 안내';
             // 참가 구성 예약 — 항목 이름 한 줄, 시간은 처음 참석하는 회차 기준 (항목 예약이 아니면 기존 문구 그대로)
             $optLine = !empty($b['optionName']) ? '참가: ' . (string)$b['optionName'] . "\n" : '';
-            if (bookingFirstSessionTime($b) !== '') $ptime = bookingFirstSessionTime($b);
+            if (bookingFirstSessionTime($b, $party) !== '') $ptime = bookingFirstSessionTime($b, $party);
 
             $msg =
                 "{$name}님, 내일은 설레는 만남이 있는 {$typeLabel} 날입니다!\n\n" .
