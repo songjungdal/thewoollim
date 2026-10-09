@@ -329,7 +329,7 @@ export default function MatchingResultsPage() {
               {/* 하단 링크 — 기존 로그인 화면과 동일 (아이디/비밀번호 찾기) */}
               <div className="flex justify-center items-center gap-5 mt-6 text-sm font-bold">
                 <Link href="/login/" className="text-gray-500 hover:text-black transition-colors">아이디 찾기</Link>
-                <span className="text-gray-300" aria-hidden="true">|</span>
+                <span className="text-gray-500" aria-hidden="true">|</span>
                 <Link href="/login/" className="text-gray-500 hover:text-black transition-colors">비밀번호 찾기</Link>
               </div>
             </div>
@@ -352,19 +352,19 @@ export default function MatchingResultsPage() {
                 <h3 className="text-lg font-black text-black mb-4">나의 프로필 정보</h3>
                 <div className="grid grid-cols-2 gap-4 text-base">
                   <div>
-                    <p className="text-xs text-gray-400 font-bold mb-1">이름</p>
+                    <p className="text-xs text-gray-500 font-bold mb-1">이름</p>
                     <p className="font-black text-black">{data.user?.name || "-"}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-400 font-bold mb-1">성별</p>
+                    <p className="text-xs text-gray-500 font-bold mb-1">성별</p>
                     <p className="font-black text-black">{data.user?.gender || "-"}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-400 font-bold mb-1">생년월일</p>
+                    <p className="text-xs text-gray-500 font-bold mb-1">생년월일</p>
                     <p className="font-bold text-gray-700 tabular-nums">{data.user?.birth_date || "-"}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-400 font-bold mb-1">연락처</p>
+                    <p className="text-xs text-gray-500 font-bold mb-1">연락처</p>
                     <p className="font-bold text-gray-700 tabular-nums">{data.user?.phone || "-"}</p>
                   </div>
                 </div>
@@ -472,7 +472,7 @@ export default function MatchingResultsPage() {
                               </span>
                             ))}
                             {selectedParty.my_vote.picks.length === 0 && (
-                              <span className="text-base text-gray-400 font-bold">선택 정보 없음</span>
+                              <span className="text-base text-gray-500 font-bold">선택 정보 없음</span>
                             )}
                           </div>
                         </div>
@@ -519,7 +519,7 @@ export default function MatchingResultsPage() {
                         <div>
                           {/* 라벨/안내문 — 소프트 그레이 + 모바일 한 단계 축소(짤림 방지, 한 줄 유지) */}
                           <label className="block text-[13px] sm:text-base font-black text-gray-500 mb-1 break-keep">마음에 드는 이성의 번호</label>
-                          <p className="text-[11px] sm:text-sm text-gray-400 font-bold mb-3 break-keep">
+                          <p className="text-xs sm:text-sm text-gray-500 font-bold mb-3 break-keep">
                             이성의 번호는 최소 1명에서 최대 2명까지 입력 가능합니다.
                           </p>
                           <div className="grid grid-cols-2 gap-3">
@@ -597,9 +597,9 @@ export default function MatchingResultsPage() {
                               </div>
                               {/* 상대 카드 — 이름 + 연락처 */}
                               <div className="bg-gray-50 border-2 border-[#40E0D0] rounded-2xl p-6">
-                                <p className="text-xs font-black text-gray-400 mb-1">매칭된 회원의 이름</p>
+                                <p className="text-xs font-black text-gray-500 mb-1">매칭된 회원의 이름</p>
                                 <h3 className="text-2xl font-black text-black mb-4 break-keep">{m.name}</h3>
-                                <p className="text-xs font-black text-gray-400 mb-1">연락처</p>
+                                <p className="text-xs font-black text-gray-500 mb-1">연락처</p>
                                 <a href={`tel:${m.phone}`} className="font-black text-black text-2xl tabular-nums break-all underline-offset-4 hover:underline">
                                   {m.phone || "-"}
                                 </a>

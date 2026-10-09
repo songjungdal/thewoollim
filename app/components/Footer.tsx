@@ -90,29 +90,29 @@ export default function Footer() {
             </div>
 
             <div>
-              <h4 className="font-bold text-sm md:text-lg mb-4 md:mb-6">고객센터</h4>
-              <ul className="text-gray-400 space-y-2 md:space-y-3 font-medium text-sm md:text-base break-keep">
-                <li><Link href="/refund" className="hover:text-brand-point transition-colors">이용안내 및 환불규정</Link></li>
-                <li><Link href="/report" className="hover:text-brand-point transition-colors">문의/민원접수</Link></li>
-                <li><Link href="/about" className="hover:text-brand-point transition-colors">회사소개</Link></li>
+              <h4 className="font-bold text-sm md:text-lg mb-1 md:mb-6">고객센터</h4>
+              <ul className="text-gray-400 md:space-y-3 font-medium text-sm md:text-base break-keep">
+                <li><Link href="/refund" className="inline-block py-3 md:py-0 hover:text-brand-point transition-colors">이용안내 및 환불규정</Link></li>
+                <li><Link href="/report" className="inline-block py-3 md:py-0 hover:text-brand-point transition-colors">문의/민원접수</Link></li>
+                <li><Link href="/about" className="inline-block py-3 md:py-0 hover:text-brand-point transition-colors">회사소개</Link></li>
               </ul>
             </div>
 
             <div>
-              <h4 className="font-bold text-sm md:text-lg mb-4 md:mb-6">정책안내</h4>
-              <ul className="text-gray-400 space-y-2 md:space-y-3 font-medium text-sm md:text-base">
-                <li><Link href="/terms" className="hover:text-brand-point transition-colors">이용약관</Link></li>
-                <li><Link href="/privacy" className="hover:text-brand-point transition-colors">개인정보처리방침</Link></li>
-                <li><Link href="/partnership" className="hover:text-brand-point transition-colors">협업 및 제휴문의</Link></li>
+              <h4 className="font-bold text-sm md:text-lg mb-1 md:mb-6">정책안내</h4>
+              <ul className="text-gray-400 md:space-y-3 font-medium text-sm md:text-base">
+                <li><Link href="/terms" className="inline-block py-3 md:py-0 hover:text-brand-point transition-colors">이용약관</Link></li>
+                <li><Link href="/privacy" className="inline-block py-3 md:py-0 hover:text-brand-point transition-colors">개인정보처리방침</Link></li>
+                <li><Link href="/partnership" className="inline-block py-3 md:py-0 hover:text-brand-point transition-colors">협업 및 제휴문의</Link></li>
               </ul>
             </div>
           </div>
 
-          <div className="flex flex-col md:flex-row justify-between items-center text-gray-500 text-sm font-medium">
+          <div className="flex flex-col md:flex-row justify-between items-center text-gray-400 text-sm font-medium">
             <p>Copyright © {company.name} All rights reserved.</p>
-            <div className="flex gap-4 mt-6 md:mt-0">
-              <a href="https://www.instagram.com/thewoollim_official/" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Instagram</a>
-              <a href="https://pf.kakao.com/_racXX" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Kakao Channel</a>
+            <div className="flex gap-4 mt-3 md:mt-0">
+              <a href="https://www.instagram.com/thewoollim_official/" target="_blank" rel="noopener noreferrer" className="py-3 md:py-0 hover:text-white transition-colors">Instagram</a>
+              <a href="https://pf.kakao.com/_racXX" target="_blank" rel="noopener noreferrer" className="py-3 md:py-0 hover:text-white transition-colors">Kakao Channel</a>
             </div>
           </div>
        </div>

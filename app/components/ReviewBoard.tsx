@@ -26,7 +26,7 @@ function StarRow({ rating, size = 14 }: { rating: number; size?: number }) {
   return (
     <span className="flex items-center gap-0.5 flex-shrink-0">
       {[1, 2, 3, 4, 5].map(i => (
-        <Star key={i} size={size} className={i <= rating ? "fill-brand-point text-brand-point" : "text-gray-200"} />
+        <Star key={i} size={size} className={i <= rating ? "fill-brand-point text-brand-point-ink" : "text-gray-200"} />
       ))}
     </span>
   );
@@ -38,7 +38,7 @@ function GenderBadge({ gender }: { gender: string }) {
   return (
     <span
       className={`w-8 h-8 md:w-9 md:h-9 rounded-full flex items-center justify-center flex-shrink-0 text-xs md:text-sm font-black ${
-        isMale ? "bg-[#4facfe]/15 text-[#3a85d9]" : "bg-rose-100 text-rose-600"
+        isMale ? "bg-info/15 text-info" : "bg-rose-100 text-rose-600"
       }`}
     >
       {isMale ? "남" : "여"}
@@ -199,7 +199,7 @@ export default function ReviewBoard() {
         </motion.div>
 
         {reviews.length === 0 ? (
-          <div className="text-center py-16 text-gray-400 text-sm md:text-base">등록된 후기가 없습니다.</div>
+          <div className="text-center py-16 text-gray-500 text-sm md:text-base">등록된 후기가 없습니다.</div>
         ) : (
           <div className="space-y-2.5 md:space-y-3">
             {pageReviews.map(r => {
@@ -212,7 +212,7 @@ export default function ReviewBoard() {
                     className="w-full flex items-center gap-2.5 md:gap-4 px-4 md:px-6 py-3.5 md:py-4 text-left hover:bg-gray-50 transition-colors"
                   >
                     <GenderBadge gender={r.gender} />
-                    <span className="text-[11px] md:text-xs font-bold px-2 py-1 rounded-full bg-gray-100 text-gray-600 flex-shrink-0 whitespace-nowrap">
+                    <span className="text-xs font-bold px-2 py-1 rounded-full bg-gray-100 text-gray-600 flex-shrink-0 whitespace-nowrap">
                       {r.age_group}
                     </span>
                     <span className="flex-1 min-w-0 truncate text-sm md:text-base text-gray-700 font-medium">
@@ -221,7 +221,7 @@ export default function ReviewBoard() {
                     <StarRow rating={r.rating} />
                     <ChevronDown
                       size={16}
-                      className={`flex-shrink-0 text-gray-300 transition-transform ${expanded ? "rotate-180" : ""}`}
+                      className={`flex-shrink-0 text-gray-500 transition-transform ${expanded ? "rotate-180" : ""}`}
                     />
                   </button>
                   <AnimatePresence initial={false}>
@@ -259,7 +259,7 @@ export default function ReviewBoard() {
                   onClick={() => goToPage(safePage - 1)}
                   disabled={safePage === 0}
                   aria-label="이전 페이지"
-                  className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-full border border-gray-200 text-gray-500 hover:border-brand-point hover:text-brand-point disabled:opacity-30 disabled:hover:border-gray-200 disabled:hover:text-gray-500 transition-colors flex-shrink-0"
+                  className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-full border border-gray-200 text-gray-500 hover:border-brand-point hover:text-brand-point-ink disabled:opacity-30 disabled:hover:border-gray-200 disabled:hover:text-gray-500 transition-colors flex-shrink-0"
                 >
                   <ChevronLeft size={18} />
                 </button>
@@ -281,7 +281,7 @@ export default function ReviewBoard() {
                   onClick={() => goToPage(safePage + 1)}
                   disabled={safePage === totalPages - 1}
                   aria-label="다음 페이지"
-                  className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-full border border-gray-200 text-gray-500 hover:border-brand-point hover:text-brand-point disabled:opacity-30 disabled:hover:border-gray-200 disabled:hover:text-gray-500 transition-colors flex-shrink-0"
+                  className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-full border border-gray-200 text-gray-500 hover:border-brand-point hover:text-brand-point-ink disabled:opacity-30 disabled:hover:border-gray-200 disabled:hover:text-gray-500 transition-colors flex-shrink-0"
                 >
                   <ChevronRight size={18} />
                 </button>
@@ -291,7 +291,7 @@ export default function ReviewBoard() {
               <button
                 type="button"
                 onClick={handleWriteClick}
-                className="md:col-start-3 md:justify-self-end inline-flex items-center gap-1.5 bg-brand-black text-white px-5 py-2.5 rounded-full text-sm font-bold hover:bg-brand-point hover:text-brand-black transition-colors flex-shrink-0"
+                className="md:col-start-3 md:justify-self-end inline-flex items-center gap-1.5 bg-brand-black text-white px-5 py-3 md:py-2.5 rounded-full text-sm font-bold hover:bg-brand-point hover:text-brand-black transition-colors flex-shrink-0"
               >
                 후기작성
               </button>
@@ -316,14 +316,14 @@ export default function ReviewBoard() {
               exit={{ opacity: 0, scale: 0.94, y: 16 }}
               transition={{ type: "spring", stiffness: 260, damping: 24 }}
               onClick={e => e.stopPropagation()}
-              className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 md:p-8"
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 md:p-8 max-h-[90vh] overflow-y-auto md:max-h-none md:overflow-visible"
             >
               <div className="flex items-center justify-between mb-5">
                 <h3 className="font-black text-lg md:text-xl text-brand-black">{editId ? "후기 수정" : "후기 작성"}</h3>
                 <button
                   type="button"
                   onClick={() => setWriteOpen(false)}
-                  className="text-gray-400 hover:text-brand-black transition-colors"
+                  className="-m-3 p-3 text-gray-500 hover:text-brand-black transition-colors"
                   aria-label="닫기"
                 >
                   <X size={20} />
@@ -334,7 +334,7 @@ export default function ReviewBoard() {
               <div className="flex items-center gap-1.5 mb-5">
                 {[1, 2, 3, 4, 5].map(i => (
                   <button key={i} type="button" onClick={() => setRating(i)} aria-label={`${i}점`}>
-                    <Star size={28} className={i <= rating ? "fill-brand-point text-brand-point" : "text-gray-200"} />
+                    <Star size={28} className={i <= rating ? "fill-brand-point text-brand-point-ink" : "text-gray-200"} />
                   </button>
                 ))}
               </div>
@@ -346,9 +346,9 @@ export default function ReviewBoard() {
                 rows={5}
                 maxLength={1000}
                 placeholder="솔직한 후기를 남겨주세요. (작성자 실명은 공개되지 않아요)"
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none resize-none"
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none resize-none"
               />
-              <p className="text-right text-xs text-gray-400 mt-1 mb-5">{content.length}/1000</p>
+              <p className="text-right text-xs text-gray-500 mt-1 mb-5">{content.length}/1000</p>
 
               <button
                 type="button"
@@ -386,7 +386,7 @@ export default function ReviewBoard() {
                 <button
                   type="button"
                   onClick={() => setPickerOpen(false)}
-                  className="text-gray-400 hover:text-brand-black transition-colors"
+                  className="-m-3 p-3 text-gray-500 hover:text-brand-black transition-colors"
                   aria-label="닫기"
                 >
                   <X size={20} />
@@ -402,7 +402,7 @@ export default function ReviewBoard() {
                   >
                     <div className="flex items-center justify-between mb-1">
                       <StarRow rating={r.rating} size={12} />
-                      <span className="text-[11px] text-gray-400">{r.created_at?.slice(0, 10)}</span>
+                      <span className="text-xs text-gray-500">{r.created_at?.slice(0, 10)}</span>
                     </div>
                     <p className="text-sm text-gray-600 truncate">{r.content}</p>
                   </button>

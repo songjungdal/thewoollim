@@ -116,7 +116,7 @@ export default function CancelRequestPage() {
             {cancellable.length === 0 ? (
               <div className="bg-white rounded-2xl border border-gray-100 p-10 md:p-14 text-center">
                 <CheckCircle2 size={42} className="text-gray-200 mx-auto mb-4" />
-                <p className="text-gray-400 font-bold text-sm md:text-base">취소 가능한 예약이 없습니다.</p>
+                <p className="text-gray-500 font-bold text-sm md:text-base">취소 가능한 예약이 없습니다.</p>
               </div>
             ) : (
               <div className="space-y-3 md:space-y-4">
@@ -148,11 +148,11 @@ export default function CancelRequestPage() {
                             {party?.title ?? `파티 #${b.partyId}`}
                           </h3>
                           <div className="flex flex-col gap-1.5 text-sm md:text-base text-gray-600 font-medium mb-3">
-                            {party && <span className="flex items-center gap-2"><Calendar size={14} className="text-brand-point flex-shrink-0" /> {party.dateString}</span>}
-                            {party && <span className="flex items-center gap-2"><MapPin size={14} className="text-brand-point flex-shrink-0" /> {party.location}</span>}
+                            {party && <span className="flex items-center gap-2"><Calendar size={14} className="text-brand-point-ink flex-shrink-0" /> {party.dateString}</span>}
+                            {party && <span className="flex items-center gap-2"><MapPin size={14} className="text-brand-point-ink flex-shrink-0" /> {party.location}</span>}
                           </div>
                           <div className="flex items-baseline justify-between gap-3 flex-wrap">
-                            <span className="text-xs md:text-sm font-bold text-gray-400">결제 금액 <span className="text-brand-black tabular-nums ml-1">₩{(b.total ?? party?.price ?? 0).toLocaleString()}</span></span>
+                            <span className="text-xs md:text-sm font-bold text-gray-500">결제 금액 <span className="text-brand-black tabular-nums ml-1">₩{(b.total ?? party?.price ?? 0).toLocaleString()}</span></span>
                             {r && (
                               <span className={`text-xs md:text-sm font-black px-2.5 py-1 rounded-full ${
                                 r.rate === 1   ? "bg-emerald-100 text-emerald-800" :
@@ -191,11 +191,11 @@ export default function CancelRequestPage() {
                 </div>
                 <div className="flex justify-between gap-3">
                   <dt className="text-gray-500 font-medium">환불 비율</dt>
-                  <dd className={`font-black ${refund.rate === 0 ? "text-red-600" : "text-brand-point"}`}>{refund.label}</dd>
+                  <dd className={`font-black ${refund.rate === 0 ? "text-red-600" : "text-brand-point-ink"}`}>{refund.label}</dd>
                 </div>
                 <div className="flex justify-between gap-3 pt-3 border-t border-gray-100">
                   <dt className="font-black text-base md:text-lg">환불 예정 금액</dt>
-                  <dd className={`font-black text-xl md:text-2xl tabular-nums ${refund.rate === 0 ? "text-red-500" : "text-brand-point"}`}>
+                  <dd className={`font-black text-xl md:text-2xl tabular-nums ${refund.rate === 0 ? "text-red-500" : "text-brand-point-ink"}`}>
                     ₩{refund.refund.toLocaleString()}
                   </dd>
                 </div>
@@ -209,7 +209,7 @@ export default function CancelRequestPage() {
                 className={`w-full py-4 md:py-5 rounded-xl md:rounded-2xl font-black text-base md:text-lg transition-all flex items-center justify-center gap-2.5 ${
                   submitting
                     ? "bg-gray-300 text-white cursor-wait"
-                    : "bg-brand-black text-white hover:bg-brand-point shadow-xl hover:shadow-brand-point/30"
+                    : "bg-brand-black text-white hover:bg-danger hover:text-white shadow-xl hover:shadow-danger/30"
                 }`}
               >
                 {submitting
@@ -227,7 +227,7 @@ export default function CancelRequestPage() {
           {/* === 하단: 환불 규정 === */}
           <section className="bg-white rounded-2xl md:rounded-3xl p-5 md:p-7 border border-gray-100">
             <div className="flex items-center gap-2 mb-4 md:mb-5">
-              <Info size={18} className="text-brand-point" />
+              <Info size={18} className="text-brand-point-ink" />
               <h2 className="text-base md:text-lg font-black">환불 안내</h2>
             </div>
             <p className="text-xs md:text-sm text-gray-500 font-medium mb-4 leading-relaxed">
@@ -255,7 +255,7 @@ export default function CancelRequestPage() {
                 </tbody>
               </table>
             </div>
-            <p className="text-[11px] md:text-xs text-gray-400 font-medium mt-4 leading-relaxed">
+            <p className="text-xs text-gray-500 font-medium mt-4 leading-relaxed">
               * 일수는 자정(00:00) 기준이며, 어울림 운영팀이 인정하는 천재지변 등 불가피한 사유는 별도 검토 후 처리됩니다.
             </p>
           </section>
@@ -295,8 +295,8 @@ export default function CancelRequestPage() {
                 ))}
                 <div className="flex justify-between gap-3 items-baseline pt-2.5 border-t border-gray-200/70">
                   <dt className="text-gray-500 font-bold text-sm md:text-base flex-shrink-0">환불 예정</dt>
-                  <dd className="font-black text-lg md:text-xl text-brand-point text-right">
-                    ₩{refund.refund.toLocaleString()} <span className="text-xs md:text-sm font-bold text-gray-400">({refund.label})</span>
+                  <dd className="font-black text-lg md:text-xl text-brand-point-ink text-right">
+                    ₩{refund.refund.toLocaleString()} <span className="text-xs md:text-sm font-bold text-gray-500">({refund.label})</span>
                   </dd>
                 </div>
               </dl>
@@ -304,7 +304,7 @@ export default function CancelRequestPage() {
               {/* 안내 문구 — 보조 폰트 */}
               <div className="text-xs md:text-sm text-gray-600 font-medium leading-relaxed break-keep space-y-2 mb-6">
                 <p>취소를 진행하시면 운영팀으로 환불 요청이 접수됩니다.</p>
-                <p className="text-gray-400">※ 원활한 성비 조율 및 좌석 배치 재조율을 위해, 실시간 취소가 어려울 수 있는 점 양해 부탁드립니다.</p>
+                <p className="text-gray-500">※ 원활한 성비 조율 및 좌석 배치 재조율을 위해, 실시간 취소가 어려울 수 있는 점 양해 부탁드립니다.</p>
                 <p><span className="font-bold text-brand-black">카드 결제 :</span> 확인 즉시 결제하신 카드사를 통해 취소 처리를 진행합니다. (카드사에 따라 영업일 기준 3~5일 소요)</p>
                 <p><span className="font-bold text-brand-black">무통장 입금 :</span> 운영팀에서 확인 후, 환불받으실 계좌번호로 직접 송금해 드립니다.</p>
               </div>
@@ -315,7 +315,7 @@ export default function CancelRequestPage() {
                   돌아가기
                 </button>
                 <button type="button" onClick={submitCancel} disabled={submitting}
-                  className="flex-1 py-3.5 rounded-2xl font-black text-base bg-brand-black text-white hover:bg-brand-point transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
+                  className="flex-1 py-3.5 rounded-2xl font-black text-base bg-brand-black text-white hover:bg-danger hover:text-white transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
                   확인
                 </button>
               </div>

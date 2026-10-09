@@ -1,11 +1,17 @@
-@import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&display=swap');
+@import "tailwindcss";
 
 @theme {
+  /* 브랜드 청록 — 배경·테두리·장식 전용 (흰 배경 위 글자로 쓰면 대비 부족) */
   --color-brand-point: #40E0D0;
+  /* 글자용 진한 청록 — 흰/밝은 배경 위의 강조 글자·아이콘 */
+  --color-brand-point-ink: #00807A;
   --color-brand-white: #ffffff;
   --color-brand-lightgray: #f5f5f7;
   --color-brand-black: #000000;
+  /* 상태색 — 경고·마감·취소(빨강), 남성·안내(파랑) */
+  --color-danger: #D92D20;
+  --color-info: #2E6FD8;
   --radius-3xl: 1.5rem;
 }
 
@@ -19,14 +25,4 @@ section {
 
 .glow-point {
   box-shadow: 0 0 20px rgba(64, 224, 208, 0.4), inset 0 0 10px rgba(64, 224, 208, 0.2);
-}
-
-/* Global Button Hover Style Override */
-button:hover,
-a[class*="bg-brand-black"]:hover,
-a[class*="bg-brand-point"]:hover {
-  background-color: var(--color-brand-point, #40E0D0) !important;
-  color: #000000 !important;
-  font-weight: 600 !important;
-  transition: all 0.2s ease !important;
 }
