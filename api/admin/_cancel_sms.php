@@ -79,12 +79,17 @@ if (!function_exists('notifyCancelSms')) {
             $pdate = $dt['date'] !== '' ? $dt['date'] : '추후 안내';
             $ptime = $dt['time'] !== '' ? $dt['time'] : '추후 안내';
 
+            // 참가 구성 예약 — 항목 이름 한 줄, 시각은 처음 참석하는 회차 기준 (항목 예약이 아니면 기존 문구 그대로)
+            $optLine = !empty($booking['optionName']) ? '참가: ' . (string)$booking['optionName'] . "\n" : '';
+            if (bookingFirstSessionTime($booking) !== '') $ptime = bookingFirstSessionTime($booking);
+
             // 3) 메시지 — 템플릿 (줄바꿈/특수문자 그대로 유지)
             if ($kind === 'full_refund') {
                 $msg =
                     "[어울림] {$typeLabel} 취소 및 전액 환불 안내\n" .
                     "안녕하세요, {$name}님.\n" .
                     "운영팀 사정(성비 및 최소 인원 미달)으로 인해 신청하신 {$typeLabel} 일정이 부득이하게 취소되었습니다.\n" .
+                    $optLine .
                     "일시: {$pdate} {$ptime}\n" .
                     "장소: {$loc}\n" .
                     "운영팀 취소에 따라 결제하신 참가비는 100% 전액 환불 처리됩니다.\n" .
@@ -96,6 +101,7 @@ if (!function_exists('notifyCancelSms')) {
                     "[어울림] {$typeLabel} 취소 완료 안내\n" .
                     "안녕하세요, {$name}님.\n" .
                     "신청하신 {$typeLabel} 일정이 정상적으로 취소되었습니다.\n" .
+                    $optLine .
                     "일시: {$pdate} {$ptime}\n" .
                     "장소: {$loc}\n" .
                     "- 카드 결제 : 카드사 기준 2~3일 내 자동 승인 취소\n" .

@@ -111,6 +111,8 @@ foreach ($users as $u) {
             'status'     => (string)($b['status'] ?? ''),  // 'confirmed' | 'pending_approval'
             'createdAt'  => (string)($b['createdAt'] ?? ''), // 정렬 전용 — 응답 직전에 제거
         ];
+        // 참가 구성 예약 — 항목 이름 (예: "1부+2부")
+        if (!empty($b['optionName'])) $entry['optionName'] = (string)$b['optionName'];
 
         if ($u['gender'] === '남성')      $male[]   = $entry;
         else if ($u['gender'] === '여성') $female[] = $entry;

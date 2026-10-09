@@ -4,6 +4,7 @@
  *  GET  : 모든 회원의 예약 + 회원 정보 조인 (status/gender 필터링용 데이터 포함)
  *  POST { action: "approve", email, bookingId } → status='paid_pending_profile'|'pending_approval' → 'confirmed'
  *  POST { action: "cancel",  email, bookingId } → status='cancelled' + party_counts -1 (atomic)
+ *    (참가 구성 예약은 예약에 저장된 sessionIds 회차 인원도 함께 -1 / confirm_vbank 는 그 회차마다 정원 검사 후 +1)
  *  POST { action: "cancel_full_refund", email, bookingId } → 카드결제 전액 Toss 즉시취소 + status='cancelled' + party_counts -1
  *
  *  'cancel' / 'cancel_full_refund' 공통: DB 상태 업데이트 성공 직후 _cancel_sms.php 의 notifyCancelSms() 로
@@ -126,6 +127,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (isset($p['id']) && (string)$p['id'] === $partyId) { $vbankParty = $p; break; }
         }
         $stockLimit = partyStockLimit($vbankParty, $genderKey);
+        $vbankSids  = array_map('strval', (array)($target['sessionIds'] ?? [])); // 참가 구성 예약 — 신청 시점 사본의 회차
         $countsFile = "$dataDir/party_counts.json";
         $fp = fopen($countsFile, 'c+');
         if ($fp) {
@@ -136,11 +138,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!isset($counts[$partyId]) || !is_array($counts[$partyId])) {
                 $counts[$partyId] = ['male' => 0, 'female' => 0];
             }
-            if ((int)($counts[$partyId][$genderKey] ?? 0) + 1 > $stockLimit) {
+            if ($vbankSids) {
+                // 회차마다 정원 검사 — 회차가 파티에서 사라졌으면 마감으로 본다
+                $over = optionSessionsOverStock($vbankParty, ['sessionIds' => $vbankSids], $counts[$partyId], $genderKey);
+                if ($over) {
+                    flock($fp, LOCK_UN); fclose($fp);
+                    $names = array_map(fn($sid) => (string)(partySessionById($vbankParty, $sid)['name'] ?? $sid), $over);
+                    echo json_encode(['ok' => false, 'error' => '잔여 정원을 초과하여 입금 확인을 진행할 수 없습니다. (' . implode(', ', $names) . ')'], JSON_UNESCAPED_UNICODE); exit;
+                }
+            } elseif ((int)($counts[$partyId][$genderKey] ?? 0) + 1 > $stockLimit) {
                 flock($fp, LOCK_UN); fclose($fp);
                 echo json_encode(['ok' => false, 'error' => '잔여 정원을 초과하여 입금 확인을 진행할 수 없습니다.']); exit;
             }
-            $counts[$partyId][$genderKey] = (int)($counts[$partyId][$genderKey] ?? 0) + 1;
+            countsAdjust($counts, $partyId, $genderKey, $vbankSids, 1);
             ftruncate($fp, 0); rewind($fp); fwrite($fp, json_encode($counts));
             fflush($fp); flock($fp, LOCK_UN); fclose($fp);
         }
@@ -442,10 +452,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $raw = stream_get_contents($fp);
                 $counts = $raw ? json_decode($raw, true) : [];
                 if (!is_array($counts)) $counts = [];
-                if (!isset($counts[$partyId]) || !is_array($counts[$partyId])) {
-                    $counts[$partyId] = ['male' => 0, 'female' => 0];
-                }
-                $counts[$partyId][$genderKey] = max(0, (int)($counts[$partyId][$genderKey] ?? 0) - 1);
+                // 파티 신청 인원 -1, 참가 구성 예약이면 예약에 저장된 회차 인원도 각각 -1
+                countsAdjust($counts, $partyId, $genderKey, array_map('strval', (array)($beforeBooking['sessionIds'] ?? [])), -1);
                 ftruncate($fp, 0); rewind($fp); fwrite($fp, json_encode($counts));
                 fflush($fp); flock($fp, LOCK_UN); fclose($fp);
             }
@@ -515,10 +523,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $raw = stream_get_contents($fp);
             $counts = $raw ? json_decode($raw, true) : [];
             if (!is_array($counts)) $counts = [];
-            if (!isset($counts[$partyId]) || !is_array($counts[$partyId])) {
-                $counts[$partyId] = ['male' => 0, 'female' => 0];
-            }
-            $counts[$partyId][$genderKey] = max(0, (int)($counts[$partyId][$genderKey] ?? 0) - 1);
+            // 파티 신청 인원 -1, 참가 구성 예약이면 예약에 저장된 회차 인원도 각각 -1
+            countsAdjust($counts, $partyId, $genderKey, array_map('strval', (array)($beforeBooking['sessionIds'] ?? [])), -1);
             ftruncate($fp, 0); rewind($fp); fwrite($fp, json_encode($counts));
             fflush($fp); flock($fp, LOCK_UN); fclose($fp);
         }

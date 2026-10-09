@@ -2,12 +2,13 @@
 /**
  * 결제 직전 pending order 생성.
  *
- * POST { partyIds: ["1","2",...], couponCode?, couponPartyId? }
+ * POST { partyIds: ["1","2",...], optionIds?: { "<partyId>": "<optionId>" }, couponCode?, couponPartyId? }
+ *   optionIds: 참가 구성이 있는 솔로파티는 필수 (없거나 그 파티의 항목이 아니면 거절). 다른 파티는 무시.
  *  → { ok:true, orderId, amount, orderName, customerEmail }
  *
  * 흐름:
  *  1) 회원 세션 + 프로필(특히 gender) 검증
- *  2) parties.json 조회 → 합산 금액 계산
+ *  2) parties.json 조회 → 합산 금액 계산 (항목이 있는 파티는 항목 가격, 정원은 항목에 포함된 회차마다 검사)
  *  3) 쿠폰 적용 가능 여부 검증 (실제 차감은 success.php 가 atomic 수행)
  *  4) /api/data/pending/<orderId>.json 저장 (10분 만료)
  *  5) Toss 결제창 호출에 필요한 메타 반환
@@ -30,6 +31,7 @@ if (empty($partyIds)) jsonFail('파티를 선택해주세요.');
 // 수량 개념 제거 — 동일 partyId 가 중복돼있으면 unique 화 (legacy clients 방어)
 $partyIds = array_values(array_unique($partyIds));
 
+$optionIdsIn   = is_array($body['optionIds'] ?? null) ? $body['optionIds'] : [];
 $couponCode    = strtoupper(trim((string)($body['couponCode']    ?? '')));
 $couponPartyId = trim((string)        ($body['couponPartyId'] ?? ''));
 
@@ -74,17 +76,38 @@ if (file_exists($bookingsFile)) {
     }
 }
 
-// 회원 성별 기준 참가비 — priceMale/priceFemale 우선, 미설정 시 price 폴백.
+// 회원 성별 기준 참가비 — priceMale/priceFemale 우선, 미설정 시 price 폴백. 항목이 있는 파티는 고른 항목의 성별 가격.
 $userGender = (string)($u['gender'] ?? '');
+$genderKey  = $userGender === '남성' ? 'male' : 'female';
 $total = 0; $orderTitles = [];
+$lines = [];      // partyId => 줄 가격 (결제 시점 가격 — success.php 가 예약 금액에 그대로 씀)
+$optionIds = [];  // partyId => optionId (항목이 있는 파티만)
+$plainIds = [];   // 항목이 없는 파티 — 기존 파티 단위 정원 검사
+$counts = json_decode((string)@file_get_contents($dir . '/party_counts.json'), true);
+if (!is_array($counts)) $counts = [];
 foreach ($partyIds as $pid) {
     if (!isset($partyMap[$pid])) jsonFail("파티를 찾을 수 없습니다: $pid", 404);
-    $total += priceForGender($partyMap[$pid], $userGender);
-    $orderTitles[] = (string)($partyMap[$pid]['title'] ?? '파티');
+    $oidIn = $optionIdsIn[$pid] ?? '';
+    $resolved = resolvePartyOption($partyMap[$pid], $userGender, is_scalar($oidIn) ? (string)$oidIn : '');
+    if (is_string($resolved)) jsonFail($resolved);
+    $lines[$pid] = $resolved['price'];
+    $total += $resolved['price'];
+    $title = (string)($partyMap[$pid]['title'] ?? '파티');
+    if ($resolved['option'] !== null) {
+        $optionIds[$pid] = (string)$resolved['option']['id'];
+        $title .= ' · ' . (string)$resolved['option']['name'];
+        // 정원 사전 검사 — 항목에 포함된 회차를 모두 회원 성별 기준으로 (최종 판정은 success.php)
+        if (optionSessionsOverStock($partyMap[$pid], $resolved['option'], (array)($counts[$pid] ?? []), $genderKey)) {
+            jsonFail('정원이 마감되었습니다.');
+        }
+    } else {
+        $plainIds[] = $pid;
+    }
+    $orderTitles[] = $title;
 }
 
 // 정원 사전 검사 — 결제창을 열기 전에 회원 성별 기준으로 파티마다 확인 (최종 판정은 success.php)
-if (!empty(partiesOverStock($partyIds, $partyMap, $userGender === '남성' ? 'male' : 'female'))) {
+if (!empty(partiesOverStock($plainIds, $partyMap, $genderKey))) {
     jsonFail('정원이 마감되었습니다.');
 }
 
@@ -117,8 +140,8 @@ if ($couponCode !== '') {
         }
     }
 
-    // 쿠폰 대상 파티의 성별별 가격 기준으로 할인 계산
-    $linePrice      = priceForGender($partyMap[$couponPartyId], $userGender);
+    // 쿠폰 대상 파티의 성별별 가격(항목이 있으면 고른 항목 가격) 기준으로 할인 계산
+    $linePrice      = (int)$lines[$couponPartyId];
     $couponDiscount = calcCouponDiscount($found, $linePrice);
 }
 
@@ -138,6 +161,8 @@ $payload = [
     'name'           => $u['name'],
     'gender'         => $u['gender'],
     'partyIds'       => $partyIds,
+    'optionIds'      => (object)$optionIds,
+    'lines'          => (object)$lines,
     'expectedAmount' => $amount,
     'couponCode'     => $couponCode,
     'couponPartyId'  => $couponPartyId,
