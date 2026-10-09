@@ -146,6 +146,12 @@ export default function CancelRequestPage() {
                         <div className="flex-1 min-w-0">
                           <h3 className="font-black text-base md:text-xl mb-2 leading-snug break-keep">
                             {party?.title ?? `파티 #${b.partyId}`}
+                            {/* 솔로파티 참가 구성 — 결제 당시 항목 이름 */}
+                            {b.optionName && (
+                              <span className="ml-2 align-middle inline-flex text-xs md:text-sm font-black text-brand-point-ink bg-brand-point/10 px-2 py-0.5 rounded-full whitespace-nowrap" data-testid="cancel-option">
+                                {b.optionName}
+                              </span>
+                            )}
                           </h3>
                           <div className="flex flex-col gap-1.5 text-sm md:text-base text-gray-600 font-medium mb-3">
                             {party && <span className="flex items-center gap-2"><Calendar size={14} className="text-brand-point-ink flex-shrink-0" /> {party.dateString}</span>}
@@ -284,7 +290,7 @@ export default function CancelRequestPage() {
               {/* 핵심 정보 — 폰트 강조 */}
               <dl className="rounded-2xl bg-brand-lightgray/60 border border-gray-100 p-4 md:p-5 space-y-2.5 mb-4">
                 {[
-                  { l: "대상", v: selectedParty.title },
+                  { l: "대상", v: selected.optionName ? `${selectedParty.title} · ${selected.optionName}` : selectedParty.title },
                   { l: "파티 일정", v: selectedParty.dateString },
                   { l: "결제 금액", v: `₩${(selected.total ?? selectedParty.price).toLocaleString()}` },
                 ].map(r => (

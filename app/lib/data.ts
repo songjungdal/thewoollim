@@ -1,3 +1,5 @@
+import type { PartySession, PartyOption } from "./partyOptions";
+
 /** 매칭파티 참가 자격 — 혼인여부 제한 */
 export type AllowedMaritalStatus = "all" | "싱글" | "돌싱";
 
@@ -58,6 +60,9 @@ export type Party = {
   theme?: Theme;               // 테마별: 티타임 / 와인파티 / 사케파티 / 쿠킹클래스
   locationTag?: LocationTag;   // 지역별: 서울 / 성남 / 수원 / 인천 / 용인 / 기타
   partyType?: PartyType;       // 파티 종류 — 없으면 매칭파티 (partyTypeOf 로 읽는다)
+  // 솔로파티 참가 구성 (docs/specs/party-options-solo.md) — 있으면 남은 자리·마감은 회차 기준(partyStockStatus)
+  sessions?: PartySession[];   // 회차 (maleBooked/femaleBooked = 회차별 신청 인원)
+  options?: PartyOption[];     // 참가 항목 (항목 가격·포함 회차)
 };
 
 export const PARTIES: Party[] = [
@@ -71,7 +76,6 @@ export const PARTIES: Party[] = [
   { id: "8", title: "40대 프리미엄 위스키 살롱",     dateString: "2026. 7. 5 (토) 19:30",  calendarDate: "2026-07-05", location: "압구정 위스키바",  target: "만 35-45세 / 프리미엄",             price: 120000, tag: "연령별", maleStock: 12, femaleStock: 12, maleBooked: 0, femaleBooked: 0 },
 ];
 
-/** 파티 재고 상태 계산 (UI·검증 공통 사용) */
 /**
  * 회원 성별 기준 파티 참가비 — priceMale / priceFemale 우선, 미설정 시 price 폴백.
  * 사용처: 카트 합계, /checkout 결제 금액, pending.php 와 동일 규칙으로 클라/서버가 일치해야 함.
@@ -82,16 +86,144 @@ export function priceForGender(party: Pick<Party, "price" | "priceMale" | "price
   return party.price; // 폴백
 }
 
-export function partyStockStatus(party: Party) {
+/** 참가 구성이 있는 파티인지 (회차·항목이 모두 있어야 함) */
+export function partyHasOptions(party: Pick<Party, "sessions" | "options">): boolean {
+  return (party.options?.length ?? 0) > 0 && (party.sessions?.length ?? 0) > 0;
+}
+
+/** 파티의 참가 항목 하나 (없으면 null) */
+export function partyOptionById(party: Pick<Party, "options">, optionId?: string | null): PartyOption | null {
+  if (!optionId) return null;
+  return party.options?.find(o => o.id === optionId) ?? null;
+}
+
+/**
+ * 장바구니·결제 한 줄 금액 — 참가 구성 파티는 고른 항목의 내 성별 가격(서버 api/lib.php priceForGender 와 같은 규칙),
+ * 그 밖의 파티는 priceForGender. 참가 구성 파티인데 항목을 못 찾으면 null(결제 불가).
+ */
+export function linePriceFor(party: Party, gender: string | null | undefined, optionId?: string | null): number | null {
+  if (!partyHasOptions(party)) return priceForGender(party, gender);
+  const o = partyOptionById(party, optionId);
+  if (!o) return null;
+  return gender === "여성" ? o.priceFemale : o.priceMale;
+}
+
+/** 실시간 신청 인원 (api/party-counts.php 한 파티 값) */
+export type LivePartyCount = { male: number; female: number; sessions?: Record<string, { male: number; female: number }> };
+
+/**
+ * 실시간 신청 인원을 파티에 입힌다 — 카운트가 없으면 0 (시드/테스트 데이터 무시, 기존 규칙과 같음).
+ * 참가 구성 파티는 회차별 인원도 함께 입힌다. 메인 카드·일정 섹션·상세가 같은 방식으로 쓴다.
+ */
+export function withLiveCounts(party: Party, live?: LivePartyCount | null): Party {
+  return {
+    ...party,
+    maleBooked:   live?.male   ?? 0,
+    femaleBooked: live?.female ?? 0,
+    ...(party.sessions ? {
+      sessions: party.sessions.map(s => ({
+        ...s,
+        maleBooked:   live?.sessions?.[s.id]?.male   ?? 0,
+        femaleBooked: live?.sessions?.[s.id]?.female ?? 0,
+      })),
+    } : {}),
+  };
+}
+
+/** 회차 하나의 남은 자리 */
+export type SessionStock = PartySession & {
+  maleRemaining: number;
+  femaleRemaining: number;
+  maleFull: boolean;
+  femaleFull: boolean;
+};
+
+/** 참가 항목 하나의 마감 여부 — 포함 회차 중 하나라도 그 성별 정원이 차면 마감 */
+export type OptionStock = PartyOption & {
+  sessions: SessionStock[];   // 포함 회차 (회차 순서)
+  maleClosed: boolean;
+  femaleClosed: boolean;
+};
+
+export type PartyStock = {
+  /**
+   * 그 성별이 아직 신청할 수 있는 인원.
+   *  - 참가 구성 없음: 정원 - 신청 인원 (기존 식)
+   *  - 참가 구성 있음: 고를 수 있는 항목마다 "포함 회차 남은 자리 중 최솟값"을 구해 그중 최댓값 (마감이면 0)
+   */
+  maleRemaining: number;
+  femaleRemaining: number;
+  maleFull: boolean;      // 성별 마감 (참가 구성: 그 성별로 고를 수 있는 항목이 없음)
+  femaleFull: boolean;
+  allFull: boolean;       // 모집 마감 (남녀 모두 마감)
+  nearlyFull: boolean;    // 마감 임박 — 마감이 아니고 남은 자리(남+여)가 1~3석 (참가 구성: 어느 회차든)
+  hasOptions: boolean;
+  sessions: SessionStock[];   // 참가 구성 없으면 []
+  options: OptionStock[];     // 참가 구성 없으면 []
+  /** 남은 자리 문구 — "남 3 · 여 2" / 참가 구성: "1부 남3·여2 · 2부 남5·여4" */
+  remainingLabel: string;
+};
+
+/**
+ * 파티 남은 자리·마감 계산 (UI·검증 공통). 메인 카드, 일정 섹션, 상세 신청 차단이 모두 이 결과를 쓴다.
+ * 참가 구성 파티는 파티 단위 maleBooked/maleStock 을 쓰지 않고 회차 기준으로 계산한다 (명세 8-3).
+ * 신청 인원은 호출 전에 withLiveCounts 로 입혀 둔다.
+ */
+export function partyStockStatus(party: Party): PartyStock {
+  if (partyHasOptions(party)) {
+    const sessions: SessionStock[] = (party.sessions ?? []).map(s => {
+      const maleRemaining   = Math.max(0, s.maleStock   - (s.maleBooked   ?? 0));
+      const femaleRemaining = Math.max(0, s.femaleStock - (s.femaleBooked ?? 0));
+      return { ...s, maleRemaining, femaleRemaining, maleFull: maleRemaining <= 0, femaleFull: femaleRemaining <= 0 };
+    });
+    const byId = new Map(sessions.map(s => [s.id, s]));
+    const options: OptionStock[] = (party.options ?? []).map(o => {
+      const inc = sessions.filter(s => o.sessionIds.includes(s.id));
+      const missing = o.sessionIds.some(id => !byId.has(id)) || inc.length === 0;
+      return {
+        ...o,
+        sessions: inc,
+        maleClosed:   missing || inc.some(s => s.maleFull),
+        femaleClosed: missing || inc.some(s => s.femaleFull),
+      };
+    });
+    const remainingOf = (g: "male" | "female") => Math.max(0, ...options
+      .filter(o => !(g === "male" ? o.maleClosed : o.femaleClosed))
+      .map(o => Math.min(...o.sessions.map(s => g === "male" ? s.maleRemaining : s.femaleRemaining))));
+    const maleRemaining   = remainingOf("male");
+    const femaleRemaining = remainingOf("female");
+    const maleFull   = options.every(o => o.maleClosed);
+    const femaleFull = options.every(o => o.femaleClosed);
+    const allFull = maleFull && femaleFull;
+    const nearlyFull = !allFull && sessions.some(s => {
+      const left = s.maleRemaining + s.femaleRemaining;
+      return left >= 1 && left <= 3;
+    });
+    return {
+      maleRemaining, femaleRemaining, maleFull, femaleFull, allFull, nearlyFull,
+      hasOptions: true, sessions, options,
+      remainingLabel: sessions.map(s => `${s.name} 남${s.maleRemaining}·여${s.femaleRemaining}`).join(" · "),
+    };
+  }
   const maleRemaining   = Math.max(0, party.maleStock   - party.maleBooked);
   const femaleRemaining = Math.max(0, party.femaleStock - party.femaleBooked);
+  const left = maleRemaining + femaleRemaining;
+  const allFull = maleRemaining <= 0 && femaleRemaining <= 0;
   return {
     maleRemaining,
     femaleRemaining,
     maleFull:   maleRemaining   <= 0,
     femaleFull: femaleRemaining <= 0,
-    allFull:    maleRemaining   <= 0 && femaleRemaining <= 0,
+    allFull,
+    nearlyFull: !allFull && left >= 1 && left <= 3,
+    hasOptions: false, sessions: [], options: [],
+    remainingLabel: `남 ${maleRemaining} · 여 ${femaleRemaining}`,
   };
+}
+
+/** "2026. 8. 1 (토) 19:00" → "2026. 8. 1 (토)" (시각 앞까지) */
+export function dateOnly(dateString: string): string {
+  return (dateString || "").replace(/\s*\d{1,2}:\d{2}.*$/, "").trim();
 }
 
 /** 메인 노출 종료 기준 — 행사 일시 경과 후 X일이 지나면 카드 리스트에서 자동 제외 */

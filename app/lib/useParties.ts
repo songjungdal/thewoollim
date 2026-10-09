@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { normalizeSessions, normalizeOptions } from "./partyOptions";
 import { PARTIES as DEFAULT_PARTIES, TARGET_GROUPS, THEMES, LOCATION_TAGS, partyTypeOf, type Party, type TargetGroup, type Theme, type LocationTag } from "./data";
 
 const CHANNEL_NAME = "woollim_parties";
@@ -70,6 +71,12 @@ export function useParties(): Party[] {
               locationTag: LOCATION_TAGS.includes(p.locationTag as LocationTag) ? (p.locationTag as LocationTag) : undefined,
               // 파티 종류 (없거나 잘못된 값은 matching)
               partyType:   partyTypeOf({ partyType: typeof p.partyType === "string" ? p.partyType : undefined }),
+              // 솔로파티 참가 구성 — 회차·항목이 모두 있을 때만 (없으면 기존 파티와 똑같이 동작)
+              ...(() => {
+                const sessions = normalizeSessions(p.sessions);
+                const options  = normalizeOptions(p.options);
+                return sessions.length > 0 && options.length > 0 ? { sessions, options } : {};
+              })(),
             };
           });
           setParties(normalized);
