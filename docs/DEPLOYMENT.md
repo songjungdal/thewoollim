@@ -10,15 +10,15 @@
  ① 빌드·검사 ─ 실패 시 여기서 중단                          
     npm ci → 타입검사 → 린트 → npm run build(out/)           
     → PHP 문법검사 → 금지 파일 검사                         
- ② 배포 계획 (production 승인 후) ── rsync --dry-run (읽기만) ─▶  /var/www/thewoollim/  (비교만)
- ③ 운영 반영 (잠금 해제 + DEPLOY 확인 + production 승인 후)
+ ② 배포 계획 (main, production 환경) ─ rsync --dry-run (읽기만) ─▶  /var/www/thewoollim/  (비교만)
+ ③ 운영 반영 (잠금 해제 + DEPLOY 확인 후, main, production 환경)
     rsync ──────────────────────────────────────────────▶  /home/admin/deploy-staging/thewoollim-gha-release/  (임시 경로)
     ssh: 백업 ──────────────────────────────────────────▶  /home/admin/deploy-backups/*.tar.gz
     ssh: sudo rsync 임시 경로 → 운영 경로 (필터 적용) ───▶  /var/www/thewoollim/
  ④ 상태 확인 ───── HTTPS 요청 ──────────────────────────▶  https://thewoollim.com
 ```
 
-서버에 접속하는 단계(②·③, 백업 목록, 되돌리기)는 모두 GitHub 의 **production 환경 승인**을 거칩니다. 실행한 사람은 스스로 승인할 수 없어 대표·개발자 중 **상대방**이 승인합니다. ①은 승인 없이 실행되며 서버에 접속하지 않습니다.
+서버에 접속하는 단계(②·③, 백업 목록, 되돌리기)는 모두 GitHub 의 **production 환경**에서 실행됩니다. 서버 접속 키는 이 환경에만 있고 **`main` 브랜치에서만** 열리므로, `main` 에 병합된 코드(상대방의 PR 승인을 거친 코드)만 서버에 접속할 수 있습니다. 배포 실행에는 **별도 승인 단계가 없어** 대표·개발자가 각자 바로 실행할 수 있습니다. ①은 서버에 접속하지 않습니다.
 
 | 파일 | 역할 |
 |---|---|
@@ -37,22 +37,24 @@
 
 | 모드 | 하는 일 | 서버 변경 | 필요 조건 |
 |---|---|---|---|
-| `plan` | 빌드·검사 → 서버와 비교해 바뀔 파일 목록을 실행 요약(Summary)에 표시 | 없음 | main 브랜치 + production 승인(1번). production 환경에 서버 Secret 이 없으면 빌드·검사만 수행 |
-| `deploy` | plan 과 같은 검사 → 임시 경로 업로드 → **백업** → 반영 → 상태 확인 | 있음 | `DEPLOY_UNLOCKED: "true"` + main 브랜치 + `confirm=DEPLOY` + production 승인 **2번**(배포 계획 → 운영 반영) |
-| `rollback-list` | 서버의 백업 목록 표시 | 없음 | main 브랜치 + production 승인(1번) |
-| `rollback` | 지정한 백업으로 복원 → 상태 확인 | 있음 | `DEPLOY_UNLOCKED: "true"` + `confirm=ROLLBACK` + production 승인(1번) |
+| `plan` | 빌드·검사 → 서버와 비교해 바뀔 파일 목록을 실행 요약(Summary)에 표시 | 없음 | main 브랜치. production 환경에 서버 Secret 이 없으면 빌드·검사만 수행 |
+| `deploy` | plan 과 같은 검사 → 임시 경로 업로드 → **백업** → 반영 → 상태 확인 | 있음 | `DEPLOY_UNLOCKED: "true"` + main 브랜치 + `confirm=DEPLOY` |
+| `rollback-list` | 서버의 백업 목록 표시 | 없음 | main 브랜치 |
+| `rollback` | 지정한 백업으로 복원 → 상태 확인 | 있음 | `DEPLOY_UNLOCKED: "true"` + main 브랜치 + `confirm=ROLLBACK` |
+
+네 모드 모두 별도 배포 승인 없이 실행됩니다. 실행할 수 있는 사람은 저장소 쓰기 권한이 있는 대표·개발자입니다.
 
 **잠금 상태에서도 서버와 통신하는 경우**
 
 | 모드 | 서버 SSH 접속 | 서버 파일 변경 | AWS 보안그룹 변경 |
 |---|---|---|---|
 | `plan` (production 환경에 서버 Secret 미등록) | 없음 | 없음 | 없음 |
-| `plan` (서버 Secret 등록, 승인 후) | **있음** — 접속 확인, `sudo -n true`, `rsync --dry-run` (읽기만) | 없음 | `aws-sg-temporary` 일 때만 실행기 IP 를 **임시로 추가했다가 제거** |
-| `rollback-list` (승인 후) | **있음** — 백업 폴더 목록 읽기 | 없음 | 위와 같음 |
-| `deploy` (잠금) | 없음 — 빌드 첫 단계에서 실패, 승인 요청도 생기지 않음 | 없음 | 없음 |
-| `rollback` (잠금) | 없음 — 승인 후 첫 단계에서 실패 | 없음 | 없음 |
+| `plan` (서버 Secret 등록) | **있음** — 접속 확인, `sudo -n true`, `rsync --dry-run` (읽기만) | 없음 | `aws-sg-temporary` 일 때만 실행기 IP 를 **임시로 추가했다가 제거** |
+| `rollback-list` | **있음** — 백업 폴더 목록 읽기 | 없음 | 위와 같음 |
+| `deploy` (잠금) | 없음 — 빌드 첫 단계에서 실패 | 없음 | 없음 |
+| `rollback` (잠금) | 없음 — 첫 단계에서 실패 | 없음 | 없음 |
 
-**지금은 잠금 상태**입니다(`deploy.yml` 의 `DEPLOY_UNLOCKED: "false"`). `plan`과 `rollback-list`만 동작하고(둘 다 production 승인 필요), `deploy`·`rollback`은 첫 단계에서 실패합니다. 잠금을 풀려면 이 값을 `"true"`로 바꾸는 PR 을 상대방이 승인한 뒤 병합해야 합니다.
+**지금은 잠금 상태**입니다(`deploy.yml` 의 `DEPLOY_UNLOCKED: "false"`). `plan`과 `rollback-list`만 동작하고, `deploy`·`rollback`은 첫 단계에서 실패합니다. 잠금을 풀려면 이 값을 `"true"`로 바꾸는 PR 을 상대방이 승인한 뒤 병합해야 합니다.
 
 **배포 대상(target)**
 
@@ -101,7 +103,7 @@ GitHub 이 제공하는 실행기(GitHub-hosted runner)는 실행할 때마다 I
 - Repository Secrets·Variables: GitHub 저장소 → **Settings → Secrets and variables → Actions** (Secrets 탭 = 값이 가려지는 비밀값 / Variables 탭 = 일반 설정값)
 - production 환경과 환경 Secret: **Settings → Environments → `production`**
 
-### 5-1. Repository Secrets (빌드용 — 승인 없이 build 작업에서 사용)
+### 5-1. Repository Secrets (빌드용 — build 작업에서 사용)
 
 | 이름 | 내용 | 필수 |
 |---|---|---|
@@ -112,7 +114,7 @@ GitHub 이 제공하는 실행기(GitHub-hosted runner)는 실행할 때마다 I
 > `NEXT_PUBLIC_*` 값은 빌드된 화면 파일에 들어가 브라우저에 공개되는 값입니다. 그래도 저장소 코드에 적지 않고 Secret 으로 관리합니다.
 > PHP 비밀 설정 5종(DB·문자·OAuth·토스·포트원)은 **GitHub 에 넣지 않습니다.** 지금처럼 서버에만 둡니다.
 
-### 5-2. production Environment Secrets (서버 접속용 — 승인을 거친 작업만 사용)
+### 5-2. production Environment Secrets (서버 접속용 — main 의 production 작업만 사용)
 
 | 이름 | 내용 |
 |---|---|
@@ -120,9 +122,9 @@ GitHub 이 제공하는 실행기(GitHub-hosted runner)는 실행할 때마다 I
 | `DEPLOY_SSH_HOST` | 서버 주소 |
 | `DEPLOY_SSH_KNOWN_HOSTS` | 서버 호스트 키 한 줄 (`ssh-keyscan` 결과를 지문으로 직접 확인한 뒤 등록) |
 
-- `environment: production` 을 지정한 작업(`plan`·`deploy`·`rollback-list`·`rollback`)만, 상대방이 승인한 뒤에 이 값을 읽을 수 있습니다. `build` 작업은 읽을 수 없습니다.
-- **같은 이름을 Repository Secrets 에 두지 않습니다.** 남아 있으면 production 환경을 지정하지 않은 작업(예: 다른 브랜치에서 수정한 워크플로)도 그 값을 읽을 수 있어 승인 절차를 우회할 수 있습니다.
-  - 전환 순서: production 환경에 먼저 등록 → 이 구조의 워크플로 병합 → `plan`·`rollback-list` 검증 → Repository 쪽 같은 이름 3개 삭제
+- `environment: production` 을 지정한 작업(`plan`·`deploy`·`rollback-list`·`rollback`)이 **`main` 브랜치에서 실행될 때만** 이 값을 읽을 수 있습니다. `build` 작업과 다른 브랜치의 실행은 읽을 수 없습니다.
+- **같은 이름을 Repository Secrets 에 두지 않습니다.** 남아 있으면 production 환경을 지정하지 않은 작업(예: 다른 브랜치에서 수정한 워크플로)도 그 값을 읽을 수 있어 `main` 전용 제한을 우회할 수 있습니다.
+  - 현재 Repository Secrets 에는 빌드용 3개만 있고, 서버 접속용 3개는 production 환경에만 있습니다.
 
 ### 5-3. Variables (일반 설정값) — 비워 두면 괄호 안 기본값 사용
 
@@ -140,21 +142,18 @@ GitHub 이 제공하는 실행기(GitHub-hosted runner)는 실행할 때마다 I
 | `AWS_SECURITY_GROUP_ID` | — | `aws-sg-temporary` 일 때 필수 |
 | `AWS_DEPLOY_ROLE_ARN` | — | `aws-sg-temporary` 일 때 필수 (GitHub OIDC 신뢰 IAM 역할) |
 
-### 5-4. production 환경 (상대방 승인)
+### 5-4. production 환경 (main 전용, 별도 배포 승인 없음)
 
 설정 위치: **Settings → Environments → `production`**
 
 | 설정 | 값 | 의미 |
 |---|---|---|
-| Required reviewers | 대표·개발자 2명 | GitHub 는 이 중 **한 명**만 승인하면 진행합니다 |
-| Prevent self-review | 켜짐 | 실행한 사람은 자기 실행을 승인할 수 없습니다 → **항상 상대방이 승인** |
-| Allow administrators to bypass | 꺼짐 | 저장소 관리자도 승인을 건너뛸 수 없습니다 |
-| Deployment branches | `main` 만 | 다른 브랜치의 실행은 production 작업으로 넘어가지 못합니다 |
+| Required reviewers | 없음 | 배포 실행에 별도 승인 단계가 없습니다. 대표·개발자가 각자 바로 실행합니다 |
+| Deployment branches | `main` 만 | `main` 의 워크플로만 서버 접속 키를 쓸 수 있습니다. 다른 브랜치의 실행은 production 작업으로 넘어가지 못합니다 |
+| Allow administrators to bypass | 꺼짐 | 환경 보호 규칙을 관리자도 건너뛰지 않도록 유지합니다 |
 
 - 이 환경을 쓰는 작업: `plan`, `deploy`, `rollback-list`, `rollback` (`build` 는 쓰지 않음)
-- 승인 횟수: `plan` 1번, `deploy` 모드 2번(배포 계획 → 계획 결과 확인 후 운영 반영), `rollback-list` 1번, `rollback` 1번
-- 승인 방법: Actions 실행 화면 → **Review deployments** → `production` 선택 → **Approve and deploy** (거절은 **Reject**)
-- 승인하지 않은 실행은 최대 30일 동안 기다리며, 그동안 다음 실행이 대기할 수 있습니다. 필요 없는 실행은 거절하거나 취소합니다.
+- 서버에 올라가는 코드는 `main` 에 병합된 코드뿐이고, `main` 병합에는 상대방의 PR 승인 1명이 필요합니다(11장 "코드 변경 승인").
 - 다른 브랜치에서는 `plan` 의 서버 비교도 할 수 없습니다. 변경은 PR 로 `main` 에 병합한 뒤 `plan` 을 실행합니다.
 
 ## 6. 서버·AWS 쪽 준비 (담당자가 직접 진행)
@@ -180,8 +179,8 @@ GitHub 이 제공하는 실행기(GitHub-hosted runner)는 실행할 때마다 I
 1. 워크플로 PR 을 상대방이 승인한 뒤 병합 (잠금 상태 그대로)
 2. 빌드용 Repository Secret 3개 등록 → `plan` 실행 → **빌드·검사만** 통과하는지 확인
 3. 6장의 서버 준비 + `production` 환경 설정(5-4) + 서버 접속 Secret 3개를 **production 환경**에 등록
-4. `plan` 실행 → 실행한 사람은 승인할 수 없는지 확인 → 상대방 승인 → 실행 요약의 **변경 목록**과 **삭제 예정 0건**(API) 확인
-5. `rollback-list` 실행 → 상대방 승인 → 서버 접속·sudo 확인 (백업은 아직 없음)
+4. `plan` 실행 → 실행 요약의 **변경 목록**과 **삭제 예정 0건**(API) 확인
+5. `rollback-list` 실행 → 서버 접속·sudo 확인 (백업은 아직 없음)
 6. Repository Secrets 에 서버 접속용 같은 이름이 남아 있지 않은지 확인 (있으면 삭제) → `plan` 을 한 번 더 실행해 정상인지 확인
 7. `DEPLOY_UNLOCKED: "true"` 로 바꾸는 PR → 상대방 승인 후 병합
 8. 첫 배포는 `target=frontend` 또는 `target=api` 하나로 범위를 좁혀 시작 → 상태 확인 결과 검토 → 이후 `all` 사용
@@ -189,13 +188,12 @@ GitHub 이 제공하는 실행기(GitHub-hosted runner)는 실행할 때마다 I
 ## 8. 평소 배포 절차 ("배포해 줘")
 
 1. 변경 사항이 PR 로 리뷰되어(상대방 승인 1명) **main 에 병합**되어 있어야 합니다.
-2. `plan` 실행 → 상대방이 승인 → 실행 요약에서 바뀔 파일 목록 확인
-3. 확인 후 `deploy` 실행 (`confirm=DEPLOY`, 같은 target)
-4. 상대방이 GitHub 화면에서 **배포 계획 단계를 승인** → 계획 결과를 확인한 뒤 **운영 반영 단계를 승인**
-5. 워크플로가 백업 → 반영 → 상태 확인을 자동으로 진행
-6. 실행 요약에서 결과와 **백업 이름** 확인
+2. `plan` 실행 → 실행 요약에서 바뀔 파일 목록 확인
+3. 확인 후 `deploy` 실행 (`confirm=DEPLOY`, 같은 target) — 별도 승인 없이 바로 진행됩니다
+4. 워크플로가 배포 계획 → 백업 → 반영 → 상태 확인을 자동으로 진행
+5. 실행 요약에서 결과와 **백업 이름** 확인
 
-Claude Code 에서 "배포해 줘"라고 요청하면 Claude 는 위 순서대로 진행합니다. `plan` 결과를 먼저 보고하고, 요청자의 명시적 승인을 받은 뒤에만 `deploy` 를 실행합니다. production 승인 버튼은 사람(상대방)이 누르며, Claude 가 대신 승인하지 않습니다. (CLAUDE.md 의 "운영 배포 규칙" 참고)
+Claude Code 에서 "배포해 줘"라고 요청하면 Claude 는 위 순서대로 진행합니다. `plan` 결과를 먼저 보고하고, 요청자의 명시적 승인을 받은 뒤에만 `deploy` 를 실행합니다. (CLAUDE.md 의 "운영 배포 규칙" 참고)
 
 ## 9. 백업과 롤백
 
@@ -222,7 +220,8 @@ Claude Code 에서 "배포해 줘"라고 요청하면 Claude 는 위 순서대�
 - **파일 소유자**: 반영은 `sudo rsync` 로 하므로 소유자를 지정하지 않으면 변경된 파일이 root 소유가 될 수 있습니다. 현재 `DEPLOY_FILE_OWNER=admin:admin` 으로 서버 기존 파일과 같은 소유자로 맞춥니다. 비밀 설정·운영 데이터·업로드·세션은 배포 대상이 아니므로 소유자가 바뀌지 않습니다.
 - **코드 변경 승인**: `main` 에는 PR 로만 병합하며, 작성자가 아닌 상대방 1명의 승인이 필요합니다. 새 커밋을 올리면 기존 승인이 취소되고, 마지막으로 커밋을 올린 사람이 아닌 사람이 승인해야 합니다. 상대방 PR 에는 직접 커밋하지 말고 의견으로 남깁니다.
 - **공개 저장소**: Actions 실행 기록·실행 요약·결과 파일은 누구나 볼 수 있습니다. Secret 값은 자동으로 가려지고, 접속 확인 단계는 서버 이름을 출력하지 않습니다.
-- **Mac 수동 배포**: 기존 `.pem` 키로 하는 수동 배포는 GitHub 승인 절차를 거치지 않습니다. 사용 원칙은 대표·개발자가 정합니다.
+- **배포 권한**: 저장소 쓰기 권한이 있는 대표·개발자는 각자 별도 승인 없이 `main` 의 코드를 배포·되돌리기 할 수 있습니다. 배포 전에 `plan` 결과를 확인합니다.
+- **Mac 수동 배포**: 기존 `.pem` 키로 하는 수동 배포는 GitHub Actions(PR 승인·`main` 전용 제한)를 거치지 않습니다. 사용 원칙은 대표·개발자가 정합니다.
 - **문자 예약발송 타이머(systemd)**, DB 마이그레이션, PHP 비밀 설정 변경은 이 워크플로의 범위가 아닙니다.
 - **외부 액션**: `actions/checkout`, `setup-node`, `upload-artifact`, `download-artifact`, `aws-actions/configure-aws-credentials` 를 커밋 SHA 로 고정했습니다(버전은 주석). 업데이트할 때도 SHA 로 바꿉니다.
 - **GITHUB_TOKEN 권한**: 기본값은 권한 없음(`permissions: {}`). 빌드는 `contents: read`, 서버를 다루는 작업은 `contents: read` + `id-token: write`(AWS 임시 자격증명용)만 씁니다. checkout 은 토큰을 남기지 않도록 `persist-credentials: false` 입니다.
