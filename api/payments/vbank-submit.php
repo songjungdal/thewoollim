@@ -89,6 +89,11 @@ foreach ($partyIds as $pid) {
     $orderTitles[] = (string)($partyMap[$pid]['title'] ?? '파티');
 }
 
+// 정원 사전 검사 — 쿠폰 사용 처리 전에 파티마다 확인 (최종 판정은 입금 확인 시 confirm_vbank)
+if (!empty(partiesOverStock($partyIds, $partyMap, $genderKey))) {
+    jsonFail('정원이 마감되었습니다.');
+}
+
 // ── 4) 쿠폰 검증 + atomic consume (success.php 와 동일 규칙) ──────────────
 $couponDiscount = 0;
 if ($couponCode !== '') {
