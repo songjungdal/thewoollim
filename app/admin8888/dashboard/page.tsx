@@ -2011,7 +2011,7 @@ export default function AdminDashboard() {
                       {/* 제목 */}
                       <FormField label="제목 *" value={partyForm.title} onChange={v => setPartyForm(p => ({ ...p, title: v }))} />
                       {/* 내용 */}
-                      <FormField label="내용 (소개)" value={partyForm.description} onChange={v => setPartyForm(p => ({ ...p, description: v }))} textarea />
+                      <FormField label="한 줄 소개 (제목 아래 표시)" value={partyForm.description} onChange={v => setPartyForm(p => ({ ...p, description: v }))} textarea />
                       {/* 일시 */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {partyForm.partyType === "solo" && partyForm.optionMode === "options" ? (

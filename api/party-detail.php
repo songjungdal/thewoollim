@@ -2,7 +2,7 @@
 /**
  * 파티 상세페이지 안내 조회 (공개).
  *
- * GET ?id=N → { ok: true, partyType: 'matching'|'solo', detail: {...} | null }
+ * GET ?id=N → { ok: true, partyType: 'matching'|'solo', detail: {...} | null }   (detail.about: 소개글 — docs/specs/party-solo-guide.md 7장)
  *   - detail 이 없으면 null — 화면은 종류별 기본 내용(app/lib/partyDetailTemplates.ts)으로 그린다.
  *   - 목록 API(/api/parties.php)는 10초마다 다시 불러오므로 detail 을 넣지 않고 이 API 로 따로 조회한다.
  *   - 파티가 없으면 404 { ok: false }.
