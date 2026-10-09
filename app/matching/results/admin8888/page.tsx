@@ -474,11 +474,11 @@ export default function MatchingAdminPage() {
                   {/* 참가자 총원 + 투표 완료 현황 */}
                   <div className="grid grid-cols-2 gap-3 mb-4">
                     <div className="bg-gray-50 rounded-2xl px-4 py-3 text-center">
-                      <p className="text-xs font-bold text-gray-400 mb-1">참가자 (남/여)</p>
+                      <p className="text-xs font-bold text-gray-500 mb-1">참가자 (남/여)</p>
                       <p className="text-lg font-black text-black tabular-nums">{part.male} / {part.female}</p>
                     </div>
                     <div className="bg-gray-50 rounded-2xl px-4 py-3 text-center">
-                      <p className="text-xs font-bold text-gray-400 mb-1">투표 완료</p>
+                      <p className="text-xs font-bold text-gray-500 mb-1">투표 완료</p>
                       <p className="text-base font-black text-black tabular-nums break-keep">
                         남 {votedM}/{part.male} · 여 {votedF}/{part.female}
                       </p>
@@ -486,7 +486,7 @@ export default function MatchingAdminPage() {
                   </div>
 
                   {p.host_name ? (
-                    <p className="text-xs font-bold text-gray-400 mb-4">담당자: {p.host_name}</p>
+                    <p className="text-xs font-bold text-gray-500 mb-4">담당자: {p.host_name}</p>
                   ) : null}
 
                   {/* 3대 제어 버튼 — 종료(finalized) 파티는 조건부 색상으로 마감 여부를 한눈에 강조.
@@ -500,7 +500,7 @@ export default function MatchingAdminPage() {
                       disabled={!!busy || isOpen || isFinal}
                       className={`px-2 py-4 rounded-2xl font-black text-sm active:scale-[0.97] transition-transform ${
                         startInactive
-                          ? "bg-transparent border-2 border-gray-200 text-gray-400"
+                          ? "bg-transparent border-2 border-gray-200 text-gray-500"
                           : "bg-[#40E0D0] text-black disabled:bg-gray-100 disabled:text-gray-300"
                       }`}
                     >
@@ -536,7 +536,7 @@ export default function MatchingAdminPage() {
                         <p>매칭된 커플 수 : <span className="text-black font-black">{couples}쌍</span></p>
                         <p className="break-keep">
                           인기번호 : 남자 {popM.number || "-"}번 : {popM.count}표
-                          <span className="text-gray-300 mx-1">|</span>
+                          <span className="text-gray-500 mx-1">|</span>
                           여자 {popF.number || "-"}번 : {popF.count}표
                         </p>
                       </div>
@@ -564,7 +564,7 @@ export default function MatchingAdminPage() {
                             </thead>
                             <tbody>
                               {d.votes.length === 0 ? (
-                                <tr><td colSpan={7} className="px-3 py-4 text-center text-gray-400 font-bold">투표 내역이 없습니다.</td></tr>
+                                <tr><td colSpan={7} className="px-3 py-4 text-center text-gray-500 font-bold">투표 내역이 없습니다.</td></tr>
                               ) : d.votes.map((v, i) => (
                                 <tr key={i} className="border-t border-gray-100">
                                   <td className="px-3 py-2.5 font-bold">{v.gender}</td>
@@ -573,7 +573,7 @@ export default function MatchingAdminPage() {
                                   <td className="px-3 py-2.5 text-gray-500">{v.email}</td>
                                   <td className="px-3 py-2.5 font-black text-black tabular-nums">{v.picks.join(", ") || "-"}</td>
                                   <td className="px-3 py-2.5 tabular-nums">{v.phone || "-"}</td>
-                                  <td className="px-3 py-2.5 text-gray-400 tabular-nums">{v.updated_at}</td>
+                                  <td className="px-3 py-2.5 text-gray-500 tabular-nums">{v.updated_at}</td>
                                 </tr>
                               ))}
                             </tbody>

@@ -35,7 +35,7 @@ export default function Error({
           홈으로 이동해 주세요.
         </p>
         {error?.digest && (
-          <p className="text-[11px] text-gray-400 font-mono mb-5">
+          <p className="text-xs text-gray-500 font-mono mb-5">
             digest: {error.digest}
           </p>
         )}
@@ -43,7 +43,7 @@ export default function Error({
           <button
             type="button"
             onClick={() => unstable_retry()}
-            className="flex-1 bg-brand-black text-white py-3.5 rounded-xl font-bold hover:bg-brand-point transition-colors"
+            className="flex-1 bg-brand-black text-white py-3.5 rounded-xl font-bold hover:bg-brand-point hover:text-black transition-colors"
           >
             다시 시도
           </button>

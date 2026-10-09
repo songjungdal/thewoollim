@@ -37,18 +37,18 @@ export default function RefundPage() {
               {/* ⓪ 환불 규정 및 유효기간 안내 — 서비스 제공기간/예약 소멸 기준 고지 */}
               <section>
                 <div className="flex items-center gap-3 mb-6 md:mb-8">
-                  <Clock className="text-brand-point flex-shrink-0" size={24} />
+                  <Clock className="text-brand-point-ink flex-shrink-0" size={24} />
                   <h2 className="text-2xl md:text-3xl font-black tracking-tight">환불 규정 및 유효기간 안내</h2>
                 </div>
                 <ul className="bg-gray-50 border border-gray-100 rounded-2xl md:rounded-3xl p-6 md:p-9 space-y-4 md:space-y-5 text-sm md:text-base text-gray-700 leading-relaxed">
                   <li className="flex gap-3">
-                    <span className="text-brand-point font-black flex-shrink-0">·</span>
+                    <span className="text-brand-point-ink font-black flex-shrink-0">·</span>
                     <span>
                       <span className="font-bold text-gray-900">서비스 제공 기간(유효기간)</span> : 본 파티 예약 서비스의 제공 기간은 결제일(구매일)로부터 3개월(90일)까지입니다.
                     </span>
                   </li>
                   <li className="flex gap-3">
-                    <span className="text-brand-point font-black flex-shrink-0">·</span>
+                    <span className="text-brand-point-ink font-black flex-shrink-0">·</span>
                     <span>
                       <span className="font-bold text-gray-900">예약 소멸 기준</span> : 결제 후 3개월 이내에 파티 참가 예약을 완료하지 않거나 참가하지 않은 이용권은 기간 만료로 소멸되며, 이후에는 환불 및 서비스 제공이 불가합니다.
                     </span>
@@ -59,7 +59,7 @@ export default function RefundPage() {
               {/* ① 시기별 환불 안내 — 메인 강조 카드 (전폭, 컬러 tier 표) */}
               <section>
                 <div className="flex items-center gap-3 mb-6 md:mb-8">
-                  <RefreshCw className="text-brand-point flex-shrink-0" size={24} />
+                  <RefreshCw className="text-brand-point-ink flex-shrink-0" size={24} />
                   <h2 className="text-2xl md:text-3xl font-black tracking-tight">취소 시기별 환불 안내</h2>
                 </div>
                 <p className="text-sm md:text-base text-gray-500 font-medium leading-relaxed mb-6 md:mb-8">
@@ -89,18 +89,18 @@ export default function RefundPage() {
               <section className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
                 <div className="bg-white border border-gray-100 rounded-2xl md:rounded-3xl p-6 md:p-8 hover:border-brand-point/30 transition-colors">
                   <div className="flex items-center gap-3 mb-4 md:mb-5">
-                    <Info className="text-brand-point flex-shrink-0" size={22} />
+                    <Info className="text-brand-point-ink flex-shrink-0" size={22} />
                     <h2 className="text-lg md:text-xl font-black">취소 안내</h2>
                   </div>
                   <p className="text-sm md:text-base text-gray-700 leading-relaxed">
-                    취소 신청은 <span className="font-black text-brand-point">마이페이지</span>를 통해 가능하며,
+                    취소 신청은 <span className="font-black text-brand-point-ink">마이페이지</span>를 통해 가능하며,
                     취소 완료 시 결제 수단으로 자동 환불됩니다.
                   </p>
                 </div>
 
                 <div className="bg-white border border-gray-100 rounded-2xl md:rounded-3xl p-6 md:p-8 hover:border-brand-point/30 transition-colors">
                   <div className="flex items-center gap-3 mb-4 md:mb-5">
-                    <CreditCard className="text-brand-point flex-shrink-0" size={22} />
+                    <CreditCard className="text-brand-point-ink flex-shrink-0" size={22} />
                     <h2 className="text-lg md:text-xl font-black">환불 방법</h2>
                   </div>
                   <p className="text-sm md:text-base text-gray-700 leading-relaxed">
@@ -136,20 +136,20 @@ export default function RefundPage() {
               {/* ④ 환불 예외 규정 — 긍정 케이스 */}
               <section>
                 <div className="flex items-center gap-3 mb-6 md:mb-8">
-                  <ScrollText className="text-brand-point flex-shrink-0" size={24} />
+                  <ScrollText className="text-brand-point-ink flex-shrink-0" size={24} />
                   <h2 className="text-2xl md:text-3xl font-black tracking-tight">환불 예외 규정</h2>
                 </div>
                 <ul className="bg-gray-50 border border-gray-100 rounded-2xl md:rounded-3xl p-6 md:p-9 space-y-4 md:space-y-5 text-sm md:text-base text-gray-700 leading-relaxed">
                   <li className="flex gap-3">
-                    <span className="text-brand-point font-black flex-shrink-0">·</span>
+                    <span className="text-brand-point-ink font-black flex-shrink-0">·</span>
                     <span>주최측의 사정으로 파티가 취소될 경우 <span className="font-bold text-gray-900">전액 환불</span>해 드립니다.</span>
                   </li>
                   <li className="flex gap-3">
-                    <span className="text-brand-point font-black flex-shrink-0">·</span>
+                    <span className="text-brand-point-ink font-black flex-shrink-0">·</span>
                     <span>천재지변 등으로 행사가 정상 진행되지 못할 경우 <span className="font-bold text-gray-900">전액 환불</span> 대상입니다.</span>
                   </li>
                   <li className="flex gap-3">
-                    <span className="text-brand-point font-black flex-shrink-0">·</span>
+                    <span className="text-brand-point-ink font-black flex-shrink-0">·</span>
                     <span>매칭 파트너의 노쇼로 인해 파티 구성이 현저히 깨진 경우 <span className="font-bold text-gray-900">부분 환불 또는 차후 파티 초대권</span>을 제공합니다.</span>
                   </li>
                 </ul>

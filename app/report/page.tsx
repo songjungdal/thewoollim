@@ -27,17 +27,17 @@ export default function ReportPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8 mb-12 md:mb-20">
                 <div className="p-6 md:p-8 bg-gray-50 rounded-2xl md:rounded-3xl border border-gray-100">
-                  <UserCheck className="text-brand-point mb-4 md:mb-6" size={28} />
+                  <UserCheck className="text-brand-point-ink mb-4 md:mb-6" size={28} />
                   <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-3">빠르고 정확한 안내</h3>
                   <p className="text-sm md:text-base">접수된 문의 및 민원 사항은 전담 운영팀에서 신속하고 공정하게 확인 후 답변을 드립니다.</p>
                 </div>
                 <div className="p-6 md:p-8 bg-gray-50 rounded-2xl md:rounded-3xl border border-gray-100">
-                  <Lock className="text-brand-point mb-4 md:mb-6" size={28} />
+                  <Lock className="text-brand-point-ink mb-4 md:mb-6" size={28} />
                   <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-3">철저한 비밀 및 익명 보장</h3>
                   <p className="text-sm md:text-base">매너 위반 제보 및 민원 신고의 경우에는 상대방에게 공개되지 않으며 철저히 익명으로 처리됩니다.</p>
                 </div>
                 <div className="p-6 md:p-8 bg-gray-50 rounded-2xl md:rounded-3xl border border-gray-100">
-                  <ShieldAlert className="text-brand-point mb-4 md:mb-6" size={28} />
+                  <ShieldAlert className="text-brand-point-ink mb-4 md:mb-6" size={28} />
                   <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-3">신속한 문제 해결</h3>
                   <p className="text-sm md:text-base">서비스 불편 사항 개선부터 이용 규칙 위반에 대한 제재 조치까지 올바른 이용 환경 조성을 위해 엄격하게 대응합니다.</p>
                 </div>
@@ -60,7 +60,7 @@ export default function ReportPage() {
                     <span className="font-bold text-right">@어울림톡</span>
                   </li>
                 </ul>
-                <a href="https://pf.kakao.com/_racXX" target="_blank" rel="noopener noreferrer" className="inline-block mt-8 md:mt-12 w-full md:w-auto text-center bg-brand-point text-white px-8 md:px-10 py-4 rounded-xl font-bold hover:brightness-110 transition-all">
+                <a href="https://pf.kakao.com/_racXX" target="_blank" rel="noopener noreferrer" className="inline-block mt-8 md:mt-12 w-full md:w-auto text-center bg-brand-point text-black px-8 md:px-10 py-4 rounded-xl font-bold hover:brightness-110 transition-all">
                   카카오톡으로 문의하기
                 </a>
               </div>

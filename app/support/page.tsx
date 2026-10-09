@@ -27,20 +27,20 @@ export default function SupportPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 mb-12 md:mb-20">
                 <div className="p-6 md:p-8 rounded-2xl md:rounded-3xl bg-gray-50 border border-gray-100 flex flex-col items-center text-center">
                   <div className="w-14 md:w-16 h-14 md:h-16 bg-white rounded-full flex items-center justify-center shadow-sm mb-4 md:mb-6">
-                    <MessageCircle className="text-brand-point" size={26} />
+                    <MessageCircle className="text-brand-point-ink" size={26} />
                   </div>
                   <h3 className="text-lg md:text-xl font-black text-gray-900 mb-2 md:mb-3">카카오톡 채널</h3>
                   <p className="mb-5 md:mb-6 font-semibold text-sm md:text-base">@어울림</p>
-                  <a href="#" className="bg-brand-black text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-brand-point transition-colors">상담 시작하기</a>
+                  <a href="#" className="bg-brand-black text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-brand-point hover:text-black transition-colors">상담 시작하기</a>
                 </div>
 
                 <div className="p-6 md:p-8 rounded-2xl md:rounded-3xl bg-gray-50 border border-gray-100 flex flex-col items-center text-center">
                   <div className="w-14 md:w-16 h-14 md:h-16 bg-white rounded-full flex items-center justify-center shadow-sm mb-4 md:mb-6">
-                    <Mail className="text-brand-point" size={26} />
+                    <Mail className="text-brand-point-ink" size={26} />
                   </div>
                   <h3 className="text-lg md:text-xl font-black text-gray-900 mb-2 md:mb-3">이메일 문의</h3>
                   <p className="mb-5 md:mb-6 font-semibold text-sm md:text-base">support@thewoollim.com</p>
-                  <a href="mailto:support@thewoollim.com" className="bg-brand-black text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-brand-point transition-colors">메일 보내기</a>
+                  <a href="mailto:support@thewoollim.com" className="bg-brand-black text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-brand-point hover:text-black transition-colors">메일 보내기</a>
                 </div>
               </div>
 
