@@ -56,7 +56,7 @@ function GallerySlider({
   // 화살표 공통 스타일 — 원형/사각형 박스 X, 화살표 기호만.
   // 이미지 위에 오버레이되므로 기본 흰색(밝은 가독성) + hover 시 brand-point 청록.
   const arrowBase =
-    "absolute top-1/2 -translate-y-1/2 z-10 p-2 text-white hover:text-[#008080] " +
+    "absolute top-1/2 -translate-y-1/2 z-10 p-2 text-white hover:text-brand-point " +
     "transition-colors disabled:text-white/30 disabled:cursor-not-allowed " +
     "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#008080]/40 rounded-md " +
     "drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]";
@@ -136,7 +136,7 @@ function GallerySlider({
               type="button"
               onClick={() => setCurrentPage(() => i)}
               aria-label={`갤러리 ${i + 1} 페이지`}
-              className={`h-2 rounded-full transition-all ${
+              className={`relative h-2 rounded-full transition-all before:absolute before:-inset-x-1 before:-inset-y-[18px] ${
                 i === safePage ? "w-6 bg-[#008080]" : "w-2 bg-white/30 hover:bg-white/50"
               }`}
             />
@@ -425,7 +425,7 @@ export default function SmoothOnePage() {
                   e.preventDefault();
                   document.getElementById('apply')?.scrollIntoView({ behavior: 'smooth' });
                 }}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-3 bg-brand-black text-white px-7 py-4 md:px-10 md:py-6 rounded-full text-base md:text-lg font-bold hover:bg-brand-point hover:-translate-y-1 transition-all shadow-xl hover:shadow-brand-point/30 cursor-pointer border border-white/20"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-3 bg-brand-black text-white px-7 py-4 md:px-10 md:py-6 rounded-full text-base md:text-lg font-bold hover:bg-brand-point hover:text-black hover:-translate-y-1 transition-all shadow-xl hover:shadow-brand-point/30 cursor-pointer border border-white/20"
               >
                 어울림 매칭파티 신청하기 <ArrowRight size={20} />
               </button>
@@ -460,7 +460,7 @@ export default function SmoothOnePage() {
                       onClick={() => pickAxis(axis)}
                       className={`px-5 md:px-7 py-2.5 md:py-3 text-base md:text-lg font-black rounded-full transition-all whitespace-nowrap ${
                         isActive
-                          ? "bg-brand-point text-white shadow-md"
+                          ? "bg-brand-point text-black shadow-md"
                           : "bg-gray-50 text-gray-500 hover:bg-gray-100 border border-gray-200"
                       }`}
                     >
@@ -487,7 +487,7 @@ export default function SmoothOnePage() {
                         onClick={() => setFilterValue(null)}
                         className={`px-3.5 md:px-5 py-1.5 md:py-2 text-xs md:text-sm font-bold rounded-full transition-all ${
                           !filterValue
-                            ? "bg-brand-point/10 text-brand-point border border-brand-point/30"
+                            ? "bg-brand-point/10 text-brand-point-ink border border-brand-point/30"
                             : "bg-white text-gray-500 hover:bg-gray-50 border border-gray-200"
                         }`}
                       >
@@ -502,7 +502,7 @@ export default function SmoothOnePage() {
                             onClick={() => setFilterValue(opt)}
                             className={`px-3.5 md:px-5 py-1.5 md:py-2 text-xs md:text-sm font-bold rounded-full transition-all ${
                               isSelected
-                                ? "bg-brand-point text-white shadow-md"
+                                ? "bg-brand-point text-black shadow-md"
                                 : "bg-white text-gray-500 hover:bg-gray-50 border border-gray-200"
                             }`}
                           >
@@ -512,8 +512,8 @@ export default function SmoothOnePage() {
                       })}
                     </div>
                     {filterValue && (
-                      <p className="text-center text-xs md:text-sm text-gray-400 font-medium mt-3">
-                        {activeAxis} · <span className="text-brand-point font-bold">{categoryLabel(filterValue)}</span> · {sortedParties.length}건
+                      <p className="text-center text-xs md:text-sm text-gray-500 font-medium mt-3">
+                        {activeAxis} · <span className="text-brand-point-ink font-bold">{categoryLabel(filterValue)}</span> · {sortedParties.length}건
                       </p>
                     )}
                   </motion.div>
@@ -523,8 +523,8 @@ export default function SmoothOnePage() {
 
             {sortedParties.length === 0 ? (
               <div className="bg-white border border-gray-100 rounded-2xl md:rounded-3xl p-10 md:p-16 text-center">
-                <p className="text-gray-400 font-bold text-sm md:text-base">선택한 조건에 맞는 매칭파티가 없습니다.</p>
-                <p className="text-xs md:text-sm text-gray-400 mt-2">다른 카테고리를 선택하거나 조건을 초기화해주세요.</p>
+                <p className="text-gray-500 font-bold text-sm md:text-base">선택한 조건에 맞는 매칭파티가 없습니다.</p>
+                <p className="text-xs md:text-sm text-gray-500 mt-2">다른 카테고리를 선택하거나 조건을 초기화해주세요.</p>
               </div>
             ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
@@ -564,18 +564,18 @@ export default function SmoothOnePage() {
                     {/* 우측 상단 배지 영역 — 종료 시 [모집종료] 단일 배지, 아니면 대상(싱글/돌싱) + 모집마감 스택 */}
                     <div className="absolute top-4 right-4 md:top-5 md:right-5 flex flex-col items-end gap-1.5 z-10">
                       {isEnded ? (
-                        <span className="bg-[#f8d8dd] text-[#9a3a47] text-[11px] md:text-xs font-black px-2.5 py-1 rounded-full shadow-md whitespace-nowrap tracking-tight">
+                        <span className="bg-[#f8d8dd] text-danger text-xs font-black px-2.5 py-1 rounded-full shadow-md whitespace-nowrap tracking-tight">
                           모집종료
                         </span>
                       ) : (
                         <>
                           {(card.targetGroup === "싱글" || card.targetGroup === "돌싱") && (
-                            <span className={`${card.targetGroup === "돌싱" ? "bg-[#b4a7d6]" : "bg-brand-point"} text-black text-[11px] md:text-xs font-black px-2.5 py-1 rounded-full shadow-md whitespace-nowrap`}>
+                            <span className={`${card.targetGroup === "돌싱" ? "bg-[#b4a7d6]" : "bg-brand-point"} text-black text-xs font-black px-2.5 py-1 rounded-full shadow-md whitespace-nowrap`}>
                               {card.targetGroup}
                             </span>
                           )}
                           {stock.allFull && (
-                            <span className="bg-gray-900 text-white text-[11px] md:text-xs font-black px-2.5 py-1 rounded-full shadow-md whitespace-nowrap">
+                            <span className="bg-gray-900 text-white text-xs font-black px-2.5 py-1 rounded-full shadow-md whitespace-nowrap">
                               모집 마감
                             </span>
                           )}
@@ -583,13 +583,13 @@ export default function SmoothOnePage() {
                       )}
                     </div>
                     {/* 제목 → 내용(소개) → 일시 → 장소 순서, 전체적으로 폰트 축소 — 우측 상단 배지가 가리지 않도록 우측 패딩 확보 */}
-                    <h3 className="text-base md:text-lg font-bold mb-1 group-hover:text-brand-point transition-colors leading-snug pr-16 md:pr-20">{card.title}</h3>
+                    <h3 className="text-base md:text-lg font-bold mb-1 group-hover:text-brand-point-ink transition-colors leading-snug pr-16 md:pr-20">{card.title}</h3>
                     {card.description && (
                       <p className="text-xs md:text-sm text-gray-500 font-medium mb-2.5 md:mb-3 line-clamp-2 break-keep">{card.description}</p>
                     )}
                     <div className="space-y-1.5 mb-4 md:mb-5 text-gray-600 font-medium flex-1 text-xs md:text-sm">
-                      <div className="flex items-center gap-2"><Calendar size={13} className="text-gray-400 group-hover:text-brand-point transition-colors flex-shrink-0" /> <span className="font-bold">{card.dateString}</span></div>
-                      <div className="flex items-center gap-2"><MapPin size={13} className="text-gray-400 group-hover:text-brand-point transition-colors flex-shrink-0" /> {card.location}</div>
+                      <div className="flex items-center gap-2"><Calendar size={13} className="text-gray-500 group-hover:text-brand-point-ink transition-colors flex-shrink-0" /> <span className="font-bold">{card.dateString}</span></div>
+                      <div className="flex items-center gap-2"><MapPin size={13} className="text-gray-500 group-hover:text-brand-point-ink transition-colors flex-shrink-0" /> {card.location}</div>
                     </div>
 
                     {/* 대상 + 신청 버튼 — 한 줄에 좌(대상) · 우(버튼) 배치, 신청하기와 동일한 가로 레이아웃 유지 */}
@@ -599,12 +599,12 @@ export default function SmoothOnePage() {
                       {/* 종료 카드는 파스텔 빨강(#f8d8dd) 버튼, disabled/pointer-events 적용 X (링크 정상 동작) */}
                       <Link
                         href={`/party/${card.id}`}
-                        className={`flex-shrink-0 text-center font-bold px-4 py-2 text-xs md:text-sm rounded-xl transition-colors duration-300 whitespace-nowrap ${
+                        className={`relative flex-shrink-0 text-center font-bold px-4 py-2 text-xs md:text-sm rounded-xl transition-colors duration-300 whitespace-nowrap before:absolute before:inset-x-0 before:-inset-y-1.5 ${
                           isEnded
-                            ? "bg-[#f8d8dd] text-[#9a3a47] hover:bg-[#f4c5cd]"
+                            ? "bg-[#f8d8dd] text-danger hover:bg-[#f4c5cd]"
                             : stock.allFull
                               ? "bg-gray-200 text-gray-500 hover:bg-gray-300"
-                              : "bg-brand-black text-white hover:bg-brand-point"
+                              : "bg-brand-black text-white hover:bg-brand-point hover:text-black"
                         }`}
                       >
                         {isEnded ? "모집 종료된 매칭파티" : stock.allFull ? "모집 마감 · 상세보기" : "신청하기"}
@@ -623,7 +623,7 @@ export default function SmoothOnePage() {
                 <button
                   type="button"
                   onClick={() => setApplyMoreOpen(true)}
-                  className="inline-flex items-center justify-center gap-2 h-12 px-8 md:px-10 rounded-full border border-gray-300 text-gray-700 font-bold text-sm md:text-base hover:border-brand-point hover:text-brand-point transition-colors"
+                  className="inline-flex items-center justify-center gap-2 h-12 px-8 md:px-10 rounded-full border border-gray-300 text-gray-700 font-bold text-sm md:text-base hover:border-brand-point hover:text-brand-point-ink transition-colors"
                 >
                   더보기 <ChevronDown size={18} />
                 </button>
@@ -681,7 +681,7 @@ export default function SmoothOnePage() {
                   type="button"
                   onClick={goPrevMonth}
                   aria-label="이전 달"
-                  className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-100 text-brand-black hover:bg-brand-point hover:text-white active:scale-95 transition-all"
+                  className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-100 text-brand-black hover:bg-brand-point hover:text-black active:scale-95 transition-all"
                 >
                   <ChevronLeft size={22} strokeWidth={2.5} />
                 </button>
@@ -692,7 +692,7 @@ export default function SmoothOnePage() {
                   type="button"
                   onClick={goNextMonth}
                   aria-label="다음 달"
-                  className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-100 text-brand-black hover:bg-brand-point hover:text-white active:scale-95 transition-all"
+                  className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-100 text-brand-black hover:bg-brand-point hover:text-black active:scale-95 transition-all"
                 >
                   <ChevronRight size={22} strokeWidth={2.5} />
                 </button>
@@ -701,7 +701,7 @@ export default function SmoothOnePage() {
               {/* 선택 월 일정 리스트 */}
               <div className="space-y-3">
                 {mobileSchedule.length === 0 ? (
-                  <p className="text-center text-gray-400 py-12">
+                  <p className="text-center text-gray-500 py-12">
                     {mobileYear > 0 ? `${mobileMonth}월에 등록된 일정이 없습니다.` : ""}
                   </p>
                 ) : (
@@ -725,16 +725,16 @@ export default function SmoothOnePage() {
                         }`}
                       >
                         <div className={`flex-shrink-0 w-14 rounded-xl py-2 text-center ${isPast ? "bg-[#f8d8dd]" : "bg-[#40E0D0]/15"}`}>
-                          <div className={`text-[11px] font-bold ${isPast ? "text-[#9a3a47]" : "text-[#008080]"}`}>{month}월</div>
-                          <div className={`text-2xl font-black leading-none ${isPast ? "text-[#7a2c37]" : "text-brand-black"}`}>{day}</div>
-                          <div className={`text-[11px] font-semibold ${isPast ? "text-[#9a3a47]/70" : "text-gray-400"}`}>{dayName}요일</div>
+                          <div className={`text-xs font-bold ${isPast ? "text-danger" : "text-brand-point-ink"}`}>{month}월</div>
+                          <div className={`text-2xl font-black leading-none ${isPast ? "text-danger" : "text-brand-black"}`}>{day}</div>
+                          <div className={`text-xs font-semibold ${isPast ? "text-danger" : "text-gray-500"}`}>{dayName}요일</div>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className={`font-bold text-[15px] mb-1 leading-snug ${isPast ? "text-[#7a2c37]" : "text-brand-black"}`}>{event.title}</div>
-                          <div className={`text-sm ${isPast ? "text-[#9a3a47]/85" : "text-gray-500"}`}>{party?.dateString}</div>
-                          <div className={`text-xs mt-0.5 truncate ${isPast ? "text-[#9a3a47]/70" : "text-gray-400"}`}>{party?.location} · {party?.target}</div>
+                          <div className={`font-bold text-[15px] mb-1 leading-snug ${isPast ? "text-danger" : "text-brand-black"}`}>{event.title}</div>
+                          <div className={`text-sm ${isPast ? "text-danger" : "text-gray-500"}`}>{party?.dateString}</div>
+                          <div className={`text-xs mt-0.5 truncate ${isPast ? "text-danger" : "text-gray-500"}`}>{party?.location} · {party?.target}</div>
                         </div>
-                        <ArrowRight size={16} className={`flex-shrink-0 ${isPast ? "text-[#9a3a47]/50" : "text-gray-300"}`} />
+                        <ArrowRight size={16} className={`flex-shrink-0 ${isPast ? "text-danger/60" : "text-gray-500"}`} />
                       </button>
                     );
                   })
@@ -745,7 +745,7 @@ export default function SmoothOnePage() {
                   <button
                     type="button"
                     onClick={() => setScheduleMoreOpen(true)}
-                    className="mt-2 w-full h-12 inline-flex items-center justify-center gap-2 rounded-full border border-gray-300 text-gray-700 font-bold text-sm hover:border-brand-point hover:text-brand-point transition-colors"
+                    className="mt-2 w-full h-12 inline-flex items-center justify-center gap-2 rounded-full border border-gray-300 text-gray-700 font-bold text-sm hover:border-brand-point hover:text-brand-point-ink transition-colors"
                   >
                     더보기 <ChevronDown size={18} />
                   </button>
@@ -844,11 +844,11 @@ export default function SmoothOnePage() {
                   </div>
                   <h3 className="text-sm md:text-2xl font-black mb-1.5 md:mb-3 text-gray-900 leading-tight">{p.job}</h3>
                   {p.age && (
-                    <p className="text-brand-point font-bold text-xs md:text-lg mb-3 md:mb-8 whitespace-nowrap">{p.age}</p>
+                    <p className="text-brand-point-ink font-bold text-xs md:text-lg mb-3 md:mb-8 whitespace-nowrap">{p.age}</p>
                   )}
                   <div className="flex flex-wrap justify-center gap-1.5 md:gap-2">
                     {p.keywords.map((k, kIdx) => (
-                      <span key={kIdx} className="bg-gray-50 text-gray-500 text-[10px] md:text-sm font-bold px-2.5 md:px-4 py-1 md:py-1.5 rounded-full border border-gray-100">#{k}</span>
+                      <span key={kIdx} className="bg-gray-50 text-gray-500 text-xs md:text-sm font-bold px-2.5 md:px-4 py-1 md:py-1.5 rounded-full border border-gray-100">#{k}</span>
                     ))}
                   </div>
                 </motion.div>
@@ -880,7 +880,7 @@ export default function SmoothOnePage() {
                       className="w-full px-5 md:px-8 py-5 md:py-6 flex justify-between items-center text-left bg-white hover:bg-brand-lightgray transition-colors"
                     >
                       <span className="text-base md:text-lg font-bold pr-4">{faq.q}</span>
-                      <ChevronDown className={`transform transition-transform duration-300 text-brand-point ${isOpen ? 'rotate-180' : ''}`} />
+                      <ChevronDown className={`shrink-0 transform transition-transform duration-300 text-brand-point-ink ${isOpen ? 'rotate-180' : ''}`} />
                     </button>
                     <AnimatePresence>
                       {isOpen && (

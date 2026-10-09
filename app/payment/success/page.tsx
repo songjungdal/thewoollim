@@ -125,15 +125,15 @@ function PaymentSuccessContent() {
             className="text-center mb-7 md:mb-10"
           >
             <div className="w-16 h-16 md:w-20 md:h-20 bg-brand-point/10 rounded-full flex items-center justify-center mx-auto mb-5 md:mb-6">
-              <CheckCircle2 size={36} className="text-brand-point md:hidden" />
-              <CheckCircle2 size={42} className="text-brand-point hidden md:block" />
+              <CheckCircle2 size={36} className="text-brand-point-ink md:hidden" />
+              <CheckCircle2 size={42} className="text-brand-point-ink hidden md:block" />
             </div>
             <h1 className="text-2xl md:text-4xl font-black tracking-tight mb-2 md:mb-3">
               결제가 완료되었습니다!
             </h1>
             {total > 0 && (
               <p className="text-gray-500 font-medium text-sm md:text-base">
-                ₩{total.toLocaleString()}{isTest && <span className="ml-2 text-xs text-gray-400">(테스트 결제)</span>}
+                ₩{total.toLocaleString()}{isTest && <span className="ml-2 text-xs text-gray-500">(테스트 결제)</span>}
               </p>
             )}
           </motion.div>
@@ -157,12 +157,12 @@ function PaymentSuccessContent() {
               initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
               className="bg-white rounded-2xl md:rounded-3xl p-5 md:p-7 border border-gray-100 mb-5 md:mb-6"
             >
-              <p className="text-xs md:text-sm font-bold text-gray-400 mb-3 tracking-wider">결제 내역</p>
+              <p className="text-xs md:text-sm font-bold text-gray-500 mb-3 tracking-wider">결제 내역</p>
               <div className="space-y-2.5">
                 {parties.map(p => (
                   <div key={p.id} className="flex justify-between items-center gap-4">
                     <span className="font-bold text-sm md:text-base truncate">{p.title}</span>
-                    <span className="font-black text-sm md:text-base text-brand-point whitespace-nowrap">₩{p.price.toLocaleString()}</span>
+                    <span className="font-black text-sm md:text-base text-brand-point-ink whitespace-nowrap">₩{p.price.toLocaleString()}</span>
                   </div>
                 ))}
               </div>
@@ -177,15 +177,15 @@ function PaymentSuccessContent() {
             >
               <div className="flex items-start gap-3 md:gap-4">
                 <div className="w-10 h-10 md:w-12 md:h-12 bg-brand-point rounded-full flex items-center justify-center flex-shrink-0">
-                  <AlertTriangle size={20} className="text-white md:hidden" />
-                  <AlertTriangle size={24} className="text-white hidden md:block" />
+                  <AlertTriangle size={20} className="text-black md:hidden" />
+                  <AlertTriangle size={24} className="text-black hidden md:block" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-black text-base md:text-lg mb-1.5 text-brand-black leading-snug">
                     잠시만요!
                   </h3>
                   <p className="text-sm md:text-base text-gray-700 font-medium leading-relaxed mb-1">
-                    <span className="text-brand-point font-black">프로필 카드 작성</span>을 완료해야
+                    <span className="text-brand-point-ink font-black">프로필 카드 작성</span>을 완료해야
                     매칭파티 <span className="font-black">참가 확정</span>을 받을 수 있습니다.
                   </p>
                   <p className="text-xs md:text-sm text-gray-500 leading-relaxed">
@@ -201,14 +201,14 @@ function PaymentSuccessContent() {
             >
               <div className="flex items-start gap-3 md:gap-4">
                 <div className="w-10 h-10 md:w-12 md:h-12 bg-brand-point/10 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Sparkles size={20} className="text-brand-point md:hidden" />
-                  <Sparkles size={24} className="text-brand-point hidden md:block" />
+                  <Sparkles size={20} className="text-brand-point-ink md:hidden" />
+                  <Sparkles size={24} className="text-brand-point-ink hidden md:block" />
                 </div>
                 <div className="flex-1">
                   <h3 className="font-black text-base md:text-lg mb-1.5">이미 프로필 카드 정보가 저장되어 있습니다</h3>
                   <p className="text-sm md:text-base text-gray-600 font-medium leading-relaxed">
                     별도 추가작성 없이 기존 프로필 정보의 수정사항이 없는지 확인 후 전송해주시면
-                    어울림 운영팀이 확인하여 <span className="font-black text-brand-point">참가확정</span> 안내 문자를 보내드립니다.
+                    어울림 운영팀이 확인하여 <span className="font-black text-brand-point-ink">참가확정</span> 안내 문자를 보내드립니다.
                   </p>
                 </div>
               </div>
@@ -225,7 +225,7 @@ function PaymentSuccessContent() {
                 type="button"
                 onClick={handleStartProfile}
                 disabled={checkingProfile}
-                className="w-full bg-brand-black text-white py-4 md:py-5 rounded-2xl font-black text-base md:text-lg hover:bg-brand-point transition-all shadow-xl hover:shadow-brand-point/30 flex items-center justify-center gap-2.5 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                className="w-full bg-brand-black text-white py-4 md:py-5 rounded-2xl font-black text-base md:text-lg hover:bg-brand-point hover:text-black transition-all shadow-xl hover:shadow-brand-point/30 flex items-center justify-center gap-2.5 disabled:bg-gray-300 disabled:cursor-not-allowed"
               >
                 {checkingProfile ? "프로필 확인 중..." : (
                   <>지금 바로 프로필 카드 작성하기 <ArrowRight size={20} /></>
@@ -234,7 +234,7 @@ function PaymentSuccessContent() {
             ) : (
               <Link
                 href="/mypage"
-                className="w-full bg-brand-black text-white py-4 md:py-5 rounded-2xl font-black text-base md:text-lg hover:bg-brand-point transition-all shadow-xl hover:shadow-brand-point/30 flex items-center justify-center gap-2.5"
+                className="w-full bg-brand-black text-white py-4 md:py-5 rounded-2xl font-black text-base md:text-lg hover:bg-brand-point hover:text-black transition-all shadow-xl hover:shadow-brand-point/30 flex items-center justify-center gap-2.5"
               >
                 마이페이지로 이동
                 <ArrowRight size={20} />
@@ -270,7 +270,7 @@ function PaymentSuccessContent() {
             >
               <button
                 onClick={() => setShowLeaveModal(false)}
-                className="absolute top-4 right-4 text-gray-300 hover:text-gray-600 transition-colors"
+                className="absolute top-4 right-4 text-gray-500 hover:text-gray-600 transition-colors"
                 aria-label="닫기"
               >
                 <X size={22} />
@@ -287,7 +287,7 @@ function PaymentSuccessContent() {
                 <p className="text-sm md:text-base text-gray-500 font-medium leading-relaxed mb-2">
                   계속하시겠습니까?
                 </p>
-                <p className="text-xs md:text-sm text-gray-400 font-medium leading-relaxed mb-7 md:mb-8">
+                <p className="text-xs md:text-sm text-gray-500 font-medium leading-relaxed mb-7 md:mb-8">
                   프로필 카드는 마이페이지에서 등록 및 수정할 수 있습니다.
                 </p>
 
@@ -306,7 +306,7 @@ function PaymentSuccessContent() {
                       handleStartProfile();
                     }}
                     disabled={checkingProfile}
-                    className="flex-1 bg-brand-black text-white py-3.5 rounded-xl font-black text-sm md:text-base hover:bg-brand-point transition-all shadow-lg order-1 sm:order-2 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    className="flex-1 bg-brand-black text-white py-3.5 rounded-xl font-black text-sm md:text-base hover:bg-brand-point hover:text-black transition-all shadow-lg order-1 sm:order-2 disabled:bg-gray-300 disabled:cursor-not-allowed"
                   >
                     {checkingProfile ? "확인 중..." : "프로필 작성하기"}
                   </button>
