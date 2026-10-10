@@ -14,7 +14,8 @@
  *     프로필 작성 완료로 pending_approval 전환 시 프론트 30초 폴링으로 자동 반영됨)
  *  - paymentId 가 'test-' 로 시작하면 제외 (테스트 데이터 필터)
  *  - 이름은 maskName() 으로 마스킹, 생년월일은 ageBand() 으로 변환
- *  - 직업·MBTI 는 그대로 노출 (관리자 폼에서 입력한 공개 의도)
+ *  - 직업·MBTI 는 그대로 노출 (관리자 폼에서 입력한 공개 의도). 단 솔로파티는 프로필 카드를 받지 않으므로
+ *    mbti·job 을 빈 값으로 내려준다 (docs/specs/party-solo-guide.md 4-2)
  *  - 탈퇴 회원: 진행 예정/진행 중 파티(행사일 미경과)는 기존과 동일하게 제외.
  *    단, 행사일이 이미 지난(완료된) 파티는 탈퇴 회원도 명단에 포함 — 탈퇴 시 익명화되는
  *    항목은 name/phone/nickname/SNS 뿐이고 gender/mbti/job/birth_date 는 유지되므로
@@ -48,12 +49,14 @@ $VISIBLE_STATUSES = ['confirmed', 'pending_approval', 'completed', 'paid_pending
 // 이미 지난(행사일 경과) 파티인지 확인 — 지난 파티에 한해서만 탈퇴 회원 노출 예외 허용.
 // 파티 정보를 못 찾으면(삭제됨 등) 안전하게 false 로 두어 기존 동작(탈퇴 회원 제외) 유지.
 $partyIsPast = false;
+$partyIsSolo = false;
 $partiesJson = json_decode((string)@file_get_contents($dir . '/parties.json'), true);
 if (is_array($partiesJson)) {
     foreach ($partiesJson as $p) {
         if ((string)($p['id'] ?? '') === $partyId) {
             $cal = (string)($p['calendarDate'] ?? '');
             if ($cal !== '' && $cal < date('Y-m-d')) $partyIsPast = true;
+            $partyIsSolo = partyTypeOf($p) === 'solo';
             break;
         }
     }
@@ -106,8 +109,8 @@ foreach ($users as $u) {
             'id'         => (string)($b['id'] ?? bin2hex(random_bytes(4))),
             'maskedName' => $isWithdrawnUser ? '***' : maskName((string)$u['name']),
             'ageBand'    => $u['birth_date'] ? ageBand((string)$u['birth_date']) : '',
-            'mbti'       => (string)($u['mbti'] ?? ''),
-            'job'        => (string)($u['job']  ?? ''),
+            'mbti'       => $partyIsSolo ? '' : (string)($u['mbti'] ?? ''),
+            'job'        => $partyIsSolo ? '' : (string)($u['job']  ?? ''),
             'status'     => (string)($b['status'] ?? ''),  // 'confirmed' | 'pending_approval'
             'createdAt'  => (string)($b['createdAt'] ?? ''), // 정렬 전용 — 응답 직전에 제거
         ];

@@ -11,6 +11,9 @@ import type { PartyType } from "./data";
 export type PartyDetailImage = { url: string; alt: string };
 export type PartyDetailStep = { title: string; time: string; desc: string; note: string };
 export type PartyDetailDurationRow = { label: string; total: string };
+/** 소개글 묶음 — 소제목·본문·사진 (docs/specs/party-solo-guide.md 7-1). 셋 중 하나 이상 있어야 한다 */
+export type PartyAboutSection = { heading: string; body: string; images: PartyDetailImage[] };
+export const DEFAULT_ABOUT_TITLE = "파티 소개";
 
 export const DETAIL_IMAGE_SLOTS = ["beforeApply", "afterApply", "beforeTimeline", "beforeNotice", "afterNotice"] as const;
 export type DetailImageSlot = typeof DETAIL_IMAGE_SLOTS[number];
@@ -26,6 +29,7 @@ export type PartyDetail = {
   timeline: { title: string; intro: string; steps: PartyDetailStep[] };
   durations: { title: string; rows: PartyDetailDurationRow[] };
   images: Record<DetailImageSlot, PartyDetailImage[]>;
+  about: { title: string; sections: PartyAboutSection[] };   // 묶음 0개면 상세페이지에 영역 자체가 없다
 };
 
 /** 입력 제한 — api/lib.php sanitizePartyDetail 과 같은 값 */
@@ -43,6 +47,11 @@ export const DETAIL_LIMITS = {
   durationTotal: 30,
   imagesPerSlot: 10,
   imageAlt: 100,
+  aboutTitle: 40,
+  aboutSections: 10,
+  aboutHeading: 40,
+  aboutBody: 2000,
+  aboutImages: 10,
 } as const;
 
 /** 사진 주소 허용 규칙 — /uploads/parties/파일명 또는 /images/파일명 만 (외부 주소 불가) */
@@ -106,6 +115,7 @@ export const MATCHING_TEMPLATE: PartyDetail = {
       { url: "/images/party_required_notice_bottom.png", alt: "필수 확인 사항 안내" },
     ],
   },
+  about: { title: DEFAULT_ABOUT_TITLE, sections: [] },
 };
 
 /** 솔로파티 기본 내용 — 모두 비어 있음 (제목 필드 기본값만) */
@@ -113,6 +123,7 @@ export const SOLO_TEMPLATE: PartyDetail = {
   timeline: { title: DEFAULT_TIMELINE_TITLE, intro: "", steps: [] },
   durations: { title: DEFAULT_DURATIONS_TITLE, rows: [] },
   images: { beforeApply: [], afterApply: [], beforeTimeline: [], beforeNotice: [], afterNotice: [] },
+  about: { title: DEFAULT_ABOUT_TITLE, sections: [] },
 };
 
 /** 종류별 기본 내용 (편집기에서 고칠 수 있도록 매번 새 복사본) */
@@ -134,11 +145,13 @@ export function normalizeDetail(raw: unknown): PartyDetail | null {
   const tl = obj(r.timeline);
   const du = obj(r.durations);
   const im = obj(r.images);
+  const ab = obj(r.about);
+  const imageList = (v: unknown) => arr(v)
+    .map(x => ({ url: str(obj(x).url), alt: str(obj(x).alt) }))
+    .filter(x => DETAIL_IMAGE_URL_RE.test(x.url));
   const images = {} as Record<DetailImageSlot, PartyDetailImage[]>;
   for (const slot of DETAIL_IMAGE_SLOTS) {
-    images[slot] = arr(im[slot])
-      .map(x => ({ url: str(obj(x).url), alt: str(obj(x).alt) }))
-      .filter(x => DETAIL_IMAGE_URL_RE.test(x.url));
+    images[slot] = imageList(im[slot]);
   }
   return {
     timeline: {
@@ -154,10 +167,19 @@ export function normalizeDetail(raw: unknown): PartyDetail | null {
       rows: arr(du.rows).map(x => ({ label: str(obj(x).label), total: str(obj(x).total) })),
     },
     images,
+    // 소개글 — 없던 예전 파티는 묶음 0개
+    about: {
+      title: str(ab.title),
+      sections: arr(ab.sections).map(x => {
+        const s = obj(x);
+        return { heading: str(s.heading), body: str(s.body), images: imageList(s.images) };
+      }),
+    },
   };
 }
 
 /** 사진 총 장수 (안내·기록용) */
 export function detailPhotoCount(d: PartyDetail): number {
-  return DETAIL_IMAGE_SLOTS.reduce((n, slot) => n + d.images[slot].length, 0);
+  return DETAIL_IMAGE_SLOTS.reduce((n, slot) => n + d.images[slot].length, 0)
+    + d.about.sections.reduce((n, s) => n + s.images.length, 0);
 }

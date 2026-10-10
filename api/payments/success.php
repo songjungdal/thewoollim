@@ -14,7 +14,7 @@
  *       (파티 없음·쿠폰 검증 실패 등 승인 뒤 실패도 같은 autoCancelAndFail() 로 자동 취소)
  *     - party_counts atomic +1
  *     - 쿠폰 atomic consume
- *     - booking 생성 (status: 프로필 완성도에 따라 paid_pending_profile / pending_approval)
+ *     - booking 생성 (status: 솔로파티는 pending_approval, 매칭파티는 프로필 완성도에 따라 paid_pending_profile / pending_approval — 예약마다)
  *  5) /payment/success/?ids=...&total=... 로 redirect
  *
  * 실패: /checkout?error=... 로 redirect.
@@ -374,7 +374,8 @@ if (!$skipCounts && $fp) {
 
 // booking row 생성 — partyMap 은 위에서 이미 로드됨
 
-// 프로필 자동 분기
+// 프로필 자동 분기 — 매칭파티 예약에만 쓴다. 솔로파티는 프로필 단계가 없어 바로 pending_approval
+//   (docs/specs/party-solo-guide.md 4-1: 예약마다, 결제 시점 parties.json 의 파티 종류로 판단)
 $profileComplete = false;
 try {
     $pdo = getDB();
@@ -386,7 +387,7 @@ try {
         $profileComplete = true;
     }
 } catch (Exception $e) {}
-$initialStatus = $profileComplete ? 'pending_approval' : 'paid_pending_profile';
+$matchingStatus = $profileComplete ? 'pending_approval' : 'paid_pending_profile';
 
 $bookingsFile = "$dataDir/bookings_" . md5(strtolower(trim($email))) . '.json';
 $bookings = file_exists($bookingsFile) ? json_decode(file_get_contents($bookingsFile), true) : [];
@@ -404,6 +405,7 @@ foreach ($partyIds as $pid) {
     $rowDiscount = $isCouponHit ? $couponDiscount : 0;
     if ($isCouponHit) $couponApplied = true;
     $rowTotal = max(0, $partyPrice - $rowDiscount);
+    $initialStatus = partyTypeOf($partyMap[$pid] ?? []) === 'solo' ? 'pending_approval' : $matchingStatus;
     $newBooking = [
         'id'          => bin2hex(random_bytes(8)),
         'partyId'     => $pid,
@@ -430,23 +432,25 @@ foreach ($partyIds as $pid) {
 }
 file_put_contents($bookingsFile, json_encode($bookings, JSON_UNESCAPED_UNICODE));
 
-// 확정 대기중(pending_approval) 전환 DB 반영 성공 직후 → 알리고 신청접수 알림 문자
+// 확정 대기중(pending_approval) 전환 DB 반영 성공 직후 → 알리고 신청접수 알림 문자 (그 상태의 예약만)
 // (테스트/관리자 계정 제외, 실패해도 결제 흐름 무중단)
-if ($initialStatus === 'pending_approval') {
+$pendingNew = array_values(array_filter($newBookings, fn($nb) => ($nb['status'] ?? '') === 'pending_approval'));
+$profileNew = array_values(array_filter($newBookings, fn($nb) => ($nb['status'] ?? '') === 'paid_pending_profile'));
+if ($pendingNew) {
     try {
         require_once __DIR__ . '/../_pending_sms.php';
-        foreach ($newBookings as $nb) { notifyPendingSms($email, $nb); }
+        foreach ($pendingNew as $nb) { notifyPendingSms($email, $nb); }
     } catch (Throwable $e) {
         error_log('[payments/success pending sms] ' . $e->getMessage());
     }
 }
 
-// 결제완료(프로필 대기) 전환 DB 반영 성공 직후 → 알리고 프로필작성 안내 문자 (1차 즉시발송)
+// 결제완료(프로필 대기) 전환 DB 반영 성공 직후 → 알리고 프로필작성 안내 문자 (1차 즉시발송, 그 상태의 예약만)
 // (테스트/관리자 계정 제외, 실패해도 결제 흐름 무중단)
-if ($initialStatus === 'paid_pending_profile') {
+if ($profileNew) {
     try {
         require_once __DIR__ . '/../_profile_notify_sms.php';
-        foreach ($newBookings as $nb) { notifyProfileReminderSms($email, (string)($nb['id'] ?? ''), 'initial'); }
+        foreach ($profileNew as $nb) { notifyProfileReminderSms($email, (string)($nb['id'] ?? ''), 'initial'); }
     } catch (Throwable $e) {
         error_log('[payments/success profile notify sms] ' . $e->getMessage());
     }

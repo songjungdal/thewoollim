@@ -2,14 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Heart, Clock, ShoppingBag, X, ClipboardList, Users as UsersIcon, ShieldCheck, Info } from "lucide-react";
+import { ArrowLeft, Heart, Clock, ShoppingBag, X, ClipboardList, Users as UsersIcon, ShieldCheck, Info, BookOpen } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
-import { partyStockStatus, withLiveCounts, dateOnly, partyTypeOf, PARTY_TYPE_LABELS, PARTIES as SEED_PARTIES, type PartyType } from "../../lib/data";
+import { partyStockStatus, withLiveCounts, dateOnly, partyHasOptions, partyTypeOf, PARTY_TYPE_LABELS, PARTIES as SEED_PARTIES, type PartyType } from "../../lib/data";
 import PartyOptionPicker, { optionClosedFor } from "./PartyOptionPicker";
-import { templateFor, normalizeDetail, type PartyDetail, type PartyDetailImage, type DetailImageSlot } from "../../lib/partyDetailTemplates";
+import { PARTY_GUIDES, visibleNotices } from "../../lib/partyGuides";
+import { templateFor, normalizeDetail, DEFAULT_ABOUT_TITLE, type PartyDetail, type PartyDetailImage, type DetailImageSlot } from "../../lib/partyDetailTemplates";
 import { useAuth } from "../../context/AuthContext";
 import { useParties } from "../../lib/useParties";
 import { checkEligibility, eligibilitySummary, calculateAge } from "../../lib/eligibility";
@@ -59,13 +60,14 @@ function StatusMiniBadge({ status }: { status?: string }) {
 
 /** 성별별 참가자 컬럼 — 칩 카드 형태로 정렬 */
 function ParticipantColumn({
-  label, list, toneBg, toneAccent, toneBadge,
+  label, list, toneBg, toneAccent, toneBadge, hideProfile = false,
 }: {
   label: string;
   list: Participant[];
   toneBg: string;
   toneAccent: string;
   toneBadge: string;
+  hideProfile?: boolean;   // 솔로파티 — 프로필 카드를 받지 않으므로 MBTI·직업 칸을 그리지 않는다
 }) {
   return (
     <div className="p-4 md:p-4">
@@ -105,6 +107,7 @@ function ParticipantColumn({
                   </span>
                 )}
               </div>
+              {!hideProfile && (
               <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap">
                 {p.mbti && (
                   <span className="text-xs font-black text-brand-point-ink bg-brand-point/10 px-1.5 py-0.5 rounded-full">
@@ -117,6 +120,7 @@ function ParticipantColumn({
                   </span>
                 )}
               </div>
+              )}
             </li>
           ))}
         </ul>
@@ -256,6 +260,10 @@ export default function PartyClientView({ id }: { id: string }) {
   //   요청이 실패해 종류를 모르면 실시간 파티 목록을 받은 뒤에 그 종류로 템플릿을 고른다(빌드 시점 샘플로 오판 방지).
   const detailReady = !!detailRes && detailRes.id === id && (detailRes.detail !== null || detailRes.partyType !== null || partiesLoaded);
   const shownDetail: PartyDetail | null = detailReady && detailRes ? (detailRes.detail ?? templateFor(partyType)) : null;
+  // 고정 안내 문구(신청 전 확인·참가 신청 방법·필수 확인 사항) — 종류가 확인된 뒤에만 그린다
+  //   (솔로파티에 매칭파티 문구가 잠깐 비치지 않도록). 상세 안내 응답이나 실시간 파티 목록 중 먼저 온 쪽으로 확인한다
+  //   (빌드 시점 샘플 목록만 있을 때는 종류를 믿지 않는다). app/lib/partyGuides.ts
+  const guide = detailReady || partiesLoaded ? PARTY_GUIDES[partyType] : null;
   const renderDetailImage = (img: PartyDetailImage, i: number) => (
     // eslint-disable-next-line @next/next/no-img-element
     <img key={`${img.url}-${i}`} src={img.url} alt={img.alt} className="block w-full h-auto object-contain" />
@@ -536,18 +544,19 @@ export default function PartyClientView({ id }: { id: string }) {
               })()}
             </div>
 
-            {/* 신청 전 꼭 확인해주세요 */}
-            <div className="bg-white p-3.5 rounded-xl border border-gray-200 mb-3">
+            {/* 신청 전 꼭 확인해주세요 — 파티 종류별 문구 (app/lib/partyGuides.ts) */}
+            {guide && (
+            <div className="bg-white p-3.5 rounded-xl border border-gray-200 mb-3" data-testid="guide-before-apply">
               <h4 className="font-bold mb-1.5 flex items-center gap-1.5 text-xs md:text-sm">
                 <Heart size={14} className="text-brand-point-ink" /> 신청 전 꼭 확인해주세요.
               </h4>
               <p className="text-[13px] md:text-xs text-gray-500 leading-relaxed break-keep">
-                어울림은 진정성 있는 만남을 위해 <strong className="font-bold text-brand-black">100% 사전 승인제</strong>로 운영됩니다.
-                결제 후 프로필 정보를 입력해 주시면 <strong className="font-bold text-brand-black">[확정 대기 중]</strong> 상태가 되며,
-                관리자의 꼼꼼한 확인을 거쳐 최종 <strong className="font-bold text-brand-black">[참가 확정]</strong>이 이루어집니다.
-                참가 확정 및 안내 문자는 확정 시점에 맞춰 순차적으로 발송됩니다.
+                {guide.beforeApply.map((seg, i) => seg.strong
+                  ? <strong key={i} className="font-bold text-brand-black">{seg.text}</strong>
+                  : <span key={i}>{seg.text}</span>)}
               </p>
             </div>
+            )}
 
             {/* 참가 대상 표시 — 자격 제한이 설정된 경우 노출 (기존 로직 그대로) */}
             {eligibilityLabel && (
@@ -637,6 +646,30 @@ export default function PartyClientView({ id }: { id: string }) {
             })()}
           </div>
 
+          {/* 소개글 — 참가 항목·버튼 바로 아래, 실시간 참가 인원 위 (docs/specs/party-solo-guide.md 7-2).
+               묶음이 0개면 영역 전체를 그리지 않는다. 본문은 글자 그대로(줄바꿈 유지), 사진은 폭에 맞춰 비율 유지 */}
+          {shownDetail && shownDetail.about.sections.length > 0 && (
+            <div className="max-w-4xl mx-auto mb-10 md:mb-16" data-testid="party-about">
+              <div className="flex items-center gap-3 mb-5 md:mb-7">
+                <BookOpen size={20} className="text-brand-point-ink flex-shrink-0" />
+                <h3 className="text-xl md:text-3xl font-bold tracking-tight break-keep">{shownDetail.about.title.trim() || DEFAULT_ABOUT_TITLE}</h3>
+              </div>
+              <div className="space-y-10 md:space-y-16">
+                {shownDetail.about.sections.map((sec, i) => (
+                  <section key={i} data-testid="party-about-section">
+                    {sec.heading && <h4 className="text-lg md:text-2xl font-black text-brand-black leading-snug mb-2 md:mb-3 break-keep">{sec.heading}</h4>}
+                    {sec.body && <p className="text-sm md:text-base text-gray-700 font-medium leading-relaxed whitespace-pre-line break-keep">{sec.body}</p>}
+                    {sec.images.length > 0 && (
+                      <div className={`space-y-3 md:space-y-4 ${sec.heading || sec.body ? "mt-4 md:mt-6" : ""}`}>
+                        {sec.images.map(renderDetailImage)}
+                      </div>
+                    )}
+                  </section>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* PARTICIPANTS PANEL — 다른 섹션들(참가 신청 방법/Party Timeline 등)과 동일 폭 max-w-4xl */}
           {(participants.male.length > 0 || participants.female.length > 0) && (
             <div className="max-w-4xl mx-auto mb-10 md:mb-16">
@@ -676,6 +709,7 @@ export default function PartyClientView({ id }: { id: string }) {
                       toneBg="bg-[#E3F2FD]"
                       toneAccent="text-info"
                       toneBadge="bg-[#E3F2FD] text-info"
+                      hideProfile={partyType === "solo"}
                     />
                   </div>
                   <div className="flex-1">
@@ -685,6 +719,7 @@ export default function PartyClientView({ id }: { id: string }) {
                       toneBg="bg-[#FCE4EC]"
                       toneAccent="text-rose-500"
                       toneBadge="bg-rose-100 text-rose-700"
+                      hideProfile={partyType === "solo"}
                     />
                   </div>
                 </div>
@@ -765,8 +800,9 @@ export default function PartyClientView({ id }: { id: string }) {
           {/* 사진 ① 참가 신청 방법 위 — 컨테이너 폭(max-w-4xl) 1:1 매칭, 라운드 X, 비율 보존. 사진이 없으면 영역째 그리지 않음 */}
           {renderWrappedSlot("beforeApply", "mb-7 md:mb-10")}
 
-          {/* HOW TO JOIN — Timeline-styled Application Guide */}
-          <div className="mb-10 md:mb-24">
+          {/* HOW TO JOIN — Timeline-styled Application Guide (파티 종류별 단계, app/lib/partyGuides.ts) */}
+          {guide && (
+          <div className="mb-10 md:mb-24" data-testid="guide-steps">
             <div className="max-w-4xl mx-auto">
               <div className="bg-white p-6 md:p-20 rounded-2xl md:rounded-[3rem] shadow-sm border border-gray-100">
                 <div className="flex items-center gap-3 md:gap-4 mb-7 md:mb-12">
@@ -776,23 +812,7 @@ export default function PartyClientView({ id }: { id: string }) {
                 </div>
 
                 <div className="space-y-7 md:space-y-12 relative before:absolute before:left-3.5 md:before:left-4 before:top-2 before:bottom-2 before:w-px before:bg-gray-100">
-                  {[
-                    {
-                      title: "파티 카드를 확인하고 결제하기",
-                      desc: "파티 카드의 일시, 장소, 연령대를 확인하고 결제해주세요.",
-                      note: null,
-                    },
-                    {
-                      title: "프로필 카드 작성하기",
-                      desc: "프로필 카드 작성을 완료해야 참가확정을 받으실 수 있습니다.",
-                      note: "마이페이지의 내 예약 현황에서 현재 참가 확정 여부를 확인하실 수 있습니다.",
-                    },
-                    {
-                      title: "파티 참가확정 확인 후 방문하기",
-                      desc: "참가확정이 되어야만 참석 가능하오니 알림 문자나 참가 확정 여부를 꼭 확인해주세요!",
-                      note: "성비가 맞지 않거나 주최측의 사정으로 파티가 취소될 경우 100% 환불이나 쿠폰 적립 후 다음 모임 선확정 중 선택하실 수 있습니다.",
-                    },
-                  ].map((item, idx) => (
+                  {guide.steps.map((item, idx) => (
                     <div key={idx} className="relative pl-12 md:pl-14">
                       <div className="absolute left-0 top-0 w-7 h-7 md:w-8 md:h-8 bg-brand-point text-black rounded-full border-4 border-white shadow-md flex items-center justify-center font-black text-xs md:text-sm">
                         {idx + 1}
@@ -811,6 +831,7 @@ export default function PartyClientView({ id }: { id: string }) {
               </div>
             </div>
           </div>
+          )}
 
           {/* 사진 ② 참가 신청 방법 아래 — 컨테이너 폭(max-w-4xl) 1:1, 비율 보존 */}
           {renderWrappedSlot("afterApply", "mb-10 md:mb-24")}
@@ -908,45 +929,20 @@ export default function PartyClientView({ id }: { id: string }) {
                 {/* 사진 ④ 필수 확인 사항 위 */}
                 {shownDetail?.images.beforeNotice.map(renderDetailImage)}
 
-                {/* ── 필수 확인 사항 — Final CTA 직전, 참가 신청 방법/Party Timeline 과 동일 톤 ── */}
-                <div className="bg-white p-6 md:p-20 rounded-2xl md:rounded-[3rem] shadow-sm border border-gray-100">
+                {/* ── 필수 확인 사항 — Final CTA 직전, 참가 신청 방법/Party Timeline 과 동일 톤 (파티 종류별 문구) ── */}
+                {guide && (
+                <div className="bg-white p-6 md:p-20 rounded-2xl md:rounded-[3rem] shadow-sm border border-gray-100" data-testid="guide-notices">
                   <div className="flex items-center gap-3 md:gap-4 mb-3 md:mb-4">
                     <ShieldCheck size={26} className="text-brand-point-ink md:hidden" />
                     <ShieldCheck size={32} className="text-brand-point-ink hidden md:block" />
                     <h3 className="text-xl md:text-3xl font-bold tracking-tight">필수 확인 사항</h3>
                   </div>
                   <p className="text-sm md:text-base text-gray-500 font-medium mb-7 md:mb-12 leading-relaxed">
-                    편안하고 신뢰할 수 있는 만남을 위해 아래 내용을 꼭 확인해 주세요.
+                    {guide.noticeIntro}
                   </p>
 
                   <div className="space-y-7 md:space-y-12 relative before:absolute before:left-3.5 md:before:left-4 before:top-2 before:bottom-2 before:w-px before:bg-gray-100">
-                    {[
-                      {
-                        title: "본인 확인을 위한 신분증 지참",
-                        desc:  "안전하고 투명한 만남을 위해 사전 인증이 완료된 분들만 참여 가능합니다. 현장에서 본인 확인 절차가 진행되오니, 신분증(주민등록증, 운전면허증 등)을 반드시 지참해 주세요.",
-                        warn:  "미지참 시 입장이 제한될 수 있으며, 이로 인한 환불은 불가합니다.",
-                      },
-                      {
-                        title: "드레스코드 — 깔끔하고 단정한 차림",
-                        desc:  "첫인상은 소중한 인연의 시작입니다. 상대방에 대한 예의를 갖춘 깔끔한 소개팅 복장(셔츠, 슬랙스, 원피스 등)을 권장합니다.",
-                        warn:  "트레이닝복, 슬리퍼 등 과하게 편안한 복장은 입장이 제한될 수 있습니다.",
-                      },
-                      {
-                        title: "성숙한 매너와 배려",
-                        desc:  "서로를 존중하는 따뜻한 분위기를 지향합니다. 과도한 음주, 무례한 언행 등 타인에게 불편을 주는 경우 운영진의 판단에 따라 즉시 퇴장 조치될 수 있으며 참가비는 환불되지 않습니다.",
-                        warn:  null,
-                      },
-                      {
-                        title: "신중한 참가 신청",
-                        desc:  "파티는 정해진 성비를 맞추어 세심하게 준비됩니다. 당일 무단 불참(No-Show)은 다른 참가자분들의 소중한 기회를 저해하므로 신중한 참가신청을 부탁드립니다.",
-                        warn:  "무단 불참 시 향후 모든 파티 참여가 제한될 수 있습니다.",
-                      },
-                      {
-                        title: "현장 기록 및 마케팅 활용 안내",
-                        desc:  "파티의 분위기를 기록하기 위해 현장 스케치 촬영이 진행될 수 있습니다. 촬영된 모든 사진은 참가자의 프라이버시 보호를 위해 얼굴 식별이 불가능하도록 블러/모자이크 처리 후 마케팅 자료로 활용됩니다.",
-                        warn:  null,
-                      },
-                    ].map((item, idx) => (
+                    {visibleNotices(guide, partyHasOptions(detailItem)).map((item, idx) => (
                       <div key={idx} className="relative pl-12 md:pl-14">
                         <div className="absolute left-0 top-0 w-7 h-7 md:w-8 md:h-8 bg-brand-point text-black rounded-full border-4 border-white shadow-md flex items-center justify-center font-black text-xs md:text-sm">
                           {idx + 1}
@@ -962,6 +958,7 @@ export default function PartyClientView({ id }: { id: string }) {
                     ))}
                   </div>
                 </div>
+                )}
 
                 {/* 사진 ⑤ 필수 확인 사항 아래 */}
                 {shownDetail?.images.afterNotice.map(renderDetailImage)}
