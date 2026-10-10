@@ -2,7 +2,7 @@
 
 /**
  * 관리자 파티 등록 모달 — [상세페이지 안내] 탭 편집기.
- * 화면 순서(상세페이지 순서): 소개글 → 사진 ① → 참가 신청 방법 → 사진 ②③ → 진행 안내 → 소요 시간 → 사진 ④ → 필수 확인 사항 → 사진 ⑤
+ * 화면 순서(상세페이지 순서): 신청 전 꼭 확인해주세요 → 소개글 → 사진 ① → 참가 신청 방법 → 사진 ②③ → 진행 안내 → 소요 시간 → 사진 ④ → 필수 확인 사항 → 사진 ⑤
  * 참가 신청 방법·필수 확인 사항·진행 안내 형식: docs/specs/party-guide-edit.md
  * 구조·입력 제한·기본 내용: app/lib/partyDetailTemplates.ts (서버도 같은 제한을 강제)
  */
@@ -11,7 +11,7 @@ import { ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Trash2, Plus, ImageIcon,
 import { PARTY_TYPE_LABELS, type PartyType } from "../../lib/data";
 import {
   DETAIL_IMAGE_SLOT_LABELS, DETAIL_LIMITS, DEFAULT_ABOUT_TITLE, DEFAULT_APPLY_TITLE, DEFAULT_NOTICE_TITLE,
-  templateFor, cloneDetail, withGuideDefaults, defaultApply, defaultNotice,
+  templateFor, cloneDetail, withGuideDefaults, defaultApply, defaultNotice, defaultBeforeApply, DEFAULT_BEFORE_APPLY_TITLE,
   type PartyApplyStep, type PartyNoticeItem,
   type PartyDetail, type DetailImageSlot, type PartyDetailStep, type PartyDetailDurationRow, type PartyDetailImage, type PartyAboutSection,
 } from "../../lib/partyDetailTemplates";
@@ -68,6 +68,8 @@ export default function PartyDetailEditor({ value, onChange, partyType, hasSessi
   const setApply = (fn: (a: typeof apply) => void) => set(d => { const a = d.apply ?? defaultApply(partyType); fn(a); d.apply = a; });
   const setNotice = (fn: (n: typeof notice) => void) => set(d => { const n = d.notice ?? defaultNotice(partyType, hasSessions); fn(n); d.notice = n; });
   const numbered = value.timeline.numbered !== false;
+  const beforeApply = value.beforeApply ?? defaultBeforeApply(partyType);
+  const setBeforeApply = (k: "title" | "body", v: string) => set(d => { d.beforeApply = { ...(d.beforeApply ?? defaultBeforeApply(partyType)), [k]: v }; });
 
   const loadFromParty = () => {
     const src = sources.find(s => s.id === sourceId);
@@ -206,6 +208,28 @@ export default function PartyDetailEditor({ value, onChange, partyType, hasSessi
         <p className="text-[11px] md:text-xs text-gray-500 leading-relaxed">
           JPG·PNG·WebP, 10MB 이하. 원본 비율 그대로 화면 폭에 맞춰 표시됩니다. 가로 900px 이상 권장.
         </p>
+      </div>
+
+      {/* 신청 전 꼭 확인해주세요 — 상세페이지 참가하기 버튼 위 박스 (docs/specs/party-box-sms.md 1-2) */}
+      <div className="rounded-xl border border-gray-200 p-3 md:p-4 space-y-3" data-testid="before-apply-editor">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <p className="text-sm font-black text-gray-700">신청 전 꼭 확인해주세요 <span className="text-gray-500 font-medium">· 본문을 비우면 상세페이지에서 박스가 숨겨집니다</span></p>
+          <button type="button" className={smallBtn}
+            onClick={() => { if (confirm(`신청 전 꼭 확인해주세요를 ${PARTY_TYPE_LABELS[partyType]} 기본 문구로 되돌릴까요?`)) set(d => { d.beforeApply = defaultBeforeApply(partyType); }); }}>
+            <RotateCcw size={12} />기본 문구로 되돌리기
+          </button>
+        </div>
+        <div>
+          <div className="flex justify-between mb-1"><label className="text-xs font-bold text-gray-500">제목</label><Counter value={beforeApply.title} max={DETAIL_LIMITS.beforeApplyTitle} /></div>
+          <input value={beforeApply.title} maxLength={DETAIL_LIMITS.beforeApplyTitle} placeholder={DEFAULT_BEFORE_APPLY_TITLE} aria-label="신청 전 확인 박스 제목"
+            onChange={e => setBeforeApply("title", e.target.value)} className={inputCls} />
+        </div>
+        <div>
+          <div className="flex justify-between mb-1"><label className="text-xs font-bold text-gray-500">본문</label><Counter value={beforeApply.body} max={DETAIL_LIMITS.beforeApplyBody} /></div>
+          <textarea value={beforeApply.body} maxLength={DETAIL_LIMITS.beforeApplyBody} rows={4} aria-label="신청 전 확인 박스 본문"
+            onChange={e => setBeforeApply("body", e.target.value)} className={`${inputCls} resize-y`} />
+          <p className="mt-1 text-[11px] md:text-xs text-gray-500">**굵게**처럼 감싸면 굵은 글씨로 보입니다. 줄바꿈은 그대로 보입니다.</p>
+        </div>
       </div>
 
       {/* 소개글 — 소제목·본문·사진 묶음 (docs/specs/party-solo-guide.md 7-3) */}
