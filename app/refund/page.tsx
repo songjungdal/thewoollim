@@ -63,7 +63,7 @@ export default function RefundPage() {
                   <h2 className="text-2xl md:text-3xl font-black tracking-tight">취소 시기별 환불 안내</h2>
                 </div>
                 <p className="text-sm md:text-base text-gray-500 font-medium leading-relaxed mb-6 md:mb-8">
-                  파티 행사일 기준 자정(00:00)으로 계산되며, 마이페이지에서 취소 시 자동 적용됩니다.
+                  취소를 요청한 날부터 파티 행사일까지 남은 일수(자정 00:00 기준)로 계산되며, 마이페이지에서 취소를 요청하면 자동 적용됩니다. 요청한 뒤에는 환불 금액이 바뀌지 않습니다.
                 </p>
                 <div className="rounded-2xl md:rounded-3xl border-2 border-brand-point/20 overflow-hidden">
                   {[
@@ -94,7 +94,7 @@ export default function RefundPage() {
                   </div>
                   <p className="text-sm md:text-base text-gray-700 leading-relaxed">
                     취소 신청은 <span className="font-black text-brand-point-ink">마이페이지</span>를 통해 가능하며,
-                    취소 완료 시 결제 수단으로 자동 환불됩니다.
+                    운영팀 확인 후 결제 수단에 맞춰 환불됩니다.
                   </p>
                 </div>
 

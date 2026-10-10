@@ -806,6 +806,29 @@ function countCouponUsages(array $usages, string $code): int {
     return $n;
 }
 
+// ─── 취소 시기별 환불 금액 (app/lib/refund.ts 와 같은 규정) ─────────────────
+//   파티 자정까지 남은 일수: 5일 이상 100% / 4일 80% / 3일 50% / 그 외(2일 전~당일·지난 파티) 0%.
+//   환불액은 원 단위 이하 버림. $atTs 시점(기본: 지금)의 날짜로 계산한다.
+//   파티 날짜("YYYY-MM-DD")를 알 수 없으면 null.
+function refundQuote(int $paidAmount, string $calendarDate, ?int $atTs = null): ?array {
+    if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $calendarDate, $m)) return null;
+    $atTs ??= time();
+    $partyMid = mktime(0, 0, 0, (int)$m[2], (int)$m[3], (int)$m[1]);
+    $dayMid   = mktime(0, 0, 0, (int)date('n', $atTs), (int)date('j', $atTs), (int)date('Y', $atTs));
+    $days = (int)floor(($partyMid - $dayMid) / 86400);
+    $rate = $days >= 5 ? 1.0 : ($days === 4 ? 0.8 : ($days === 3 ? 0.5 : 0.0));
+    return ['days' => $days, 'rate' => $rate, 'amount' => (int)floor(max(0, $paidAmount) * $rate)];
+}
+
+// parties.json 에서 파티 날짜(calendarDate)를 찾는다. 없으면 "".
+function partyCalendarDate(string $partyId): string {
+    $parties = json_decode((string)@file_get_contents(dataDir() . '/parties.json'), true);
+    foreach ((array)$parties as $p) {
+        if (is_array($p) && isset($p['id']) && (string)$p['id'] === $partyId) return (string)($p['calendarDate'] ?? '');
+    }
+    return '';
+}
+
 // ─── 쿠폰 사용 이력 해제 (취소/환불 시 "사용 안 한 것처럼" 복원) ──────────────
 //   coupon_usages.json 에서 해당 code+email 사용 기록을 제거.
 //   - 동일 사용자 재사용 차단 검사(coupons-validate.php/pending.php/success.php/

@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Users, Ticket, Tag, Building2, LogOut, ShieldCheck, CheckCircle2, Clock, AlertTriangle, Calendar, Plus, Pencil, Trash2, ImageIcon, X, FileText, Search, StickyNote, Save, ChevronDown, CreditCard, RotateCcw, Star } from "lucide-react";
 import { useParties, broadcastPartiesUpdated } from "../../lib/useParties";
 import { formatPhoneKR } from "../../lib/phone";
-import { calculateRefund } from "../../lib/refund";
+import { calculateRefund, refundRateLabel } from "../../lib/refund";
 import { formatKST } from "../../lib/datetime";
 import { partyVisibility, partyTypeOf, PARTY_TYPES, PARTY_TYPE_LABELS, type Party, type PartyType } from "../../lib/data";
 import { templateFor, normalizeDetail, withGuideDefaults, compactDetailForSave, defaultNotice, type PartyDetail } from "../../lib/partyDetailTemplates";
@@ -34,6 +34,10 @@ type BookingRow = {
   userInterests?: string; userIdealType?: string;
   optionName?: string;       // 솔로파티 참가 구성 예약 — 결제 당시 항목 이름
   sessionIds?: string[];     // 포함 회차 (예약 사본)
+  cancelRequestedAt?: string;   // 회원 취소요청 시각
+  refundRequestRate?: number;   // 취소요청한 날 기준 환불 비율 (서버 저장, 승인 시 이 금액으로 환불)
+  refundRequestAmount?: number; // 취소요청한 날 기준 환불 금액
+  refundAmount?: number;        // 실제 환불액 (환불 완료 건)
 };
 type TabKey = "members" | "bookings" | "parties" | "coupons" | "company" | "gallery" | "reviews" | "logs" | "cancel_requests" | "memos";
 
@@ -2873,7 +2877,8 @@ export default function AdminDashboard() {
               .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
             return (
               <section>
-                {/* 상단 고정 강조 문구 — 처리 순서 (api/payments/cancel-request.php → api/admin/bookings.php approve_refund → cancel) */}
+                {/* 상단 고정 강조 문구 — 처리 순서 (api/payments/cancel-request.php → api/admin/bookings.php approve_refund → cancel).
+                    환불 금액은 요청한 날 기준으로 고정(cancel-request.php 가 저장) */}
                 <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 md:p-5 mb-5 text-sm md:text-base font-medium text-brand-black leading-relaxed break-keep">
                   <p className="font-black mb-2">취소요청 처리 순서</p>
                   <ol className="list-decimal pl-5 space-y-1.5">
@@ -2883,7 +2888,7 @@ export default function AdminDashboard() {
                       <ul className="list-disc pl-5 mt-1 space-y-1">
                         <li><strong>카드 결제</strong>: &apos;환불받을 금액&apos;만큼 카드 결제가 자동으로 취소됩니다.</li>
                         <li><strong>무통장 입금</strong>: 자동 환불이 되지 않습니다. 고객에게 연락해 환불 계좌를 받고 &apos;환불받을 금액&apos;을 직접 송금한 뒤 눌러 주세요.</li>
-                        <li>환불 비율은 회원이 요청한 날이 아니라 <strong>[취소승인처리]를 누르는 날</strong> 기준입니다(표의 &apos;환불받을 금액&apos;도 오늘 기준). 처리가 늦어지면 환불 금액이 줄어들 수 있으니 되도록 빨리 처리해 주세요. 금액이 0원이면 결제 취소 없이 환불 완료로만 바뀝니다.</li>
+                        <li>환불 금액은 <strong>회원이 취소요청한 날</strong> 기준으로 정해져 있습니다(표의 &apos;환불받을 금액&apos;). [취소승인처리]를 늦게 눌러도 금액은 바뀌지 않습니다. 금액이 0원이면 결제 취소 없이 환불 완료로만 바뀝니다.</li>
                       </ul>
                     </li>
                     <li>
@@ -2926,8 +2931,16 @@ export default function AdminDashboard() {
                         {rows.map(b => {
                           const party   = PARTIES.find(p => p.id === b.partyId);
                           const isVbank = b.paymentMethod === "vbank";
-                          const refund  = party ? calculateRefund(b.total ?? party.price ?? 0, party.calendarDate) : null;
                           const done    = b.status === "refund_completed";
+                          // 환불받을 금액 — 환불 완료 건은 실제 환불액, 취소요청 건은 요청한 날 기준으로 서버가 저장한 금액
+                          // (저장값이 없는 예전 요청은 요청 시각 기준으로 계산 — api/admin/bookings.php approve_refund 와 같은 규칙)
+                          const refund = done && typeof b.refundAmount === "number"
+                            ? { refund: b.refundAmount, label: typeof b.refundRequestRate === "number" ? refundRateLabel(b.refundRequestRate) : "환불액" }
+                            : typeof b.refundRequestAmount === "number"
+                              ? { refund: b.refundRequestAmount, label: refundRateLabel(b.refundRequestRate ?? 0) }
+                              : party
+                                ? calculateRefund(b.total ?? party.price ?? 0, party.calendarDate, b.cancelRequestedAt ? new Date(b.cancelRequestedAt) : undefined)
+                                : null;
                           return (
                             <tr key={b.id} className="border-t border-gray-100 hover:bg-gray-50">
                               <td className="px-3 py-2.5 first:pl-5 md:first:pl-7">
