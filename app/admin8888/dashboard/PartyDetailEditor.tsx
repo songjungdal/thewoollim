@@ -293,7 +293,7 @@ export default function PartyDetailEditor({ value, onChange, partyType, hasSessi
         <button type="button" disabled={apply.steps.length >= DETAIL_LIMITS.applySteps}
           onClick={() => setApply(a => { a.steps = [...a.steps, { title: "", desc: "", note: "" }]; })}
           className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border-2 border-dashed border-gray-300 text-sm font-bold text-gray-600 hover:border-brand-point disabled:opacity-40">
-          <Plus size={14} />단계 추가 ({apply.steps.length}/{DETAIL_LIMITS.applySteps})
+          <Plus size={14} />참가 신청 단계 추가 ({apply.steps.length}/{DETAIL_LIMITS.applySteps})
         </button>
       </div>
 
