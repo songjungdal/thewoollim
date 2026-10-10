@@ -276,6 +276,9 @@ export default function SmoothOnePage() {
   const optionLabel = (axis: Axis, value: string) =>
     axis === "type" ? PARTY_TYPE_LABELS[value as PartyType] : categoryLabel(value);
   const [openAxis, setOpenAxis] = useState<Axis | null>(null);
+  // 지금 열린 축 — 닫히는 애니메이션(0.22초) 동안 화면에 남은 옵션 줄의 클릭을 걸러내는 데 쓴다 (pickOption)
+  const openAxisRef = useRef<Axis | null>(null);
+  useEffect(() => { openAxisRef.current = openAxis; }, [openAxis]);
   const [selections, setSelections] = useState<Record<CategoryAxis, string | null>>({ targetGroup: null, theme: null, locationTag: null });
 
   // 종류 축 선택값 — /?type=solo#apply 로 들어오면 솔로파티가 선택된 채 열리고, 바꾸면 주소만 바꾼다(history.replaceState).
@@ -299,6 +302,8 @@ export default function SmoothOnePage() {
   const toggleAxis = (axis: Axis) => setOpenAxis(cur => (cur === axis ? null : axis));
   // 옵션 클릭 = 그 축 값 선택(null = "전체", 선택 해제) + 옵션 줄 닫기
   const pickOption = (axis: Axis, value: string | null) => {
+    // 닫히는 중인(사라지는) 옵션 줄은 반응하지 않는다 — 지금 열린 축의 줄만 선택 가능
+    if (openAxisRef.current !== axis) return;
     if (axis === "type") pickType((value as PartyType | null) ?? "all");
     else setSelections(s => ({ ...s, [axis]: value }));
     setOpenAxis(null);
