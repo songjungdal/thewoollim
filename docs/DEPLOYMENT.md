@@ -37,7 +37,7 @@
 
 | 모드 | 하는 일 | 서버 변경 | 필요 조건 |
 |---|---|---|---|
-| `plan` | 빌드·검사 → 서버와 비교해 바뀔 파일 목록을 실행 요약(Summary)에 표시 | 없음 | main 브랜치. production 환경에 서버 Secret 이 없으면 빌드·검사만 수행 |
+| `plan` | 빌드·검사 → 서버와 비교해 바뀔 파일 목록을 실행 요약(Summary)과 작업 로그에 표시 | 없음 | main 브랜치. production 환경에 서버 Secret 이 없으면 빌드·검사만 수행 |
 | `deploy` | plan 과 같은 검사 → 임시 경로 업로드 → **백업** → 반영 → 상태 확인 | 있음 | `DEPLOY_UNLOCKED: "true"` + main 브랜치 + `confirm=DEPLOY` |
 | `rollback-list` | 서버의 백업 목록 표시 | 없음 | main 브랜치 |
 | `rollback` | 지정한 백업으로 복원 → 상태 확인 | 있음 | `DEPLOY_UNLOCKED: "true"` + main 브랜치 + `confirm=ROLLBACK` |
@@ -188,12 +188,35 @@ GitHub 이 제공하는 실행기(GitHub-hosted runner)는 실행할 때마다 I
 ## 8. 평소 배포 절차 ("배포해 줘")
 
 1. 변경 사항이 PR 로 리뷰되어(상대방 승인 1명) **main 에 병합**되어 있어야 합니다.
-2. `plan` 실행 → 실행 요약에서 바뀔 파일 목록 확인
+2. `plan` 실행 → 실행 요약 또는 작업 로그에서 바뀔 파일 목록 확인
 3. 확인 후 `deploy` 실행 (`confirm=DEPLOY`, 같은 target) — 별도 승인 없이 바로 진행됩니다
 4. 워크플로가 배포 계획 → 백업 → 반영 → 상태 확인을 자동으로 진행
 5. 실행 요약에서 결과와 **백업 이름** 확인
 
-Claude Code 에서 "배포해 줘"라고 요청하면 Claude 는 위 순서대로 진행합니다. `plan` 결과를 먼저 보고하고, 요청자의 명시적 승인을 받은 뒤에만 `deploy` 를 실행합니다. (CLAUDE.md 의 "운영 배포 규칙" 참고)
+**plan 결과가 남는 곳** — 실행 요약(Summary)의 "배포 계획" 표와 함께, "배포 계획 (dry-run)" 작업의 "서버와 비교" 단계 로그에도 같은 내용이 찍힙니다.
+
+```
+PLAN_FILE frontend index.html        ← 새 파일·변경 파일 (대상별)
+PLAN_FILE api lib.php
+PLAN_DELETE frontend old.js          ← 삭제 예정 (frontend_delete=true 일 때만 생길 수 있음)
+PLAN_COUNT frontend changed=… new_dirs=… delete=…
+PLAN_COUNT api changed=… new_dirs=… delete=…   ← 건수는 로그 끝부분에
+```
+
+### Claude Code 에게 "배포해"라고 할 때
+
+Claude 는 아래 순서로 진행하고, **조건을 모두 만족하면 요청자의 추가 승인 없이 `deploy` 까지 실행**합니다. (CLAUDE.md 의 "운영 배포 규칙"과 같은 내용)
+
+1. 배포할 변경을 `main` 에 병합하고 배포할 커밋과 대상(따로 말이 없으면 `all`)을 정합니다.
+2. 그 커밋으로 `plan` (`frontend_delete=false`) 실행
+3. plan 작업 로그에서 `PLAN_FILE` / `PLAN_DELETE` / `PLAN_COUNT` 줄과 빌드·검사 결과 확인
+4. 다음을 **모두** 만족하면 `deploy` (`confirm=DEPLOY`, 같은 대상, `frontend_delete=false`) 실행
+   - (a) 서버 기준 api 변경 파일 목록이 **지난 배포 커밋** 이후 git 변경 목록(`git diff --name-only <지난 배포 커밋> <배포할 커밋> -- api`)과 같음. 지난 배포 커밋 = "운영 반영" 작업이 성공한 가장 최근 `deploy` 실행의 커밋. 다르면 서버 파일이 지난 배포와 달라졌다는 뜻입니다.
+   - (b) 삭제 예정 0건 (api·frontend 모두)
+   - (c) 빌드·검사(타입 검사, 린트, 빌드, PHP 문법·금지 파일 검사)와 plan 작업 모두 통과
+   - (d) plan 과 deploy 가 같은 `main` 커밋 (deploy 직전에 다시 확인)
+5. 하나라도 다르거나 확인할 수 없으면 **배포하지 않고 멈춰서** 요청자에게 무엇이 달랐는지 보고합니다.
+6. 배포 후 상태 확인 결과와 백업 이름을 보고합니다. 실패하거나 문제가 보이면 롤백하지 않고 먼저 요청자에게 묻습니다(롤백은 요청자 승인 후).
 
 ## 9. 백업과 롤백
 
