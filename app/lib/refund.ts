@@ -39,6 +39,11 @@ export function daysUntil(calendarDate: string, now: Date = new Date()): number 
   return Math.floor((partyMidnight - todayMidnight) / 86400000);
 }
 
+/** 환불 비율 → 라벨 ("100% 환불" 등). 서버에 저장된 비율(refundRequestRate) 표시용 */
+export function refundRateLabel(rate: number): string {
+  return rate > 0 ? `${Math.round(rate * 100)}% 환불` : "환불 불가";
+}
+
 export function calculateRefund(paidAmount: number, calendarDate: string, now?: Date): RefundResult {
   const days = daysUntil(calendarDate, now);
   const { rate, label } = refundTier(days);

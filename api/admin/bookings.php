@@ -246,21 +246,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if (!$found) { echo json_encode(['ok' => false, 'error' => 'booking not found']); exit; }
 
-        // 환불 금액 — 프론트(refund.ts)와 동일한 날짜 대조 tier 산정 (서버 권위):
-        //   파티까지 5일+ → 100% / 4일 → 80% / 3일 → 50% / 그 외 → 0%
-        $partiesJson = file_exists("$dataDir/parties.json") ? json_decode((string)file_get_contents("$dataDir/parties.json"), true) : [];
-        $calDate = '';
-        foreach ((array)$partiesJson as $p) {
-            if (isset($p['id']) && (string)$p['id'] === (string)($target['partyId'] ?? '')) { $calDate = (string)($p['calendarDate'] ?? ''); break; }
-        }
+        // 환불 금액 — 회원이 취소요청한 날 기준으로 고정 (cancel-request.php 가 저장한 refundRequestAmount).
+        //   승인이 늦어져도 줄지 않는다. 저장값이 없는 예전 요청은 요청 시각(cancelRequestedAt),
+        //   그것도 없으면 오늘 날짜로 같은 규정(refundQuote: 5일+ 100% / 4일 80% / 3일 50% / 그 외 0%)을 적용.
         $paidAmount = (int)($target['total'] ?? 0);
-        $refundAmount = 0;
-        if ($calDate !== '' && preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $calDate, $m)) {
-            $partyMid = mktime(0, 0, 0, (int)$m[2], (int)$m[3], (int)$m[1]);
-            $todayMid = mktime(0, 0, 0, (int)date('n'), (int)date('j'), (int)date('Y'));
-            $days = (int)floor(($partyMid - $todayMid) / 86400);
-            $rate = $days >= 5 ? 1.0 : ($days === 4 ? 0.8 : ($days === 3 ? 0.5 : 0.0));
-            $refundAmount = (int)floor(max(0, $paidAmount) * $rate);
+        if (isset($target['refundRequestAmount']) && is_numeric($target['refundRequestAmount'])) {
+            $refundAmount = min($paidAmount, max(0, (int)$target['refundRequestAmount']));
+        } else {
+            $reqTs = strtotime((string)($target['cancelRequestedAt'] ?? '')) ?: null;
+            $quote = refundQuote($paidAmount, partyCalendarDate((string)($target['partyId'] ?? '')), $reqTs);
+            $refundAmount = $quote['amount'] ?? 0;
         }
 
         $method = (string)($target['paymentMethod'] ?? '');
