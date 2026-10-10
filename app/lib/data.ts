@@ -1,4 +1,5 @@
 import type { PartySession, PartyOption } from "./partyOptions";
+import COUPON_MESSAGES from "../../api/coupon-messages.json";
 
 /** 매칭파티 참가 자격 — 혼인여부 제한 */
 export type AllowedMaritalStatus = "all" | "싱글" | "돌싱";
@@ -28,6 +29,12 @@ export type PartyType = typeof PARTY_TYPES[number];
 export const PARTY_TYPE_LABELS: Record<PartyType, string> = { matching: "매칭파티", solo: "솔로파티" };
 export const partyTypeOf = (party: { partyType?: string | null }): PartyType =>
   (PARTY_TYPES as readonly string[]).includes(party.partyType ?? "") ? (party.partyType as PartyType) : "matching";
+
+/**
+ * 쿠폰 적용 불가 파티 안내 문구 — 서버와 같은 문구를 쓰도록 api/coupon-messages.json 한 곳에서 읽는다
+ * (서버: api/lib.php couponDisabledMessage). 장바구니 쿠폰 입력창 placeholder·서버 거절 응답에 쓰인다.
+ */
+export const COUPON_DISABLED_MESSAGE: string = COUPON_MESSAGES.couponDisabled;
 
 /** 무통장 입금 계좌 — 결제 페이지 모달 / 마이페이지 안내 가이드 공용 (v7.0) */
 export const VBANK_INFO = { bank: "신협", account: "132-137-790923", holder: "라지성" } as const;
@@ -60,6 +67,7 @@ export type Party = {
   theme?: Theme;               // 테마별: 티타임 / 와인파티 / 사케파티 / 쿠킹클래스
   locationTag?: LocationTag;   // 지역별: 서울 / 성남 / 수원 / 인천 / 용인 / 기타
   partyType?: PartyType;       // 파티 종류 — 없으면 매칭파티 (partyTypeOf 로 읽는다)
+  couponDisabled?: boolean;    // 쿠폰 적용 불가 (매칭·솔로 공통) — 없으면 쿠폰 사용 가능
   // 솔로파티 참가 구성 (docs/specs/party-options-solo.md) — 있으면 남은 자리·마감은 회차 기준(partyStockStatus)
   sessions?: PartySession[];   // 회차 (maleBooked/femaleBooked = 회차별 신청 인원)
   options?: PartyOption[];     // 참가 항목 (항목 가격·포함 회차)

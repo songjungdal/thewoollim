@@ -295,6 +295,12 @@ if (!$fp) {
 // 쿠폰 atomic consume — 사용 이력 기록 + max_count 한도 enforce
 $couponDiscount = 0;
 if ($couponCode !== '') {
+    // 쿠폰 적용 불가 파티 — 결제 준비 뒤 관리자가 설정을 켠 경우. 할인된 금액으로 승인됐으므로 자동 취소하고,
+    // 사용 기록 전이라 쿠폰은 소진되지 않는다. (안내 문구 끝의 마침표는 뒤에 붙는 안내와 겹치지 않게 뗀다)
+    if (isset($partyMap[$couponPartyId]) && partyCouponDisabled($partyMap[$couponPartyId])) {
+        if ($fp) { flock($fp, LOCK_UN); fclose($fp); }
+        autoCancelAndFail(rtrim(couponDisabledMessage(), '.'), '쿠폰 적용 불가 파티로 자동 취소', 'COUPON_PARTY_DISABLED', "coupon=$couponCode party=$couponPartyId");
+    }
     $couponsFile = "$dataDir/coupons.json";
     $usagesFile  = "$dataDir/coupon_usages.json";
     $coupons = file_exists($couponsFile) ? json_decode(file_get_contents($couponsFile), true) : [];

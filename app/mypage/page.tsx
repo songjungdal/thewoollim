@@ -9,7 +9,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useAuth, calcCouponDiscount, type BookingStatus } from "../context/AuthContext";
 import { useParties } from "../lib/useParties";
-import { partyStockStatus, linePriceFor, partyHasOptions, partyOptionById, dateOnly, VBANK_ACCOUNT_LINE, PARTIES as SEED_PARTIES } from "../lib/data";
+import { partyStockStatus, linePriceFor, partyHasOptions, partyOptionById, dateOnly, VBANK_ACCOUNT_LINE, COUPON_DISABLED_MESSAGE, PARTIES as SEED_PARTIES } from "../lib/data";
 
 // 관리자 페이지의 신청자 상태 배지 규격과 동일한 색상 조합 사용 (admin8888/dashboard STATUS_LABEL)
 const STATUS_DISPLAY: Record<BookingStatus, { label: string; tone: string; stripe: string; icon: typeof Clock; sub?: string }> = {
@@ -165,8 +165,14 @@ export default function MyPage() {
     setCouponMsg({});
   };
 
+  // 쿠폰 적용 불가 파티에 걸려 있던 쿠폰은 해제 — 장바구니에서 쿠폰을 넣은 뒤 관리자가 설정을 켠 경우 (서버도 결제 때 거절)
+  const couponPartyDisabled = !!appliedCoupon && !!PARTIES.find(p => p.id === appliedCoupon.partyId)?.couponDisabled;
+  useEffect(() => {
+    if (couponPartyDisabled) clearCoupon();
+  }, [couponPartyDisabled, clearCoupon]);
+
   const computeRowPrice = (partyId: string, originalPrice: number) =>
-    appliedCoupon?.partyId === partyId
+    appliedCoupon?.partyId === partyId && !couponPartyDisabled
       ? Math.max(0, originalPrice - calcCouponDiscount(appliedCoupon, originalPrice))
       : originalPrice;
 
@@ -489,8 +495,9 @@ export default function MyPage() {
 
                 {cartParties.map(party => {
                   const isSelected      = selectedIds.has(party.id);
-                  const couponHere      = appliedCoupon?.partyId === party.id;
-                  const couponElsewhere = !!appliedCoupon && appliedCoupon.partyId !== party.id;
+                  const couponOff       = !!party.couponDisabled; // 쿠폰 적용 불가 파티 — 쿠폰 입력·적용 비활성
+                  const couponHere      = !couponOff && appliedCoupon?.partyId === party.id;
+                  const couponElsewhere = !couponOff && !!appliedCoupon && appliedCoupon.partyId !== party.id;
                   const rowPrice        = computeRowPrice(party.id, party.price);
                   return (
                     <motion.div
@@ -580,6 +587,27 @@ export default function MyPage() {
                                 쿠폰 해제
                               </button>
                             </div>
+                          ) : couponOff ? (
+                            // 쿠폰 적용 불가 — 입력창·적용 버튼 비활성, 안내 문구는 입력창 안(placeholder)에 회색으로 표시.
+                            // 모바일은 문구가 잘리지 않도록 입력창을 한 줄 전체로 쓰고 버튼을 아래로 내린다.
+                            <div className="flex flex-col sm:flex-row gap-2">
+                              <input
+                                type="text"
+                                value=""
+                                readOnly
+                                disabled
+                                placeholder={COUPON_DISABLED_MESSAGE}
+                                aria-label="쿠폰 코드 입력"
+                                className="sm:flex-[3] min-w-0 h-14 px-3 rounded-xl border-2 border-gray-200 bg-gray-100 text-sm font-medium cursor-not-allowed placeholder:text-gray-600 placeholder:font-medium"
+                              />
+                              <button
+                                type="button"
+                                disabled
+                                className="sm:flex-[1] h-12 sm:h-14 px-3 sm:px-5 rounded-xl font-black text-sm whitespace-nowrap bg-gray-200 text-gray-500 cursor-not-allowed"
+                              >
+                                적용
+                              </button>
+                            </div>
                           ) : couponElsewhere ? (
                             <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl border-2 border-gray-200 bg-gray-50">
                               <p className="text-xs md:text-sm text-gray-500 font-bold leading-snug min-w-0 truncate">
@@ -612,7 +640,7 @@ export default function MyPage() {
                               </button>
                             </div>
                           )}
-                          {couponMsg[party.id] && !couponHere && (
+                          {couponMsg[party.id] && !couponHere && !couponOff && (
                             <p className={`text-xs md:text-sm mt-2 ml-1 font-bold ${couponMsg[party.id]!.startsWith("✓") ? "text-brand-point-ink" : "text-red-500"}`}>
                               {couponMsg[party.id]}
                             </p>

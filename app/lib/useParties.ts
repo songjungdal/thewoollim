@@ -71,6 +71,7 @@ export function useParties(): Party[] {
               locationTag: LOCATION_TAGS.includes(p.locationTag as LocationTag) ? (p.locationTag as LocationTag) : undefined,
               // 파티 종류 (없거나 잘못된 값은 matching)
               partyType:   partyTypeOf({ partyType: typeof p.partyType === "string" ? p.partyType : undefined }),
+              couponDisabled: p.couponDisabled === true,
               // 솔로파티 참가 구성 — 회차·항목이 모두 있을 때만 (없으면 기존 파티와 똑같이 동작)
               ...(() => {
                 const sessions = normalizeSessions(p.sessions);

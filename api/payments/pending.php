@@ -9,7 +9,7 @@
  * 흐름:
  *  1) 회원 세션 + 프로필(특히 gender) 검증
  *  2) parties.json 조회 → 합산 금액 계산 (항목이 있는 파티는 항목 가격, 정원은 항목에 포함된 회차마다 검사)
- *  3) 쿠폰 적용 가능 여부 검증 (실제 차감은 success.php 가 atomic 수행)
+ *  3) 쿠폰 적용 가능 여부 검증 (실제 차감은 success.php 가 atomic 수행). 쿠폰 적용 불가 파티면 거절
  *  4) /api/data/pending/<orderId>.json 저장 (10분 만료)
  *  5) Toss 결제창 호출에 필요한 메타 반환
  */
@@ -114,6 +114,10 @@ if (!empty(partiesOverStock($plainIds, $partyMap, $genderKey))) {
 // 쿠폰 적용 가능 검사 (실 차감은 success 에서)
 $couponDiscount = 0;
 if ($couponCode !== '') {
+    // 쿠폰 적용 불가 파티 — 쿠폰 내용과 무관하게 거절 (장바구니에서 쿠폰을 넣은 뒤 관리자가 설정을 켠 경우도 여기서 막힘)
+    if (isset($partyMap[$couponPartyId]) && partyCouponDisabled($partyMap[$couponPartyId])) {
+        jsonFail(couponDisabledMessage());
+    }
     $coupons = json_decode((string)@file_get_contents($dir . '/coupons.json'), true);
     if (!is_array($coupons)) $coupons = [];
     $found = null;

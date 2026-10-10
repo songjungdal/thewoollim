@@ -110,6 +110,7 @@ type PartyForm = {
   // 솔로파티 참가 구성 (명세 docs/specs/party-options-solo.md 7-1) — "options" 면 남/여 참가비·정원 대신 회차·항목을 쓴다
   optionMode: "single" | "options";
   optionsDraft: OptionsDraft;
+  couponDisabled: boolean; // 쿠폰 적용 불가 (매칭·솔로 공통) — 체크하면 이 파티 결제에 쿠폰을 쓸 수 없다
 };
 const EMPTY_PARTY: PartyForm = {
   partyType: "",
@@ -119,6 +120,7 @@ const EMPTY_PARTY: PartyForm = {
   minAge: "", maxAge: "", allowedMaritalStatus: "all",
   targetGroup: "", theme: "", locationTag: "",
   optionMode: "single", optionsDraft: EMPTY_OPTIONS_DRAFT,
+  couponDisabled: false,
 };
 
 function BookingTable({ label, toneClass, rows, party, remarks, onApprove, onCancel, onConfirmVBank, onFullRefund, showOption = false }: {
@@ -306,6 +308,7 @@ type AdminPartyRow = {
   sessions: PartySession[];
   options: PartyOption[];
   applicants: OptionApplicants | null;
+  couponDisabled: boolean;
 };
 
 /** 관리자 GET 응답 → 파티별 AdminPartyRow */
@@ -313,7 +316,7 @@ function buildAdminPartyRows(items: unknown[]): Record<string, AdminPartyRow> {
   const out: Record<string, AdminPartyRow> = {};
   for (const it of items) {
     if (!it || typeof it !== "object") continue;
-    const r = it as { id?: unknown; partyType?: string; detail?: unknown; sessions?: unknown; options?: unknown; applicants?: unknown };
+    const r = it as { id?: unknown; partyType?: string; detail?: unknown; sessions?: unknown; options?: unknown; applicants?: unknown; couponDisabled?: unknown };
     if (r.id == null) continue;
     const type = partyTypeOf(r);
     const options = type === "solo" ? normalizeOptions(r.options) : [];
@@ -322,6 +325,7 @@ function buildAdminPartyRows(items: unknown[]): Record<string, AdminPartyRow> {
     out[String(r.id)] = {
       partyType: type, detail: normalizeDetail(r.detail), sessions, options,
       applicants: ap ? { options: ap.options ?? {}, sessions: ap.sessions ?? {} } : null,
+      couponDisabled: r.couponDisabled === true,
     };
   }
   return out;
@@ -624,6 +628,7 @@ export default function AdminDashboard() {
       partyType: type,
       optionMode: row?.options?.length ? "options" : "single",
       optionsDraft: row?.options?.length ? draftFromParty(row.sessions, row.options) : EMPTY_OPTIONS_DRAFT,
+      couponDisabled: row?.couponDisabled ?? !!p.couponDisabled,
     });
     resetPartyModal();
     // 저장된 안내에 참가 신청 방법·필수 확인 사항이 없으면 기본 문구로 채워 보여준다 (저장 때 기본 문구와 같으면 다시 빠진다)
@@ -1896,7 +1901,12 @@ export default function AdminDashboard() {
                             ? <img src={p.imageUrl} alt="" className="w-12 h-9 object-cover rounded" />
                             : <div className="w-12 h-9 bg-gray-100 rounded flex items-center justify-center text-gray-500"><ImageIcon size={14} /></div>}
                         </td>
-                        <td className="px-3 py-2.5 font-bold">{p.title}</td>
+                        <td className="px-3 py-2.5 font-bold">
+                          {p.title}
+                          {(adminPartyRows[p.id]?.couponDisabled ?? p.couponDisabled) && (
+                            <span className="ml-1.5 inline-block align-middle px-1.5 py-0.5 rounded bg-gray-100 border border-gray-200 text-gray-600 text-[11px] font-bold">쿠폰불가</span>
+                          )}
+                        </td>
                         <td className="px-3 py-2.5 text-gray-600">{p.dateString}</td>
                         <td className="px-3 py-2.5 text-gray-600">{p.location}</td>
                         <td className="px-3 py-2.5 text-gray-600">{p.target}</td>
@@ -2225,6 +2235,22 @@ export default function AdminDashboard() {
                             </select>
                           </div>
                         </div>
+                      </div>
+
+                      {/* 쿠폰 적용 불가 (매칭·솔로 공통) — 서버(결제 준비·무통장 신청·결제 완료)도 같은 값으로 쿠폰을 막는다 */}
+                      <div className="pt-2 mt-1 border-t border-gray-100">
+                        <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={partyForm.couponDisabled}
+                            onChange={e => setPartyForm(p => ({ ...p, couponDisabled: e.target.checked }))}
+                            className="mt-0.5 w-4 h-4 accent-black flex-shrink-0"
+                          />
+                          <span>
+                            <span className="block text-sm font-black text-gray-700">쿠폰 적용 불가</span>
+                            <span className="block text-xs font-medium text-gray-500 mt-0.5">체크 시 이 파티 결제에 쿠폰을 사용할 수 없습니다</span>
+                          </span>
+                        </label>
                       </div>
                       </>)}
                     </div>

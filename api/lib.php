@@ -829,6 +829,22 @@ function partyCalendarDate(string $partyId): string {
     return '';
 }
 
+// ─── 쿠폰 적용 불가 파티 (parties.json 의 couponDisabled, 매칭·솔로 공통) ─────────
+//   안내 문구는 api/coupon-messages.json 한 곳에만 둔다 — 프론트(app/lib/data.ts COUPON_DISABLED_MESSAGE)도
+//   같은 파일을 빌드 때 읽어 쓴다. 파일을 못 읽는 비상시에만 아래 대체 문구를 쓴다.
+function couponDisabledMessage(): string {
+    static $msg = null;
+    if ($msg === null) {
+        $j = json_decode((string)@file_get_contents(__DIR__ . '/coupon-messages.json'), true);
+        $msg = (is_array($j) && is_string($j['couponDisabled'] ?? null)) ? $j['couponDisabled'] : '쿠폰을 사용할 수 없는 파티입니다.';
+    }
+    return $msg;
+}
+
+function partyCouponDisabled(array $party): bool {
+    return !empty($party['couponDisabled']);
+}
+
 // ─── 쿠폰 사용 이력 해제 (취소/환불 시 "사용 안 한 것처럼" 복원) ──────────────
 //   coupon_usages.json 에서 해당 code+email 사용 기록을 제거.
 //   - 동일 사용자 재사용 차단 검사(coupons-validate.php/pending.php/success.php/
