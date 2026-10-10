@@ -254,25 +254,34 @@ export default function SmoothOnePage() {
     [liveMembers]
   );
 
-  // 계층형 카테고리: 상위 축(대상별/테마별/지역별) 선택 후 세부 값 선택.
-  // null = 미선택, "all" = 축 선택했지만 세부 미선택(전체 노출).
-  type Axis = "대상별" | "테마별" | "지역별";
-  const [activeAxis, setActiveAxis] = useState<Axis | null>(null);
-  const [filterValue, setFilterValue] = useState<string | null>(null);
-
+  // 4축 필터 [종류 / 대상 / 테마 / 지역] — 축마다 값을 하나씩 골라 겹쳐(AND) 거른다.
+  //   openAxis = 세부 옵션 줄이 열린 축(1개 또는 null), selections = 대상·테마·지역 선택값(없으면 null).
+  //   종류 축의 선택값은 아래 typeTab(?type= 주소 연동)을 그대로 쓴다.
+  type Axis = "type" | "targetGroup" | "theme" | "locationTag";
+  type CategoryAxis = Exclude<Axis, "type">;
+  const AXES: { key: Axis; label: string }[] = [
+    { key: "type", label: "종류" }, { key: "targetGroup", label: "대상" },
+    { key: "theme", label: "테마" }, { key: "locationTag", label: "지역" },
+  ];
+  const CATEGORY_AXES: CategoryAxis[] = ["targetGroup", "theme", "locationTag"];
   const AXIS_OPTIONS: Record<Axis, readonly string[]> = {
-    "대상별": ["싱글", "돌싱"],
-    "테마별": ["티타임", "와인파티", "사케파티", "쿠킹클래스"],
+    type: PARTY_TYPES,
+    targetGroup: ["싱글", "돌싱"],
+    theme: ["티타임", "와인파티", "사케파티", "쿠킹클래스"],
     // '기타' 는 필터 버튼에서 노출 제외 — 기존 '기타' 파티는 전체보기에 그대로 노출됨
     // 표시 순서만: 인천 ↔ 용인 교체 (DB 값/매칭 로직 무영향)
-    "지역별": ["서울", "성남", "수원", "용인", "인천"],
+    locationTag: ["서울", "성남", "수원", "용인", "인천"],
   };
-  const AXIS_FIELD: Record<Axis, "targetGroup" | "theme" | "locationTag"> = {
-    "대상별": "targetGroup", "테마별": "theme", "지역별": "locationTag",
-  };
+  // 화면 표시 라벨 — 종류는 매칭파티/솔로파티, 나머지는 categoryLabel (테마 "쿠킹클래스" → "세션")
+  const optionLabel = (axis: Axis, value: string) =>
+    axis === "type" ? PARTY_TYPE_LABELS[value as PartyType] : categoryLabel(value);
+  const [openAxis, setOpenAxis] = useState<Axis | null>(null);
+  // 지금 열린 축 — 닫히는 애니메이션(0.22초) 동안 화면에 남은 옵션 줄의 클릭을 걸러내는 데 쓴다 (pickOption)
+  const openAxisRef = useRef<Axis | null>(null);
+  useEffect(() => { openAxisRef.current = openAxis; }, [openAxis]);
+  const [selections, setSelections] = useState<Record<CategoryAxis, string | null>>({ targetGroup: null, theme: null, locationTag: null });
 
-  // 파티 종류 탭 [전체 / 매칭파티 / 솔로파티] — 기존 대상·테마·지역 필터와 둘 다 만족하는 파티만 보여준다.
-  //   /?type=solo#apply 로 들어오면 솔로파티 탭이 선택된 채 열리고, 탭을 바꾸면 주소만 바꾼다(history.replaceState).
+  // 종류 축 선택값 — /?type=solo#apply 로 들어오면 솔로파티가 선택된 채 열리고, 바꾸면 주소만 바꾼다(history.replaceState).
   const [typeTab, setTypeTab] = useState<"all" | PartyType>("all");
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get("type");
@@ -287,16 +296,27 @@ export default function SmoothOnePage() {
     } catch { /* 주소 갱신 실패는 무시 */ }
   };
 
-  const pickAxis = (axis: Axis) => {
-    if (axis === activeAxis) {
-      // 같은 축 다시 클릭 → 전체로 복귀
-      setActiveAxis(null);
-      setFilterValue(null);
-    } else {
-      setActiveAxis(axis);
-      setFilterValue(null); // 축 변경 시 세부 값 초기화
-    }
+  const selectedOf = (axis: Axis): string | null =>
+    axis === "type" ? (typeTab === "all" ? null : typeTab) : selections[axis];
+  // 축 버튼 = 그 축의 옵션 줄 열기/닫기 (다른 축 선택값은 유지)
+  const toggleAxis = (axis: Axis) => setOpenAxis(cur => (cur === axis ? null : axis));
+  // 옵션 클릭 = 그 축 값 선택(null = "전체", 선택 해제) + 옵션 줄 닫기
+  const pickOption = (axis: Axis, value: string | null) => {
+    // 닫히는 중인(사라지는) 옵션 줄은 반응하지 않는다 — 지금 열린 축의 줄만 선택 가능
+    if (openAxisRef.current !== axis) return;
+    if (axis === "type") pickType((value as PartyType | null) ?? "all");
+    else setSelections(s => ({ ...s, [axis]: value }));
+    setOpenAxis(null);
   };
+  const resetFilters = () => {
+    setSelections({ targetGroup: null, theme: null, locationTag: null });
+    pickType("all");
+    setOpenAxis(null);
+  };
+  const selectedLabels = AXES.flatMap(({ key }) => {
+    const v = selectedOf(key);
+    return v ? [optionLabel(key, v)] : [];
+  });
 
   // SSR/CSR 시간대 차이로 인한 hydration mismatch 방지 — now 는 mount 후에만 세팅,
   // 1분마다 갱신해 행사 종료 시점에 카드 UI 가 자연스럽게 전환되게 함
@@ -342,10 +362,10 @@ export default function SmoothOnePage() {
     return () => mq.removeEventListener("change", update);
   }, []);
 
-  // 카테고리 탭(상위 축/세부 값) 전환 시 더보기 상태 초기화 → 새 탭은 항상 접힌 채 처음부터 노출
+  // 필터(종류·대상·테마·지역) 변경 시 더보기 상태 초기화 → 새 결과는 항상 접힌 채 처음부터 노출
   useEffect(() => {
     setApplyMoreOpen(false);
-  }, [activeAxis, filterValue, typeTab]);
+  }, [selections, typeTab]);
 
   // 모바일 일정 섹션 — 마운트 1회, 현재 날짜 기준 연/월 초기화
   useEffect(() => {
@@ -355,10 +375,10 @@ export default function SmoothOnePage() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sortedParties = useMemo(() => {
+    // 선택된 모든 축을 동시에 만족(AND)하는 파티만
     const filtered = [...PARTIES].filter(p => {
       if (typeTab !== "all" && partyTypeOf(p) !== typeTab) return false;
-      if (!activeAxis || !filterValue) return true;
-      return p[AXIS_FIELD[activeAxis]] === filterValue;
+      return CATEGORY_AXES.every(ax => !selections[ax] || p[ax] === selections[ax]);
     });
 
     // mount 전(SSR/초기 hydration) — 시간 의존 필터/정렬 생략, 기존 동작 유지
@@ -373,7 +393,7 @@ export default function SmoothOnePage() {
         return a.calendarDate.localeCompare(b.calendarDate);     // 그룹 내부는 기존 날짜 오름차순 유지
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeAxis, filterValue, typeTab, PARTIES, now]);
+  }, [selections, typeTab, PARTIES, now]);
 
   // 신청 섹션 렌더용 slice — 위 sortedParties(필터/정렬 완료)를 가로채 노출 개수만 제한
   const applyLimit = isDesktop ? APPLY_LIMIT_DESKTOP : APPLY_LIMIT_MOBILE;
@@ -616,55 +636,42 @@ export default function SmoothOnePage() {
                 seed → live 데이터 swap 깜빡임 방지. 컨테이너 레이아웃은 유지되어 layout shift 없음. */}
             <div className={`transition-opacity duration-500 ease-out ${contentReady ? "opacity-100" : "opacity-0"}`}>
 
-            {/* 파티 종류 탭 — 밑줄형 텍스트 탭. 선택: 검정 굵은 글씨 + 터쿼이즈 밑줄 2px / 미선택: 회색. 모바일 한 줄 */}
-            <div className="flex justify-center gap-6 md:gap-10 mb-6 md:mb-8" role="tablist" aria-label="파티 종류">
-              {(["all", ...PARTY_TYPES] as const).map(t => {
-                const isActive = typeTab === t;
-                return (
-                  <button
-                    key={t}
-                    type="button"
-                    role="tab"
-                    aria-selected={isActive}
-                    onClick={() => pickType(t)}
-                    className={`pt-3 pb-1.5 text-base md:text-xl whitespace-nowrap border-b-2 transition-colors ${
-                      isActive ? "text-brand-black font-black border-brand-point" : "text-gray-500 font-bold border-transparent hover:text-gray-700"
-                    }`}
-                  >
-                    {t === "all" ? "전체" : PARTY_TYPE_LABELS[t]}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* 계층형 카테고리 — 중앙 정렬, 상위 축 클릭 → 세부 옵션 전개 */}
+            {/* 4축 필터 [종류 / 대상 / 테마 / 지역] — 축 버튼 = 옵션 줄 열기/닫기, 옵션 = 그 축 값 선택(AND)
+                모바일은 4칸 그리드 한 줄(320px 에서도 "솔로파티 ▾"가 한 줄), md 이상은 가운데 정렬 */}
             <div className="mb-10 md:mb-16 border-b border-gray-100 pb-6 md:pb-8">
-              {/* 1단계: 상위 축 (대상별 / 테마별 / 지역별) — 중앙 정렬 */}
-              <div className="flex justify-center flex-wrap gap-2 md:gap-3">
-                {(["대상별", "테마별", "지역별"] as const).map(axis => {
-                  const isActive = activeAxis === axis;
+              <div className="grid grid-cols-4 gap-1.5 md:flex md:justify-center md:gap-3">
+                {AXES.map(({ key, label }) => {
+                  const isOpen = openAxis === key;
+                  const sel = selectedOf(key);
+                  const text = sel ? optionLabel(key, sel) : label;
                   return (
                     <button
-                      key={axis}
+                      key={key}
                       type="button"
-                      onClick={() => pickAxis(axis)}
-                      className={`px-5 md:px-7 py-2.5 md:py-3 text-base md:text-lg font-black rounded-full transition-all whitespace-nowrap ${
-                        isActive
-                          ? "bg-brand-point text-black shadow-md"
-                          : "bg-gray-50 text-gray-500 hover:bg-gray-100 border border-gray-200"
+                      onClick={() => toggleAxis(key)}
+                      aria-expanded={isOpen}
+                      aria-controls="apply-filter-options"
+                      aria-label={sel ? `${label}: ${text}` : label}
+                      className={`py-2 px-1 md:px-7 md:py-3 text-[12px] min-[360px]:text-[13px] md:text-lg font-black rounded-full transition-all whitespace-nowrap truncate ${
+                        isOpen
+                          ? "bg-brand-point text-black shadow-md border-2 border-brand-point"
+                          : sel
+                            ? "bg-white text-brand-black border-2 border-brand-point"
+                            : "bg-gray-50 text-gray-500 hover:bg-gray-100 border border-gray-200"
                       }`}
                     >
-                      {axis}
+                      {text} <span aria-hidden="true">{isOpen ? "▴" : "▾"}</span>
                     </button>
                   );
                 })}
               </div>
 
-              {/* 2단계: 세부 카테고리 (active axis가 있을 때만 노출) — 중앙 정렬, 부드러운 reveal */}
+              {/* 세부 옵션 줄 (열린 축이 있을 때만) — 맨 앞 "전체" = 그 축 선택 해제. 고르면 줄이 닫힌다 */}
               <AnimatePresence initial={false}>
-                {activeAxis && (
+                {openAxis && (
                   <motion.div
-                    key={activeAxis}
+                    key={openAxis}
+                    id="apply-filter-options"
                     initial={{ opacity: 0, height: 0, y: -6 }}
                     animate={{ opacity: 1, height: "auto", y: 0 }}
                     exit={{ opacity: 0, height: 0, y: -6 }}
@@ -674,41 +681,52 @@ export default function SmoothOnePage() {
                     <div className="flex justify-center flex-wrap gap-2 md:gap-2.5 mt-5 md:mt-6">
                       <button
                         type="button"
-                        onClick={() => setFilterValue(null)}
+                        onClick={() => pickOption(openAxis, null)}
                         className={`px-3.5 md:px-5 py-1.5 md:py-2 text-xs md:text-sm font-bold rounded-full transition-all ${
-                          !filterValue
+                          !selectedOf(openAxis)
                             ? "bg-brand-point/10 text-brand-point-ink border border-brand-point/30"
                             : "bg-white text-gray-500 hover:bg-gray-50 border border-gray-200"
                         }`}
                       >
                         전체
                       </button>
-                      {AXIS_OPTIONS[activeAxis].map(opt => {
-                        const isSelected = filterValue === opt;
+                      {AXIS_OPTIONS[openAxis].map(opt => {
+                        const isSelected = selectedOf(openAxis) === opt;
                         return (
                           <button
                             key={opt}
                             type="button"
-                            onClick={() => setFilterValue(opt)}
+                            onClick={() => pickOption(openAxis, opt)}
                             className={`px-3.5 md:px-5 py-1.5 md:py-2 text-xs md:text-sm font-bold rounded-full transition-all ${
                               isSelected
                                 ? "bg-brand-point text-black shadow-md"
                                 : "bg-white text-gray-500 hover:bg-gray-50 border border-gray-200"
                             }`}
                           >
-                            {categoryLabel(opt)}
+                            {optionLabel(openAxis, opt)}
                           </button>
                         );
                       })}
                     </div>
-                    {filterValue && (
-                      <p className="text-center text-xs md:text-sm text-gray-500 font-medium mt-3">
-                        {activeAxis} · <span className="text-brand-point-ink font-bold">{categoryLabel(filterValue)}</span> · {sortedParties.length}건
-                      </p>
-                    )}
                   </motion.div>
                 )}
               </AnimatePresence>
+
+              {/* 요약 줄 — 선택이 있을 때만: "솔로파티 · 싱글 · 와인파티 · N건  초기화" */}
+              {selectedLabels.length > 0 && (
+                <div className="flex flex-wrap justify-center items-baseline gap-x-2 gap-y-1 mt-4 text-xs md:text-sm text-gray-500 font-medium">
+                  <span>
+                    <span className="text-brand-point-ink font-bold">{selectedLabels.join(" · ")}</span> · {sortedParties.length}건
+                  </span>
+                  <button
+                    type="button"
+                    onClick={resetFilters}
+                    className="py-3 -my-3 px-1 text-gray-500 font-bold underline underline-offset-2 hover:text-brand-black"
+                  >
+                    초기화
+                  </button>
+                </div>
+              )}
             </div>
 
             {sortedParties.length === 0 ? (
