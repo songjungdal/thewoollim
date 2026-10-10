@@ -117,6 +117,10 @@ if (!empty(partiesOverStock($plainIds, $partyMap, $genderKey))) {
 // ── 4) 쿠폰 검증 + atomic consume (success.php 와 동일 규칙) ──────────────
 $couponDiscount = 0;
 if ($couponCode !== '') {
+    // 쿠폰 적용 불가 파티 — 사용 처리(consume) 전에 거절하므로 쿠폰은 소진되지 않는다
+    if (isset($partyMap[$couponPartyId]) && partyCouponDisabled($partyMap[$couponPartyId])) {
+        jsonFail(couponDisabledMessage());
+    }
     $couponsFile = "$dataDir/coupons.json";
     $usagesFile  = "$dataDir/coupon_usages.json";
     $coupons = file_exists($couponsFile) ? json_decode((string)file_get_contents($couponsFile), true) : [];

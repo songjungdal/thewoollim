@@ -722,7 +722,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await fetch("/api/coupons-validate.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: trimmed, email: userEmailRef.current }),
+        // partyId — 서버가 쿠폰 적용 불가 파티를 거절하는 데 쓴다
+        body: JSON.stringify({ code: trimmed, email: userEmailRef.current, partyId }),
       });
       const d = await res.json();
       if (d?.ok && d?.coupon) {

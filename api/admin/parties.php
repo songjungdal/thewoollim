@@ -15,9 +15,10 @@
  *   minAge?, maxAge?, allowedMaritalStatus?,
  *   imageUrl?, description?, targetGroup?, theme?, locationTag?, host_name?,
  *   partyType ('matching'|'solo', create 시 필수), detail? (상세페이지 안내 — lib.php sanitizePartyDetail)
+ *   couponDisabled (쿠폰 적용 불가 — true 면 이 파티 결제에 쿠폰을 쓸 수 없다. 없으면 false)
  *   sessions?·options? (솔로파티 참가 구성 — lib.php sanitizePartyOptions, docs/specs/party-options-solo.md)
  *
- * update: 요청에 없는 host_name·partyType·detail·voting_status·status·sessions·options 는 기존 값을 그대로 둔다.
+ * update: 요청에 없는 host_name·partyType·detail·voting_status·status·couponDisabled·sessions·options 는 기존 값을 그대로 둔다.
  * GET: 참가 구성이 있는 파티에는 applicants(취소되지 않은 예약 기준 항목별·회차별 신청자 수)를 덧붙인다.
  *
  * 보안:
@@ -127,7 +128,7 @@ try {
                     if ((string)($row['id'] ?? '') === (string)$p['id']) {
                         // 요청에 없는 필드는 기존 값 유지 — 관리자 폼이 보내지 않는 값(투표 상태·모임종료 표시·담당자)이
                         // 저장 때마다 초기화되지 않도록. partyType·detail 도 요청에 없으면 그대로 둔다.
-                        foreach (['host_name', 'partyType', 'detail', 'voting_status', 'status'] as $keep) {
+                        foreach (['host_name', 'partyType', 'detail', 'voting_status', 'status', 'couponDisabled'] as $keep) {
                             if (!array_key_exists($keep, $p) && array_key_exists($keep, $row)) {
                                 $p[$keep] = $row[$keep];
                             }
@@ -263,6 +264,9 @@ function sanitizeParty(array $p): array {
 
     // 파티 종류 — 허용 목록 밖이면 matching (create 의 필수 검사는 위 핸들러에서)
     $clean['partyType'] = isset(PARTY_TYPE_LABELS[(string)($p['partyType'] ?? '')]) ? (string)$p['partyType'] : 'matching';
+
+    // 쿠폰 적용 불가 (매칭·솔로 공통) — 값이 없거나 false 면 false (기존 파티는 지금처럼 쿠폰 사용 가능)
+    $clean['couponDisabled'] = filter_var($p['couponDisabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
     // 상세페이지 안내 — 있으면 검증 후 저장 (입력 제한 위반 시 RuntimeException → 저장 거절)
     if (array_key_exists('detail', $p) && $p['detail'] !== null) {

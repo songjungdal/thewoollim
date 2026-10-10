@@ -74,8 +74,9 @@ function CheckoutContent() {
   // 무통장 입금 접수 완료 안내 모달
   const [vbankModal, setVbankModal] = useState<{ amount: number } | null>(null);
 
-  // 결제 대상 파티 안에 적용된 쿠폰만 유효
-  const couponApplicable = !!appliedCoupon && uniquePartyIds.includes(appliedCoupon.partyId);
+  // 결제 대상 파티 안에 적용된 쿠폰만 유효 — 쿠폰 적용 불가 파티에 걸린 쿠폰은 보내지 않고 정가로 계산 (서버도 거절)
+  const couponApplicable = !!appliedCoupon && uniquePartyIds.includes(appliedCoupon.partyId)
+    && !PARTIES.find(p => p.id === appliedCoupon.partyId)?.couponDisabled;
   const effectiveCoupon  = couponApplicable ? appliedCoupon : null;
 
   const computeRowPrice = (partyId: string, originalPrice: number) =>

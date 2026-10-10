@@ -2,7 +2,8 @@
 /**
  * 쿠폰 유효성 검증 (체크아웃 단계 사전 적용).
  *
- * POST { code, email } → { ok: true, coupon: { code, amount } }
+ * POST { code, email, partyId? } → { ok: true, coupon: { code, amount } }
+ *  - partyId 의 파티가 쿠폰 적용 불가(couponDisabled)면 거절 (결제 단계 pending/vbank-submit/success 도 다시 막음)
  *  - 실 차감은 결제 성공 시(payments/success.php)에 atomic 발생
  *  - 본 단계는 가용성만 응답 (만료/active/사용이력 검사)
  *
@@ -20,11 +21,23 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') jsonFail('method not allowed', 405);
 $body  = jsonBody();
 $email = normalizeEmail((string)($body['email'] ?? ''));
 $code  = strtoupper(trim((string)($body['code'] ?? '')));
+$partyId = trim((string)($body['partyId'] ?? ''));
 requireUser($email);
 
 if ($code === '' || strlen($code) > 32) jsonFail('쿠폰 코드를 입력해주세요.');
 
 $dir         = dataDir();
+
+// 쿠폰 적용 불가 파티 — 쿠폰 내용과 무관하게 거절 (사용 기록은 남기지 않음)
+if ($partyId !== '') {
+    $parties = json_decode((string)@file_get_contents($dir . '/parties.json'), true);
+    foreach ((array)$parties as $p) {
+        if (is_array($p) && (string)($p['id'] ?? '') === $partyId && partyCouponDisabled($p)) {
+            jsonFail(couponDisabledMessage());
+        }
+    }
+}
+
 $couponsFile = $dir . '/coupons.json';
 $usagesFile  = $dir . '/coupon_usages.json';
 
