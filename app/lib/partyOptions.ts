@@ -118,6 +118,31 @@ export function validateOptionsDraft(d: OptionsDraft, applicants?: OptionApplica
   return errs;
 }
 
+/**
+ * 포함 회차가 똑같은 참가 항목 쌍 — 저장 전 확인 창용 (docs/specs/party-guide-edit.md 5장, 서버는 막지 않음).
+ * sessions: 포함 회차 이름 ("1부, 2부")
+ */
+export function duplicateOptionSessions(d: OptionsDraft): { a: string; b: string; sessions: string }[] {
+  const order = d.sessions.map(s => s.key);
+  const keyOf = (o: OptionDraft) => order.filter(k => o.sessionKeys.includes(k)).join("|");
+  const out: { a: string; b: string; sessions: string }[] = [];
+  d.options.forEach((o, i) => {
+    const k = keyOf(o);
+    if (!k) return;
+    const j = d.options.findIndex((p, pi) => pi < i && keyOf(p) === k);
+    if (j < 0) return;
+    const names = d.sessions.filter(s => o.sessionKeys.includes(s.key)).map(s => s.name.trim() || "이름 없는 회차").join(", ");
+    out.push({ a: d.options[j].name.trim() || `항목 ${j + 1}`, b: o.name.trim() || `항목 ${i + 1}`, sessions: names });
+  });
+  return out;
+}
+
+/** 포함 회차 한 줄 요약 — "포함: 1부 20:00 · 2부 22:00" */
+export function optionSessionsSummary(d: OptionsDraft, o: OptionDraft): string {
+  const inc = d.sessions.filter(s => o.sessionKeys.includes(s.key));
+  return inc.length ? `포함: ${inc.map(s => `${s.name.trim() || "이름 없는 회차"}${s.startTime.trim() ? ` ${s.startTime.trim()}` : ""}`).join(" · ")}` : "포함: 없음";
+}
+
 /** 입력 상태 → 저장 요청 (sessions·options). 새 회차·항목은 임시 키를 id 로 보낸다 */
 export function draftToPayload(d: OptionsDraft): { sessions: object[]; options: object[] } {
   const keys = new Set(d.sessions.map(s => s.key));

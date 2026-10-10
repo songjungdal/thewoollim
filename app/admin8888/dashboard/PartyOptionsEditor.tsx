@@ -8,7 +8,7 @@
  */
 import { ArrowUp, ArrowDown, Trash2, Plus, Wand2 } from "lucide-react";
 import {
-  OPTION_LIMITS, defaultOptionsDraft, newDraftKey,
+  OPTION_LIMITS, optionSessionsSummary, defaultOptionsDraft, newDraftKey,
   type OptionsDraft, type SessionDraft, type OptionDraft, type OptionApplicants,
 } from "../../lib/partyOptions";
 
@@ -62,6 +62,9 @@ export default function PartyOptionsEditor({ value, onChange, applicants }: {
       </div>
       <p className="text-xs md:text-[13px] text-gray-600 leading-relaxed bg-brand-point/5 border-l-2 border-brand-point/40 pl-3 py-2 rounded-r-md">
         1부+2부처럼 여러 회차를 포함한 항목을 신청하면, 포함된 회차의 정원을 모두 차지합니다.
+      </p>
+      <p className="text-xs md:text-[13px] font-bold text-danger leading-relaxed" data-testid="options-lock-notice">
+        신청자가 생기면 항목의 포함 회차를 바꿀 수 없습니다. 저장 전에 항목마다 포함 회차를 꼭 확인해주세요.
       </p>
 
       {/* 회차 */}
@@ -153,6 +156,7 @@ export default function PartyOptionsEditor({ value, onChange, applicants }: {
                     </label>
                   ))}
                 </div>
+                <p className="mt-1 text-xs font-bold text-gray-700" data-testid="option-sessions-summary">{optionSessionsSummary(value, o)}</p>
                 {n > 0 && <p className="mt-1 text-xs text-gray-500">신청자가 있어 포함 회차는 바꿀 수 없습니다. 이름·가격은 바꿀 수 있고, 가격은 이후 결제부터 적용됩니다.</p>}
                 <div className="mt-2 flex flex-wrap items-center justify-end gap-1.5">
                   {n > 0 && <span className="text-xs font-bold text-gray-600 whitespace-nowrap mr-1">신청자 {n}명</span>}

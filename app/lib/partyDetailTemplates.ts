@@ -7,6 +7,7 @@
  * - 입력 제한·사진 주소 규칙은 서버(api/lib.php sanitizePartyDetail)에서도 같은 값으로 강제한다.
  */
 import type { PartyType } from "./data";
+import { PARTY_GUIDES, visibleNotices } from "./partyGuides";
 
 export type PartyDetailImage = { url: string; alt: string };
 export type PartyDetailStep = { title: string; time: string; desc: string; note: string };
@@ -14,6 +15,13 @@ export type PartyDetailDurationRow = { label: string; total: string };
 /** 소개글 묶음 — 소제목·본문·사진 (docs/specs/party-solo-guide.md 7-1). 셋 중 하나 이상 있어야 한다 */
 export type PartyAboutSection = { heading: string; body: string; images: PartyDetailImage[] };
 export const DEFAULT_ABOUT_TITLE = "파티 소개";
+/** 참가 신청 방법·필수 확인 사항 (docs/specs/party-guide-edit.md 3-1). 없으면 상세페이지는 종류별 기본 문구(partyGuides.ts) */
+export type PartyApplyStep = { title: string; desc: string; note: string };
+export type PartyNoticeItem = { title: string; desc: string; warn: string };
+export type PartyApply = { title: string; steps: PartyApplyStep[] };
+export type PartyNotice = { title: string; intro: string; items: PartyNoticeItem[] };
+export const DEFAULT_APPLY_TITLE = "참가 신청 방법";
+export const DEFAULT_NOTICE_TITLE = "필수 확인 사항";
 
 export const DETAIL_IMAGE_SLOTS = ["beforeApply", "afterApply", "beforeTimeline", "beforeNotice", "afterNotice"] as const;
 export type DetailImageSlot = typeof DETAIL_IMAGE_SLOTS[number];
@@ -26,10 +34,12 @@ export const DETAIL_IMAGE_SLOT_LABELS: Record<DetailImageSlot, string> = {
 };
 
 export type PartyDetail = {
-  timeline: { title: string; intro: string; steps: PartyDetailStep[] };
+  timeline: { title: string; intro: string; steps: PartyDetailStep[]; numbered?: boolean };   // numbered 없음 = true(번호 형식)
   durations: { title: string; rows: PartyDetailDurationRow[] };
   images: Record<DetailImageSlot, PartyDetailImage[]>;
   about: { title: string; sections: PartyAboutSection[] };   // 묶음 0개면 상세페이지에 영역 자체가 없다
+  apply?: PartyApply;     // 저장된 경우만 — 단계 0개면 영역 숨김
+  notice?: PartyNotice;   // 저장된 경우만 — 항목 0개면 영역 숨김
 };
 
 /** 입력 제한 — api/lib.php sanitizePartyDetail 과 같은 값 */
@@ -52,6 +62,17 @@ export const DETAIL_LIMITS = {
   aboutHeading: 40,
   aboutBody: 2000,
   aboutImages: 10,
+  applyTitle: 40,
+  applySteps: 8,
+  applyStepTitle: 60,
+  applyStepDesc: 500,
+  applyStepNote: 300,
+  noticeTitle: 40,
+  noticeIntro: 200,
+  noticeItems: 10,
+  noticeItemTitle: 60,
+  noticeItemDesc: 500,
+  noticeItemWarn: 200,
 } as const;
 
 /** 사진 주소 허용 규칙 — /uploads/parties/파일명 또는 /images/파일명 만 (외부 주소 불가) */
@@ -120,15 +141,45 @@ export const MATCHING_TEMPLATE: PartyDetail = {
 
 /** 솔로파티 기본 내용 — 모두 비어 있음 (제목 필드 기본값만) */
 export const SOLO_TEMPLATE: PartyDetail = {
-  timeline: { title: DEFAULT_TIMELINE_TITLE, intro: "", steps: [] },
+  timeline: { title: DEFAULT_TIMELINE_TITLE, intro: "", steps: [], numbered: false },   // 솔로파티는 자유 형식이 기본
   durations: { title: DEFAULT_DURATIONS_TITLE, rows: [] },
   images: { beforeApply: [], afterApply: [], beforeTimeline: [], beforeNotice: [], afterNotice: [] },
   about: { title: DEFAULT_ABOUT_TITLE, sections: [] },
 };
 
-/** 종류별 기본 내용 (편집기에서 고칠 수 있도록 매번 새 복사본) */
-export function templateFor(type: PartyType): PartyDetail {
-  return cloneDetail(type === "solo" ? SOLO_TEMPLATE : MATCHING_TEMPLATE);
+/** 참가 신청 방법 기본 문구 — 지금 고정 문구(partyGuides.ts) 그대로 */
+export function defaultApply(type: PartyType): PartyApply {
+  return { title: DEFAULT_APPLY_TITLE, steps: PARTY_GUIDES[type].steps.map(s => ({ title: s.title, desc: s.desc, note: s.note ?? "" })) };
+}
+
+/** 필수 확인 사항 기본 문구 — 솔로파티 "신청한 회차 시간 지키기"는 참가 구성(회차)이 있을 때만 */
+export function defaultNotice(type: PartyType, hasSessions: boolean): PartyNotice {
+  const g = PARTY_GUIDES[type];
+  return { title: DEFAULT_NOTICE_TITLE, intro: g.noticeIntro, items: visibleNotices(g, hasSessions).map(n => ({ title: n.title, desc: n.desc, warn: n.warn ?? "" })) };
+}
+
+/** 종류별 기본 내용 (편집기에서 고칠 수 있도록 매번 새 복사본). 참가 신청 방법·필수 확인 사항 기본 문구 포함 */
+export function templateFor(type: PartyType, hasSessions = false): PartyDetail {
+  return { ...cloneDetail(type === "solo" ? SOLO_TEMPLATE : MATCHING_TEMPLATE), apply: defaultApply(type), notice: defaultNotice(type, hasSessions) };
+}
+
+/** 편집기에 채울 값 — 저장된 안내에 참가 신청 방법·필수 확인 사항이 없으면 기본 문구로 채운다 (화면은 이미 기본 문구로 보이고 있으므로) */
+export function withGuideDefaults(d: PartyDetail, type: PartyType, hasSessions: boolean): PartyDetail {
+  return { ...d, apply: d.apply ?? defaultApply(type), notice: d.notice ?? defaultNotice(type, hasSessions) };
+}
+
+/**
+ * 저장할 값 — 기본 문구와 똑같은 참가 신청 방법·필수 확인 사항은 빼고, 번호 형식(true)은 numbered 를 뺀다.
+ * 편집하지 않은 파티를 그대로 다시 저장해도 저장 값과 화면이 바뀌지 않게 하기 위해서다(빠진 값은 종류별 기본 문구로 보인다).
+ */
+export function compactDetailForSave(d: PartyDetail, type: PartyType): PartyDetail {
+  const out: PartyDetail = cloneDetail(d);
+  if (out.timeline.numbered !== false) delete out.timeline.numbered;
+  const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+  if (out.apply && same(out.apply, defaultApply(type))) delete out.apply;
+  // 필수 확인 사항은 회차 항목 포함/미포함 기본 문구 둘 다 "기본 문구"로 본다 — 빠지면 화면이 참가 구성 여부에 맞춰 기본 문구를 고른다
+  if (out.notice && (same(out.notice, defaultNotice(type, true)) || same(out.notice, defaultNotice(type, false)))) delete out.notice;
+  return out;
 }
 
 export function cloneDetail(d: PartyDetail): PartyDetail {
@@ -157,6 +208,7 @@ export function normalizeDetail(raw: unknown): PartyDetail | null {
     timeline: {
       title: str(tl.title),
       intro: str(tl.intro),
+      ...(tl.numbered === false ? { numbered: false } : {}),
       steps: arr(tl.steps).map(x => {
         const s = obj(x);
         return { title: str(s.title), time: str(s.time), desc: str(s.desc), note: str(s.note) };
@@ -167,6 +219,16 @@ export function normalizeDetail(raw: unknown): PartyDetail | null {
       rows: arr(du.rows).map(x => ({ label: str(obj(x).label), total: str(obj(x).total) })),
     },
     images,
+    // 참가 신청 방법·필수 확인 사항 — 저장된 경우만
+    ...(r.apply && typeof r.apply === "object" ? { apply: {
+      title: str(obj(r.apply).title),
+      steps: arr(obj(r.apply).steps).map(x => ({ title: str(obj(x).title), desc: str(obj(x).desc), note: str(obj(x).note) })),
+    } } : {}),
+    ...(r.notice && typeof r.notice === "object" ? { notice: {
+      title: str(obj(r.notice).title),
+      intro: str(obj(r.notice).intro),
+      items: arr(obj(r.notice).items).map(x => ({ title: str(obj(x).title), desc: str(obj(x).desc), warn: str(obj(x).warn) })),
+    } } : {}),
     // 소개글 — 없던 예전 파티는 묶음 0개
     about: {
       title: str(ab.title),

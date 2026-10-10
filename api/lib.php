@@ -633,6 +633,53 @@ function sanitizePartyAbout($ab): array {
 }
 
 /**
+ * 참가 신청 방법 (detail.apply) — 제목 40자, 단계 0~8개(제목 60·설명 500·참고 박스 300자, 제목·설명 필수).
+ * docs/specs/party-guide-edit.md 3-1. 단계 0개면 상세페이지에서 영역을 숨긴다.
+ */
+function sanitizePartyApply(array $a): array {
+    $in = is_array($a['steps'] ?? null) ? array_values($a['steps']) : [];
+    if (count($in) > 8) throw new RuntimeException('참가 신청 방법 단계는 8개까지 입력할 수 있습니다.');
+    $steps = [];
+    foreach ($in as $i => $st) {
+        $n = $i + 1;
+        if (!is_array($st)) throw new RuntimeException("참가 신청 방법 {$n}단계 형식이 올바르지 않습니다.");
+        $row = [
+            'title' => detailTextField($st, 'title', 60,  false, "참가 신청 방법 {$n}단계 제목"),
+            'desc'  => detailTextField($st, 'desc',  500, true,  "참가 신청 방법 {$n}단계 설명"),
+            'note'  => detailTextField($st, 'note',  300, true,  "참가 신청 방법 {$n}단계 참고 박스"),
+        ];
+        if ($row['title'] === '' || $row['desc'] === '') throw new RuntimeException("참가 신청 방법 {$n}단계의 제목과 설명을 입력해주세요.");
+        $steps[] = $row;
+    }
+    return ['title' => detailTextField($a, 'title', 40, false, '참가 신청 방법 제목'), 'steps' => $steps];
+}
+
+/**
+ * 필수 확인 사항 (detail.notice) — 제목 40자, 머리말 200자, 항목 0~10개(제목 60·설명 500·경고 200자, 제목·설명 필수).
+ */
+function sanitizePartyNotice(array $nt): array {
+    $in = is_array($nt['items'] ?? null) ? array_values($nt['items']) : [];
+    if (count($in) > 10) throw new RuntimeException('필수 확인 사항은 10개까지 입력할 수 있습니다.');
+    $items = [];
+    foreach ($in as $i => $it) {
+        $n = $i + 1;
+        if (!is_array($it)) throw new RuntimeException("필수 확인 사항 {$n}번 형식이 올바르지 않습니다.");
+        $row = [
+            'title' => detailTextField($it, 'title', 60,  false, "필수 확인 사항 {$n}번 제목"),
+            'desc'  => detailTextField($it, 'desc',  500, true,  "필수 확인 사항 {$n}번 설명"),
+            'warn'  => detailTextField($it, 'warn',  200, true,  "필수 확인 사항 {$n}번 경고"),
+        ];
+        if ($row['title'] === '' || $row['desc'] === '') throw new RuntimeException("필수 확인 사항 {$n}번의 제목과 설명을 입력해주세요.");
+        $items[] = $row;
+    }
+    return [
+        'title' => detailTextField($nt, 'title', 40,  false, '필수 확인 사항 제목'),
+        'intro' => detailTextField($nt, 'intro', 200, false, '필수 확인 사항 머리말'),
+        'items' => $items,
+    ];
+}
+
+/**
  * 관리자 입력 detail 정규화 + 입력 제한 검사. 알려진 필드만 남긴다.
  * 넘치거나 허용되지 않은 값이면 RuntimeException (저장 거절).
  */
@@ -642,6 +689,8 @@ function sanitizePartyDetail($d): array {
     $du   = is_array($d['durations'] ?? null) ? $d['durations'] : [];
     $imgs = is_array($d['images'] ?? null)    ? $d['images']    : [];
 
+    // numbered: 번호 형식(기본, 값 없음 = true) / false = 자유 형식(제목·문구만). docs/specs/party-guide-edit.md 4장
+    $numbered = !array_key_exists('numbered', $tl) || $tl['numbered'] !== false;
     $stepsIn = is_array($tl['steps'] ?? null) ? array_values($tl['steps']) : [];
     if (count($stepsIn) > 10) throw new RuntimeException('진행 단계는 10개까지 입력할 수 있습니다.');
     $steps = [];
@@ -654,8 +703,12 @@ function sanitizePartyDetail($d): array {
             'desc'  => detailTextField($st, 'desc',  500, true,  "단계 {$n} 설명"),
             'note'  => detailTextField($st, 'note',  200, true,  "단계 {$n} 참고 문구"),
         ];
-        if ($step['title'] === '') throw new RuntimeException("단계 {$n}의 제목을 입력해주세요.");
-        if ($step['desc'] === '')  throw new RuntimeException("단계 {$n}의 설명을 입력해주세요.");
+        if ($numbered) {
+            if ($step['title'] === '') throw new RuntimeException("단계 {$n}의 제목을 입력해주세요.");
+            if ($step['desc'] === '')  throw new RuntimeException("단계 {$n}의 설명을 입력해주세요.");
+        } elseif ($step['title'] === '' && $step['desc'] === '') {
+            throw new RuntimeException("진행 안내 {$n}번째 블록에 제목이나 문구를 입력해주세요.");
+        }
         $steps[] = $step;
     }
 
@@ -693,6 +746,11 @@ function sanitizePartyDetail($d): array {
         ],
         'images'    => $images,
     ];
+    // 자유 형식만 저장한다 — 값이 없으면 번호 형식(지금 모양). 예전 파티를 그대로 다시 저장해도 detail 이 바뀌지 않도록
+    if (!$numbered) $out['timeline']['numbered'] = false;
+    // 참가 신청 방법·필수 확인 사항 — 요청에 있을 때만 저장 (없으면 화면은 종류별 기본 문구)
+    if (is_array($d['apply'] ?? null))  $out['apply']  = sanitizePartyApply($d['apply']);
+    if (is_array($d['notice'] ?? null)) $out['notice'] = sanitizePartyNotice($d['notice']);
     // 소개글은 묶음이 있을 때만 저장한다 — 없던 예전 파티를 그대로 다시 저장해도 detail 이 바뀌지 않도록 (묶음 0개 = about 없음)
     $about = sanitizePartyAbout($d['about'] ?? null);
     if ($about['sections']) $out['about'] = $about;
