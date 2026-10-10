@@ -749,6 +749,13 @@ function sanitizePartyDetail($d): array {
     // 자유 형식만 저장한다 — 값이 없으면 번호 형식(지금 모양). 예전 파티를 그대로 다시 저장해도 detail 이 바뀌지 않도록
     if (!$numbered) $out['timeline']['numbered'] = false;
     // 참가 신청 방법·필수 확인 사항 — 요청에 있을 때만 저장 (없으면 화면은 종류별 기본 문구)
+    // 신청 전 꼭 확인해주세요 — 요청에 있을 때만 저장 (없으면 종류별 기본 문구). 본문의 **글자** 만 굵게, 나머지는 글자 그대로
+    if (is_array($d['beforeApply'] ?? null)) {
+        $out['beforeApply'] = [
+            'title' => detailTextField($d['beforeApply'], 'title', 40,  false, '신청 전 확인 박스 제목'),
+            'body'  => detailTextField($d['beforeApply'], 'body',  500, true,  '신청 전 확인 박스 본문'),
+        ];
+    }
     if (is_array($d['apply'] ?? null))  $out['apply']  = sanitizePartyApply($d['apply']);
     if (is_array($d['notice'] ?? null)) $out['notice'] = sanitizePartyNotice($d['notice']);
     // 소개글은 묶음이 있을 때만 저장한다 — 없던 예전 파티를 그대로 다시 저장해도 detail 이 바뀌지 않도록 (묶음 0개 = about 없음)

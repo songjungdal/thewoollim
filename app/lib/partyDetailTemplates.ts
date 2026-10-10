@@ -7,7 +7,7 @@
  * - 입력 제한·사진 주소 규칙은 서버(api/lib.php sanitizePartyDetail)에서도 같은 값으로 강제한다.
  */
 import type { PartyType } from "./data";
-import { PARTY_GUIDES, visibleNotices } from "./partyGuides";
+import { PARTY_GUIDES, visibleNotices, guideTextToMarkup } from "./partyGuides";
 
 export type PartyDetailImage = { url: string; alt: string };
 export type PartyDetailStep = { title: string; time: string; desc: string; note: string };
@@ -21,6 +21,9 @@ export type PartyNoticeItem = { title: string; desc: string; warn: string };
 export type PartyApply = { title: string; steps: PartyApplyStep[] };
 export type PartyNotice = { title: string; intro: string; items: PartyNoticeItem[] };
 export const DEFAULT_APPLY_TITLE = "참가 신청 방법";
+/** 신청 전 꼭 확인해주세요 박스 (docs/specs/party-box-sms.md 1-1). body 의 **글자** 만 굵게 */
+export type PartyBeforeApply = { title: string; body: string };
+export const DEFAULT_BEFORE_APPLY_TITLE = "신청 전 꼭 확인해주세요.";
 export const DEFAULT_NOTICE_TITLE = "필수 확인 사항";
 
 export const DETAIL_IMAGE_SLOTS = ["beforeApply", "afterApply", "beforeTimeline", "beforeNotice", "afterNotice"] as const;
@@ -38,6 +41,7 @@ export type PartyDetail = {
   durations: { title: string; rows: PartyDetailDurationRow[] };
   images: Record<DetailImageSlot, PartyDetailImage[]>;
   about: { title: string; sections: PartyAboutSection[] };   // 묶음 0개면 상세페이지에 영역 자체가 없다
+  beforeApply?: PartyBeforeApply;   // 저장된 경우만 — 본문이 비면 박스 숨김
   apply?: PartyApply;     // 저장된 경우만 — 단계 0개면 영역 숨김
   notice?: PartyNotice;   // 저장된 경우만 — 항목 0개면 영역 숨김
 };
@@ -62,6 +66,8 @@ export const DETAIL_LIMITS = {
   aboutHeading: 40,
   aboutBody: 2000,
   aboutImages: 10,
+  beforeApplyTitle: 40,
+  beforeApplyBody: 500,
   applyTitle: 40,
   applySteps: 8,
   applyStepTitle: 60,
@@ -147,6 +153,11 @@ export const SOLO_TEMPLATE: PartyDetail = {
   about: { title: DEFAULT_ABOUT_TITLE, sections: [] },
 };
 
+/** 신청 전 확인 박스 기본 문구 — 고정 문구의 굵은 글씨를 **…** 로 옮긴 것 */
+export function defaultBeforeApply(type: PartyType): PartyBeforeApply {
+  return { title: DEFAULT_BEFORE_APPLY_TITLE, body: guideTextToMarkup(PARTY_GUIDES[type].beforeApply) };
+}
+
 /** 참가 신청 방법 기본 문구 — 지금 고정 문구(partyGuides.ts) 그대로 */
 export function defaultApply(type: PartyType): PartyApply {
   return { title: DEFAULT_APPLY_TITLE, steps: PARTY_GUIDES[type].steps.map(s => ({ title: s.title, desc: s.desc, note: s.note ?? "" })) };
@@ -160,12 +171,12 @@ export function defaultNotice(type: PartyType, hasSessions: boolean): PartyNotic
 
 /** 종류별 기본 내용 (편집기에서 고칠 수 있도록 매번 새 복사본). 참가 신청 방법·필수 확인 사항 기본 문구 포함 */
 export function templateFor(type: PartyType, hasSessions = false): PartyDetail {
-  return { ...cloneDetail(type === "solo" ? SOLO_TEMPLATE : MATCHING_TEMPLATE), apply: defaultApply(type), notice: defaultNotice(type, hasSessions) };
+  return { ...cloneDetail(type === "solo" ? SOLO_TEMPLATE : MATCHING_TEMPLATE), beforeApply: defaultBeforeApply(type), apply: defaultApply(type), notice: defaultNotice(type, hasSessions) };
 }
 
 /** 편집기에 채울 값 — 저장된 안내에 참가 신청 방법·필수 확인 사항이 없으면 기본 문구로 채운다 (화면은 이미 기본 문구로 보이고 있으므로) */
 export function withGuideDefaults(d: PartyDetail, type: PartyType, hasSessions: boolean): PartyDetail {
-  return { ...d, apply: d.apply ?? defaultApply(type), notice: d.notice ?? defaultNotice(type, hasSessions) };
+  return { ...d, beforeApply: d.beforeApply ?? defaultBeforeApply(type), apply: d.apply ?? defaultApply(type), notice: d.notice ?? defaultNotice(type, hasSessions) };
 }
 
 /**
@@ -176,6 +187,7 @@ export function compactDetailForSave(d: PartyDetail, type: PartyType): PartyDeta
   const out: PartyDetail = cloneDetail(d);
   if (out.timeline.numbered !== false) delete out.timeline.numbered;
   const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+  if (out.beforeApply && same(out.beforeApply, defaultBeforeApply(type))) delete out.beforeApply;
   if (out.apply && same(out.apply, defaultApply(type))) delete out.apply;
   // 필수 확인 사항은 회차 항목 포함/미포함 기본 문구 둘 다 "기본 문구"로 본다 — 빠지면 화면이 참가 구성 여부에 맞춰 기본 문구를 고른다
   if (out.notice && (same(out.notice, defaultNotice(type, true)) || same(out.notice, defaultNotice(type, false)))) delete out.notice;
@@ -219,7 +231,10 @@ export function normalizeDetail(raw: unknown): PartyDetail | null {
       rows: arr(du.rows).map(x => ({ label: str(obj(x).label), total: str(obj(x).total) })),
     },
     images,
-    // 참가 신청 방법·필수 확인 사항 — 저장된 경우만
+    // 신청 전 확인 박스·참가 신청 방법·필수 확인 사항 — 저장된 경우만
+    ...(r.beforeApply && typeof r.beforeApply === "object" ? { beforeApply: {
+      title: str(obj(r.beforeApply).title), body: str(obj(r.beforeApply).body),
+    } } : {}),
     ...(r.apply && typeof r.apply === "object" ? { apply: {
       title: str(obj(r.apply).title),
       steps: arr(obj(r.apply).steps).map(x => ({ title: str(obj(x).title), desc: str(obj(x).desc), note: str(obj(x).note) })),

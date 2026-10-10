@@ -148,3 +148,22 @@ export const PARTY_GUIDES: Record<PartyType, PartyGuide> = {
 export function visibleNotices(guide: PartyGuide, hasSessions: boolean): GuideNotice[] {
   return guide.notices.filter(n => !n.onlyWithSessions || hasSessions);
 }
+
+/** 신청 전 확인 박스 본문을 편집용 글자로 — 굵은 구간을 **…** 로 감싼다 (docs/specs/party-box-sms.md 1-1) */
+export function guideTextToMarkup(t: GuideText): string {
+  return t.map(seg => (seg.strong ? `**${seg.text}**` : seg.text)).join("");
+}
+
+/** 편집용 글자 → 굵게/보통 구간. **…** 로 감싼 부분만 굵게, 그 밖의 기호는 글자 그대로 */
+export function markupToGuideText(body: string): GuideText {
+  const out: GuideText = [];
+  const re = /\*\*([\s\S]+?)\*\*/g;
+  let last = 0;
+  for (let m = re.exec(body); m; m = re.exec(body)) {
+    if (m.index > last) out.push({ text: body.slice(last, m.index) });
+    out.push({ text: m[1], strong: true });
+    last = m.index + m[0].length;
+  }
+  if (last < body.length) out.push({ text: body.slice(last) });
+  return out;
+}

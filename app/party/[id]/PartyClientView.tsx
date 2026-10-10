@@ -9,8 +9,8 @@ import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import { partyStockStatus, withLiveCounts, dateOnly, partyHasOptions, partyTypeOf, PARTY_TYPE_LABELS, PARTIES as SEED_PARTIES, type PartyType } from "../../lib/data";
 import PartyOptionPicker, { optionClosedFor } from "./PartyOptionPicker";
-import { PARTY_GUIDES, visibleNotices } from "../../lib/partyGuides";
-import { templateFor, normalizeDetail, DEFAULT_ABOUT_TITLE, DEFAULT_APPLY_TITLE, DEFAULT_NOTICE_TITLE, type PartyDetail, type PartyDetailImage, type DetailImageSlot } from "../../lib/partyDetailTemplates";
+import { PARTY_GUIDES, visibleNotices, markupToGuideText } from "../../lib/partyGuides";
+import { templateFor, normalizeDetail, DEFAULT_ABOUT_TITLE, DEFAULT_APPLY_TITLE, DEFAULT_NOTICE_TITLE, DEFAULT_BEFORE_APPLY_TITLE, type PartyDetail, type PartyDetailImage, type DetailImageSlot } from "../../lib/partyDetailTemplates";
 import { useAuth } from "../../context/AuthContext";
 import { useParties } from "../../lib/useParties";
 import { checkEligibility, eligibilitySummary, calculateAge } from "../../lib/eligibility";
@@ -275,6 +275,12 @@ export default function PartyClientView({ id }: { id: string }) {
     : savedDetail?.notice
       ? { title: savedDetail.notice.title.trim() || DEFAULT_NOTICE_TITLE, intro: savedDetail.notice.intro, items: savedDetail.notice.items.map(n => ({ ...n, warn: n.warn || null })) }
       : { title: DEFAULT_NOTICE_TITLE, intro: guide.noticeIntro, items: visibleNotices(guide, partyHasOptions(detailItem)) };
+  // 신청 전 꼭 확인해주세요 — 저장된 내용(detail.beforeApply)이 있으면 그것(**글자** 만 굵게), 없으면 종류별 기본 문구.
+  //   저장된 내용이 있을 수 있으므로 상세 안내 응답 뒤에 그린다. 본문이 비면 숨김. docs/specs/party-box-sms.md 1장
+  const beforeApplyView = !detailReady || !guide ? null
+    : savedDetail?.beforeApply
+      ? { title: savedDetail.beforeApply.title.trim() || DEFAULT_BEFORE_APPLY_TITLE, segs: markupToGuideText(savedDetail.beforeApply.body.trim()) }
+      : { title: DEFAULT_BEFORE_APPLY_TITLE, segs: guide.beforeApply };
   // 진행 안내 형식 — numbered 가 없으면 번호 형식(지금 모양)
   const timelineNumbered = shownDetail?.timeline.numbered !== false;
   const renderDetailImage = (img: PartyDetailImage, i: number) => (
@@ -558,13 +564,13 @@ export default function PartyClientView({ id }: { id: string }) {
             </div>
 
             {/* 신청 전 꼭 확인해주세요 — 파티 종류별 문구 (app/lib/partyGuides.ts) */}
-            {guide && (
+            {beforeApplyView && beforeApplyView.segs.length > 0 && (
             <div className="bg-white p-3.5 rounded-xl border border-gray-200 mb-3" data-testid="guide-before-apply">
               <h4 className="font-bold mb-1.5 flex items-center gap-1.5 text-xs md:text-sm">
-                <Heart size={14} className="text-brand-point-ink" /> 신청 전 꼭 확인해주세요.
+                <Heart size={14} className="text-brand-point-ink" /> {beforeApplyView.title}
               </h4>
-              <p className="text-[13px] md:text-xs text-gray-500 leading-relaxed break-keep">
-                {guide.beforeApply.map((seg, i) => seg.strong
+              <p className="text-[13px] md:text-xs text-gray-500 leading-relaxed break-keep whitespace-pre-line">
+                {beforeApplyView.segs.map((seg, i) => seg.strong
                   ? <strong key={i} className="font-bold text-brand-black">{seg.text}</strong>
                   : <span key={i}>{seg.text}</span>)}
               </p>
