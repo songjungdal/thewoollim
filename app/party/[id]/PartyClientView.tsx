@@ -10,7 +10,7 @@ import Footer from "../../components/Footer";
 import { partyStockStatus, withLiveCounts, dateOnly, partyHasOptions, partyTypeOf, PARTY_TYPE_LABELS, PARTIES as SEED_PARTIES, type PartyType } from "../../lib/data";
 import PartyOptionPicker, { optionClosedFor } from "./PartyOptionPicker";
 import { PARTY_GUIDES, visibleNotices } from "../../lib/partyGuides";
-import { templateFor, normalizeDetail, DEFAULT_ABOUT_TITLE, type PartyDetail, type PartyDetailImage, type DetailImageSlot } from "../../lib/partyDetailTemplates";
+import { templateFor, normalizeDetail, DEFAULT_ABOUT_TITLE, DEFAULT_APPLY_TITLE, DEFAULT_NOTICE_TITLE, type PartyDetail, type PartyDetailImage, type DetailImageSlot } from "../../lib/partyDetailTemplates";
 import { useAuth } from "../../context/AuthContext";
 import { useParties } from "../../lib/useParties";
 import { checkEligibility, eligibilitySummary, calculateAge } from "../../lib/eligibility";
@@ -264,6 +264,19 @@ export default function PartyClientView({ id }: { id: string }) {
   //   (솔로파티에 매칭파티 문구가 잠깐 비치지 않도록). 상세 안내 응답이나 실시간 파티 목록 중 먼저 온 쪽으로 확인한다
   //   (빌드 시점 샘플 목록만 있을 때는 종류를 믿지 않는다). app/lib/partyGuides.ts
   const guide = detailReady || partiesLoaded ? PARTY_GUIDES[partyType] : null;
+  // 참가 신청 방법·필수 확인 사항 — 파티에 저장된 내용(detail.apply / notice)이 있으면 그것, 없으면 종류별 기본 문구.
+  //   저장된 내용이 있을 수 있으므로 상세 안내 응답 뒤에 그린다 (기본 문구가 비쳤다가 바뀌지 않도록). docs/specs/party-guide-edit.md 3장
+  const savedDetail = detailReady && detailRes ? detailRes.detail : null;
+  const applyView = !detailReady || !guide ? null
+    : savedDetail?.apply
+      ? { title: savedDetail.apply.title.trim() || DEFAULT_APPLY_TITLE, steps: savedDetail.apply.steps.map(s => ({ ...s, note: s.note || null })) }
+      : { title: DEFAULT_APPLY_TITLE, steps: guide.steps };
+  const noticeView = !detailReady || !guide ? null
+    : savedDetail?.notice
+      ? { title: savedDetail.notice.title.trim() || DEFAULT_NOTICE_TITLE, intro: savedDetail.notice.intro, items: savedDetail.notice.items.map(n => ({ ...n, warn: n.warn || null })) }
+      : { title: DEFAULT_NOTICE_TITLE, intro: guide.noticeIntro, items: visibleNotices(guide, partyHasOptions(detailItem)) };
+  // 진행 안내 형식 — numbered 가 없으면 번호 형식(지금 모양)
+  const timelineNumbered = shownDetail?.timeline.numbered !== false;
   const renderDetailImage = (img: PartyDetailImage, i: number) => (
     // eslint-disable-next-line @next/next/no-img-element
     <img key={`${img.url}-${i}`} src={img.url} alt={img.alt} className="block w-full h-auto object-contain" />
@@ -801,28 +814,28 @@ export default function PartyClientView({ id }: { id: string }) {
           {renderWrappedSlot("beforeApply", "mb-7 md:mb-10")}
 
           {/* HOW TO JOIN — Timeline-styled Application Guide (파티 종류별 단계, app/lib/partyGuides.ts) */}
-          {guide && (
+          {applyView && applyView.steps.length > 0 && (
           <div className="mb-10 md:mb-24" data-testid="guide-steps">
             <div className="max-w-4xl mx-auto">
               <div className="bg-white p-6 md:p-20 rounded-2xl md:rounded-[3rem] shadow-sm border border-gray-100">
                 <div className="flex items-center gap-3 md:gap-4 mb-7 md:mb-12">
                   <ClipboardList size={26} className="text-brand-point-ink md:hidden" />
                   <ClipboardList size={32} className="text-brand-point-ink hidden md:block" />
-                  <h3 className="text-xl md:text-3xl font-bold tracking-tight">참가 신청 방법</h3>
+                  <h3 className="text-xl md:text-3xl font-bold tracking-tight">{applyView.title}</h3>
                 </div>
 
                 <div className="space-y-7 md:space-y-12 relative before:absolute before:left-3.5 md:before:left-4 before:top-2 before:bottom-2 before:w-px before:bg-gray-100">
-                  {guide.steps.map((item, idx) => (
+                  {applyView.steps.map((item, idx) => (
                     <div key={idx} className="relative pl-12 md:pl-14">
                       <div className="absolute left-0 top-0 w-7 h-7 md:w-8 md:h-8 bg-brand-point text-black rounded-full border-4 border-white shadow-md flex items-center justify-center font-black text-xs md:text-sm">
                         {idx + 1}
                       </div>
                       <div className="text-brand-point-ink font-black text-xs md:text-sm tracking-[0.15em] mb-1 md:mb-1.5">STEP {idx + 1}</div>
                       <div className="font-bold text-base md:text-xl mb-1.5 md:mb-2 text-brand-black leading-snug">{item.title}</div>
-                      <div className="text-gray-600 font-medium text-sm md:text-base leading-relaxed">{item.desc}</div>
+                      <div className="text-gray-600 font-medium text-sm md:text-base leading-relaxed whitespace-pre-line">{item.desc}</div>
                       {item.note && (
                         <div className="mt-2.5 md:mt-3 bg-brand-point/5 border-l-2 border-brand-point/40 pl-3 md:pl-4 py-2 md:py-2.5 rounded-r-lg">
-                          <p className="text-[13px] md:text-sm text-gray-600 leading-relaxed">{item.note}</p>
+                          <p className="text-[13px] md:text-sm text-gray-600 leading-relaxed whitespace-pre-line">{item.note}</p>
                         </div>
                       )}
                     </div>
@@ -864,9 +877,9 @@ export default function PartyClientView({ id }: { id: string }) {
                     </p>
                   )}
 
-                  {/* STEP 카드 — 번호(01, 02…)는 순서대로 자동 */}
+                  {/* STEP 카드 — 번호(01, 02…)는 순서대로 자동. 자유 형식(numbered=false)은 제목·문구만 (번호·STEP·소요 시간·참고 문구 없음) */}
                   <div className="space-y-5 md:space-y-7">
-                    {shownDetail.timeline.steps.map((item, idx) => (
+                    {shownDetail.timeline.steps.map((item, idx) => timelineNumbered ? (
                       <div
                         key={idx}
                         className="relative pl-12 md:pl-16 pb-5 md:pb-7 border-b border-gray-100 last:border-b-0 last:pb-0"
@@ -894,6 +907,19 @@ export default function PartyClientView({ id }: { id: string }) {
                         {item.note && (
                           <p className="mt-2.5 md:mt-3 text-[13px] md:text-xs text-gray-500 italic bg-brand-point/5 border-l-2 border-brand-point/40 pl-3 py-2 rounded-r-md leading-relaxed whitespace-pre-line">
                             &ldquo;{item.note}&rdquo;
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div key={idx} className="pb-5 md:pb-7 border-b border-gray-100 last:border-b-0 last:pb-0" data-testid="timeline-free-block">
+                        {item.title && (
+                          <div className="font-bold text-base md:text-xl mb-2 md:mb-2.5 text-brand-black leading-snug">
+                            {item.title}
+                          </div>
+                        )}
+                        {item.desc && (
+                          <p className="text-sm md:text-base text-gray-600 leading-relaxed break-keep whitespace-pre-line">
+                            {item.desc}
                           </p>
                         )}
                       </div>
@@ -930,28 +956,30 @@ export default function PartyClientView({ id }: { id: string }) {
                 {shownDetail?.images.beforeNotice.map(renderDetailImage)}
 
                 {/* ── 필수 확인 사항 — Final CTA 직전, 참가 신청 방법/Party Timeline 과 동일 톤 (파티 종류별 문구) ── */}
-                {guide && (
+                {noticeView && noticeView.items.length > 0 && (
                 <div className="bg-white p-6 md:p-20 rounded-2xl md:rounded-[3rem] shadow-sm border border-gray-100" data-testid="guide-notices">
                   <div className="flex items-center gap-3 md:gap-4 mb-3 md:mb-4">
                     <ShieldCheck size={26} className="text-brand-point-ink md:hidden" />
                     <ShieldCheck size={32} className="text-brand-point-ink hidden md:block" />
-                    <h3 className="text-xl md:text-3xl font-bold tracking-tight">필수 확인 사항</h3>
+                    <h3 className="text-xl md:text-3xl font-bold tracking-tight">{noticeView.title}</h3>
                   </div>
+                  {noticeView.intro && (
                   <p className="text-sm md:text-base text-gray-500 font-medium mb-7 md:mb-12 leading-relaxed">
-                    {guide.noticeIntro}
+                    {noticeView.intro}
                   </p>
+                  )}
 
                   <div className="space-y-7 md:space-y-12 relative before:absolute before:left-3.5 md:before:left-4 before:top-2 before:bottom-2 before:w-px before:bg-gray-100">
-                    {visibleNotices(guide, partyHasOptions(detailItem)).map((item, idx) => (
+                    {noticeView.items.map((item, idx) => (
                       <div key={idx} className="relative pl-12 md:pl-14">
                         <div className="absolute left-0 top-0 w-7 h-7 md:w-8 md:h-8 bg-brand-point text-black rounded-full border-4 border-white shadow-md flex items-center justify-center font-black text-xs md:text-sm">
                           {idx + 1}
                         </div>
                         <div className="font-bold text-base md:text-xl mb-1.5 md:mb-2 text-brand-black leading-snug">{item.title}</div>
-                        <div className="text-gray-600 font-medium text-sm md:text-base leading-relaxed break-keep">{item.desc}</div>
+                        <div className="text-gray-600 font-medium text-sm md:text-base leading-relaxed break-keep whitespace-pre-line">{item.desc}</div>
                         {item.warn && (
                           <div className="mt-2.5 md:mt-3 bg-red-50 border-l-2 border-red-400/60 pl-3 md:pl-4 py-2 md:py-2.5 rounded-r-lg">
-                            <p className="text-[13px] md:text-sm text-red-700 font-bold leading-relaxed break-keep">⚠ {item.warn}</p>
+                            <p className="text-[13px] md:text-sm text-red-700 font-bold leading-relaxed break-keep whitespace-pre-line">⚠ {item.warn}</p>
                           </div>
                         )}
                       </div>
