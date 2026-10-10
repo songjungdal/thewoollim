@@ -9,11 +9,11 @@ import { formatPhoneKR } from "../../lib/phone";
 import { calculateRefund } from "../../lib/refund";
 import { formatKST } from "../../lib/datetime";
 import { partyVisibility, partyTypeOf, PARTY_TYPES, PARTY_TYPE_LABELS, type Party, type PartyType } from "../../lib/data";
-import { templateFor, normalizeDetail, type PartyDetail } from "../../lib/partyDetailTemplates";
+import { templateFor, normalizeDetail, withGuideDefaults, compactDetailForSave, defaultNotice, type PartyDetail } from "../../lib/partyDetailTemplates";
 import PartyDetailEditor, { validateDetail, type DetailSourceParty } from "./PartyDetailEditor";
 import PartyOptionsEditor from "./PartyOptionsEditor";
 import {
-  EMPTY_OPTIONS_DRAFT, draftFromParty, draftToPayload, validateOptionsDraft, optionsMinPrice, normalizeSessions, normalizeOptions,
+  EMPTY_OPTIONS_DRAFT, draftFromParty, draftToPayload, validateOptionsDraft, duplicateOptionSessions, optionsMinPrice, normalizeSessions, normalizeOptions,
   type OptionsDraft, type OptionApplicants, type PartySession, type PartyOption,
 } from "../../lib/partyOptions";
 
@@ -550,15 +550,17 @@ export default function AdminDashboard() {
     }
     // 매칭파티는 단일 가격만. 신규 솔로파티는 참가 구성 사용을 기본으로 (기존 파티는 저장된 방식 유지)
     setPartyForm(p => ({ ...p, partyType: t, ...(t === "matching" ? { optionMode: "single" as const } : partyEditMode === "create" ? { optionMode: "options" as const } : {}) }));
+    // 기본 문구(필수 확인 사항의 회차 항목)용 — 바뀐 종류 기준 참가 구성 사용 여부
+    const hs = t === "solo" && (partyEditMode === "create" || partyForm.optionMode === "options");
     setPartyFormDirty(true);
     if (!partyDetail) {
       // 신규 등록에서 종류를 처음 고르면 그 종류의 기본 내용으로 채운다
-      setPartyDetail(templateFor(t)); setDetailTouched(false);
+      setPartyDetail(templateFor(t, hs)); setDetailTouched(false);
     } else if (detailTouched || (partyEditMode === "edit" && !detailUsingDefault)) {
       // 고친 내용(또는 이 파티 전용으로 저장된 내용)이 있으면 바꿀지 묻는다
       setTypeSwitchPrompt(t);
     } else {
-      setPartyDetail(templateFor(t)); setDetailTouched(false);
+      setPartyDetail(templateFor(t, hs)); setDetailTouched(false);
     }
   };
 
@@ -575,6 +577,10 @@ export default function AdminDashboard() {
     }
     setPartyForm(p => ({ ...p, optionMode: m }));
     setPartyFormDirty(true);
+    // 필수 확인 사항이 기본 문구 그대로면 회차 항목("신청한 회차 시간 지키기")을 참가 구성 사용 여부에 맞춘다
+    const t = partyForm.partyType || "matching";
+    setPartyDetail(prev => prev && JSON.stringify(prev.notice) === JSON.stringify(defaultNotice(t, m !== "options"))
+      ? { ...prev, notice: defaultNotice(t, m === "options") } : prev);
   };
 
   const openPartyCreate = () => { setPartyForm(EMPTY_PARTY); resetPartyModal(); setPartyEditMode("create"); setPartyFormDirty(false); };
@@ -616,7 +622,9 @@ export default function AdminDashboard() {
       optionsDraft: row?.options?.length ? draftFromParty(row.sessions, row.options) : EMPTY_OPTIONS_DRAFT,
     });
     resetPartyModal();
-    setPartyDetail(row?.detail ?? templateFor(type));
+    // 저장된 안내에 참가 신청 방법·필수 확인 사항이 없으면 기본 문구로 채워 보여준다 (저장 때 기본 문구와 같으면 다시 빠진다)
+    const hs = type === "solo" && !!row?.options?.length;
+    setPartyDetail(row?.detail ? withGuideDefaults(row.detail, type, hs) : templateFor(type, hs));
     setDetailUsingDefault(!row?.detail);
     setPartyEditMode("edit");
     setPartyFormDirty(false);
@@ -677,12 +685,20 @@ export default function AdminDashboard() {
       alert(`모든 항목을 입력해야 등록이 가능합니다.\n[${missing.join(", ")}]을 확인해주세요.`);
       return;
     }
-    const detail = partyDetail ?? templateFor(f.partyType || "matching");
-    const detailErrors = validateDetail(detail);
+    const detailType = f.partyType || "matching";
+    const detailFull = partyDetail ?? templateFor(detailType, useOptions);
+    const detailErrors = validateDetail(detailFull);
     if (detailErrors.length > 0) {
       setPartyModalTab("detail");
       alert(`상세페이지 안내에서 다음 항목을 입력해주세요.\n[${detailErrors.join(", ")}]`);
       return;
+    }
+    // 기본 문구 그대로인 참가 신청 방법·필수 확인 사항과 번호 형식(기본)은 저장하지 않는다 — 편집하지 않은 파티는 그대로 보이도록
+    const detail = compactDetailForSave(detailFull, detailType);
+    // 참가 항목 설정 실수 경고 — 포함 회차가 같은 항목 (서버는 막지 않음, docs/specs/party-guide-edit.md 5장)
+    if (useOptions) {
+      const dups = duplicateOptionSessions(f.optionsDraft);
+      if (dups.length > 0 && !confirm(dups.map(d => `「${d.a}」과 「${d.b}」의 포함 회차가 같습니다(${d.sessions}).`).join("\n") + " 그대로 저장할까요?")) return;
     }
     const action = partyEditMode === "create" ? "create" : "update";
     try {
@@ -1953,6 +1969,7 @@ export default function AdminDashboard() {
                             value={partyDetail}
                             onChange={updatePartyDetail}
                             partyType={partyForm.partyType}
+                            hasSessions={partyForm.partyType === "solo" && partyForm.optionMode === "options"}
                             usingDefault={partyEditMode === "edit" && detailUsingDefault}
                             currentId={partyForm.id}
                             sources={[...PARTIES]
@@ -2226,7 +2243,7 @@ export default function AdminDashboard() {
                           <button type="button" onClick={() => setTypeSwitchPrompt(null)}
                             className="px-4 py-2.5 rounded-lg text-sm font-bold border border-gray-200 hover:bg-gray-50">지금 내용 유지</button>
                           <button type="button" onClick={() => {
-                              setPartyDetail(templateFor(typeSwitchPrompt)); setDetailTouched(false);
+                              setPartyDetail(templateFor(typeSwitchPrompt, typeSwitchPrompt === "solo" && (partyEditMode === "create" || partyForm.optionMode === "options"))); setDetailTouched(false);
                               setPartyFormDirty(true); setTypeSwitchPrompt(null);
                             }}
                             className="px-4 py-2.5 rounded-lg text-sm font-black bg-brand-black text-white hover:bg-brand-point hover:text-black">바꾸기</button>
