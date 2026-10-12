@@ -39,11 +39,7 @@ function _s2hLog(string $status, string $detail): void {
 
 /** 발송 제외 대상(테스트/관리자) — 기존 SMS 배치와 동일 규칙 */
 function _s2hIsTestAccount(string $email, string $role): bool {
-    $email = strtolower(trim($email));
-    if ($role === 'admin') return true;
-    if (str_ends_with($email, '@woollim.local')) return true;
-    if (preg_match('/^[ab](?:[1-9]|10)@naver\.com$/', $email)) return true;
-    return false;
+    return isSmsExcludedAccount($email, $role);   // 관리자·테스트 회원 (api/lib.php)
 }
 
 /** calendarDate('2026-10-04') + 'HH:MM' → 시작 시각 (KST). 정보 부족 시 null */

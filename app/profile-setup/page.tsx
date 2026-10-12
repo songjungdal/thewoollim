@@ -107,7 +107,7 @@ function ProfileSetupContent() {
         parseLocation(merged.location);
         setAgreed(true);
         // 저장된 값이 있는 본인인증 필드만 lock 대상으로 등록 (최초 입력은 허용)
-        // 테스트 회원(a1~a10, b1~b10@naver.com)은 잠금 우회 — 자유 수정 허용
+        // 테스트 회원(a1~a20, b1~b20@naver.com — lib/testUsers.ts)은 잠금 우회 — 자유 수정 허용
         const locked = new Set<keyof Profile>();
         if (!testUser) {
           if (profile.name?.trim())                                                locked.add("name");

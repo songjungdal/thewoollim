@@ -75,15 +75,39 @@ function normalizeEmail(string $email): string {
     return strtolower(trim($email));
 }
 
+/** 테스트 회원 번호 상한 — a1~a{N}(남성), b1~b{N}(여성). 범위를 바꿀 때는 이 값과 app/lib/testUsers.ts 만 고친다. */
+const TEST_USER_MAX = 20;
+
 /**
  * 테스트 회원 식별.
- *  패턴: a1@naver.com ~ a10@naver.com / b1@naver.com ~ b10@naver.com
+ *  패턴: a1@naver.com ~ a20@naver.com / b1@naver.com ~ b20@naver.com (번호 앞 0 은 인정하지 않음)
  *  → 프로필 핵심 5종 잠금 해제 (관리자 권한 부여 — 테스트 편의)
+ *  → 모든 알림 문자 발송 제외 (isSmsExcludedAccount), 임시 비밀번호 문자 대상 제외
  *  클라이언트 동일 로직: app/lib/testUsers.ts
  */
 function isTestUser(string $email): bool {
     $e = normalizeEmail($email);
-    return (bool)preg_match('/^(a|b)([1-9]|10)@naver\.com$/', $e);
+    if (!preg_match('/^[ab]([1-9]\d*)@naver\.com$/', $e, $m)) return false;
+    return (int)$m[1] <= TEST_USER_MAX;
+}
+
+/** 테스트 회원 이메일 전체 목록 — a1~a{N}, b1~b{N} 순서 */
+function testUserEmails(): array {
+    $out = [];
+    foreach (['a', 'b'] as $p) {
+        for ($i = 1; $i <= TEST_USER_MAX; $i++) $out[] = "{$p}{$i}@naver.com";
+    }
+    return $out;
+}
+
+/**
+ * 알림 문자 발송 제외 대상 — 관리자 role, 관리자 도메인(@woollim.local), 테스트 회원.
+ *  신청 접수·참가 확정·취소·프로필 안내 문자와 cron(D-1·2시간 전·프로필 24시간) 이 모두 이 규칙을 쓴다.
+ */
+function isSmsExcludedAccount(string $email, string $role): bool {
+    if ($role === 'admin') return true;
+    if (str_ends_with(normalizeEmail($email), '@woollim.local')) return true;
+    return isTestUser($email);
 }
 
 // ─── 회원·참가자 표시 헬퍼 ─────────────────────────────────────────
