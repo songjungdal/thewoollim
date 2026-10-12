@@ -483,10 +483,11 @@ function ImageSide({ view, value, onChange, analyses, onUploaded, optional }: {
           <input type="file" accept="image/webp,image/jpeg,image/png" className="hidden" disabled={busy}
             onChange={e => { pickFile(e.target.files?.[0]); e.target.value = ""; }} />
         </label>
-        {img && (
-          <button type="button" onClick={() => onChange({ [key("image")]: optional ? null : HERO_DEFAULT_IMAGE } as Partial<ImageSet>)}
+        {/* 파티 전용 이미지만 비울 수 있다 (비우면 파티 대표 이미지 사용). 브랜드 이미지는 [이미지 바꾸기]로만 교체 */}
+        {img && optional && (
+          <button type="button" onClick={() => onChange({ [key("image")]: null } as Partial<ImageSet>)}
             className="px-3 py-2 rounded-lg text-xs font-bold border border-gray-200 hover:bg-gray-50">
-            {optional ? "비우기" : "기본 이미지로"}
+            비우기
           </button>
         )}
       </div>
