@@ -707,7 +707,7 @@ export default function SmoothOnePage() {
                   // 실시간 결제완료 인원만 노출 — 카운트 없으면 0으로 강제 (시드/테스트 데이터 무시)
                   // 모집 마감은 partyStockStatus 결과 (참가 구성 파티는 모든 항목이 마감일 때, 명세 8-3)
                   const stock = partyStockStatus(withLiveCounts(card, partyCounts[card.id]));
-                  // 행사 일시 경과 → 모집 종료 카드 UI (배너 흐리게, [모집 종료된 파티] 버튼은 누를 수 없음)
+                  // 행사 일시 경과 → 모집 종료 카드 UI (배너 흐리게, [모집 종료된 파티] 표시). 카드는 다른 카드처럼 상세페이지로 이동
                   const isEnded = now ? partyVisibility(card, now) === "ended" : false;
                   // 모집 중 = 종료 전이고 마감 아님 — D-day 배지·솔로파티 사이키 테두리는 이때만
                   const recruiting = !isEnded && !stock.allFull;
@@ -725,19 +725,21 @@ export default function SmoothOnePage() {
                     transition={{ duration: 0.35, type: "spring", stiffness: 300, damping: 28 }}
                     className="h-full"
                   >
-                    {/* 카드 — 배경은 투명(솔로파티 사이키 글로우가 카드 뒤에 깔림), 배너·본문에 각각 배경.
-                         hover 들어올림은 md 이상만(모바일 없음). motion.div 가 transform 을 쓰므로 안쪽 요소에 준다 */}
-                    <div
-                      className={`h-full flex flex-col rounded-2xl md:rounded-[20px] border border-[#E6E8EC] shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-[transform,box-shadow] duration-[250ms] md:hover:-translate-y-1 md:hover:shadow-[0_10px_24px_rgba(0,0,0,0.08)] ${
-                        psyche ? "card--psyche" : ""
-                      }`}
+                    {/* 카드 전체가 상세페이지 링크(모집 중·마감·종료 모두 같은 URL). 배경은 투명(솔로파티 사이키 글로우가 카드 뒤에 깔림), 배너·본문에 각각 배경.
+                         hover·키보드 포커스: 들어올림은 md 이상만, 청록 강조는 모집 종료 카드 제외 — 전환 시간은 globals.css .party-card.
+                         motion.div 가 transform 을 쓰므로 안쪽 요소에 준다 */}
+                    <Link
+                      href={`/party/${card.id}`}
+                      className={`party-card group h-full flex flex-col rounded-2xl md:rounded-[20px] border border-[#E6E8EC] shadow-[0_2px_8px_rgba(0,0,0,0.04)] md:hover:-translate-y-1 md:hover:shadow-[0_10px_24px_rgba(0,0,0,0.08)] md:focus-visible:-translate-y-1 md:focus-visible:shadow-[0_10px_24px_rgba(0,0,0,0.08)] ${
+                        isEnded ? "" : "hover:border-brand-point focus-visible:border-brand-point"
+                      } ${psyche ? "card--psyche" : ""}`}
                     >
                       {/* 배너 9:2 — 관리자 "대표 이미지"(imageUrl), 없으면 공통 기본 배너. 배너에만 overflow-hidden + 상단 radius */}
                       <div className="relative aspect-[9/2] overflow-hidden rounded-t-[15px] md:rounded-t-[19px] bg-[#F4F5F7]">
                         <img
                           src={card.imageUrl || "/images/party_card_default_banner.jpg"}
                           alt=""
-                          className={`absolute inset-0 w-full h-full object-cover ${isEnded ? "grayscale-60 opacity-70" : ""}`}
+                          className={`absolute inset-0 w-full h-full object-cover ${isEnded ? "grayscale-60 opacity-70 transition-[filter,opacity] duration-[250ms] group-hover:grayscale-30 group-hover:opacity-85 group-focus-visible:grayscale-30 group-focus-visible:opacity-85" : ""}`}
                         />
                         {/* 배지 대비용 오버레이 */}
                         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.25)_0%,rgba(0,0,0,0)_45%,rgba(0,0,0,0.2)_100%)]" />
@@ -781,27 +783,26 @@ export default function SmoothOnePage() {
                         <div className="mt-auto pt-3.5 md:pt-4">
                           <div className="flex items-center justify-between gap-3 pt-3.5 md:pt-4 border-t border-[#E6E8EC]">
                             <span className="min-w-0 text-xs md:text-[13px] text-[#6B7280] break-keep md:truncate">{card.target}</span>
+                            {/* 버튼 모양 표시 — 카드 전체가 링크라서 안쪽은 링크·버튼이 아닌 span. 색은 카드 hover·포커스 때 바뀜 */}
                             {isEnded ? (
-                              // 모집 종료 — 누를 수 없는 버튼 (hover 없음)
-                              <button type="button" disabled className="flex-shrink-0 h-10 px-[18px] rounded-[10px] bg-[#FDE2E4] text-[#C81E33] text-sm font-bold whitespace-nowrap cursor-not-allowed">
+                              <span className="flex-shrink-0 inline-flex items-center h-10 px-[18px] rounded-[10px] bg-[#FDE2E4] text-[#C81E33] text-sm font-bold whitespace-nowrap">
                                 모집 종료된 파티
-                              </button>
+                              </span>
                             ) : (
-                              <Link
-                                href={`/party/${card.id}`}
+                              <span
                                 className={`apply-btn relative flex-shrink-0 inline-flex items-center h-10 px-[18px] rounded-[10px] text-sm font-bold whitespace-nowrap transition-colors duration-300 ${
                                   stock.allFull
-                                    ? "bg-gray-200 text-gray-500 hover:bg-gray-300"
-                                    : "bg-[#111] text-white hover:bg-[#333]"
+                                    ? "bg-gray-200 text-gray-500 group-hover:bg-gray-300 group-focus-visible:bg-gray-300"
+                                    : "bg-[#111] text-white group-hover:bg-brand-point group-focus-visible:bg-brand-point"
                                 }`}
                               >
                                 {stock.allFull ? "모집 마감 · 상세보기" : "신청하기"}
-                              </Link>
+                              </span>
                             )}
                           </div>
                         </div>
                       </div>
-                    </div>
+                    </Link>
                   </motion.div>
                   );
                 })}
