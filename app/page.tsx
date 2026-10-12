@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import Header from "./components/Header";
+import HeroSlider from "./components/HeroSlider";
 import Footer from "./components/Footer";
 import ReviewBoard from "./components/ReviewBoard";
 import { PARTICIPANTS, FAQS, partyStockStatus, withLiveCounts, partyVisibility, categoryLabel, partyTypeOf, PARTY_TYPES, PARTY_TYPE_LABELS, type PartyType } from "./lib/data";
@@ -582,45 +583,8 @@ export default function SmoothOnePage() {
       <Header />
       
       <main className="flex-1">
-        {/* Hero Section — 모바일/PC 통합 풀블리드 오버레이 구조 */}
-        <section className="relative flex flex-col bg-brand-black overflow-hidden min-h-[70vh] md:h-[88vh] md:min-h-[700px]">
-
-          {/* 풀블리드 배경 이미지 — 모바일/PC 공통, object-cover 로 잘림 허용 */}
-          <Image
-            src="/images/hero-bg.webp"
-            alt=""
-            fill
-            priority
-            className="object-cover object-[center_30%] pointer-events-none"
-          />
-
-          {/* Overlay — 모바일: 균일 다크, PC: 하단으로 진해지는 그라디언트 */}
-          <div className="absolute inset-0 bg-black/40 md:hidden" />
-          <div className="hidden md:block absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-black/20" />
-
-          {/* Content — 두 환경 모두 하단 정렬 (mt-auto), fade-in 유지 */}
-          <div className="relative z-10 mt-auto max-w-7xl mx-auto px-5 md:px-10 w-full text-white pb-12 md:pb-24 md:pt-[160px]">
-            <motion.div initial="hidden" animate="visible" variants={fadeInUp}>
-              <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black tracking-tighter leading-[1.15] mb-4 md:mb-10 drop-shadow-2xl">
-                세상을 울리는<br />
-                새로운 연결, <span className="text-brand-point">어울림</span>
-              </h1>
-              <p className="text-sm sm:text-lg md:text-2xl text-white/85 font-semibold max-w-3xl leading-relaxed mb-8 md:mb-14 flex flex-col gap-1 md:gap-2 drop-shadow-lg">
-                <span>숫자와 스펙으로 재단되는 관계를 넘어,</span>
-                <span>모든 인연과 깊게 마주하는 로테이션 매칭파티를 경험하세요.</span>
-              </p>
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  document.getElementById('apply')?.scrollIntoView({ behavior: 'smooth' });
-                }}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-3 bg-brand-black text-white px-7 py-4 md:px-10 md:py-6 rounded-full text-base md:text-lg font-bold hover:bg-brand-point hover:text-black hover:-translate-y-1 transition-all shadow-xl hover:shadow-brand-point/30 cursor-pointer border border-white/20"
-              >
-                어울림 매칭파티 신청하기 <ArrowRight size={20} />
-              </button>
-            </motion.div>
-          </div>
-        </section>
+        {/* Hero Section — 롤링 히어로 (1번 브랜드 + 모집중 파티 최대 3장, app/components/HeroSlider.tsx) */}
+        <HeroSlider />
 
         {/* 참여하기 (Apply Cards) Section */}
         <section id="apply" className="py-16 md:py-32 px-4 md:px-6 bg-white rounded-t-3xl md:rounded-t-[3rem] shadow-[0_-20px_40px_rgba(0,0,0,0.02)]">

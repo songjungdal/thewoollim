@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Users, Ticket, Tag, Building2, LogOut, ShieldCheck, CheckCircle2, Clock, AlertTriangle, Calendar, Plus, Pencil, Trash2, ImageIcon, X, FileText, Search, StickyNote, Save, ChevronDown, CreditCard, RotateCcw, Star } from "lucide-react";
+import { Users, Ticket, Tag, Building2, LogOut, ShieldCheck, CheckCircle2, Clock, AlertTriangle, Calendar, Plus, Pencil, Trash2, ImageIcon, X, FileText, Search, StickyNote, Save, ChevronDown, CreditCard, RotateCcw, Star, GalleryHorizontal } from "lucide-react";
 import { useParties, broadcastPartiesUpdated } from "../../lib/useParties";
 import { formatPhoneKR } from "../../lib/phone";
 import { calculateRefund, refundRateLabel } from "../../lib/refund";
@@ -11,6 +11,7 @@ import { formatKST } from "../../lib/datetime";
 import { partyVisibility, partyTypeOf, PARTY_TYPES, PARTY_TYPE_LABELS, type Party, type PartyType } from "../../lib/data";
 import { templateFor, normalizeDetail, withGuideDefaults, compactDetailForSave, defaultNotice, type PartyDetail } from "../../lib/partyDetailTemplates";
 import PartyDetailEditor, { validateDetail, type DetailSourceParty } from "./PartyDetailEditor";
+import HeroEditor from "./HeroEditor";
 import PartyOptionsEditor from "./PartyOptionsEditor";
 import {
   EMPTY_OPTIONS_DRAFT, draftFromParty, draftToPayload, validateOptionsDraft, duplicateOptionSessions, optionsMinPrice, normalizeSessions, normalizeOptions,
@@ -39,7 +40,7 @@ type BookingRow = {
   refundRequestAmount?: number; // 취소요청한 날 기준 환불 금액
   refundAmount?: number;        // 실제 환불액 (환불 완료 건)
 };
-type TabKey = "members" | "bookings" | "parties" | "coupons" | "company" | "gallery" | "reviews" | "logs" | "cancel_requests" | "memos";
+type TabKey = "members" | "bookings" | "parties" | "coupons" | "company" | "hero" | "gallery" | "reviews" | "logs" | "cancel_requests" | "memos";
 
 type MemoItem = {
   id: number;
@@ -1357,6 +1358,7 @@ export default function AdminDashboard() {
     { key: "parties", label: "파티 관리", icon: Calendar },
     { key: "coupons", label: "쿠폰 관리", icon: Tag },
     { key: "company", label: "기업 정보", icon: Building2 },
+    { key: "hero", label: "메인이미지", icon: GalleryHorizontal },
     { key: "gallery", label: "현장스케치 관리", icon: ImageIcon },
     { key: "reviews", label: "후기게시판", icon: Star },
     { key: "logs", label: "로그 관리", icon: FileText },
@@ -2484,6 +2486,9 @@ export default function AdminDashboard() {
               </div>
             </section>
           )}
+
+          {/* === 메인이미지 (히어로 롤링 슬라이드) — 탭을 열 때 /api/admin/hero.php 로드 === */}
+          {tab === "hero" && <HeroEditor />}
 
           {/* === 후기 갤러리 관리 === */}
           {tab === "gallery" && (
