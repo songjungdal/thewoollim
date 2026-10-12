@@ -67,7 +67,7 @@ export default function AdminLoginPage() {
                 id="admin-id"
                 type="text" value={id} onChange={e => setId(e.target.value)}
                 autoComplete="username" required placeholder="아이디 입력"
-                className="w-full pl-11 pr-4 py-4 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-brand-point focus:border-brand-point transition-all outline-none font-medium text-sm"
+                className="w-full pl-11 pr-4 py-4 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-brand-point focus:border-brand-point transition-all outline-none font-medium text-base"
               />
             </div>
           </div>
@@ -79,7 +79,7 @@ export default function AdminLoginPage() {
                 id="admin-pw"
                 type="password" value={pw} onChange={e => setPw(e.target.value)}
                 autoComplete="current-password" required placeholder="비밀번호 입력"
-                className="w-full pl-11 pr-4 py-4 rounded-xl border border-gray-100 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-brand-point focus:border-brand-point transition-all outline-none font-medium text-sm"
+                className="w-full pl-11 pr-4 py-4 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-brand-point focus:border-brand-point transition-all outline-none font-medium text-base"
               />
             </div>
           </div>
