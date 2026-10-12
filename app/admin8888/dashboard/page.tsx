@@ -152,10 +152,10 @@ function BookingTable({ label, toneClass, rows, party, remarks, onApprove, onCan
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs md:text-sm whitespace-nowrap">
-          <thead className="bg-gray-50 text-gray-500 font-bold">
+          <thead className="bg-gray-50 text-gray-500 font-bold md:sticky md:top-0 md:z-10">
             <tr>
-              {["취소", "이름", ...(showOption ? ["항목"] : []), "연락처", "생년월일", "직업", "결제금액", "상태", "관리", "결제일", "이메일", "비고"].map(h => (
-                <th key={h} className="text-left px-3 py-2.5 first:pl-5 md:first:pl-7">{h}</th>
+              {["이름", ...(showOption ? ["항목"] : []), "연락처", "생년월일", "직업", "결제금액", "상태", "관리", "결제일", "이메일", "비고", "취소·환불"].map(h => (
+                <th key={h} className={`text-left px-3 py-2.5 md:py-3 first:pl-5 md:first:pl-7 ${h === "결제금액" ? "md:text-right" : ""} ${h === "이름" ? "md:sticky md:left-0 md:z-20 md:bg-gray-50" : ""} ${h === "취소·환불" ? "md:border-l md:border-gray-200" : ""}`}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -171,13 +171,57 @@ function BookingTable({ label, toneClass, rows, party, remarks, onApprove, onCan
               return (
                 <tr key={b.id} className={`border-t border-gray-100 transition-colors ${isCancelled
                     ? "bg-gray-50 text-gray-500"
-                    : "hover:bg-gray-50"
+                    : "hover:bg-gray-50 md:even:bg-gray-50/50 md:hover:bg-brand-point/5"
                   }`}>
-                  {/* 좌측 [취소] 컬럼 — 3가지 분기:
+                  <td className={`px-3 py-2.5 md:py-3 first:pl-5 md:first:pl-7 font-bold md:sticky md:left-0 md:z-[1] ${isCancelled ? "line-through md:bg-gray-50" : "md:text-brand-black md:bg-white"}`}>{b.userName}</td>
+                  {showOption && <td className={`px-3 py-2.5 md:py-3 font-bold ${isCancelled ? "line-through" : ""}`}>{b.optionName || "-"}</td>}
+                  <td className="px-3 py-2.5 md:py-3 tabular-nums">{formatPhoneKR(b.userPhone)}</td>
+                  <td className="px-3 py-2.5 md:py-3 text-gray-600 tabular-nums" title="프로필 카드 기반 (수정 불가)">{birth}</td>
+                  <td className="px-3 py-2.5 md:py-3">{b.userJob || "-"}</td>
+                  <td className={`px-3 py-2.5 md:py-3 md:text-right md:tabular-nums font-black ${isCancelled ? "text-gray-500 line-through" : "text-brand-point-ink"}`}>₩{(b.total ?? party?.price ?? 0).toLocaleString()}</td>
+                  <td className="px-3 py-2.5 md:py-3">
+                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-black ${meta.tone}`}>{meta.label}</span>
+                  </td>
+                  <td className="px-3 py-2.5 md:py-3">
+                    {isCancelled ? (
+                      <span className="text-xs text-gray-500 font-bold">—</span>
+                    ) : b.status === "completed" ? (
+                      // 모임종료(투표 종료 후) 상태 — 변경 불가. 참가확정 버튼 숨김.
+                      <span className="text-xs text-gray-500 font-bold">—</span>
+                    ) : confirmed ? (
+                      <span className="inline-flex items-center gap-1 text-emerald-600 font-bold text-xs">
+                        <CheckCircle2 size={13} /> 확정 완료
+                      </span>
+                    ) : (b.status === "cancel_requested" || b.status === "refund_completed") ? (
+                      // 취소요청/환불완료 — [취소요청] 탭에서 처리. 여기선 참가확정 버튼 숨김(좌측 [취소]는 유지).
+                      <span className="text-xs text-gray-500 font-bold">—</span>
+                    ) : b.status === "vbank_pending" ? (
+                      // 무통장 입금 신청자 — [결제확인] 시 pending_approval 전환 + 인원 +1 (v7.0)
+                      <button type="button" onClick={() => onConfirmVBank(b.userEmail, b.id, b.total ?? party?.price ?? 0)}
+                        className="inline-flex items-center gap-1 bg-[#fce5cd] text-danger px-2.5 md:px-3 py-1.5 rounded-lg text-xs font-black hover:brightness-95 transition-all min-h-11 md:min-h-0">
+                        <CreditCard size={11} /> 결제확인
+                      </button>
+                    ) : (
+                      <button onClick={() => onApprove(b.userEmail, b.id)}
+                        className="inline-flex items-center gap-1 bg-brand-point text-brand-black px-2.5 md:px-3 py-1.5 rounded-lg text-xs font-black hover:brightness-95 transition-all min-h-11 md:min-h-0">
+                        <CheckCircle2 size={11} /> 참가확정
+                      </button>
+                    )}
+                  </td>
+                  <td className="px-3 py-2.5 md:py-3 text-gray-500 md:tabular-nums">{b.createdAt?.slice(0, 10)}</td>
+                  {/* v3.6: MBTI 컬럼만 이메일(로그인 아이디)로 교체. 길이 대응 — font-mono + text-xs (md:text-sm) + max-w + truncate.
+                       탈퇴 회원은 시스템 익명화로 이메일이 매우 길어지므로 노출 생략 ("—"). */}
+                  {b.userStatus === "withdrawn" ? (
+                    <td className="px-3 py-2.5 md:py-3 text-xs md:text-sm text-gray-500">—</td>
+                  ) : (
+                    <td className="px-3 py-2.5 md:py-3 font-mono text-xs md:text-sm text-gray-700 max-w-[240px] md:max-w-[200px] truncate" title={b.userEmail || ""}>{b.userEmail || "-"}</td>
+                  )}
+                  <td className="px-3 py-2.5 md:py-3 text-xs md:text-sm text-gray-700 font-medium whitespace-pre-line md:whitespace-nowrap md:max-w-[200px] md:truncate" title={isCancelled ? undefined : remarks[b.id]?.join("\n")}>{isCancelled ? "-" : (remarks[b.id]?.join("\n") || "-")}</td>
+                  {/* 맨 오른쪽 [취소·환불] 컬럼 — 3가지 분기 (내용은 예전 맨 앞 [취소] 칸 그대로, 위치만 이동):
                        1) 회원탈퇴: userStatus === 'withdrawn' (booking 은 completed 상태로 보존됨)
                        2) 취소완료: booking status === 'cancelled'
                        3) 취소(버튼): 그 외 (정상 active 회원의 진행/완료 booking) */}
-                  <td className="px-3 py-2.5 first:pl-5 md:first:pl-7">
+                  <td className="px-3 py-2.5 md:py-3 md:border-l md:border-gray-200">
                     {b.userStatus === "withdrawn" ? (
                       <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-black bg-gray-200 text-black">
                         회원탈퇴
@@ -215,50 +259,6 @@ function BookingTable({ label, toneClass, rows, party, remarks, onApprove, onCan
                       </div>
                     )}
                   </td>
-                  <td className={`px-3 py-2.5 font-bold ${isCancelled ? "line-through" : ""}`}>{b.userName}</td>
-                  {showOption && <td className={`px-3 py-2.5 font-bold ${isCancelled ? "line-through" : ""}`}>{b.optionName || "-"}</td>}
-                  <td className="px-3 py-2.5 tabular-nums">{formatPhoneKR(b.userPhone)}</td>
-                  <td className="px-3 py-2.5 text-gray-600 tabular-nums" title="프로필 카드 기반 (수정 불가)">{birth}</td>
-                  <td className="px-3 py-2.5">{b.userJob || "-"}</td>
-                  <td className={`px-3 py-2.5 font-black ${isCancelled ? "text-gray-500 line-through" : "text-brand-point-ink"}`}>₩{(b.total ?? party?.price ?? 0).toLocaleString()}</td>
-                  <td className="px-3 py-2.5">
-                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-black ${meta.tone}`}>{meta.label}</span>
-                  </td>
-                  <td className="px-3 py-2.5">
-                    {isCancelled ? (
-                      <span className="text-xs text-gray-500 font-bold">—</span>
-                    ) : b.status === "completed" ? (
-                      // 모임종료(투표 종료 후) 상태 — 변경 불가. 참가확정 버튼 숨김.
-                      <span className="text-xs text-gray-500 font-bold">—</span>
-                    ) : confirmed ? (
-                      <span className="inline-flex items-center gap-1 text-emerald-600 font-bold text-xs">
-                        <CheckCircle2 size={13} /> 확정 완료
-                      </span>
-                    ) : (b.status === "cancel_requested" || b.status === "refund_completed") ? (
-                      // 취소요청/환불완료 — [취소요청] 탭에서 처리. 여기선 참가확정 버튼 숨김(좌측 [취소]는 유지).
-                      <span className="text-xs text-gray-500 font-bold">—</span>
-                    ) : b.status === "vbank_pending" ? (
-                      // 무통장 입금 신청자 — [결제확인] 시 pending_approval 전환 + 인원 +1 (v7.0)
-                      <button type="button" onClick={() => onConfirmVBank(b.userEmail, b.id, b.total ?? party?.price ?? 0)}
-                        className="inline-flex items-center gap-1 bg-[#fce5cd] text-danger px-2.5 md:px-3 py-1.5 rounded-lg text-xs font-black hover:brightness-95 transition-all min-h-11 md:min-h-0">
-                        <CreditCard size={11} /> 결제확인
-                      </button>
-                    ) : (
-                      <button onClick={() => onApprove(b.userEmail, b.id)}
-                        className="inline-flex items-center gap-1 bg-brand-point text-brand-black px-2.5 md:px-3 py-1.5 rounded-lg text-xs font-black hover:brightness-95 transition-all min-h-11 md:min-h-0">
-                        <CheckCircle2 size={11} /> 참가확정
-                      </button>
-                    )}
-                  </td>
-                  <td className="px-3 py-2.5 text-gray-500">{b.createdAt?.slice(0, 10)}</td>
-                  {/* v3.6: MBTI 컬럼만 이메일(로그인 아이디)로 교체. 길이 대응 — font-mono + text-xs (md:text-sm) + max-w + truncate.
-                       탈퇴 회원은 시스템 익명화로 이메일이 매우 길어지므로 노출 생략 ("—"). */}
-                  {b.userStatus === "withdrawn" ? (
-                    <td className="px-3 py-2.5 text-xs md:text-sm text-gray-500">—</td>
-                  ) : (
-                    <td className="px-3 py-2.5 font-mono text-xs md:text-sm text-gray-700 max-w-[240px] truncate" title={b.userEmail || ""}>{b.userEmail || "-"}</td>
-                  )}
-                  <td className="px-3 py-2.5 text-xs md:text-sm text-gray-700 font-medium whitespace-pre-line">{isCancelled ? "-" : (remarks[b.id]?.join("\n") || "-")}</td>
                 </tr>
               );
             })}
@@ -1375,11 +1375,55 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 lg:flex">
       <meta name="robots" content="noindex, nofollow" />
 
-      {/* Header — 모바일: [햄버거 + 현재 탭 이름] / [로그아웃], md 이상: 로고 + 가로 탭 바 */}
-      <header className="bg-brand-black text-white sticky top-0 z-40">
+      {/* lg 이상 — 좌측 고정 사이드바(로고 · 운영/콘텐츠/설정 메뉴 · 로그아웃). 메뉴 묶음은 MOBILE_MENU_GROUPS, 이름·아이콘은 TABS */}
+      <aside className="hidden lg:flex lg:flex-col w-56 flex-shrink-0 sticky top-0 h-screen bg-brand-black text-white">
+        <div className="flex items-center gap-2.5 h-16 px-5 border-b border-white/10 flex-shrink-0">
+          <ShieldCheck size={20} className="text-brand-point" />
+          <span className="font-black text-lg">어울림 관리자</span>
+        </div>
+        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5" aria-label="관리 메뉴">
+          {MOBILE_MENU_GROUPS.map(g => (
+            <div key={g.label}>
+              <p className="px-3 mb-1.5 text-xs font-bold text-white/75">{g.label}</p>
+              <ul className="space-y-0.5">
+                {g.keys.map(k => {
+                  const t = TABS.find(x => x.key === k);
+                  if (!t) return null;
+                  const Icon = t.icon;
+                  const active = tab === k;
+                  return (
+                    <li key={k}>
+                      <button
+                        type="button"
+                        onClick={() => setTab(k)}
+                        aria-current={active ? "page" : undefined}
+                        className={`w-full h-10 flex items-center gap-2.5 px-3 rounded-lg text-sm font-bold text-left transition-colors ${
+                          active ? "bg-white/10 text-brand-point" : "text-white/75 hover:text-white hover:bg-white/5"
+                        }`}
+                      >
+                        <Icon size={16} className="flex-shrink-0" />
+                        <span className="truncate">{t.label}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+        </nav>
+        <div className="p-3 border-t border-white/10 flex-shrink-0">
+          <button type="button" onClick={handleLogout} className="w-full h-10 flex items-center gap-2.5 px-3 rounded-lg text-sm font-bold text-white/75 hover:text-white hover:bg-white/10 transition-colors">
+            <LogOut size={16} /> 로그아웃
+          </button>
+        </div>
+      </aside>
+
+      <div className="flex-1 min-w-0">
+      {/* Header — 모바일: [햄버거 + 현재 탭 이름] / [로그아웃], md~lg: 로고 + 가로 탭 바, lg 이상: 숨김(사이드바) */}
+      <header className="bg-brand-black text-white sticky top-0 z-40 lg:hidden">
         <div className="max-w-7xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between gap-3">
           <div className="md:hidden flex items-center gap-1 min-w-0">
             <button
@@ -1468,7 +1512,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      <main className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8">
+      <main className="max-w-7xl lg:max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
         <motion.div key={tab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
 
           {/* === 회원 관리 === */}
@@ -1518,14 +1562,14 @@ export default function AdminDashboard() {
                         value={memberSearch}
                         onChange={e => setMemberSearch(e.target.value)}
                         placeholder="이름 / 연락처 / 이메일"
-                        className="flex-1 min-w-0 md:flex-none md:w-64 px-3 py-2 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point focus:border-brand-point outline-none min-h-11 md:min-h-0"
+                        className="flex-1 min-w-0 md:flex-none md:w-64 px-3 py-2 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point focus:border-brand-point outline-none min-h-11 md:min-h-0 md:h-10"
                         aria-label="회원 검색"
                       />
                       {memberSearch && (
                         <button
                           type="button"
                           onClick={() => setMemberSearch("")}
-                          className="text-xs font-bold text-gray-500 hover:text-gray-700 transition-colors min-h-11 md:min-h-0"
+                          className="text-xs font-bold text-gray-500 hover:text-gray-700 transition-colors min-h-11 md:min-h-0 md:h-10"
                         >
                           초기화
                         </button>
@@ -1537,7 +1581,7 @@ export default function AdminDashboard() {
                         aria-label="혼인여부 필터"
                         value={memberMaritalFilter}
                         onChange={e => setMemberMaritalFilter(e.target.value as "all" | "싱글" | "돌싱" | "empty")}
-                        className="flex-1 md:flex-none px-3 py-2 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white min-h-11 md:min-h-0"
+                        className="flex-1 md:flex-none px-3 py-2 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white min-h-11 md:min-h-0 md:h-10"
                       >
                         <option value="all">전체</option>
                         <option value="싱글">싱글만</option>
@@ -1548,13 +1592,13 @@ export default function AdminDashboard() {
                     <TestUsersButton onCreated={loadAll} />
                   </div>
                 </div>
-                <div className="hidden md:block bg-white rounded-2xl border border-gray-200 overflow-x-auto">
+                <div className="hidden md:block bg-white rounded-2xl border border-gray-200 overflow-auto max-h-[calc(100vh-220px)]">
                   <table className="w-full text-sm whitespace-nowrap">
-                    <thead className="bg-gray-50 text-gray-600 font-bold">
+                    <thead className="bg-gray-50 text-gray-600 font-bold sticky top-0 z-10">
                       <tr>
-                        {/* '#' 컬럼 제거, 가입일 활성화 + 최신순 정렬 */}
-                        {["가입일", "이메일", "이름", "성별", "혼인여부", "연락처", "지역", "직업", "MBTI", "생년월일", "SNS", "관리"].map(h => (
-                          <th key={h} className="text-left px-3 py-3">{h}</th>
+                        {/* '#' 컬럼 제거, 가입일 최신순 정렬. 이름 칸은 맨 앞 + 가로 스크롤 때 고정 */}
+                        {["이름", "성별", "혼인여부", "연락처", "이메일", "가입일", "지역", "직업", "MBTI", "생년월일", "SNS", "관리"].map(h => (
+                          <th key={h} className={`text-left px-3 py-3 ${h === "이름" ? "sticky left-0 z-20 bg-gray-50" : ""}`}>{h}</th>
                         ))}
                       </tr>
                     </thead>
@@ -1576,17 +1620,10 @@ export default function AdminDashboard() {
                             })()
                           : "-";
                         return (
-                          <tr key={u.id} className="border-t border-gray-100 hover:bg-gray-50">
-                            <td className="px-3 py-2.5 text-gray-500 tabular-nums">{created}</td>
-                            <td className="px-3 py-2.5">
-                              {u.email}
-                              {u.role === "admin" && (
-                                <span className="ml-1.5 inline-block px-1.5 py-0.5 rounded text-xs font-black bg-red-100 text-red-700 align-middle">ADMIN</span>
-                              )}
-                            </td>
-                            <td className="px-3 py-2.5 font-bold">{u.name || <span className="text-gray-500 text-xs">미입력</span>}</td>
-                            <td className="px-3 py-2.5">{u.gender || <span className="text-gray-500 text-xs">미입력</span>}</td>
-                            <td className="px-3 py-2.5">
+                          <tr key={u.id} className="border-t border-gray-100 even:bg-gray-50/50 hover:bg-brand-point/5">
+                            <td className="px-3 py-3 font-bold text-brand-black sticky left-0 z-[1] bg-white">{u.name || <span className="text-gray-500 text-xs">미입력</span>}</td>
+                            <td className="px-3 py-3">{u.gender || <span className="text-gray-500 text-xs">미입력</span>}</td>
+                            <td className="px-3 py-3">
                               {ms === "싱글" ? (
                                 <span className="inline-block px-2 py-0.5 rounded-full text-xs font-black bg-blue-100 text-blue-800">싱글</span>
                               ) : ms === "돌싱" ? (
@@ -1595,17 +1632,24 @@ export default function AdminDashboard() {
                                 <span className="text-gray-500 text-xs">미입력</span>
                               )}
                             </td>
-                            <td className="px-3 py-2.5 tabular-nums">{u.phone ? formatPhoneKR(u.phone) : <span className="text-gray-500 text-xs">미입력</span>}</td>
-                            <td className="px-3 py-2.5">{u.location || "-"}</td>
-                            <td className="px-3 py-2.5">{u.job || "-"}</td>
-                            <td className="px-3 py-2.5">{u.mbti || "-"}</td>
-                            <td className="px-3 py-2.5">{u.birth_date || <span className="text-gray-500 text-xs">미입력</span>}</td>
-                            <td className="px-3 py-2.5">{u.sns_provider || "일반"}</td>
-                            <td className="px-3 py-2.5">
+                            <td className="px-3 py-3 tabular-nums">{u.phone ? formatPhoneKR(u.phone) : <span className="text-gray-500 text-xs">미입력</span>}</td>
+                            <td className="px-3 py-3">
+                              <span className="inline-block max-w-[200px] truncate align-middle" title={u.email}>{u.email}</span>
+                              {u.role === "admin" && (
+                                <span className="ml-1.5 inline-block px-1.5 py-0.5 rounded text-xs font-black bg-red-100 text-red-700 align-middle">ADMIN</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-3 text-gray-500 tabular-nums">{created}</td>
+                            <td className="px-3 py-3">{u.location || "-"}</td>
+                            <td className="px-3 py-3">{u.job || "-"}</td>
+                            <td className="px-3 py-3">{u.mbti || "-"}</td>
+                            <td className="px-3 py-3">{u.birth_date || <span className="text-gray-500 text-xs">미입력</span>}</td>
+                            <td className="px-3 py-3">{u.sns_provider || "일반"}</td>
+                            <td className="px-3 py-3">
                               <button
                                 type="button"
                                 onClick={() => deleteUser(u.email, u.name)}
-                                className="inline-flex items-center gap-1 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 px-2.5 py-1.5 rounded-lg text-xs font-black transition-colors min-h-11 md:min-h-0"
+                                className="inline-flex items-center gap-1 bg-white border border-danger text-danger hover:bg-danger hover:text-white px-2.5 py-1.5 rounded-lg text-xs font-black transition-colors min-h-11 md:min-h-0"
                               >
                                 <Trash2 size={12} /> 삭제
                               </button>
@@ -1737,7 +1781,7 @@ export default function AdminDashboard() {
                   </div>
                   <div className="grid grid-cols-2 gap-2 w-full md:w-auto md:flex md:items-center md:flex-wrap">
                     <select value={monthFilter} onChange={e => setMonthFilter(e.target.value)}
-                      className="w-full md:w-auto px-3 py-2 rounded-lg border border-gray-200 text-base md:text-sm font-bold bg-white text-brand-black min-h-11 md:min-h-0"
+                      className="w-full md:w-auto px-3 py-2 rounded-lg border border-gray-200 text-base md:text-sm font-bold bg-white text-brand-black min-h-11 md:min-h-0 md:h-10"
                       aria-label="월 필터">
                       <option value="all">전체 월</option>
                       {monthOptions.map(m => (
@@ -1745,7 +1789,7 @@ export default function AdminDashboard() {
                       ))}
                     </select>
                     <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as typeof statusFilter)}
-                      className="w-full md:w-auto px-3 py-2 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white min-h-11 md:min-h-0" aria-label="상태 필터">
+                      className="w-full md:w-auto px-3 py-2 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white min-h-11 md:min-h-0 md:h-10" aria-label="상태 필터">
                       <option value="all">전체 상태</option>
                       <option value="paid_pending_profile">결제완료(프로필 대기)</option>
                       <option value="pending_approval">확정 대기 중</option>
@@ -1768,7 +1812,7 @@ export default function AdminDashboard() {
                     const Icon = s.icon;
                     return (
                       <div key={s.key} className="bg-white rounded-xl border border-gray-200 p-3 md:p-4">
-                        <div className="flex items-center gap-2 text-gray-500 text-[13px] md:text-sm font-bold mb-1.5"><Icon size={13} /> {s.label}</div>
+                        <div className="flex items-center gap-2 text-gray-500 md:text-gray-600 text-[13px] md:text-sm font-bold mb-1.5"><Icon size={13} /> {s.label}</div>
                         <p className="text-xl md:text-2xl font-black">{count}</p>
                       </div>
                     );
@@ -1814,7 +1858,7 @@ export default function AdminDashboard() {
                             }
                           }}
                           aria-label={`${party?.title ?? `파티 #${pid}`} 신청자 명단 ${expanded ? "접기" : "펼치기"}`}
-                          className="bg-gradient-to-r from-brand-point/10 to-white px-5 md:px-7 py-4 md:py-5 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-point focus-visible:ring-inset"
+                          className="bg-gradient-to-r from-brand-point/10 to-white px-5 md:px-7 py-4 md:py-5 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-point focus-visible:ring-inset lg:flex lg:flex-wrap lg:items-center lg:gap-x-6"
                         >
                           {/*
                             제목 행 — 데스크톱 가로 정렬 / 모바일 세로 적층
@@ -1822,7 +1866,8 @@ export default function AdminDashboard() {
                               · 데스크톱 (≥ md): flex-row + items-center + justify-between
                               · gap-3 (모바일) / gap-4 (데스크톱)
                           */}
-                          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4">
+                          {/* lg 이상: 제목 행과 인원 행을 한 줄로 — 종류·제목·일시·결제 금액·호스트 → 오른쪽 끝 남/여 인원·펼치기 */}
+                          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4 lg:flex-1 lg:min-w-0">
                             {/*
                               좌측 — 제목 / 날짜 / 매출액
                               · md:flex-1 min-w-0 : 데스크톱에서 가용 공간 채움 + 안전한 줄임 처리
@@ -1887,7 +1932,7 @@ export default function AdminDashboard() {
                               )}
                             </div>
                           </div>
-                          <div className="flex gap-3 md:gap-4 mt-2 text-[13px] md:text-sm items-center">
+                          <div className="flex gap-3 md:gap-4 mt-2 lg:mt-0 lg:flex-shrink-0 text-[13px] md:text-sm items-center">
                             {/* 카운트는 cancelled 제외 (실제 참가 인원). 취소자는 아래 테이블에 line-through 로 보존 노출. */}
                             <span className="font-bold text-info">남성 {activeMales}명</span>
                             <span className="font-bold text-rose-500">여성 {activeFemales}명</span>
@@ -1903,7 +1948,7 @@ export default function AdminDashboard() {
                           </div>
                           {/* 참가 구성 파티 — 회차별 남/여 인원/정원 (명세 7-2) */}
                           {(adminPartyRows[pid]?.sessions?.length ?? 0) > 0 && (
-                            <p className="mt-1.5 text-[13px] md:text-sm font-bold text-gray-700 break-keep" data-testid="session-counts">{sessionCountsLine(adminPartyRows[pid].sessions, partyRows)}</p>
+                            <p className="mt-1.5 lg:basis-full text-[13px] md:text-sm font-bold text-gray-700 break-keep" data-testid="session-counts">{sessionCountsLine(adminPartyRows[pid].sessions, partyRows)}</p>
                           )}
                         </div>
 
@@ -1993,7 +2038,7 @@ export default function AdminDashboard() {
                     value={partyTypeFilter}
                     onChange={e => setPartyTypeFilter(e.target.value as "all" | PartyType)}
                     aria-label="파티 종류 필터"
-                    className="w-full md:w-auto px-3 py-2.5 rounded-lg border border-gray-200 text-base md:text-sm font-bold bg-white text-brand-black focus:ring-2 focus:ring-brand-point outline-none min-h-11 md:min-h-0"
+                    className="w-full md:w-auto px-3 py-2.5 rounded-lg border border-gray-200 text-base md:text-sm font-bold bg-white text-brand-black focus:ring-2 focus:ring-brand-point outline-none min-h-11 md:min-h-0 md:h-10"
                   >
                     <option value="all">전체</option>
                     {PARTY_TYPES.map(t => <option key={t} value={t}>{PARTY_TYPE_LABELS[t]}</option>)}
@@ -2002,7 +2047,7 @@ export default function AdminDashboard() {
                     value={partyMonthFilter}
                     onChange={e => setPartyMonthFilter(e.target.value)}
                     aria-label="파티 월 필터"
-                    className="w-full md:w-auto px-3 py-2.5 rounded-lg border border-gray-200 text-base md:text-sm font-bold bg-white text-brand-black focus:ring-2 focus:ring-brand-point outline-none min-h-11 md:min-h-0"
+                    className="w-full md:w-auto px-3 py-2.5 rounded-lg border border-gray-200 text-base md:text-sm font-bold bg-white text-brand-black focus:ring-2 focus:ring-brand-point outline-none min-h-11 md:min-h-0 md:h-10"
                   >
                     <option value="all">전체 월</option>
                     {partyMonthOptions.map(m => (
@@ -2011,64 +2056,65 @@ export default function AdminDashboard() {
                   </select>
                   {/* 모바일: 화면 하단 고정 전체폭 버튼 / md 이상: 필터 옆 (같은 버튼 하나) */}
                   <button onClick={openPartyCreate}
-                    className="fixed bottom-3 inset-x-4 z-30 min-h-12 justify-center text-base shadow-lg md:static md:inset-auto md:z-auto md:min-h-0 md:justify-start md:text-sm md:shadow-none inline-flex items-center gap-2 bg-brand-point text-brand-black px-4 py-2.5 rounded-lg font-black hover:brightness-95 transition-all whitespace-nowrap">
+                    className="fixed bottom-3 inset-x-4 z-30 min-h-12 justify-center text-base shadow-lg md:static md:inset-auto md:z-auto md:min-h-0 md:h-10 md:justify-start md:text-sm md:shadow-none inline-flex items-center gap-2 bg-brand-point text-brand-black px-4 py-2.5 rounded-lg font-black hover:brightness-95 transition-all whitespace-nowrap">
                     <Plus size={14} /> 신규 등록
                   </button>
                 </div>
               </div>
-              <div className="hidden md:block bg-white rounded-2xl border border-gray-200 overflow-x-auto">
+              <div className="hidden md:block bg-white rounded-2xl border border-gray-200 overflow-auto max-h-[calc(100vh-220px)]">
                 <table className="w-full text-sm whitespace-nowrap">
-                  <thead className="bg-gray-50 text-gray-600 font-bold">
+                  <thead className="bg-gray-50 text-gray-600 font-bold sticky top-0 z-10">
                     <tr>
                       {/* '태그' 컬럼 제거 — 주제별/일정별/지역별 등 카테고리 태그는 UI 노출 X.
-                          데이터(p.tag)는 보존 — 파티 등록/수정 폼 / 홈 카테고리 필터에서 계속 활용. */}
+                          데이터(p.tag)는 보존 — 파티 등록/수정 폼 / 홈 카테고리 필터에서 계속 활용.
+                          금액·인원은 오른쪽 정렬, 액션 칸은 오른쪽 끝 고정 폭(가로 스크롤 때도 보임) */}
                       {["#", "종류", "이미지", "제목", "일시", "장소", "대상", "참가비", "정원(남/여)", "액션"].map(h => (
-                        <th key={h} className="text-left px-3 py-3">{h}</th>
+                        <th key={h} className={`px-3 py-3 ${h === "참가비" || h === "정원(남/여)" ? "text-right" : "text-left"} ${h === "액션" ? "w-[196px] sticky right-0 z-20 bg-gray-50" : ""}`}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {filteredParties.map(p => (
-                      <tr key={p.id} className="border-t border-gray-100 hover:bg-gray-50">
-                        <td className="px-3 py-2.5 font-bold text-gray-500">{p.id}</td>
-                        <td className="px-3 py-2.5"><PartyTypeBadge type={partyTypeOf(p)} /></td>
-                        <td className="px-3 py-2.5">
+                      <tr key={p.id} className="border-t border-gray-100 even:bg-gray-50/50 hover:bg-brand-point/5">
+                        <td className="px-3 py-3 font-bold text-gray-500">{p.id}</td>
+                        <td className="px-3 py-3"><PartyTypeBadge type={partyTypeOf(p)} /></td>
+                        <td className="px-3 py-3">
                           {p.imageUrl
                             ? <img src={p.imageUrl} alt="" className="w-12 h-9 object-cover rounded" />
                             : <div className="w-12 h-9 bg-gray-100 rounded flex items-center justify-center text-gray-500"><ImageIcon size={14} /></div>}
                         </td>
-                        <td className="px-3 py-2.5 font-bold">
+                        <td className="px-3 py-3 font-bold text-brand-black">
                           {p.title}
                           {(adminPartyRows[p.id]?.couponDisabled ?? p.couponDisabled) && (
                             <span className="ml-1.5 inline-block align-middle px-1.5 py-0.5 rounded bg-gray-100 border border-gray-200 text-gray-600 text-xs font-bold">쿠폰불가</span>
                           )}
                         </td>
-                        <td className="px-3 py-2.5 text-gray-600">{p.dateString}</td>
-                        <td className="px-3 py-2.5 text-gray-600">{p.location}</td>
-                        <td className="px-3 py-2.5 text-gray-600">{p.target}</td>
+                        <td className="px-3 py-3 text-gray-600">{p.dateString}</td>
+                        <td className="px-3 py-3 text-gray-600 max-w-[200px] truncate" title={p.location}>{p.location}</td>
+                        <td className="px-3 py-3 text-gray-600">{p.target}</td>
                         {(() => {
                           // 참가 구성이 있으면 "항목 3개 · ₩30,000~" / 회차별 정원 "1부 20/20명 · 2부 15/15명" (명세 7-2)
                           const ar = adminPartyRows[p.id];
                           if (ar?.options?.length) {
                             return (<>
-                              <td className="px-3 py-2.5 font-black text-brand-point-ink">항목 {ar.options.length}개 · ₩{optionsMinPrice(ar.options).toLocaleString()}~</td>
-                              <td className="px-3 py-2.5 text-gray-600">{ar.sessions.map(s => `${s.name} ${s.maleStock}/${s.femaleStock}명`).join(" · ")}</td>
+                              <td className="px-3 py-3 text-right tabular-nums font-black text-brand-point-ink">항목 {ar.options.length}개 · ₩{optionsMinPrice(ar.options).toLocaleString()}~</td>
+                              <td className="px-3 py-3 text-right tabular-nums text-gray-600">{ar.sessions.map(s => `${s.name} ${s.maleStock}/${s.femaleStock}명`).join(" · ")}</td>
                             </>);
                           }
                           return (<>
-                            <td className="px-3 py-2.5 font-black text-brand-point-ink">₩{p.price.toLocaleString()}</td>
-                            <td className="px-3 py-2.5 text-gray-600">{p.maleStock}명 / {p.femaleStock}명</td>
+                            <td className="px-3 py-3 text-right tabular-nums font-black text-brand-point-ink">₩{p.price.toLocaleString()}</td>
+                            <td className="px-3 py-3 text-right tabular-nums text-gray-600">{p.maleStock}명 / {p.femaleStock}명</td>
                           </>);
                         })()}
-                        <td className="px-3 py-2.5">
-                          <div className="flex gap-1.5">
+                        <td className="px-3 py-3 w-[196px] sticky right-0 z-[1] bg-white">
+                          <div className="flex gap-2">
                             <a href={`/party/${p.id}/`} target="_blank" rel="noopener noreferrer" className="bg-white border border-gray-200 text-brand-black px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-gray-50 transition-all">
                               보기
                             </a>
                             <button onClick={() => openPartyEdit(p.id)} className="bg-brand-black text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-brand-point hover:text-black transition-all min-h-11 md:min-h-0">
                               <Pencil size={11} className="inline mr-1" />수정
                             </button>
-                            <button onClick={() => deleteParty(p.id)} className="bg-red-50 text-danger px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-danger hover:text-white transition-all min-h-11 md:min-h-0">
+                            <button onClick={() => deleteParty(p.id)} className="bg-white border border-danger text-danger px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-danger hover:text-white transition-all min-h-11 md:min-h-0">
                               <Trash2 size={11} className="inline mr-1" />삭제
                             </button>
                           </div>
@@ -2156,7 +2202,7 @@ export default function AdminDashboard() {
               {partyEditMode && (
                 <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-0 md:p-4">
                   <div
-                    className="bg-white rounded-none md:rounded-2xl shadow-2xl w-full h-[100dvh] md:h-auto max-w-none md:max-w-2xl max-h-none md:max-h-[92vh] flex flex-col overflow-hidden"
+                    className="bg-white rounded-none md:rounded-2xl shadow-2xl w-full h-[100dvh] md:h-auto max-w-none md:max-w-3xl lg:max-w-5xl max-h-none md:max-h-[92vh] flex flex-col overflow-hidden"
                     onInput={() => setPartyFormDirty(true)}
                     onChange={() => setPartyFormDirty(true)}
                   >
@@ -2199,267 +2245,281 @@ export default function AdminDashboard() {
                             [기본 정보] 탭에서 파티 종류를 먼저 선택해주세요.
                           </p>
                         )
-                      ) : (<>
-                      <h4 className="text-[13px] md:text-sm font-black text-gray-500">파티 종류 · 대표 이미지</h4>
-                      {/* 파티 종류 */}
-                      <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-1.5">파티 종류 *</label>
-                        <div className="grid grid-cols-2 gap-3">
-                          {PARTY_TYPES.map(t => (
-                            <button key={t} type="button" onClick={() => selectPartyType(t)} aria-pressed={partyForm.partyType === t}
-                              className={`w-full py-4 rounded-xl border-2 text-base md:text-lg font-black transition-all ${partyForm.partyType === t ? "border-brand-black bg-brand-black text-white" : "border-gray-200 text-gray-500 hover:border-gray-300"} min-h-11 md:min-h-0`}>
-                              {PARTY_TYPE_LABELS[t]}
-                            </button>
-                          ))}
-                        </div>
-                        {partyForm.partyType === "solo" && (
-                          <p className="text-[13px] md:text-sm font-bold text-gray-600 mt-2">솔로파티는 매칭 투표가 없습니다.</p>
-                        )}
-                      </div>
-
-                      {/* 대표 이미지 */}
-                      <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-1.5">대표 이미지</label>
-                        <div className="flex items-start gap-3">
-                          <div className="w-28 h-20 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0">
-                            {partyForm.imageUrl
-                              ? <img src={partyForm.imageUrl} alt="" className="w-full h-full object-cover" />
-                              : <ImageIcon size={20} className="text-gray-500" />}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <input type="file" accept="image/*" aria-label="대표 이미지"
-                              onChange={e => { const f = e.target.files?.[0]; if (f) uploadImage(f); }}
-                              className="block w-full text-xs file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-brand-black file:text-white file:font-bold file:cursor-pointer hover:file:bg-brand-point" />
-                            <p className="text-[13px] md:text-sm text-gray-500 mt-1.5">JPG/PNG/WebP, 최대 10MB. 메인페이지 카드·상세페이지 상단에 공통 노출 — 가로로 넓은 배너형 권장 (예: 1200×300)</p>
-                            {uploading && <p className="text-[13px] md:text-sm text-brand-point-ink mt-1">업로드 중...</p>}
-                            {partyForm.imageUrl && (
-                              <button onClick={() => setPartyForm(p => ({ ...p, imageUrl: "" }))}
-                                className="text-xs text-red-500 mt-1.5 underline min-h-11 md:min-h-0">이미지 제거</button>
+                      ) : (
+                      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[280px_minmax(0,1fr)] lg:gap-x-8 lg:items-start">
+                        {/* lg 이상 2단 — 왼쪽: 파티 종류·대표 이미지·쿠폰 옵션 / 오른쪽: 기본 정보·참가비·정원·자격·카테고리.
+                             모바일·md 는 두 묶음을 풀어(contents) 예전 순서 그대로 한 줄로 보여준다(쿠폰 옵션은 order-last 로 맨 끝) */}
+                        <div className="contents lg:flex lg:flex-col lg:gap-4">
+                          <h4 className="text-[13px] md:text-sm font-black text-gray-500">파티 종류 · 대표 이미지</h4>
+                          {/* 파티 종류 */}
+                          <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-1.5">파티 종류 *</label>
+                            <div className="grid grid-cols-2 gap-3">
+                              {PARTY_TYPES.map(t => (
+                                <button key={t} type="button" onClick={() => selectPartyType(t)} aria-pressed={partyForm.partyType === t}
+                                  className={`w-full py-4 rounded-xl border-2 text-base md:text-lg font-black transition-all ${partyForm.partyType === t ? "border-brand-black bg-brand-black text-white" : "border-gray-200 text-gray-500 hover:border-gray-300"} min-h-11 md:min-h-0`}>
+                                  {PARTY_TYPE_LABELS[t]}
+                                </button>
+                              ))}
+                            </div>
+                            {partyForm.partyType === "solo" && (
+                              <p className="text-[13px] md:text-sm font-bold text-gray-600 mt-2">솔로파티는 매칭 투표가 없습니다.</p>
                             )}
                           </div>
-                        </div>
-                      </div>
 
-                      <div className="pt-4 border-t border-gray-100"><h4 className="text-[13px] md:text-sm font-black text-gray-500">기본 정보</h4></div>
-                      {/* 제목 */}
-                      <FormField label="제목 *" value={partyForm.title} onChange={v => setPartyForm(p => ({ ...p, title: v }))} />
-                      {/* 내용 */}
-                      <FormField label="한 줄 소개 (제목 아래 표시)" value={partyForm.description} onChange={v => setPartyForm(p => ({ ...p, description: v }))} textarea />
-                      {/* 일시 */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {partyForm.partyType === "solo" && partyForm.optionMode === "options" ? (
-                          <FormField label="일시 (표시용 텍스트) *" value={partyForm.dateString} onChange={v => setPartyForm(p => ({ ...p, dateString: v }))}
-                            placeholder="2026. 8. 1 (토) 19:00 — 시각은 24시간 형식" hint="시각은 첫 회차 시각으로 자동 저장됩니다" />
-                        ) : (
-                          <FormField label="일시 (표시용 텍스트) *" value={partyForm.dateString} onChange={v => setPartyForm(p => ({ ...p, dateString: v }))} placeholder="2026. 8. 1 (토) 19:00" />
-                        )}
-                        <div>
-                          <label className="block text-sm font-bold text-gray-700 mb-1.5">달력 날짜 *</label>
-                          <input type="date" value={partyForm.calendarDate} onChange={e => setPartyForm(p => ({ ...p, calendarDate: e.target.value }))}
-                            className="w-full px-4 py-3 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none min-h-11 md:min-h-0" aria-label="달력 날짜" />
+                          {/* 대표 이미지 */}
+                          <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-1.5">대표 이미지</label>
+                            <div className="flex items-start gap-3 lg:flex-col">
+                              <div className="w-28 h-20 lg:w-full lg:h-auto lg:aspect-[7/5] bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0">
+                                {partyForm.imageUrl
+                                  ? <img src={partyForm.imageUrl} alt="" className="w-full h-full object-cover" />
+                                  : <ImageIcon size={20} className="text-gray-500" />}
+                              </div>
+                              <div className="flex-1 min-w-0 lg:w-full">
+                                <input type="file" accept="image/*" aria-label="대표 이미지"
+                                  onChange={e => { const f = e.target.files?.[0]; if (f) uploadImage(f); }}
+                                  className="block w-full text-xs file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-brand-black file:text-white file:font-bold file:cursor-pointer hover:file:bg-brand-point" />
+                                <p className="text-[13px] md:text-sm text-gray-500 mt-1.5">JPG/PNG/WebP, 최대 10MB. 메인페이지 카드·상세페이지 상단에 공통 노출 — 가로로 넓은 배너형 권장 (예: 1200×300)</p>
+                                {uploading && <p className="text-[13px] md:text-sm text-brand-point-ink mt-1">업로드 중...</p>}
+                                {partyForm.imageUrl && (
+                                  <button onClick={() => setPartyForm(p => ({ ...p, imageUrl: "" }))}
+                                    className="text-xs text-red-500 mt-1.5 underline min-h-11 md:min-h-0">이미지 제거</button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 쿠폰 적용 불가 (매칭·솔로 공통) — 서버(결제 준비·무통장 신청·결제 완료)도 같은 값으로 쿠폰을 막는다 */}
+                          <div className="pt-2 border-t border-gray-100 order-last lg:order-none">
+                            <label className="flex items-start gap-3 w-full min-h-11 py-2 -my-1 px-2 -mx-2 rounded-lg hover:bg-gray-50 cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={partyForm.couponDisabled}
+                                onChange={e => setPartyForm(p => ({ ...p, couponDisabled: e.target.checked }))}
+                                className="mt-0.5 w-5 h-5 md:w-4 md:h-4 accent-black flex-shrink-0"
+                              />
+                              <span>
+                                <span className="block text-sm font-black text-gray-700">쿠폰 적용 불가</span>
+                                <span className="block text-[13px] md:text-sm font-medium text-gray-500 mt-0.5">체크 시 이 파티 결제에 쿠폰을 사용할 수 없습니다</span>
+                              </span>
+                            </label>
+                          </div>
+                        </div>
+                        <div className="contents lg:flex lg:flex-col lg:gap-4">
+                          <div className="pt-4 border-t border-gray-100 lg:pt-0 lg:border-t-0"><h4 className="text-[13px] md:text-sm font-black text-gray-500">기본 정보</h4></div>
+                          {/* 제목 */}
+                          <FormField label="제목 *" value={partyForm.title} onChange={v => setPartyForm(p => ({ ...p, title: v }))} />
+                          {/* 내용 */}
+                          <FormField label="한 줄 소개 (제목 아래 표시)" value={partyForm.description} onChange={v => setPartyForm(p => ({ ...p, description: v }))} textarea />
+                          {/* 일시 */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {partyForm.partyType === "solo" && partyForm.optionMode === "options" ? (
+                              <FormField label="일시 (표시용 텍스트) *" value={partyForm.dateString} onChange={v => setPartyForm(p => ({ ...p, dateString: v }))}
+                                placeholder="2026. 8. 1 (토) 19:00 — 시각은 24시간 형식" hint="시각은 첫 회차 시각으로 자동 저장됩니다" />
+                            ) : (
+                              <FormField label="일시 (표시용 텍스트) *" value={partyForm.dateString} onChange={v => setPartyForm(p => ({ ...p, dateString: v }))} placeholder="2026. 8. 1 (토) 19:00" />
+                            )}
+                            <div className="lg:order-first">
+                              <label className="block text-sm font-bold text-gray-700 mb-1.5">달력 날짜 *</label>
+                              <input type="date" value={partyForm.calendarDate} onChange={e => setPartyForm(p => ({ ...p, calendarDate: e.target.value }))}
+                                className="w-full px-4 py-3 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none min-h-11 md:min-h-0" aria-label="달력 날짜" />
+                            </div>
+                          </div>
+                          {/* 장소/대상 — lg 이상 2열 */}
+                          <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-4">
+                            <FormField label="장소 *" value={partyForm.location} onChange={v => setPartyForm(p => ({ ...p, location: v }))} />
+                            <FormField label="대상 *" value={partyForm.target} onChange={v => setPartyForm(p => ({ ...p, target: v }))} placeholder="만 25-35세 / 남녀비율 1:1" />
+                          </div>
+                          <div className="pt-4 border-t border-gray-100"><h4 className="text-[13px] md:text-sm font-black text-gray-500">참가비 · 정원</h4></div>
+                          {/* 솔로파티 — 참가 구성 사용 / 단일 가격 (명세 7-1) */}
+                          {partyForm.partyType === "solo" && (
+                            <div>
+                              <label className="block text-sm font-bold text-gray-700 mb-1.5">참가비·정원 방식 *</label>
+                              <div className="grid grid-cols-2 gap-3" role="group" aria-label="참가비·정원 방식">
+                                {([["options", "참가 구성 사용"], ["single", "단일 가격"]] as const).map(([m, label]) => (
+                                  <button key={m} type="button" onClick={() => selectOptionMode(m)} aria-pressed={partyForm.optionMode === m}
+                                    className={`w-full py-3 rounded-xl border-2 text-sm md:text-base font-black transition-all ${partyForm.optionMode === m ? "border-brand-black bg-brand-black text-white" : "border-gray-200 text-gray-500 hover:border-gray-300"} min-h-11 md:min-h-0`}>
+                                    {label}
+                                  </button>
+                                ))}
+                              </div>
+                              <p className="text-[13px] md:text-sm text-gray-500 mt-2">참가 구성: 1부·2부 같은 회차와 1부만·2부만·1부+2부 같은 참가 항목을 정합니다. 단일 가격: 남/여 참가비와 정원 하나씩.</p>
+                            </div>
+                          )}
+                          {partyForm.partyType === "solo" && partyForm.optionMode === "options" ? (
+                            <PartyOptionsEditor
+                              value={partyForm.optionsDraft}
+                              onChange={next => { setPartyForm(p => ({ ...p, optionsDraft: next })); setPartyFormDirty(true); }}
+                              applicants={partyForm.id ? adminPartyRows[partyForm.id]?.applicants ?? null : null}
+                            />
+                          ) : (<>
+                          {/* 남·여 참가비 + 남·여 정원 — lg 이상 한 줄 4칸 */}
+                          <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-4">
+                            {/* 참가비 — 성별별 분리 입력 */}
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1.5">남성 참가비 (원) *</label>
+                                <input
+                                  type="number" min={0} step={1000} inputMode="numeric"
+                                  value={partyForm.priceMale}
+                                  onChange={e => {
+                                    const v = Math.max(0, parseInt(e.target.value || "0", 10));
+                                    // price 폴백 동기화 (남/여 평균 또는 남성가). priceForGender 폴백용.
+                                    setPartyForm(p => ({ ...p, priceMale: v, price: v || p.priceFemale || p.price }));
+                                  }}
+                                  className="w-full px-4 py-3 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none min-h-11 md:min-h-0"
+                                  aria-label="남성 참가비"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1.5">여성 참가비 (원) *</label>
+                                <input
+                                  type="number" min={0} step={1000} inputMode="numeric"
+                                  value={partyForm.priceFemale}
+                                  onChange={e => {
+                                    const v = Math.max(0, parseInt(e.target.value || "0", 10));
+                                    setPartyForm(p => ({ ...p, priceFemale: v, price: p.priceMale || v || p.price }));
+                                  }}
+                                  className="w-full px-4 py-3 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none min-h-11 md:min-h-0"
+                                  aria-label="여성 참가비"
+                                />
+                              </div>
+                            </div>
+                            {/* 정원 */}
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1.5">남성 정원 *</label>
+                                <input type="number" min={0} max={100} value={partyForm.maleStock} onChange={e => {
+                                    const cleaned = String(parseInt(e.target.value || "0", 10));
+                                    e.target.value = cleaned; // 선행 0 제거 즉시 반영 (controlled input 미갱신 방지)
+                                    setPartyForm(p => ({ ...p, maleStock: parseInt(cleaned, 10) }));
+                                  }}
+                                  className="w-full px-4 py-3 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none min-h-11 md:min-h-0" aria-label="남성 정원" />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1.5">여성 정원 *</label>
+                                <input type="number" min={0} max={100} value={partyForm.femaleStock} onChange={e => {
+                                    const cleaned = String(parseInt(e.target.value || "0", 10));
+                                    e.target.value = cleaned;
+                                    setPartyForm(p => ({ ...p, femaleStock: parseInt(cleaned, 10) }));
+                                  }}
+                                  className="w-full px-4 py-3 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none min-h-11 md:min-h-0" aria-label="여성 정원" />
+                              </div>
+                              <p className="col-span-2 -mt-2 text-[13px] md:text-sm text-gray-500">입력한 정원이 결제 마감 기준이 됩니다.</p>
+                            </div>
+                          </div>
+                          </>)}
+
+                          {/* 참가 자격 제한 — 신규 섹션 */}
+                          <div className="pt-2 border-t border-gray-100">
+                            <p className="text-sm font-black text-gray-700 mb-3">참가 자격 제한 <span className="text-gray-500 font-medium">· 비워두면 무제한</span></p>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+                              <div>
+                                <label className="block text-[13px] md:text-sm font-bold text-gray-500 mb-1.5">최소 나이 (만)</label>
+                                <input
+                                  type="number" min={0} max={120} placeholder="예: 25"
+                                  value={partyForm.minAge}
+                                  onChange={e => setPartyForm(p => ({ ...p, minAge: e.target.value.replace(/\D/g, "") }))}
+                                  className="w-full px-4 py-3 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none tabular-nums min-h-11 md:min-h-0"
+                                  aria-label="최소 나이"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[13px] md:text-sm font-bold text-gray-500 mb-1.5">최대 나이 (만)</label>
+                                <input
+                                  type="number" min={0} max={120} placeholder="예: 35"
+                                  value={partyForm.maxAge}
+                                  onChange={e => setPartyForm(p => ({ ...p, maxAge: e.target.value.replace(/\D/g, "") }))}
+                                  className="w-full px-4 py-3 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none tabular-nums min-h-11 md:min-h-0"
+                                  aria-label="최대 나이"
+                                />
+                              </div>
+                              <div className="col-span-2 md:col-span-1">
+                                <label className="block text-[13px] md:text-sm font-bold text-gray-500 mb-1.5">혼인여부</label>
+                                <select
+                                  value={partyForm.allowedMaritalStatus}
+                                  onChange={e => setPartyForm(p => ({ ...p, allowedMaritalStatus: e.target.value as "all" | "싱글" | "돌싱" }))}
+                                  className="w-full px-4 py-3 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none min-h-11 md:min-h-0"
+                                  aria-label="혼인여부 제한"
+                                >
+                                  <option value="all">무관 (모두 허용)</option>
+                                  <option value="싱글">싱글 전용 (돌싱 차단)</option>
+                                  <option value="돌싱">돌싱 환영 (싱글도 허용)</option>
+                                </select>
+                              </div>
+                            </div>
+                            {partyForm.minAge && partyForm.maxAge && parseInt(partyForm.minAge, 10) > parseInt(partyForm.maxAge, 10) && (
+                              <p className="text-[13px] md:text-sm text-red-500 font-medium mt-2 ml-1">최소 나이가 최대 나이보다 큽니다.</p>
+                            )}
+                          </div>
+
+                          {/* 메인 페이지 카테고리 — 3 셀렉트 */}
+                          <div className="pt-4 border-t border-gray-100"><h4 className="text-[13px] md:text-sm font-black text-gray-500">옵션</h4></div>
+                          <div>
+                            <p className="text-sm font-black text-gray-700 mb-3">
+                              메인 페이지 카테고리 <span className="text-gray-500 font-medium">· 비워두면 해당 필터에서 제외</span>
+                            </p>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+                              <div>
+                                <label className="block text-[13px] md:text-sm font-bold text-gray-500 mb-1.5">대상별</label>
+                                <select
+                                  value={partyForm.targetGroup}
+                                  onChange={e => setPartyForm(p => ({ ...p, targetGroup: e.target.value as PartyForm["targetGroup"] }))}
+                                  className="w-full px-4 py-3 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none min-h-11 md:min-h-0"
+                                  aria-label="대상별 카테고리"
+                                >
+                                  <option value="">미지정</option>
+                                  <option value="싱글">싱글</option>
+                                  <option value="돌싱">돌싱</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-[13px] md:text-sm font-bold text-gray-500 mb-1.5">테마별</label>
+                                <select
+                                  value={partyForm.theme}
+                                  onChange={e => setPartyForm(p => ({ ...p, theme: e.target.value as PartyForm["theme"] }))}
+                                  className="w-full px-4 py-3 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none min-h-11 md:min-h-0"
+                                  aria-label="테마별 카테고리"
+                                >
+                                  <option value="">미지정</option>
+                                  <option value="티타임">티타임</option>
+                                  <option value="와인파티">와인파티</option>
+                                  <option value="사케파티">사케파티</option>
+                                  {/* value 는 DB/필터 값 유지, 표시 라벨만 '세션' (v6.7) */}
+                                  <option value="쿠킹클래스">세션</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-[13px] md:text-sm font-bold text-gray-500 mb-1.5">지역별</label>
+                                <select
+                                  value={partyForm.locationTag}
+                                  onChange={e => setPartyForm(p => ({ ...p, locationTag: e.target.value as PartyForm["locationTag"] }))}
+                                  className="w-full px-4 py-3 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none min-h-11 md:min-h-0"
+                                  aria-label="지역별 카테고리"
+                                >
+                                  <option value="">미지정</option>
+                                  <option value="서울">서울</option>
+                                  <option value="성남">성남</option>
+                                  <option value="수원">수원</option>
+                                  <option value="용인">용인</option>
+                                  <option value="인천">인천</option>
+                                  {/* '기타' 옵션 노출 제외 — 신규 등록/수정 시 선택 차단.
+                                      기존 '기타' 파티 데이터는 DB 에 그대로 보존되며,
+                                      관리자가 해당 파티를 열면 select 값이 빈 상태로 표시됨 → 재선택 유도.
+                                      표시 순서: 메인 페이지와 동일하게 인천/용인 위치 교체 (값 무변경). */}
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+
                         </div>
                       </div>
-                      {/* 장소/대상 */}
-                      <FormField label="장소 *" value={partyForm.location} onChange={v => setPartyForm(p => ({ ...p, location: v }))} />
-                      <FormField label="대상 *" value={partyForm.target} onChange={v => setPartyForm(p => ({ ...p, target: v }))} placeholder="만 25-35세 / 남녀비율 1:1" />
-                      <div className="pt-4 border-t border-gray-100"><h4 className="text-[13px] md:text-sm font-black text-gray-500">참가비 · 정원</h4></div>
-                      {/* 솔로파티 — 참가 구성 사용 / 단일 가격 (명세 7-1) */}
-                      {partyForm.partyType === "solo" && (
-                        <div>
-                          <label className="block text-sm font-bold text-gray-700 mb-1.5">참가비·정원 방식 *</label>
-                          <div className="grid grid-cols-2 gap-3" role="group" aria-label="참가비·정원 방식">
-                            {([["options", "참가 구성 사용"], ["single", "단일 가격"]] as const).map(([m, label]) => (
-                              <button key={m} type="button" onClick={() => selectOptionMode(m)} aria-pressed={partyForm.optionMode === m}
-                                className={`w-full py-3 rounded-xl border-2 text-sm md:text-base font-black transition-all ${partyForm.optionMode === m ? "border-brand-black bg-brand-black text-white" : "border-gray-200 text-gray-500 hover:border-gray-300"} min-h-11 md:min-h-0`}>
-                                {label}
-                              </button>
-                            ))}
-                          </div>
-                          <p className="text-[13px] md:text-sm text-gray-500 mt-2">참가 구성: 1부·2부 같은 회차와 1부만·2부만·1부+2부 같은 참가 항목을 정합니다. 단일 가격: 남/여 참가비와 정원 하나씩.</p>
-                        </div>
                       )}
-                      {partyForm.partyType === "solo" && partyForm.optionMode === "options" ? (
-                        <PartyOptionsEditor
-                          value={partyForm.optionsDraft}
-                          onChange={next => { setPartyForm(p => ({ ...p, optionsDraft: next })); setPartyFormDirty(true); }}
-                          applicants={partyForm.id ? adminPartyRows[partyForm.id]?.applicants ?? null : null}
-                        />
-                      ) : (<>
-                      {/* 참가비 — 성별별 분리 입력 */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-bold text-gray-700 mb-1.5">남성 참가비 (원) *</label>
-                          <input
-                            type="number" min={0} step={1000} inputMode="numeric"
-                            value={partyForm.priceMale}
-                            onChange={e => {
-                              const v = Math.max(0, parseInt(e.target.value || "0", 10));
-                              // price 폴백 동기화 (남/여 평균 또는 남성가). priceForGender 폴백용.
-                              setPartyForm(p => ({ ...p, priceMale: v, price: v || p.priceFemale || p.price }));
-                            }}
-                            className="w-full px-4 py-3 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none min-h-11 md:min-h-0"
-                            aria-label="남성 참가비"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-bold text-gray-700 mb-1.5">여성 참가비 (원) *</label>
-                          <input
-                            type="number" min={0} step={1000} inputMode="numeric"
-                            value={partyForm.priceFemale}
-                            onChange={e => {
-                              const v = Math.max(0, parseInt(e.target.value || "0", 10));
-                              setPartyForm(p => ({ ...p, priceFemale: v, price: p.priceMale || v || p.price }));
-                            }}
-                            className="w-full px-4 py-3 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none min-h-11 md:min-h-0"
-                            aria-label="여성 참가비"
-                          />
-                        </div>
-                      </div>
-                      {/* 정원 */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-bold text-gray-700 mb-1.5">남성 정원 *</label>
-                          <input type="number" min={0} max={100} value={partyForm.maleStock} onChange={e => {
-                              const cleaned = String(parseInt(e.target.value || "0", 10));
-                              e.target.value = cleaned; // 선행 0 제거 즉시 반영 (controlled input 미갱신 방지)
-                              setPartyForm(p => ({ ...p, maleStock: parseInt(cleaned, 10) }));
-                            }}
-                            className="w-full px-4 py-3 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none min-h-11 md:min-h-0" aria-label="남성 정원" />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-bold text-gray-700 mb-1.5">여성 정원 *</label>
-                          <input type="number" min={0} max={100} value={partyForm.femaleStock} onChange={e => {
-                              const cleaned = String(parseInt(e.target.value || "0", 10));
-                              e.target.value = cleaned;
-                              setPartyForm(p => ({ ...p, femaleStock: parseInt(cleaned, 10) }));
-                            }}
-                            className="w-full px-4 py-3 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none min-h-11 md:min-h-0" aria-label="여성 정원" />
-                        </div>
-                        <p className="col-span-2 -mt-2 text-[13px] md:text-sm text-gray-500">입력한 정원이 결제 마감 기준이 됩니다.</p>
-                      </div>
-                      </>)}
-
-                      {/* 참가 자격 제한 — 신규 섹션 */}
-                      <div className="pt-2 mt-1 border-t border-gray-100">
-                        <p className="text-sm font-black text-gray-700 mb-3">참가 자격 제한 <span className="text-gray-500 font-medium">· 비워두면 무제한</span></p>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-                          <div>
-                            <label className="block text-[13px] md:text-sm font-bold text-gray-500 mb-1.5">최소 나이 (만)</label>
-                            <input
-                              type="number" min={0} max={120} placeholder="예: 25"
-                              value={partyForm.minAge}
-                              onChange={e => setPartyForm(p => ({ ...p, minAge: e.target.value.replace(/\D/g, "") }))}
-                              className="w-full px-4 py-3 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none tabular-nums min-h-11 md:min-h-0"
-                              aria-label="최소 나이"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[13px] md:text-sm font-bold text-gray-500 mb-1.5">최대 나이 (만)</label>
-                            <input
-                              type="number" min={0} max={120} placeholder="예: 35"
-                              value={partyForm.maxAge}
-                              onChange={e => setPartyForm(p => ({ ...p, maxAge: e.target.value.replace(/\D/g, "") }))}
-                              className="w-full px-4 py-3 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none tabular-nums min-h-11 md:min-h-0"
-                              aria-label="최대 나이"
-                            />
-                          </div>
-                          <div className="col-span-2 md:col-span-1">
-                            <label className="block text-[13px] md:text-sm font-bold text-gray-500 mb-1.5">혼인여부</label>
-                            <select
-                              value={partyForm.allowedMaritalStatus}
-                              onChange={e => setPartyForm(p => ({ ...p, allowedMaritalStatus: e.target.value as "all" | "싱글" | "돌싱" }))}
-                              className="w-full px-4 py-3 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none min-h-11 md:min-h-0"
-                              aria-label="혼인여부 제한"
-                            >
-                              <option value="all">무관 (모두 허용)</option>
-                              <option value="싱글">싱글 전용 (돌싱 차단)</option>
-                              <option value="돌싱">돌싱 환영 (싱글도 허용)</option>
-                            </select>
-                          </div>
-                        </div>
-                        {partyForm.minAge && partyForm.maxAge && parseInt(partyForm.minAge, 10) > parseInt(partyForm.maxAge, 10) && (
-                          <p className="text-[13px] md:text-sm text-red-500 font-medium mt-2 ml-1">최소 나이가 최대 나이보다 큽니다.</p>
-                        )}
-                      </div>
-
-                      {/* 메인 페이지 카테고리 — 3 셀렉트 */}
-                      <div className="pt-4 border-t border-gray-100"><h4 className="text-[13px] md:text-sm font-black text-gray-500">옵션</h4></div>
-                      <div>
-                        <p className="text-sm font-black text-gray-700 mb-3">
-                          메인 페이지 카테고리 <span className="text-gray-500 font-medium">· 비워두면 해당 필터에서 제외</span>
-                        </p>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
-                          <div>
-                            <label className="block text-[13px] md:text-sm font-bold text-gray-500 mb-1.5">대상별</label>
-                            <select
-                              value={partyForm.targetGroup}
-                              onChange={e => setPartyForm(p => ({ ...p, targetGroup: e.target.value as PartyForm["targetGroup"] }))}
-                              className="w-full px-4 py-3 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none min-h-11 md:min-h-0"
-                              aria-label="대상별 카테고리"
-                            >
-                              <option value="">미지정</option>
-                              <option value="싱글">싱글</option>
-                              <option value="돌싱">돌싱</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-[13px] md:text-sm font-bold text-gray-500 mb-1.5">테마별</label>
-                            <select
-                              value={partyForm.theme}
-                              onChange={e => setPartyForm(p => ({ ...p, theme: e.target.value as PartyForm["theme"] }))}
-                              className="w-full px-4 py-3 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none min-h-11 md:min-h-0"
-                              aria-label="테마별 카테고리"
-                            >
-                              <option value="">미지정</option>
-                              <option value="티타임">티타임</option>
-                              <option value="와인파티">와인파티</option>
-                              <option value="사케파티">사케파티</option>
-                              {/* value 는 DB/필터 값 유지, 표시 라벨만 '세션' (v6.7) */}
-                              <option value="쿠킹클래스">세션</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-[13px] md:text-sm font-bold text-gray-500 mb-1.5">지역별</label>
-                            <select
-                              value={partyForm.locationTag}
-                              onChange={e => setPartyForm(p => ({ ...p, locationTag: e.target.value as PartyForm["locationTag"] }))}
-                              className="w-full px-4 py-3 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none min-h-11 md:min-h-0"
-                              aria-label="지역별 카테고리"
-                            >
-                              <option value="">미지정</option>
-                              <option value="서울">서울</option>
-                              <option value="성남">성남</option>
-                              <option value="수원">수원</option>
-                              <option value="용인">용인</option>
-                              <option value="인천">인천</option>
-                              {/* '기타' 옵션 노출 제외 — 신규 등록/수정 시 선택 차단.
-                                  기존 '기타' 파티 데이터는 DB 에 그대로 보존되며,
-                                  관리자가 해당 파티를 열면 select 값이 빈 상태로 표시됨 → 재선택 유도.
-                                  표시 순서: 메인 페이지와 동일하게 인천/용인 위치 교체 (값 무변경). */}
-                            </select>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* 쿠폰 적용 불가 (매칭·솔로 공통) — 서버(결제 준비·무통장 신청·결제 완료)도 같은 값으로 쿠폰을 막는다 */}
-                      <div className="pt-2 mt-1 border-t border-gray-100">
-                        <label className="flex items-start gap-3 w-full min-h-11 py-2 -my-1 px-2 -mx-2 rounded-lg hover:bg-gray-50 cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={partyForm.couponDisabled}
-                            onChange={e => setPartyForm(p => ({ ...p, couponDisabled: e.target.checked }))}
-                            className="mt-0.5 w-5 h-5 md:w-4 md:h-4 accent-black flex-shrink-0"
-                          />
-                          <span>
-                            <span className="block text-sm font-black text-gray-700">쿠폰 적용 불가</span>
-                            <span className="block text-[13px] md:text-sm font-medium text-gray-500 mt-0.5">체크 시 이 파티 결제에 쿠폰을 사용할 수 없습니다</span>
-                          </span>
-                        </label>
-                      </div>
-                      </>)}
                     </div>
                     {/* 고정 푸터 */}
-                    <div className="bg-white border-t border-gray-200 px-4 md:px-7 py-3 md:py-4 grid grid-cols-3 gap-2 md:flex md:justify-end flex-shrink-0">
+                    <div className="bg-white border-t border-gray-200 px-4 md:px-7 py-3 md:py-4 grid grid-cols-3 gap-2 md:flex md:justify-end md:items-center flex-shrink-0">
+                      {partyFormDirty && <span className="hidden md:block md:mr-auto text-xs font-medium text-gray-500">저장하지 않은 변경 있음</span>}
                       <button onClick={closePartyForm} className="min-h-12 md:min-h-0 px-4 py-2.5 rounded-lg text-base md:text-sm font-bold border border-gray-200 hover:bg-gray-50">취소</button>
                       <button onClick={savePartyForm} className="col-span-2 min-h-12 md:min-h-0 px-5 py-2.5 rounded-lg text-base md:text-sm font-black bg-brand-black text-white hover:bg-brand-point hover:text-black transition-all">
                         {partyEditMode === "create" ? "등록" : "수정 저장"}
@@ -2501,24 +2561,24 @@ export default function AdminDashboard() {
                   <p className="text-sm text-gray-500 font-medium mt-1">모든 결제에 사용 가능한 범용 쿠폰 — 정액(원) / 정률(%) · 발급 수량 한도</p>
                 </div>
                 <div className="grid grid-cols-2 gap-2 w-full md:w-auto md:flex">
-                  <button onClick={addCoupon} className="inline-flex items-center justify-center gap-1.5 bg-brand-point text-brand-black px-4 py-2.5 rounded-lg text-sm font-black hover:brightness-95 transition-all min-h-11 md:min-h-0">
+                  <button onClick={addCoupon} className="inline-flex items-center justify-center gap-1.5 bg-brand-point text-brand-black px-4 py-2.5 rounded-lg text-sm font-black hover:brightness-95 transition-all min-h-11 md:min-h-0 md:h-10">
                     <Plus size={14} /> 쿠폰 추가
                   </button>
-                  <button onClick={saveCoupons} className="bg-brand-black text-white px-4 py-2.5 rounded-lg text-sm font-black hover:bg-brand-point hover:text-black transition-all min-h-11 md:min-h-0">
+                  <button onClick={saveCoupons} className="bg-brand-black text-white px-4 py-2.5 rounded-lg text-sm font-black hover:bg-brand-point hover:text-black transition-all min-h-11 md:min-h-0 md:h-10">
                     저장
                   </button>
                 </div>
               </div>
               {/* 모바일: 같은 표의 행을 카드처럼 쌓아 보여준다(행·입력·핸들러는 하나 — 인라인 편집 로직 중복 없음) */}
-              <div className="md:bg-white md:rounded-2xl md:border md:border-gray-200 md:overflow-x-auto">
+              <div className="md:bg-white md:rounded-2xl md:border md:border-gray-200 md:overflow-auto md:max-h-[calc(100vh-220px)]">
                 <table className="block md:table w-full text-sm md:whitespace-nowrap">
-                  <thead className="hidden md:table-header-group bg-gray-50 text-gray-600 font-bold">
+                  <thead className="hidden md:table-header-group bg-gray-50 text-gray-600 font-bold md:sticky md:top-0 md:z-10">
                     <tr>
                       <th className="text-left px-3 md:px-4 py-3">쿠폰 코드</th>
                       <th className="text-left px-3 md:px-4 py-3">종류</th>
-                      <th className="text-left px-3 md:px-4 py-3">할인값</th>
+                      <th className="text-right px-3 md:px-4 py-3">할인값</th>
                       <th className="text-left px-3 md:px-4 py-3">할인 대상</th>
-                      <th className="text-left px-3 md:px-4 py-3">총 수량</th>
+                      <th className="text-right px-3 md:px-4 py-3">총 수량</th>
                       <th className="text-left px-3 md:px-4 py-3">만료일</th>
                       <th className="text-left px-3 md:px-4 py-3">상태</th>
                       <th className="text-left px-3 md:px-4 py-3">관리</th>
@@ -2533,7 +2593,7 @@ export default function AdminDashboard() {
                       const used      = c.used_count ?? 0;
                       const remain    = c.max_count > 0 ? Math.max(0, c.max_count - used) : null;
                       return (
-                        <tr key={idx} className="block md:table-row bg-white rounded-2xl border border-gray-200 p-4 md:p-0 md:rounded-none md:border-0 md:border-t md:border-gray-100">
+                        <tr key={idx} className="block md:table-row bg-white rounded-2xl border border-gray-200 p-4 md:p-0 md:rounded-none md:border-0 md:border-t md:border-gray-100 md:even:bg-gray-50/50 md:hover:bg-brand-point/5">
                           <td className="block md:table-cell pb-2 md:px-4 md:py-3">
                             <span className="md:hidden text-[13px] font-bold text-gray-500 flex-shrink-0 block mb-1">쿠폰 코드</span>
                             <input
@@ -2555,7 +2615,7 @@ export default function AdminDashboard() {
                               <option value="percent">정률 (%)</option>
                             </select>
                           </td>
-                          <td className="flex items-center justify-between gap-3 py-1.5 md:table-cell md:px-4 md:py-3">
+                          <td className="flex items-center justify-between gap-3 py-1.5 md:table-cell md:px-4 md:py-3 md:text-right md:tabular-nums">
                             <span className="md:hidden text-[13px] font-bold text-gray-500 flex-shrink-0">할인값</span>
                             <span className="inline-flex items-center">
                             <input
@@ -2568,7 +2628,7 @@ export default function AdminDashboard() {
                                 e.target.value = String(v); // 선행 0 제거 즉시 반영 (controlled input 미갱신 방지)
                                 updateCoupon(idx, { amount: v });
                               }}
-                              className="w-24 px-2.5 py-1.5 rounded-lg border border-gray-200 text-base md:text-sm font-bold bg-white text-right min-h-11 md:min-h-0" aria-label="할인값"
+                              className="w-24 px-2.5 py-1.5 rounded-lg border border-gray-200 text-base md:text-sm font-bold bg-white text-right md:tabular-nums min-h-11 md:min-h-0" aria-label="할인값"
                             />
                             <span className="ml-1 text-gray-500 text-xs">{isPercent ? "%" : "원"}</span>
                             </span>
@@ -2606,7 +2666,7 @@ export default function AdminDashboard() {
                               </label>
                             </div>
                           </td>
-                          <td className="flex items-center justify-between gap-3 py-1.5 md:table-cell md:px-4 md:py-3 md:text-left">
+                          <td className="flex items-center justify-between gap-3 py-1.5 md:table-cell md:px-4 md:py-3 md:text-right md:tabular-nums">
                             <span className="md:hidden text-[13px] font-bold text-gray-500 flex-shrink-0">총 수량</span>
                             <span className="block text-right">
                             <input
@@ -2617,7 +2677,7 @@ export default function AdminDashboard() {
                                 e.target.value = String(v); // 선행 0 제거 즉시 반영 (controlled input 미갱신 방지)
                                 updateCoupon(idx, { max_count: v });
                               }}
-                              className="w-20 px-2.5 py-1.5 rounded-lg border border-gray-200 text-base md:text-sm font-bold bg-white text-right min-h-11 md:min-h-0"
+                              className="w-20 px-2.5 py-1.5 rounded-lg border border-gray-200 text-base md:text-sm font-bold bg-white text-right md:tabular-nums min-h-11 md:min-h-0"
                               aria-label="총 수량" placeholder="0=무제한"
                             />
                             <div className="text-xs text-gray-500 mt-0.5 text-right">
@@ -2647,7 +2707,7 @@ export default function AdminDashboard() {
                             </label>
                           </td>
                           <td className="block md:table-cell pt-2 md:px-4 md:py-3">
-                            <button type="button" onClick={() => removeCoupon(idx)} className="w-full md:w-auto bg-red-50 text-danger px-3 py-1.5 rounded-lg text-sm md:text-xs font-bold hover:bg-danger hover:text-white transition-all min-h-11 md:min-h-0">
+                            <button type="button" onClick={() => removeCoupon(idx)} className="w-full md:w-auto bg-red-50 md:bg-white md:border md:border-danger text-danger px-3 py-1.5 rounded-lg text-sm md:text-xs font-bold hover:bg-danger hover:text-white transition-all min-h-11 md:min-h-0">
                               <Trash2 size={11} className="inline mr-1" />삭제
                             </button>
                           </td>
@@ -2669,14 +2729,14 @@ export default function AdminDashboard() {
 
           {/* === 기업 정보 === */}
           {tab === "company" && (
-            <section className="max-w-2xl">
+            <section className="max-w-2xl lg:max-w-4xl">
               <div className="flex items-end justify-between mb-4 md:mb-5">
                 <div>
                   <h2 className="text-xl md:text-2xl font-black">기업 정보</h2>
                   <p className="text-sm text-gray-500 font-medium mt-1">푸터에 노출되는 정보</p>
                 </div>
               </div>
-              <div className="bg-white rounded-2xl border border-gray-200 p-5 md:p-6 space-y-4">
+              <div className="bg-white rounded-2xl border border-gray-200 p-5 md:p-6 space-y-4 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-x-5 lg:gap-y-4">
                 {([
                   ["name", "상호명"],
                   ["ceo", "대표자명"],
@@ -2684,7 +2744,7 @@ export default function AdminDashboard() {
                   ["address", "주소"],
                   ["telecom", "통신판매업신고"],
                 ] as const).map(([key, label]) => (
-                  <div key={key}>
+                  <div key={key} className={key === "address" ? "lg:col-span-2" : undefined}>
                     <label className="block text-sm font-bold text-gray-700 mb-1.5">{label}</label>
                     <input
                       type="text" value={company[key] ?? ""}
@@ -2693,10 +2753,10 @@ export default function AdminDashboard() {
                     />
                   </div>
                 ))}
-                <button onClick={saveCompany} className="w-full md:w-auto bg-brand-black text-white px-5 py-3 rounded-lg text-sm font-black hover:bg-brand-point hover:text-black transition-all mt-2 min-h-11 md:min-h-0">
+                <button onClick={saveCompany} className="w-full md:w-auto lg:col-span-2 lg:justify-self-start bg-brand-black text-white px-5 py-3 rounded-lg text-sm font-black hover:bg-brand-point hover:text-black transition-all mt-2 min-h-11 md:min-h-0">
                   저장
                 </button>
-                <p className="text-[13px] md:text-sm text-gray-500 leading-relaxed pt-2">변경 사항은 푸터에 자동 반영됩니다 (페이지 새로고침 후).</p>
+                <p className="text-[13px] md:text-sm text-gray-500 leading-relaxed pt-2 lg:col-span-2">변경 사항은 푸터에 자동 반영됩니다 (페이지 새로고침 후).</p>
               </div>
             </section>
           )}
@@ -2714,7 +2774,7 @@ export default function AdminDashboard() {
                     메인페이지 현장스케치 섹션에 노출되는 이미지를 관리합니다. 변경 사항은 즉시 메인에 반영됩니다.
                   </p>
                 </div>
-                <label className="inline-flex items-center gap-2 bg-brand-point hover:brightness-110 text-black px-4 py-2.5 rounded-xl font-bold text-sm cursor-pointer transition-all">
+                <label className="inline-flex items-center gap-2 bg-brand-point hover:brightness-110 text-black px-4 py-2.5 rounded-xl font-bold text-sm cursor-pointer transition-all md:h-10">
                   <Plus size={16} />
                   {galleryUploading ? "업로드 중..." : "이미지 추가"}
                   <input
@@ -2737,7 +2797,7 @@ export default function AdminDashboard() {
                   <p className="text-sm text-gray-500">등록된 갤러리 이미지가 없습니다. 우측 상단 [이미지 추가] 버튼으로 업로드하세요.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-5">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-5">
                   {gallery.map((g, idx) => (
                     <div key={g.id} className="bg-white rounded-2xl border border-gray-200 overflow-hidden group">
                       <div className="relative aspect-square bg-gray-100">
@@ -2753,7 +2813,7 @@ export default function AdminDashboard() {
                         <button
                           type="button"
                           onClick={() => deleteGalleryItem(g.id, g.alt_text)}
-                          className="absolute top-2 right-2 w-7 h-7 bg-red-500/90 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="absolute top-2 right-2 w-7 h-7 md:w-9 md:h-9 bg-red-500/90 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                           aria-label="삭제"
                         >
                           <Trash2 size={13} />
@@ -2774,7 +2834,7 @@ export default function AdminDashboard() {
                             type="button"
                             onClick={() => moveGalleryItem(g.id, -1)}
                             disabled={idx === 0}
-                            className="flex-1 px-2 py-1.5 text-xs font-bold bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-300 rounded-md transition-colors min-h-11 md:min-h-0"
+                            className="flex-1 px-2 py-1.5 text-xs font-bold bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-300 rounded-md transition-colors min-h-11 md:min-h-9"
                             title="앞으로 이동"
                           >
                             ↑
@@ -2783,7 +2843,7 @@ export default function AdminDashboard() {
                             type="button"
                             onClick={() => moveGalleryItem(g.id, 1)}
                             disabled={idx === gallery.length - 1}
-                            className="flex-1 px-2 py-1.5 text-xs font-bold bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-300 rounded-md transition-colors min-h-11 md:min-h-0"
+                            className="flex-1 px-2 py-1.5 text-xs font-bold bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-300 rounded-md transition-colors min-h-11 md:min-h-9"
                             title="뒤로 이동"
                           >
                             ↓
@@ -2813,15 +2873,15 @@ export default function AdminDashboard() {
                 <button
                   type="button"
                   onClick={openReviewCreate}
-                  className="inline-flex items-center gap-1.5 bg-brand-point text-brand-black px-4 py-2.5 rounded-lg text-sm font-black hover:brightness-95 transition-all min-h-11 md:min-h-0"
+                  className="inline-flex items-center gap-1.5 bg-brand-point text-brand-black px-4 py-2.5 rounded-lg text-sm font-black hover:brightness-95 transition-all min-h-11 md:min-h-0 md:h-10"
                 >
                   <Plus size={14} /> 새 후기 등록
                 </button>
               </div>
 
-              <div className="hidden md:block bg-white rounded-2xl border border-gray-200 overflow-x-auto">
+              <div className="hidden md:block bg-white rounded-2xl border border-gray-200 overflow-auto max-h-[calc(100vh-220px)]">
                 <table className="w-full text-sm whitespace-nowrap">
-                  <thead className="bg-gray-50 text-gray-600 font-bold">
+                  <thead className="bg-gray-50 text-gray-600 font-bold sticky top-0 z-10">
                     <tr>
                       <th className="text-left px-3 md:px-4 py-3">No</th>
                       <th className="text-left px-3 md:px-4 py-3">작성자 회원정보</th>
@@ -2841,7 +2901,7 @@ export default function AdminDashboard() {
                       <tr><td colSpan={8} className="text-center text-gray-500 py-8">등록된 후기가 없습니다. [새 후기 등록] 버튼으로 등록하세요.</td></tr>
                     )}
                     {reviews.map((r, idx) => (
-                      <tr key={r.id} className="border-t border-gray-100">
+                      <tr key={r.id} className="border-t border-gray-100 even:bg-gray-50/50 hover:bg-brand-point/5">
                         <td className="px-3 md:px-4 py-3 text-gray-500 tabular-nums">{idx + 1}</td>
                         <td className="px-3 md:px-4 py-3">
                           {r.is_admin_created ? (
@@ -2849,7 +2909,7 @@ export default function AdminDashboard() {
                           ) : (
                             <div className="text-xs leading-relaxed">
                               <p className="font-bold text-brand-black">{r.author_name || "-"}</p>
-                              <p className="text-gray-500 font-mono">{r.author_email || "-"}</p>
+                              <p className="text-gray-500 font-mono max-w-[200px] truncate" title={r.author_email || undefined}>{r.author_email || "-"}</p>
                               <p className="text-gray-500">{formatPhoneKR(r.author_phone || "")}</p>
                             </div>
                           )}
@@ -2866,13 +2926,13 @@ export default function AdminDashboard() {
                         <td className="px-3 md:px-4 py-3 max-w-[280px] truncate text-gray-600" title={r.content}>{r.content}</td>
                         <td className="px-3 md:px-4 py-3 text-gray-500">{r.created_at?.slice(0, 10)}</td>
                         <td className="px-3 md:px-4 py-3">
-                          <div className="flex gap-1.5">
+                          <div className="flex gap-2">
                             <button type="button" onClick={() => openReviewEdit(r)}
-                              className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors min-h-11 md:min-h-0" aria-label="수정">
+                              className="p-1.5 rounded-lg bg-brand-black text-white hover:bg-brand-point hover:text-black transition-colors min-h-11 md:min-h-0" aria-label="수정">
                               <Pencil size={14} />
                             </button>
                             <button type="button" onClick={() => deleteReview(r.id)}
-                              className="p-1.5 rounded-lg hover:bg-red-50 text-red-500 transition-colors min-h-11 md:min-h-0" aria-label="삭제">
+                              className="p-1.5 rounded-lg bg-white border border-danger text-danger hover:bg-danger hover:text-white transition-colors min-h-11 md:min-h-0" aria-label="삭제">
                               <Trash2 size={14} />
                             </button>
                           </div>
@@ -3015,7 +3075,7 @@ export default function AdminDashboard() {
                   type="button"
                   onClick={loadLogs}
                   disabled={logsLoading}
-                  className="px-3 py-2 rounded-lg border border-gray-200 text-sm font-bold bg-white hover:border-brand-point hover:text-brand-point-ink disabled:opacity-50 min-h-11 md:min-h-0"
+                  className="px-3 py-2 rounded-lg border border-gray-200 text-sm font-bold bg-white hover:border-brand-point hover:text-brand-point-ink disabled:opacity-50 min-h-11 md:min-h-0 md:h-10"
                 >
                   {logsLoading ? "조회 중..." : "새로고침"}
                 </button>
@@ -3026,23 +3086,23 @@ export default function AdminDashboard() {
                 <div>
                   <label className="block text-[13px] md:text-sm font-bold text-gray-500 mb-1.5">시작일</label>
                   <input type="date" value={logFromDate} onChange={e => setLogFromDate(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none min-h-11 md:min-h-0" aria-label="시작일" />
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none min-h-11 md:min-h-0 md:h-10" aria-label="시작일" />
                 </div>
                 <div>
                   <label className="block text-[13px] md:text-sm font-bold text-gray-500 mb-1.5">종료일</label>
                   <input type="date" value={logToDate} onChange={e => setLogToDate(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none min-h-11 md:min-h-0" aria-label="종료일" />
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none min-h-11 md:min-h-0 md:h-10" aria-label="종료일" />
                 </div>
                 <div>
                   <label className="block text-[13px] md:text-sm font-bold text-gray-500 mb-1.5">관리자 ID</label>
                   <input type="text" placeholder="예: admin" value={logAdminFilter}
                     onChange={e => setLogAdminFilter(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none min-h-11 md:min-h-0" />
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none min-h-11 md:min-h-0 md:h-10" />
                 </div>
                 <div>
                   <label className="block text-[13px] md:text-sm font-bold text-gray-500 mb-1.5">활동 유형</label>
                   <select value={logActionFilter} onChange={e => setLogActionFilter(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white min-h-11 md:min-h-0" aria-label="활동 유형">
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white min-h-11 md:min-h-0 md:h-10" aria-label="활동 유형">
                     <option value="">전체</option>
                     <option value="login">로그인</option>
                     <option value="logout">로그아웃</option>
@@ -3056,16 +3116,16 @@ export default function AdminDashboard() {
                 <div className="flex items-end">
                   <button type="button"
                     onClick={() => { setLogFromDate(""); setLogToDate(""); setLogAdminFilter(""); setLogActionFilter(""); }}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm font-bold bg-white hover:bg-gray-50 min-h-11 md:min-h-0">
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm font-bold bg-white hover:bg-gray-50 min-h-11 md:min-h-0 md:h-10">
                     초기화
                   </button>
                 </div>
               </div>
 
               {/* 로그 테이블 — 모바일: 같은 행을 카드로 쌓아 보여준다(펼침 state·핸들러 하나) */}
-              <div className="md:bg-white md:rounded-2xl md:border md:border-gray-200 md:overflow-x-auto">
+              <div className="md:bg-white md:rounded-2xl md:border md:border-gray-200 md:overflow-auto md:max-h-[calc(100vh-220px)]">
                 <table className="block md:table w-full text-xs md:text-sm md:whitespace-nowrap">
-                  <thead className="hidden md:table-header-group bg-gray-50 text-gray-600 font-bold">
+                  <thead className="hidden md:table-header-group bg-gray-50 text-gray-600 font-bold md:sticky md:top-0 md:z-10">
                     <tr>
                       {["일시", "관리자", "IP", "활동", "대상", "요약", "상세"].map(h => (
                         <th key={h} className="text-left px-3 py-3 first:pl-5">{h}</th>
@@ -3093,30 +3153,32 @@ export default function AdminDashboard() {
                       const meta = actionMeta[row.action] ?? { label: row.action, tone: "bg-gray-100 text-gray-600" };
                       return (
                         <Fragment key={row.id}>
-                          <tr className={`flex flex-col md:table-row rounded-2xl border border-gray-200 p-4 md:p-0 md:rounded-none md:border-0 md:border-t md:border-gray-100 ${isHighlight ? "bg-red-50/40 hover:bg-red-50" : "bg-white md:bg-transparent hover:bg-gray-50"}`}>
-                            <td className="order-3 flex justify-between gap-3 py-0.5 text-[13px] md:text-xs md:table-cell md:px-3 md:py-2.5 md:first:pl-5 text-gray-600 tabular-nums"><span className="md:hidden text-gray-500 font-medium flex-shrink-0">일시</span>{formatKST(row.created_at)}</td>
-                            <td className="order-4 flex justify-between gap-3 py-0.5 text-[13px] md:text-xs md:table-cell md:px-3 md:py-2.5 font-bold"><span className="md:hidden text-gray-500 font-medium flex-shrink-0">관리자</span>{row.admin_id || "-"}</td>
-                            <td className="order-5 flex justify-between gap-3 py-0.5 text-[13px] md:text-xs md:table-cell md:px-3 md:py-2.5 text-gray-500 tabular-nums"><span className="md:hidden text-gray-500 font-medium flex-shrink-0">IP</span>{row.ip || "-"}</td>
-                            <td className="order-1 md:table-cell md:px-3 md:py-2.5">
+                          {/* 상세가 있는 행은 행 전체가 [상세 보기/닫기] — 토글 핸들러는 예전 버튼의 것 그대로, 버튼 클릭도 여기로 전달됨 */}
+                          <tr
+                            onClick={(row.before_value || row.after_value) ? () => setLogExpanded(prev => {
+                              const next = new Set(prev);
+                              if (next.has(row.id)) next.delete(row.id); else next.add(row.id);
+                              return next;
+                            }) : undefined}
+                            className={`flex flex-col md:table-row rounded-2xl border border-gray-200 p-4 md:p-0 md:rounded-none md:border-0 md:border-t md:border-gray-100 ${(row.before_value || row.after_value) ? "md:cursor-pointer" : ""} ${isHighlight ? "bg-red-50/40 hover:bg-red-50" : "bg-white md:bg-transparent hover:bg-gray-50 md:even:bg-gray-50/50 md:hover:bg-brand-point/5"}`}>
+                            <td className="order-3 flex justify-between gap-3 py-0.5 text-[13px] md:text-xs md:table-cell md:px-3 md:py-3 md:first:pl-5 text-gray-600 tabular-nums"><span className="md:hidden text-gray-500 font-medium flex-shrink-0">일시</span>{formatKST(row.created_at)}</td>
+                            <td className="order-4 flex justify-between gap-3 py-0.5 text-[13px] md:text-xs md:table-cell md:px-3 md:py-3 font-bold"><span className="md:hidden text-gray-500 font-medium flex-shrink-0">관리자</span>{row.admin_id || "-"}</td>
+                            <td className="order-5 flex justify-between gap-3 py-0.5 text-[13px] md:text-xs md:table-cell md:px-3 md:py-3 text-gray-500 tabular-nums"><span className="md:hidden text-gray-500 font-medium flex-shrink-0">IP</span>{row.ip || "-"}</td>
+                            <td className="order-1 md:table-cell md:px-3 md:py-3">
                               <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-black ${meta.tone}`}>
                                 {meta.label}
                               </span>
                             </td>
-                            <td className="order-6 flex justify-between gap-3 py-0.5 text-[13px] md:text-xs md:table-cell md:px-3 md:py-2.5 text-gray-700">
+                            <td className="order-6 flex justify-between gap-3 py-0.5 text-[13px] md:text-xs md:table-cell md:px-3 md:py-3 text-gray-700">
                               <span className="md:hidden text-gray-500 font-medium flex-shrink-0">대상</span>
                               {row.target_type ? `${row.target_type}${row.target_id ? ` #${row.target_id}` : ""}` : "-"}
                             </td>
-                            <td className={`order-2 mt-1.5 mb-2 md:m-0 text-[15px] md:text-xs leading-snug md:leading-normal break-keep md:table-cell md:px-3 md:py-2.5 md:max-w-[28rem] whitespace-normal ${isHighlight ? "font-bold text-red-700" : "font-bold md:font-normal"}`}>
+                            <td className={`order-2 mt-1.5 mb-2 md:m-0 text-[15px] md:text-xs leading-snug md:leading-normal break-keep md:table-cell md:px-3 md:py-3 md:max-w-[28rem] whitespace-normal ${isHighlight ? "font-bold text-red-700" : "font-bold md:font-normal"}`}>
                               {row.summary || "-"}
                             </td>
-                            <td className="order-7 pt-2 md:pt-0 md:table-cell md:px-3 md:py-2.5">
+                            <td className="order-7 pt-2 md:pt-0 md:table-cell md:px-3 md:py-3">
                               {(row.before_value || row.after_value) ? (
-                                <button type="button"
-                                  onClick={() => setLogExpanded(prev => {
-                                    const next = new Set(prev);
-                                    if (next.has(row.id)) next.delete(row.id); else next.add(row.id);
-                                    return next;
-                                  })}
+                                <button type="button" aria-expanded={expanded}
                                   className="w-full md:w-auto rounded-lg md:rounded-none border border-gray-200 md:border-0 text-sm md:text-xs font-bold text-brand-point-ink md:underline min-h-11 md:min-h-0">
                                   {expanded ? "상세 닫기" : "상세 보기"}
                                 </button>
@@ -3141,7 +3203,7 @@ export default function AdminDashboard() {
                                   </div>
                                 </div>
                                 {row.user_agent && (
-                                  <p className="text-xs text-gray-500 mt-2 truncate">UA: {row.user_agent}</p>
+                                  <p className="text-xs text-gray-500 mt-2 truncate" title={row.user_agent}>UA: {row.user_agent}</p>
                                 )}
                               </td>
                             </tr>
@@ -3202,18 +3264,18 @@ export default function AdminDashboard() {
                   <div className="relative w-full md:w-auto">
                     <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
                     <input value={cancelSearch} onChange={e => setCancelSearch(e.target.value)} placeholder="이름·이메일·연락처 검색"
-                      className="pl-9 pr-3 py-2 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white w-full sm:w-56 md:w-64 min-h-11 md:min-h-0" aria-label="취소요청 검색" />
+                      className="pl-9 pr-3 py-2 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white w-full sm:w-56 md:w-64 min-h-11 md:min-h-0 md:h-10" aria-label="취소요청 검색" />
                   </div>
                 </div>
 
                 {/* 테이블 — 모바일: 같은 행을 카드로 쌓아 보여준다(환불 금액 계산·승인 핸들러 하나) */}
                 <div className="md:bg-white md:rounded-2xl md:border md:border-gray-200 md:overflow-hidden">
-                  <div className="md:overflow-x-auto">
+                  <div className="md:overflow-auto md:max-h-[calc(100vh-220px)]">
                     <table className="block md:table w-full text-xs md:text-sm md:whitespace-nowrap">
-                      <thead className="hidden md:table-header-group bg-gray-50 text-gray-500 font-bold">
+                      <thead className="hidden md:table-header-group bg-gray-50 text-gray-500 font-bold md:sticky md:top-0 md:z-10">
                         <tr>
                           {["파티 정보", "결제일", "결제 금액", "환불받을 금액", "이메일", "이름", "연락처", "결제 방식", "상태", "관리"].map(h => (
-                            <th key={h} className="text-left px-3 py-2.5 first:pl-5 md:first:pl-7">{h}</th>
+                            <th key={h} className={`${h === "결제 금액" || h === "환불받을 금액" ? "text-right" : "text-left"} px-3 py-3 first:pl-5 md:first:pl-7`}>{h}</th>
                           ))}
                         </tr>
                       </thead>
@@ -3235,28 +3297,28 @@ export default function AdminDashboard() {
                                 ? calculateRefund(b.total ?? party.price ?? 0, party.calendarDate, b.cancelRequestedAt ? new Date(b.cancelRequestedAt) : undefined)
                                 : null;
                           return (
-                            <tr key={b.id} className="flex flex-col md:table-row bg-white rounded-2xl border border-gray-200 p-4 md:p-0 md:rounded-none md:border-0 md:border-t md:border-gray-100 hover:bg-gray-50">
-                              <td className="order-2 mt-1.5 md:mt-0 md:table-cell md:px-3 md:py-2.5 md:first:pl-5 md:first:pl-7">
+                            <tr key={b.id} className="flex flex-col md:table-row bg-white rounded-2xl border border-gray-200 p-4 md:p-0 md:rounded-none md:border-0 md:border-t md:border-gray-100 hover:bg-gray-50 md:even:bg-gray-50/50 md:hover:bg-brand-point/5">
+                              <td className="order-2 mt-1.5 md:mt-0 md:table-cell md:px-3 md:py-3 md:first:pl-5 md:first:pl-7">
                                 <div className="font-bold text-[15px] md:text-xs leading-snug break-keep">{party?.title ?? `파티 #${b.partyId}`}</div>
                                 <div className="text-gray-500 text-[13px] md:text-xs">{party?.dateString ?? "-"}</div>
                               </td>
-                              <td className="order-7 flex justify-between gap-3 py-0.5 text-[13px] md:text-xs md:table-cell md:px-3 md:py-2.5 text-gray-500"><span className="md:hidden text-gray-500 font-medium flex-shrink-0">결제일</span>{b.createdAt?.slice(0, 10)}</td>
-                              <td className="order-8 flex justify-between gap-3 py-0.5 text-[13px] md:text-xs md:table-cell md:px-3 md:py-2.5 tabular-nums"><span className="md:hidden text-gray-500 font-medium flex-shrink-0">결제 금액</span>₩{(b.total ?? party?.price ?? 0).toLocaleString()}</td>
-                              <td className="order-3 flex items-baseline justify-between gap-3 mt-2 mb-1.5 md:m-0 md:table-cell md:px-3 md:py-2.5 tabular-nums font-black text-brand-point-ink text-lg md:text-xs">
+                              <td className="order-7 flex justify-between gap-3 py-0.5 text-[13px] md:text-xs md:table-cell md:px-3 md:py-3 text-gray-500"><span className="md:hidden text-gray-500 font-medium flex-shrink-0">결제일</span>{b.createdAt?.slice(0, 10)}</td>
+                              <td className="order-8 flex justify-between gap-3 py-0.5 text-[13px] md:text-xs md:table-cell md:px-3 md:py-3 md:text-right tabular-nums"><span className="md:hidden text-gray-500 font-medium flex-shrink-0">결제 금액</span>₩{(b.total ?? party?.price ?? 0).toLocaleString()}</td>
+                              <td className="order-3 flex items-baseline justify-between gap-3 mt-2 mb-1.5 md:m-0 md:table-cell md:px-3 md:py-3 md:text-right tabular-nums font-black text-brand-point-ink text-lg md:text-xs">
                                 <span className="md:hidden text-[13px] font-bold text-gray-500">환불받을 금액</span>
                                 <span>₩{(refund?.refund ?? 0).toLocaleString()}
                                 {refund && <span className="text-gray-500 font-medium text-xs"> ({refund.label})</span>}</span>
                               </td>
-                              <td className="order-6 flex justify-between gap-3 py-0.5 text-[13px] md:text-xs md:table-cell md:px-3 md:py-2.5 font-mono md:max-w-[200px] md:truncate" title={b.userEmail}><span className="md:hidden text-gray-500 font-medium flex-shrink-0">이메일</span><span className="min-w-0 break-all text-right md:text-left">{b.userEmail}</span></td>
-                              <td className="order-4 flex justify-between gap-3 py-0.5 text-[13px] md:text-xs md:table-cell md:px-3 md:py-2.5 font-bold"><span className="md:hidden text-gray-500 font-medium flex-shrink-0">이름</span>{b.userName}</td>
-                              <td className="order-5 flex justify-between gap-3 py-0.5 text-[13px] md:text-xs md:table-cell md:px-3 md:py-2.5 tabular-nums"><span className="md:hidden text-gray-500 font-medium flex-shrink-0">연락처</span>{formatPhoneKR(b.userPhone)}</td>
-                              <td className="order-9 flex justify-between gap-3 py-0.5 text-[13px] md:text-xs md:table-cell md:px-3 md:py-2.5 font-bold"><span className="md:hidden text-gray-500 font-medium flex-shrink-0">결제 방식</span>{isVbank ? "무통장 입금" : "카드"}</td>
-                              <td className="order-1 md:table-cell md:px-3 md:py-2.5">
+                              <td className="order-6 flex justify-between gap-3 py-0.5 text-[13px] md:text-xs md:table-cell md:px-3 md:py-3 font-mono md:max-w-[200px] md:truncate" title={b.userEmail}><span className="md:hidden text-gray-500 font-medium flex-shrink-0">이메일</span><span className="min-w-0 break-all text-right md:text-left">{b.userEmail}</span></td>
+                              <td className="order-4 flex justify-between gap-3 py-0.5 text-[13px] md:text-xs md:table-cell md:px-3 md:py-3 font-bold md:text-brand-black"><span className="md:hidden text-gray-500 font-medium flex-shrink-0">이름</span>{b.userName}</td>
+                              <td className="order-5 flex justify-between gap-3 py-0.5 text-[13px] md:text-xs md:table-cell md:px-3 md:py-3 tabular-nums"><span className="md:hidden text-gray-500 font-medium flex-shrink-0">연락처</span>{formatPhoneKR(b.userPhone)}</td>
+                              <td className="order-9 flex justify-between gap-3 py-0.5 text-[13px] md:text-xs md:table-cell md:px-3 md:py-3 font-bold"><span className="md:hidden text-gray-500 font-medium flex-shrink-0">결제 방식</span>{isVbank ? "무통장 입금" : "카드"}</td>
+                              <td className="order-1 md:table-cell md:px-3 md:py-3">
                                 <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-black ${done ? "bg-gray-200 text-gray-600" : "bg-[#f4cccc] text-danger"}`}>
                                   {done ? "환불 완료" : "취소요청"}
                                 </span>
                               </td>
-                              <td className="order-10 pt-3 md:pt-0 md:table-cell md:px-3 md:py-2.5">
+                              <td className="order-10 pt-3 md:pt-0 md:table-cell md:px-3 md:py-3">
                                 {done ? (
                                   <span className="inline-flex items-center gap-1 text-gray-500 font-bold text-[13px] md:text-xs"><CheckCircle2 size={13} /> 환불 완료</span>
                                 ) : (
@@ -3290,7 +3352,7 @@ export default function AdminDashboard() {
                 <button
                   type="button"
                   onClick={() => { setMemoNewOpen(true); setMemoNewContent(""); setMemoNewColor(MEMO_COLORS[0]); }}
-                  className="inline-flex items-center gap-2 bg-brand-point hover:brightness-110 text-black px-4 py-2.5 rounded-xl font-bold text-sm transition-all min-h-11 md:min-h-0"
+                  className="inline-flex items-center gap-2 bg-brand-point hover:brightness-110 text-black px-4 py-2.5 rounded-xl font-bold text-sm transition-all min-h-11 md:min-h-0 md:h-10"
                 >
                   <Plus size={16} /> 새 메모 추가
                 </button>
@@ -3472,6 +3534,7 @@ export default function AdminDashboard() {
 
         </motion.div>
       </main>
+      </div>
 
       {/* 무통장 입금 확인 — 실제 입금액 입력 모달 (탭 바깥에 렌더해 모든 탭에서 노출) */}
       {vbankModal && (

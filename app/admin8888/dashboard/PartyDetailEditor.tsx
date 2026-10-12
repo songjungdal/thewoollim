@@ -131,10 +131,10 @@ export default function PartyDetailEditor({ value, onChange, partyType, hasSessi
     return (
       <>
         {list.length > 0 ? (
-          <div className="grid grid-cols-2 gap-2 md:flex md:gap-3 md:overflow-x-auto md:pb-2 md:-mx-1 md:px-1">
+          <div className="grid grid-cols-2 gap-2 md:flex md:gap-3 md:overflow-x-auto md:pb-2 md:-mx-1 md:px-1 lg:grid lg:grid-cols-3 lg:overflow-visible lg:mx-0 lg:px-0">
             {list.map((img, i) => (
-              <div key={`${img.url}-${i}`} className="min-w-0 md:w-48 md:flex-shrink-0">
-                <div className="w-full aspect-[12/7] md:aspect-auto md:w-48 md:h-28 bg-gray-100 rounded-lg overflow-hidden">
+              <div key={`${img.url}-${i}`} className="min-w-0 md:w-48 md:flex-shrink-0 lg:w-auto">
+                <div className="w-full aspect-[12/7] md:aspect-auto md:w-48 md:h-28 lg:w-full lg:h-auto lg:aspect-[12/7] bg-gray-100 rounded-lg overflow-hidden">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={img.url} alt="" className="w-full h-full object-cover" />
                 </div>
