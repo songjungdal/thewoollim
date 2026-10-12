@@ -11,6 +11,7 @@ import { formatKST } from "../../lib/datetime";
 import { partyVisibility, partyTypeOf, PARTY_TYPES, PARTY_TYPE_LABELS, type Party, type PartyType } from "../../lib/data";
 import { templateFor, normalizeDetail, withGuideDefaults, compactDetailForSave, defaultNotice, type PartyDetail } from "../../lib/partyDetailTemplates";
 import PartyDetailEditor, { validateDetail, type DetailSourceParty } from "./PartyDetailEditor";
+import TestUsersButton from "./TestUsersButton";
 import HeroEditor from "./HeroEditor";
 import PartyOptionsEditor from "./PartyOptionsEditor";
 import {
@@ -1588,6 +1589,7 @@ export default function AdminDashboard() {
                         <option value="empty">미입력</option>
                       </select>
                     </label>
+                    <TestUsersButton onCreated={loadAll} />
                   </div>
                 </div>
                 <div className="hidden md:block bg-white rounded-2xl border border-gray-200 overflow-auto max-h-[calc(100vh-220px)]">
