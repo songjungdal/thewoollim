@@ -61,3 +61,23 @@ section {
 @media (prefers-reduced-motion: reduce) {
   .card--psyche::before, .card--psyche::after, .card--psyche .apply-btn { animation: none; }
 }
+
+/* ─── 파티 신청 카드 — hover·키보드 포커스 강조 (app/page.tsx .party-card) ─────────────
+   청록 = --color-brand-point. 예전 카드의 hover:border-brand-point(transition-all, 0.15초)와
+   신청 버튼 hover:bg-brand-point(transition-colors, 0.3초)를 되살림 — 버튼 전환은 page.tsx 클래스.
+   들어올림·그림자는 0.25초(카드 시안). 마우스 hover 는 Tailwind hover: 변형과 아래 @media (hover: hover) 로
+   터치 기기에서 눌린 채 남지 않게 하고, 키보드 포커스(:focus-visible)는 같은 강조를 그대로 보여준다. */
+.party-card {
+  /* 들어올림은 Tailwind v4 의 translate 속성(-translate-y-1)이라 transform 과 함께 적는다 */
+  transition: translate 250ms cubic-bezier(0.4, 0, 0.2, 1), transform 250ms cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 250ms cubic-bezier(0.4, 0, 0.2, 1), border-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+/* 솔로파티(모집 중) — 사이키 효과를 멈추고 청록 단색 테두리·은은한 청록 빛으로. 마우스를 떼면 다시 사이키 */
+@media (hover: hover) {
+  .card--psyche:hover::before { animation: none; background: var(--color-brand-point); }
+  .card--psyche:hover::after { animation: none; background: var(--color-brand-point); opacity: .45; }
+  .card--psyche:hover .apply-btn { animation: none; }
+}
+.card--psyche:focus-visible::before { animation: none; background: var(--color-brand-point); }
+.card--psyche:focus-visible::after { animation: none; background: var(--color-brand-point); opacity: .45; }
+.card--psyche:focus-visible .apply-btn { animation: none; }
