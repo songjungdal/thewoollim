@@ -12,8 +12,8 @@ import {
   type OptionsDraft, type SessionDraft, type OptionDraft, type OptionApplicants,
 } from "../../lib/partyOptions";
 
-const inputCls = "w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none";
-const smallBtn = "inline-flex items-center gap-1 whitespace-nowrap px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-bold bg-white hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed";
+const inputCls = "w-full min-h-11 md:min-h-0 px-3 py-2.5 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none";
+const smallBtn = "inline-flex items-center justify-center gap-1 whitespace-nowrap min-h-11 md:min-h-0 px-2.5 py-1.5 rounded-lg border border-gray-200 text-[13px] md:text-xs font-bold bg-white hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed";
 
 function move<T>(list: T[], from: number, to: number): T[] {
   if (to < 0 || to >= list.length) return list;
@@ -63,14 +63,14 @@ export default function PartyOptionsEditor({ value, onChange, applicants }: {
       <p className="text-xs md:text-[13px] text-gray-600 leading-relaxed bg-brand-point/5 border-l-2 border-brand-point/40 pl-3 py-2 rounded-r-md">
         1부+2부처럼 여러 회차를 포함한 항목을 신청하면, 포함된 회차의 정원을 모두 차지합니다.
       </p>
-      <p className="text-xs md:text-[13px] font-bold text-danger leading-relaxed" data-testid="options-lock-notice">
+      <p className="text-[13px] md:text-[13px] font-bold text-danger leading-relaxed" data-testid="options-lock-notice">
         신청자가 생기면 항목의 포함 회차를 바꿀 수 없습니다. 저장 전에 항목마다 포함 회차를 꼭 확인해주세요.
       </p>
 
       {/* 회차 */}
       <div>
         <p className="text-sm font-bold text-gray-700 mb-2">회차 <span className="text-gray-500 font-medium">· 시작 시각 순서로 저장됩니다 (24시간 형식, 예: 19:00)</span></p>
-        {sessions.length === 0 && <p className="text-xs text-gray-500 py-2">회차가 없습니다. [기본 구성 넣기] 또는 [+ 회차 추가]로 입력해주세요.</p>}
+        {sessions.length === 0 && <p className="text-[13px] md:text-sm text-gray-500 py-2">회차가 없습니다. [기본 구성 넣기] 또는 [+ 회차 추가]로 입력해주세요.</p>}
         <div className="space-y-2">
           {sessions.map((s, i) => {
             const n = sessionApplicants(s.key);
@@ -78,28 +78,28 @@ export default function PartyOptionsEditor({ value, onChange, applicants }: {
               <div key={s.key} className="rounded-xl border border-gray-200 p-3 bg-white" data-testid="session-row">
                 <div className="grid grid-cols-2 md:grid-cols-[1.2fr_1fr_0.8fr_0.8fr_auto] gap-2 items-end">
                   <label className="col-span-2 md:col-span-1">
-                    <span className="block text-xs font-bold text-gray-500 mb-1">이름</span>
+                    <span className="block text-[13px] md:text-sm font-bold text-gray-500 mb-1">이름</span>
                     <input className={inputCls} value={s.name} maxLength={OPTION_LIMITS.name} placeholder="1부" aria-label={`회차 ${i + 1} 이름`}
                       onChange={e => patchSession(i, { name: e.target.value })} />
                   </label>
                   <label className="col-span-2 md:col-span-1">
-                    <span className="block text-xs font-bold text-gray-500 mb-1">시작 시각</span>
+                    <span className="block text-[13px] md:text-sm font-bold text-gray-500 mb-1">시작 시각</span>
                     <input className={inputCls} value={s.startTime} maxLength={5} placeholder="19:00" inputMode="numeric" aria-label={`회차 ${i + 1} 시작 시각`}
                       onChange={e => patchSession(i, { startTime: e.target.value.replace(/[^\d:]/g, "") })} />
                   </label>
                   <label>
-                    <span className="block text-xs font-bold text-gray-500 mb-1">남 정원</span>
+                    <span className="block text-[13px] md:text-sm font-bold text-gray-500 mb-1">남 정원</span>
                     <input className={inputCls} value={s.maleStock} inputMode="numeric" placeholder="명" aria-label={`회차 ${i + 1} 남 정원`}
                       onChange={e => patchSession(i, { maleStock: digits(e.target.value) })} />
                   </label>
                   <label>
-                    <span className="block text-xs font-bold text-gray-500 mb-1">여 정원</span>
+                    <span className="block text-[13px] md:text-sm font-bold text-gray-500 mb-1">여 정원</span>
                     <input className={inputCls} value={s.femaleStock} inputMode="numeric" placeholder="명" aria-label={`회차 ${i + 1} 여 정원`}
                       onChange={e => patchSession(i, { femaleStock: digits(e.target.value) })} />
                   </label>
                   <div className="col-span-2 md:col-span-1 flex items-center justify-end gap-2">
-                    {n > 0 && <span className="text-xs font-bold text-gray-600 whitespace-nowrap">신청자 {n}명</span>}
-                    <button type="button" className={`${smallBtn} text-red-600`} disabled={n > 0} aria-label={`회차 ${i + 1} 삭제`}
+                    {n > 0 && <span className="text-[13px] md:text-sm font-bold text-gray-600 whitespace-nowrap">신청자 {n}명</span>}
+                    <button type="button" className={`${smallBtn} text-red-600 min-h-11 md:min-h-0`} disabled={n > 0} aria-label={`회차 ${i + 1} 삭제`}
                       title={n > 0 ? "신청자가 있는 회차는 삭제할 수 없습니다" : undefined}
                       onClick={() => setSessions(sessions.filter((_, j) => j !== i))}><Trash2 size={12} />삭제</button>
                   </div>
@@ -117,7 +117,7 @@ export default function PartyOptionsEditor({ value, onChange, applicants }: {
       {/* 참가 항목 */}
       <div>
         <p className="text-sm font-bold text-gray-700 mb-2">참가 항목 <span className="text-gray-500 font-medium">· 상세페이지에 이 순서로 나옵니다</span></p>
-        {options.length === 0 && <p className="text-xs text-gray-500 py-2">참가 항목이 없습니다. [기본 구성 넣기] 또는 [+ 항목 추가]로 입력해주세요.</p>}
+        {options.length === 0 && <p className="text-[13px] md:text-sm text-gray-500 py-2">참가 항목이 없습니다. [기본 구성 넣기] 또는 [+ 항목 추가]로 입력해주세요.</p>}
         <div className="space-y-2">
           {options.map((o, i) => {
             const n = optionApplicants(o.key);
@@ -125,24 +125,24 @@ export default function PartyOptionsEditor({ value, onChange, applicants }: {
               <div key={o.key} className="rounded-xl border border-gray-200 p-3 bg-white" data-testid="option-row">
                 <div className="grid grid-cols-2 md:grid-cols-[1.2fr_0.9fr_0.9fr] gap-2">
                   <label className="col-span-2 md:col-span-1">
-                    <span className="block text-xs font-bold text-gray-500 mb-1">이름</span>
+                    <span className="block text-[13px] md:text-sm font-bold text-gray-500 mb-1">이름</span>
                     <input className={inputCls} value={o.name} maxLength={OPTION_LIMITS.name} placeholder="1부+2부" aria-label={`항목 ${i + 1} 이름`}
                       onChange={e => patchOption(i, { name: e.target.value })} />
                   </label>
                   <label>
-                    <span className="block text-xs font-bold text-gray-500 mb-1">남 가격 (원)</span>
+                    <span className="block text-[13px] md:text-sm font-bold text-gray-500 mb-1">남 가격 (원)</span>
                     <input className={inputCls} value={o.priceMale} inputMode="numeric" placeholder="원" aria-label={`항목 ${i + 1} 남 가격`}
                       onChange={e => patchOption(i, { priceMale: digits(e.target.value) })} />
                   </label>
                   <label>
-                    <span className="block text-xs font-bold text-gray-500 mb-1">여 가격 (원)</span>
+                    <span className="block text-[13px] md:text-sm font-bold text-gray-500 mb-1">여 가격 (원)</span>
                     <input className={inputCls} value={o.priceFemale} inputMode="numeric" placeholder="원" aria-label={`항목 ${i + 1} 여 가격`}
                       onChange={e => patchOption(i, { priceFemale: digits(e.target.value) })} />
                   </label>
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
-                  <span className="text-xs font-bold text-gray-500">포함 회차</span>
-                  {sessions.length === 0 && <span className="text-xs text-gray-500">회차를 먼저 추가해주세요</span>}
+                  <span className="text-[13px] md:text-sm font-bold text-gray-500">포함 회차</span>
+                  {sessions.length === 0 && <span className="text-[13px] md:text-sm text-gray-500">회차를 먼저 추가해주세요</span>}
                   {sessions.map((s, si) => (
                     <label key={s.key} className={`inline-flex items-center gap-1.5 text-sm font-bold min-h-[32px] ${n > 0 ? "text-gray-500" : "text-gray-800 cursor-pointer"}`}>
                       <input type="checkbox" className="w-4 h-4 accent-black" disabled={n > 0}
@@ -156,13 +156,13 @@ export default function PartyOptionsEditor({ value, onChange, applicants }: {
                     </label>
                   ))}
                 </div>
-                <p className="mt-1 text-xs font-bold text-gray-700" data-testid="option-sessions-summary">{optionSessionsSummary(value, o)}</p>
-                {n > 0 && <p className="mt-1 text-xs text-gray-500">신청자가 있어 포함 회차는 바꿀 수 없습니다. 이름·가격은 바꿀 수 있고, 가격은 이후 결제부터 적용됩니다.</p>}
+                <p className="mt-1 text-[13px] md:text-sm font-bold text-gray-700" data-testid="option-sessions-summary">{optionSessionsSummary(value, o)}</p>
+                {n > 0 && <p className="mt-1 text-[13px] md:text-sm text-gray-500">신청자가 있어 포함 회차는 바꿀 수 없습니다. 이름·가격은 바꿀 수 있고, 가격은 이후 결제부터 적용됩니다.</p>}
                 <div className="mt-2 flex flex-wrap items-center justify-end gap-1.5">
-                  {n > 0 && <span className="text-xs font-bold text-gray-600 whitespace-nowrap mr-1">신청자 {n}명</span>}
+                  {n > 0 && <span className="text-[13px] md:text-sm font-bold text-gray-600 whitespace-nowrap mr-1">신청자 {n}명</span>}
                   <button type="button" className={smallBtn} disabled={i === 0} aria-label={`항목 ${i + 1} 위로`} onClick={() => setOptions(move(options, i, i - 1))}><ArrowUp size={12} />위로</button>
                   <button type="button" className={smallBtn} disabled={i === options.length - 1} aria-label={`항목 ${i + 1} 아래로`} onClick={() => setOptions(move(options, i, i + 1))}><ArrowDown size={12} />아래로</button>
-                  <button type="button" className={`${smallBtn} text-red-600`} disabled={n > 0} aria-label={`항목 ${i + 1} 삭제`}
+                  <button type="button" className={`${smallBtn} text-red-600 min-h-11 md:min-h-0`} disabled={n > 0} aria-label={`항목 ${i + 1} 삭제`}
                     title={n > 0 ? "신청자가 있는 항목은 삭제할 수 없습니다" : undefined}
                     onClick={() => setOptions(options.filter((_, j) => j !== i))}><Trash2 size={12} />삭제</button>
                 </div>
