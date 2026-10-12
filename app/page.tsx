@@ -16,6 +16,7 @@ import ReviewBoard from "./components/ReviewBoard";
 import { PARTICIPANTS, FAQS, partyStockStatus, withLiveCounts, partyVisibility, categoryLabel, partyTypeOf, PARTY_TYPES, PARTY_TYPE_LABELS, type PartyType } from "./lib/data";
 import { useAuth } from "./context/AuthContext";
 import { useParties } from "./lib/useParties";
+import { daysUntil } from "./lib/refund";
 
 /* ── #schedule(파티 일정) 섹션 전용 — 일정 상태별 표시 스타일 ──────────────
  * 우선순위: 지난 일정 > 마감 > 마감임박 > 모집중 (계산은 컴포넌트의 scheduleStatus 참고) */
@@ -699,14 +700,21 @@ export default function SmoothOnePage() {
                 <p className="text-xs md:text-sm text-gray-500 mt-2">다른 카테고리를 선택하거나 조건을 초기화해주세요.</p>
               </div>
             ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-8">
+              {/* 카드 목록 — 모바일 1열(간격 20px), md 이상 2열(간격 32px) */}
               <AnimatePresence mode="popLayout">
                 {visibleParties.map(card => {
                   // 실시간 결제완료 인원만 노출 — 카운트 없으면 0으로 강제 (시드/테스트 데이터 무시)
                   // 모집 마감은 partyStockStatus 결과 (참가 구성 파티는 모든 항목이 마감일 때, 명세 8-3)
                   const stock = partyStockStatus(withLiveCounts(card, partyCounts[card.id]));
-                  // 행사 일시 경과 → 모집 종료 카드 UI (배지/버튼 색·문구만 교체, 링크 동작은 유지)
+                  // 행사 일시 경과 → 모집 종료 카드 UI (배너 흐리게, [모집 종료된 파티] 버튼은 누를 수 없음)
                   const isEnded = now ? partyVisibility(card, now) === "ended" : false;
+                  // 모집 중 = 종료 전이고 마감 아님 — D-day 배지·솔로파티 사이키 테두리는 이때만
+                  const recruiting = !isEnded && !stock.allFull;
+                  const days = now && recruiting ? daysUntil(card.calendarDate, now) : null;
+                  const dDay = days === null || days < 0 ? null : days === 0 ? "D-DAY" : `D-${days}`;
+                  const psyche = recruiting && partyTypeOf(card) === "solo";
+                  const badgeCls = "text-[11px] md:text-xs font-bold leading-none px-2.5 py-1.5 md:px-[11px] md:py-[7px] rounded-full whitespace-nowrap";
                   return (
                   <motion.div
                     key={card.id}
@@ -715,73 +723,84 @@ export default function SmoothOnePage() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -12 }}
                     transition={{ duration: 0.35, type: "spring", stiffness: 300, damping: 28 }}
-                    className="bg-brand-lightgray border border-gray-100 p-5 md:p-8 rounded-2xl md:rounded-3xl hover:border-brand-point transition-all flex flex-col h-full group relative overflow-hidden"
+                    className="h-full"
                   >
-                    {/* 매칭파티 카드 상단 이미지 — 관리자페이지의 "대표 이미지"(imageUrl)를 그대로 노출, 미등록 파티는 공통 디폴트로 대체.
-                         카드 좌/우/상단 끝까지 꽉 차게 — 폭을 calc()로 명시해 카드 패딩만큼 정확히 확장(음수 마진만으로는
-                         우측이 살짝 안 맞는 경우가 있어 폭 자체를 계산). 이미지 자체는 라운드 처리하지 않고
-                         부모의 overflow-hidden + rounded-2xl/3xl 에 의해 상단 모서리만 자연스럽게 잘려 보임.
-                         싱글/돌싱/모집마감/모집종료 배지는 absolute 로 이미지 위에 그대로 겹쳐서 뜬다.
-                         max-w-none 필수 — Tailwind preflight 의 'img{max-width:100%}' 가 없으면 calc() 확장폭을 다시 100%로 깎아버림 */}
-                    <img
-                      src={card.imageUrl || "/images/party_card_default_banner.jpg"}
-                      alt=""
-                      className="block max-w-none w-[calc(100%+2.5rem)] md:w-[calc(100%+4rem)] h-20 md:h-24 object-cover -ml-5 -mt-5 md:-ml-8 md:-mt-8 mb-4 md:mb-5"
-                    />
-                    {/* 좌측 상단 — 파티 종류 배지 (기존 배지와 같은 크기, 검정 배경·흰 글자, 모집 종료 카드에도 표시) */}
-                    <div className="absolute top-4 left-4 md:top-5 md:left-5 z-10">
-                      <span className="bg-gray-900 text-white text-xs font-black px-2.5 py-1 rounded-full shadow-md whitespace-nowrap">
-                        {PARTY_TYPE_LABELS[partyTypeOf(card)]}
-                      </span>
-                    </div>
-                    {/* 우측 상단 배지 영역 — 종료 시 [모집종료] 단일 배지, 아니면 대상(싱글/돌싱) + 모집마감 스택 */}
-                    <div className="absolute top-4 right-4 md:top-5 md:right-5 flex flex-col items-end gap-1.5 z-10">
-                      {isEnded ? (
-                        <span className="bg-[#f8d8dd] text-danger text-xs font-black px-2.5 py-1 rounded-full shadow-md whitespace-nowrap tracking-tight">
-                          모집종료
+                    {/* 카드 — 배경은 투명(솔로파티 사이키 글로우가 카드 뒤에 깔림), 배너·본문에 각각 배경.
+                         hover 들어올림은 md 이상만(모바일 없음). motion.div 가 transform 을 쓰므로 안쪽 요소에 준다 */}
+                    <div
+                      className={`h-full flex flex-col rounded-2xl md:rounded-[20px] border border-[#E6E8EC] shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-[transform,box-shadow] duration-[250ms] md:hover:-translate-y-1 md:hover:shadow-[0_10px_24px_rgba(0,0,0,0.08)] ${
+                        psyche ? "card--psyche" : ""
+                      }`}
+                    >
+                      {/* 배너 9:2 — 관리자 "대표 이미지"(imageUrl), 없으면 공통 기본 배너. 배너에만 overflow-hidden + 상단 radius */}
+                      <div className="relative aspect-[9/2] overflow-hidden rounded-t-[15px] md:rounded-t-[19px] bg-[#F4F5F7]">
+                        <img
+                          src={card.imageUrl || "/images/party_card_default_banner.jpg"}
+                          alt=""
+                          className={`absolute inset-0 w-full h-full object-cover ${isEnded ? "grayscale-60 opacity-70" : ""}`}
+                        />
+                        {/* 배지 대비용 오버레이 */}
+                        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.25)_0%,rgba(0,0,0,0)_45%,rgba(0,0,0,0.2)_100%)]" />
+                        {/* 좌상단 — 파티 종류 */}
+                        <span className="absolute top-2.5 left-2.5 md:top-3.5 md:left-3.5 z-10 bg-[rgba(17,17,17,0.85)] text-white text-[11px] md:text-xs font-bold leading-none px-2.5 py-1.5 md:px-[11px] md:py-[7px] rounded-full whitespace-nowrap">
+                          {PARTY_TYPE_LABELS[partyTypeOf(card)]}
                         </span>
-                      ) : (
-                        <>
-                          {(card.targetGroup === "싱글" || card.targetGroup === "돌싱") && (
-                            <span className={`${card.targetGroup === "돌싱" ? "bg-[#b4a7d6]" : "bg-brand-point"} text-black text-xs font-black px-2.5 py-1 rounded-full shadow-md whitespace-nowrap`}>
-                              {card.targetGroup}
-                            </span>
+                        {/* 우상단 — D-day(모집 중일 때만) → 대상(싱글/돌싱)·모집 마감 / 종료 시 [모집종료] 하나 */}
+                        <div className="absolute top-2.5 right-2.5 md:top-3.5 md:right-3.5 z-10 flex items-center justify-end gap-1.5">
+                          {isEnded ? (
+                            <span className={`${badgeCls} bg-[#FDE2E4] text-[#C81E33]`}>모집종료</span>
+                          ) : (
+                            <>
+                              {dDay && <span className={`${badgeCls} bg-white text-[#D61F45] tabular-nums`}>{dDay}</span>}
+                              {card.targetGroup === "싱글" && <span className={`${badgeCls} bg-[#3EE0C5] text-[#0B3B34]`}>싱글</span>}
+                              {card.targetGroup === "돌싱" && <span className={`${badgeCls} bg-[#b4a7d6] text-black`}>돌싱</span>}
+                              {stock.allFull && <span className={`${badgeCls} bg-gray-900 text-white`}>모집 마감</span>}
+                            </>
                           )}
-                          {stock.allFull && (
-                            <span className="bg-gray-900 text-white text-xs font-black px-2.5 py-1 rounded-full shadow-md whitespace-nowrap">
-                              모집 마감
-                            </span>
-                          )}
-                        </>
-                      )}
-                    </div>
-                    {/* 제목 → 내용(소개) → 일시 → 장소 순서, 전체적으로 폰트 축소 — 우측 상단 배지가 가리지 않도록 우측 패딩 확보 */}
-                    <h3 className="text-base md:text-lg font-bold mb-1 group-hover:text-brand-point-ink transition-colors leading-snug pr-16 md:pr-20">{card.title}</h3>
-                    {card.description && (
-                      <p className="text-xs md:text-sm text-gray-500 font-medium mb-2.5 md:mb-3 line-clamp-2 break-keep">{card.description}</p>
-                    )}
-                    <div className="space-y-1.5 mb-4 md:mb-5 text-gray-600 font-medium flex-1 text-xs md:text-sm">
-                      <div className="flex items-center gap-2"><Calendar size={13} className="text-gray-500 group-hover:text-brand-point-ink transition-colors flex-shrink-0" /> <span className="font-bold">{card.dateString}</span></div>
-                      <div className="flex items-center gap-2"><MapPin size={13} className="text-gray-500 group-hover:text-brand-point-ink transition-colors flex-shrink-0" /> {card.location}</div>
-                    </div>
+                        </div>
+                      </div>
 
-                    {/* 대상 + 신청 버튼 — 한 줄에 좌(대상) · 우(버튼) 배치, 신청하기와 동일한 가로 레이아웃 유지 */}
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs md:text-sm text-gray-500 font-medium truncate min-w-0">{card.target}</span>
+                      {/* 본문 — 제목 → 소개 → 일시·장소 → (구분선) 참가조건 + 버튼 */}
+                      <div className="flex-1 flex flex-col bg-[#F4F5F7] rounded-b-[15px] md:rounded-b-[19px] px-4 pt-[18px] pb-4 md:px-7 md:pt-6 md:pb-[22px]">
+                        <h3 className={`text-lg md:text-xl font-bold leading-snug truncate ${isEnded ? "text-[#6B7280]" : "text-[#111]"}`}>{card.title}</h3>
+                        {card.description && (
+                          <p className="mt-1 text-[13px] md:text-sm text-[#6B7280] truncate">{card.description}</p>
+                        )}
+                        <div className="mt-3.5 md:mt-4 space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <Calendar size={16} className="text-[#9CA3AF] flex-shrink-0" />
+                            <span className="text-sm md:text-[15px] font-bold text-[#111]">{card.dateString}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <MapPin size={16} className="text-[#9CA3AF] flex-shrink-0" />
+                            <span className="min-w-0 text-[13px] md:text-sm leading-[1.45] text-[#4B5563] line-clamp-2 break-keep">{card.location}</span>
+                          </div>
+                        </div>
 
-                      {/* 종료 카드는 파스텔 빨강(#f8d8dd) 버튼, disabled/pointer-events 적용 X (링크 정상 동작) */}
-                      <Link
-                        href={`/party/${card.id}`}
-                        className={`relative flex-shrink-0 text-center font-bold px-4 py-2 text-xs md:text-sm rounded-xl transition-colors duration-300 whitespace-nowrap before:absolute before:inset-x-0 before:-inset-y-1.5 ${
-                          isEnded
-                            ? "bg-[#f8d8dd] text-danger hover:bg-[#f4c5cd]"
-                            : stock.allFull
-                              ? "bg-gray-200 text-gray-500 hover:bg-gray-300"
-                              : "bg-brand-black text-white hover:bg-brand-point hover:text-black"
-                        }`}
-                      >
-                        {isEnded ? "모집 종료된 파티" : stock.allFull ? "모집 마감 · 상세보기" : "신청하기"}
-                      </Link>
+                        {/* 하단 — 참가조건(왼쪽) · 버튼(오른쪽), 위 구분선 */}
+                        <div className="mt-auto pt-3.5 md:pt-4">
+                          <div className="flex items-center justify-between gap-3 pt-3.5 md:pt-4 border-t border-[#E6E8EC]">
+                            <span className="min-w-0 text-xs md:text-[13px] text-[#6B7280] break-keep md:truncate">{card.target}</span>
+                            {isEnded ? (
+                              // 모집 종료 — 누를 수 없는 버튼 (hover 없음)
+                              <button type="button" disabled className="flex-shrink-0 h-10 px-[18px] rounded-[10px] bg-[#FDE2E4] text-[#C81E33] text-sm font-bold whitespace-nowrap cursor-not-allowed">
+                                모집 종료된 파티
+                              </button>
+                            ) : (
+                              <Link
+                                href={`/party/${card.id}`}
+                                className={`apply-btn relative flex-shrink-0 inline-flex items-center h-10 px-[18px] rounded-[10px] text-sm font-bold whitespace-nowrap transition-colors duration-300 ${
+                                  stock.allFull
+                                    ? "bg-gray-200 text-gray-500 hover:bg-gray-300"
+                                    : "bg-[#111] text-white hover:bg-[#333]"
+                                }`}
+                              >
+                                {stock.allFull ? "모집 마감 · 상세보기" : "신청하기"}
+                              </Link>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </motion.div>
                   );

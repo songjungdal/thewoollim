@@ -26,3 +26,38 @@ section {
 .glow-point {
   box-shadow: 0 0 20px rgba(64, 224, 208, 0.4), inset 0 0 10px rgba(64, 224, 208, 0.2);
 }
+
+/* ─── 파티 신청 카드 — 솔로파티(모집 중) 사이키 테두리 효과 ───────────────────────
+   app/page.tsx 카드에 .card--psyche, 신청 버튼에 .apply-btn. 카드 배경은 투명이어야 한다
+   (::after 글로우가 z-index -1 이라 카드 배경이 있으면 덮임 — 배경은 배너·본문에 각각 칠함). */
+@property --psy-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+.card--psyche { position: relative; isolation: isolate; border-color: transparent !important; }
+.card--psyche::before {
+  content: ''; position: absolute; inset: -2px; border-radius: 22px; padding: 2px;
+  background: conic-gradient(from var(--psy-angle), #ff2bd6, #ff7a00, #ffe600, #00ff9d, #00c8ff, #8a2bff, #ff2bd6);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: psy-spin 3s linear infinite; z-index: 2; pointer-events: none;
+}
+.card--psyche::after {
+  content: ''; position: absolute; inset: -6px; border-radius: 26px; z-index: -1;
+  background: conic-gradient(from var(--psy-angle), #ff2bd6, #ff7a00, #ffe600, #00ff9d, #00c8ff, #8a2bff, #ff2bd6);
+  filter: blur(14px); opacity: .55;
+  animation: psy-spin 3s linear infinite, psy-flash 1.2s ease-in-out infinite;
+}
+@keyframes psy-spin { to { --psy-angle: 360deg; } }
+@keyframes psy-flash { 0%,100% { opacity: .33; } 50% { opacity: .82; } }
+.card--psyche .apply-btn { animation: psy-pulse 1.6s infinite; }
+@keyframes psy-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(255,43,214,.6); }
+  70% { box-shadow: 0 0 0 10px rgba(255,43,214,0); }
+  100% { box-shadow: 0 0 0 0 rgba(255,43,214,0); }
+}
+/* 모바일(카드 radius 16px) — 테두리·글로우 radius 를 카드에 맞춤 */
+@media (max-width: 767px) {
+  .card--psyche::before { border-radius: 18px; }
+  .card--psyche::after { border-radius: 22px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card--psyche::before, .card--psyche::after, .card--psyche .apply-btn { animation: none; }
+}
