@@ -2,7 +2,7 @@
 /**
  * 후기게시판 — 공개 목록 조회 + 회원 작성/수정.
  *
- * GET                     → 공개 익명 목록 [{id, gender, age_group, rating, content, created_at}, ...]
+ * GET                     → 공개 익명 목록 [{id, gender, age_group, rating, content}, ...] (최신순, 작성일은 보내지 않음)
  * GET ?mine=1 (세션 필요)  → { ok, validCount, myReviews:[{id,rating,content,created_at}] }
  *   - validCount: 본인의 유효 참가 이력(status ∈ confirmed/completed) 건수
  *   - myReviews : 본인이 작성한 후기 목록 (수정 대상 선택용)
@@ -62,7 +62,8 @@ if ($method === 'GET') {
 
     try {
         $pdo = getDB();
-        $stmt = $pdo->query("SELECT id, gender, age_group, rating, content, created_at FROM reviews ORDER BY created_at DESC");
+        // 작성일은 공개 목록에 보내지 않는다 (관리자가 직접 등록한 후기의 날짜가 겹쳐 보이지 않게). 정렬은 최신순 유지
+        $stmt = $pdo->query("SELECT id, gender, age_group, rating, content FROM reviews ORDER BY created_at DESC");
         $rows = $stmt->fetchAll();
     } catch (Throwable $e) {
         error_log('[reviews GET] ' . $e->getMessage());
