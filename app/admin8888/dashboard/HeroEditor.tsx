@@ -229,7 +229,7 @@ export default function HeroEditor() {
           </p>
         </div>
         <button type="button" onClick={save} disabled={saving}
-          className="bg-brand-black text-white px-5 py-3 rounded-lg text-sm font-black hover:bg-brand-point hover:text-black transition-all disabled:bg-gray-300 min-h-11 md:min-h-0">
+          className="bg-brand-black text-white px-5 py-3 rounded-lg text-sm font-black hover:bg-brand-point hover:text-black transition-all disabled:bg-gray-300 min-h-11 md:min-h-9">
           {saving ? "저장 중…" : "저장"}
         </button>
       </div>
@@ -282,15 +282,15 @@ export default function HeroEditor() {
       <Card title="미리보기" desc="저장 전 설정으로 계산한 실제 메인 화면입니다. 글자가 잘 안 보이면 노란 경고가 나옵니다.">
         <div className="flex flex-wrap items-center gap-2 mb-4">
           <button type="button" onClick={() => setPreviewIdx((idx - 1 + slides.length) % slides.length)} aria-label="이전 슬라이드"
-            className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 min-h-11 md:min-h-0"><ChevronLeft size={16} /></button>
+            className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 min-h-11 md:min-h-9"><ChevronLeft size={16} /></button>
           {slides.map((sl, i) => (
             <button key={i} type="button" onClick={() => setPreviewIdx(i)}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all max-w-[200px] truncate ${i === idx ? "bg-brand-black text-white border-brand-black" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"} min-h-11 md:min-h-0`}>
+              className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all max-w-[200px] truncate ${i === idx ? "bg-brand-black text-white border-brand-black" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"} min-h-11 md:min-h-9`}>
               {i + 1}. {sl.type === "brand" ? "브랜드" : sl.title}{warnOf(sl).length > 0 ? " ⚠" : ""}
             </button>
           ))}
           <button type="button" onClick={() => setPreviewIdx((idx + 1) % slides.length)} aria-label="다음 슬라이드"
-            className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50"><ChevronRight size={16} /></button>
+            className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 md:min-h-9"><ChevronRight size={16} /></button>
         </div>
         {curWarn.length > 0 && (
           <p className="flex items-start gap-2 mb-4 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm font-bold">
@@ -320,7 +320,7 @@ export default function HeroEditor() {
 
       <div className="flex justify-end">
         <button type="button" onClick={save} disabled={saving}
-          className="bg-brand-black text-white px-6 py-3 rounded-lg text-sm font-black hover:bg-brand-point hover:text-black transition-all disabled:bg-gray-300 min-h-11 md:min-h-0">
+          className="bg-brand-black text-white px-6 py-3 rounded-lg text-sm font-black hover:bg-brand-point hover:text-black transition-all disabled:bg-gray-300 min-h-11 md:min-h-9">
           {saving ? "저장 중…" : "저장"}
         </button>
       </div>
@@ -404,9 +404,9 @@ function PartyCard({ cfg, info, index, total, onMove, onRemove, onChange, analys
           <p className="text-[13px] md:text-sm text-gray-500">{info ? `${info.dateString || info.calendarDate} · 남 ${info.maleLeft}석 · 여 ${info.femaleLeft}석` : "파티 목록에 없는 파티입니다."}</p>
         </div>
         <div className="flex gap-1 flex-shrink-0">
-          <button type="button" onClick={() => onMove(-1)} disabled={index === 0} aria-label="위로" className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-30 min-h-11 md:min-h-0"><ArrowUp size={14} /></button>
-          <button type="button" onClick={() => onMove(1)} disabled={index === total - 1} aria-label="아래로" className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-30 min-h-11 md:min-h-0"><ArrowDown size={14} /></button>
-          <button type="button" onClick={onRemove} aria-label="삭제" className="p-2 rounded-lg border border-gray-200 hover:bg-red-50 hover:text-danger min-h-11 md:min-h-0"><Trash2 size={14} /></button>
+          <button type="button" onClick={() => onMove(-1)} disabled={index === 0} aria-label="위로" className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-30 min-h-11 md:min-h-9"><ArrowUp size={14} /></button>
+          <button type="button" onClick={() => onMove(1)} disabled={index === total - 1} aria-label="아래로" className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-30 min-h-11 md:min-h-9"><ArrowDown size={14} /></button>
+          <button type="button" onClick={onRemove} aria-label="삭제" className="p-2 rounded-lg border border-gray-200 hover:bg-red-50 hover:text-danger min-h-11 md:min-h-9"><Trash2 size={14} /></button>
         </div>
       </div>
       <div className="mt-4 pt-4 border-t border-gray-100">
@@ -478,7 +478,7 @@ function ImageSide({ view, value, onChange, analyses, onUploaded, optional }: {
         <p className="text-[13px] md:text-sm font-bold text-amber-700 mt-1.5">권장 비율(4:5)과 달라 일부가 잘릴 수 있어요</p>
       )}
       <div className="grid grid-cols-1 gap-2 md:flex md:flex-wrap mt-2">
-        <label className={`inline-flex items-center justify-center md:justify-start gap-1.5 min-h-11 md:min-h-0 px-3 py-2 rounded-lg text-[13px] md:text-xs font-bold cursor-pointer transition-all ${busy ? "bg-gray-200 text-gray-500" : "bg-brand-black text-white hover:bg-brand-point hover:text-black"}`}>
+        <label className={`inline-flex items-center justify-center md:justify-start gap-1.5 min-h-11 md:min-h-9 px-3 py-2 rounded-lg text-[13px] md:text-xs font-bold cursor-pointer transition-all ${busy ? "bg-gray-200 text-gray-500" : "bg-brand-black text-white hover:bg-brand-point hover:text-black"}`}>
           <Upload size={13} /> {busy ? "업로드 중…" : img ? "이미지 바꾸기" : "이미지 업로드"}
           <input type="file" accept="image/webp,image/jpeg,image/png" className="hidden" disabled={busy}
             onChange={e => { pickFile(e.target.files?.[0]); e.target.value = ""; }} />
@@ -486,7 +486,7 @@ function ImageSide({ view, value, onChange, analyses, onUploaded, optional }: {
         {/* 파티 전용 이미지만 비울 수 있다 (비우면 파티 대표 이미지 사용). 브랜드 이미지는 [이미지 바꾸기]로만 교체 */}
         {img && optional && (
           <button type="button" onClick={() => onChange({ [key("image")]: null } as Partial<ImageSet>)}
-            className="px-3 py-2 rounded-lg text-[13px] md:text-xs font-bold border border-gray-200 hover:bg-gray-50 min-h-11 md:min-h-0">
+            className="px-3 py-2 rounded-lg text-[13px] md:text-xs font-bold border border-gray-200 hover:bg-gray-50 min-h-11 md:min-h-9">
             비우기
           </button>
         )}
@@ -505,7 +505,7 @@ function ImageSide({ view, value, onChange, analyses, onUploaded, optional }: {
       <div className="grid grid-cols-1 w-full md:inline-flex md:flex-wrap md:w-auto rounded-lg border border-gray-200 overflow-hidden text-[13px] md:text-xs font-bold" role="group" aria-label={`${isPc ? "PC" : "모바일"} 글자 톤`}>
         {(["auto", "light", "dark"] as HeroToneMode[]).map(m => (
           <button key={m} type="button" onClick={() => setMode(m)} aria-pressed={mode === m}
-            className={`min-h-11 md:min-h-0 px-3 py-2 border-b last:border-b-0 md:border-b-0 md:border-r md:last:border-r-0 border-gray-200 transition-all ${mode === m ? "bg-brand-black text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>
+            className={`min-h-11 md:min-h-9 px-3 py-2 border-b last:border-b-0 md:border-b-0 md:border-r md:last:border-r-0 border-gray-200 transition-all ${mode === m ? "bg-brand-black text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>
             {m === "auto" ? `자동${shown ? ` (${autoTone ? TONE_LABEL[autoTone] : "분석 중"})` : ""}` : TONE_LABEL[m]}
           </button>
         ))}
