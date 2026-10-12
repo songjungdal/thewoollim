@@ -202,6 +202,40 @@ function partyStockLimit(array $party, string $genderKey): int {
     return $stock > 0 ? $stock : 12;
 }
 
+// ─── 파티 남은 자리 (남/여) — 메인 파티 카드의 마감 판정(app/lib/data.ts partyStockStatus)과 같은 규칙 ───
+//   $countsRow = party_counts.json 의 그 파티 값 { male, female, sessions?: { <sid>: { male, female } } }
+//   - 일반 파티: 정원 - 신청 인원
+//   - 참가 구성 솔로파티: 항목마다 포함 회차 중 가장 적은 남은 자리, 그중 가장 큰 값(마감되지 않은 항목 기준)
+//   사용처: api/_hero.php (메인 히어로 모집중·마감임박 판정)
+function partyRemainingSeats(array $party, array $countsRow): array {
+    if (partyHasOptions($party)) {
+        $sess = [];
+        foreach ((array)$party['sessions'] as $s) {
+            if (!is_array($s)) continue;
+            $sid = (string)($s['id'] ?? '');
+            $sess[$sid] = [
+                'male'   => max(0, sessionStockLimit($s, 'male')   - (int)($countsRow['sessions'][$sid]['male']   ?? 0)),
+                'female' => max(0, sessionStockLimit($s, 'female') - (int)($countsRow['sessions'][$sid]['female'] ?? 0)),
+            ];
+        }
+        $left = ['male' => 0, 'female' => 0];
+        foreach ((array)$party['options'] as $o) {
+            $ids = is_array($o) ? array_map('strval', (array)($o['sessionIds'] ?? [])) : [];
+            if (!$ids) continue;
+            foreach (['male', 'female'] as $g) {
+                $min = PHP_INT_MAX;
+                foreach ($ids as $id) $min = min($min, $sess[$id][$g] ?? 0); // 사라진 회차 = 마감
+                $left[$g] = max($left[$g], $min);
+            }
+        }
+        return $left;
+    }
+    return [
+        'male'   => max(0, partyStockLimit($party, 'male')   - (int)($countsRow['male']   ?? 0)),
+        'female' => max(0, partyStockLimit($party, 'female') - (int)($countsRow['female'] ?? 0)),
+    ];
+}
+
 // 결제 전 사전 검사 — 현재 인원 + 1 이 상한을 넘는 partyId 목록. (잠금 없는 읽기: 최종 판정은 success.php / confirm_vbank)
 function partiesOverStock(array $partyIds, array $partyMap, string $genderKey): array {
     $counts = json_decode((string)@file_get_contents(dataDir() . '/party_counts.json'), true);
