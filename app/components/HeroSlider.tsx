@@ -104,7 +104,7 @@ export default function HeroSlider() {
     <section
       aria-roledescription="carousel"
       aria-label="메인 슬라이드"
-      className="relative w-full overflow-hidden bg-brand-black aspect-[4/5] min-h-[460px] max-h-[80svh] md:aspect-auto md:h-[88vh] md:min-h-[700px] md:max-h-none"
+      className="relative w-full overflow-hidden bg-brand-black aspect-[4/5] min-h-[460px] max-h-[80svh] md:aspect-[16/9] md:h-auto md:min-h-0 md:max-h-none"
     >
       {/* 응답 전 — 검은 화면(같은 크기). 검색엔진·화면낭독기용 제목만 숨겨서 둔다 */}
       {!ready && <h1 className="sr-only">세상을 울리는 새로운 연결, 어울림</h1>}

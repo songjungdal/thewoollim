@@ -93,15 +93,24 @@ export default function HeroSlide({ slide, mode, active = true, reducedMotion = 
   );
 
   // ── 글자 블록 ──
+  // PC 글자 크기·여백은 화면 폭에 비례(clamp + vw). 관리자 미리보기(mode="pc")는 1440px 화면을 축소해 그리므로
+  // vw 대신 같은 식을 폭 1440px 에서 계산한 고정값을 쓴다 — 반응형 값을 바꾸면 pc 값도 함께 다시 계산할 것.
+  // 왼쪽 시작선은 헤더 로고와 같다 (Header.tsx 컨테이너와 같은 max-w-7xl · px-6 lg:px-10).
   const layer = pick(mode,
     "absolute inset-x-0 bottom-0 z-10 px-5 pb-6 pointer-events-none",
     "absolute inset-0 z-10 flex items-center pointer-events-none",
     "absolute inset-x-0 bottom-0 z-10 px-5 pb-6 pointer-events-none md:inset-0 md:flex md:items-center md:px-0 md:pb-0");
-  const inner = pick(mode, "w-full", "max-w-7xl mx-auto w-full px-10", "w-full md:max-w-7xl md:mx-auto md:px-10");
-  const block = pick(mode, "w-full pointer-events-auto", "max-w-[560px] pointer-events-auto", "w-full md:max-w-[560px] pointer-events-auto");
-  const btnSize = pick(mode, "w-full h-12 text-[15px]", "px-10 py-5 text-lg", "w-full h-12 text-[15px] md:w-auto md:h-auto md:px-10 md:py-5 md:text-lg");
+  const inner = pick(mode, "w-full", "max-w-7xl mx-auto w-full px-10", "w-full md:max-w-7xl md:mx-auto md:px-6 lg:px-10");
+  const block = pick(mode, "w-full pointer-events-auto", "max-w-none pointer-events-auto", "w-full md:max-w-none pointer-events-auto");
+  // 브랜드 제목·소개글 — 의도한 두 줄을 PC에서는 줄마다 한 줄로 고정 (모바일은 기존 <br /> 줄바꿈)
+  const line = pick(mode, "", "block whitespace-nowrap", "md:block md:whitespace-nowrap");
+  const lineBreak = pick(mode, "", "hidden", "md:hidden");
+  const btnSize = pick(mode,
+    "w-full h-12 text-[15px]",
+    "px-10 py-[18.72px] text-[18px] whitespace-nowrap",
+    "w-full h-12 text-[15px] md:w-auto md:h-auto md:px-[clamp(28px,2.8vw,40px)] md:py-[clamp(14px,1.3vw,20px)] md:text-[clamp(15px,1.25vw,18px)] md:whitespace-nowrap");
   const btnCls = `inline-flex items-center justify-center gap-2 rounded-full font-bold shadow-xl ${btnSize} ${t("button")}`;
-  const metaSize = pick(mode, "text-[13px]", "text-xl", "text-[13px] md:text-lg lg:text-xl");
+  const metaSize = pick(mode, "text-[13px]", "text-[18.72px]", "text-[13px] md:text-[clamp(14px,1.3vw,20px)]");
 
   const textAnim = reducedMotion
     ? { initial: { opacity: 0 }, animate: { opacity: 1 }, transition: { duration: 0.4 } }
@@ -115,17 +124,17 @@ export default function HeroSlide({ slide, mode, active = true, reducedMotion = 
       <div className={`${block} ${t("shadow")}`}>
         <h1 className={`font-black tracking-tighter break-keep ${pick(mode,
           "text-[1.75rem] leading-[1.25] mb-2",
-          "text-7xl leading-[1.15] mb-8",
-          "text-[1.75rem] leading-[1.25] mb-2 md:text-6xl lg:text-7xl md:leading-[1.15] md:mb-8")} ${t("title")}`}>
-          세상을 울리는<br />
-          새로운 연결, <span className={t("accent")}>어울림</span>
+          "text-[72px] leading-[1.15] mb-[28.8px]",
+          "text-[1.75rem] leading-[1.25] mb-2 md:text-[clamp(2.5rem,5vw,5rem)] md:leading-[1.15] md:mb-[clamp(16px,2vw,32px)]")} ${t("title")}`}>
+          <span className={line}>세상을 울리는</span><br className={lineBreak} />
+          <span className={line}>새로운 연결, <span className={t("accent")}>어울림</span></span>
         </h1>
         <p className={`font-semibold break-keep ${pick(mode,
           "text-[13px] leading-relaxed mb-4",
-          "text-xl leading-relaxed mb-10",
-          "text-[13px] leading-relaxed mb-4 md:text-lg lg:text-xl md:mb-10")} ${t("body")}`}>
-          숫자와 스펙으로 재단되는 관계를 넘어,<br />
-          모든 인연과 깊게 마주하는 로테이션 매칭파티를 경험하세요.
+          "text-[19.44px] leading-[1.65] mb-10",
+          "text-[13px] leading-relaxed mb-4 md:text-[clamp(15px,1.35vw,20px)] md:leading-[1.65] md:mb-[clamp(24px,2.8vw,40px)]")} ${t("body")}`}>
+          <span className={line}>숫자와 스펙으로 재단되는 관계를 넘어,</span><br className={lineBreak} />
+          <span className={line}>모든 인연과 깊게 마주하는 로테이션 매칭파티를 경험하세요.</span>
         </p>
         <button
           type="button"
@@ -144,10 +153,11 @@ export default function HeroSlide({ slide, mode, active = true, reducedMotion = 
         <span className={`inline-block rounded-full font-black ${pick(mode, "px-2.5 py-1 text-xs mb-2", "px-3 py-1 text-sm mb-5", "px-2.5 py-1 text-xs mb-2 md:px-3 md:text-sm md:mb-5")} ${badge.cls}`}>
           {badge.text}
         </span>
+        {/* PC 파티명은 폭 10em(≈ 화면 왼쪽 절반) 안에서 줄바꿈 — 긴 이름이 오른쪽 인물을 덮지 않도록 */}
         <h2 className={`font-black tracking-tight break-keep line-clamp-2 ${pick(mode,
           "text-[1.6rem] leading-[1.25] mb-2",
-          "text-6xl leading-[1.15] mb-6",
-          "text-[1.6rem] leading-[1.25] mb-2 md:text-5xl lg:text-6xl md:leading-[1.15] md:mb-6")} ${t("title")}`}>
+          "text-[63.36px] leading-[1.15] mb-6 max-w-[10em]",
+          "text-[1.6rem] leading-[1.25] mb-2 md:text-[clamp(2.25rem,4.4vw,4.25rem)] md:leading-[1.15] md:mb-6 md:max-w-[10em]")} ${t("title")}`}>
           {slide.title}
         </h2>
         {/* 일시 한 줄, 장소(주소) 다음 줄 — 남은 자리는 표시하지 않는다 */}
@@ -234,7 +244,9 @@ export function HeroIndicators({ count, index, onSelect, tonePc, mode, running =
         </div>
       )}
       {mode !== "mo" && (
-        <div className={`absolute bottom-8 right-10 z-20 items-center gap-2 ${mode === "responsive" ? "hidden md:flex" : "flex"}`}>
+        <div className={`absolute z-20 items-center gap-2 ${mode === "responsive"
+          ? "hidden md:flex md:bottom-[clamp(20px,2.2vw,32px)] md:right-6 lg:right-10"
+          : "flex bottom-[31.68px] right-10"}`}>
           {bars("pc")}
         </div>
       )}
