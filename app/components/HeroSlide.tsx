@@ -101,7 +101,7 @@ export default function HeroSlide({ slide, mode, active = true, reducedMotion = 
   const block = pick(mode, "w-full pointer-events-auto", "max-w-[560px] pointer-events-auto", "w-full md:max-w-[560px] pointer-events-auto");
   const btnSize = pick(mode, "w-full h-12 text-[15px]", "px-10 py-5 text-lg", "w-full h-12 text-[15px] md:w-auto md:h-auto md:px-10 md:py-5 md:text-lg");
   const btnCls = `inline-flex items-center justify-center gap-2 rounded-full font-bold shadow-xl ${btnSize} ${t("button")}`;
-  const metaCls = `${pick(mode, "text-[13px]", "text-xl", "text-[13px] md:text-lg lg:text-xl")} font-semibold`;
+  const metaSize = pick(mode, "text-[13px]", "text-xl", "text-[13px] md:text-lg lg:text-xl");
 
   const textAnim = reducedMotion
     ? { initial: { opacity: 0 }, animate: { opacity: 1 }, transition: { duration: 0.4 } }
@@ -139,7 +139,6 @@ export default function HeroSlide({ slide, mode, active = true, reducedMotion = 
     );
   } else {
     const badge = slide.almostFull ? { text: "마감임박", cls: HERO_BADGE.almost } : { text: "모집중", cls: HERO_BADGE.open };
-    const meta = [slide.dateString, slide.location].filter(Boolean).join(" · ");
     const inside = (
       <>
         <span className={`inline-block rounded-full font-black ${pick(mode, "px-2.5 py-1 text-xs mb-2", "px-3 py-1 text-sm mb-5", "px-2.5 py-1 text-xs mb-2 md:px-3 md:text-sm md:mb-5")} ${badge.cls}`}>
@@ -151,10 +150,11 @@ export default function HeroSlide({ slide, mode, active = true, reducedMotion = 
           "text-[1.6rem] leading-[1.25] mb-2 md:text-5xl lg:text-6xl md:leading-[1.15] md:mb-6")} ${t("title")}`}>
           {slide.title}
         </h2>
-        {meta && <p className={`${metaCls} ${t("body")}`}>{meta}</p>}
-        <p className={`${metaCls} font-black ${pick(mode, "mt-0.5 mb-4", "mt-2 mb-10", "mt-0.5 mb-4 md:mt-2 md:mb-10")} ${t("accent")}`}>
-          남 {slide.maleLeft}석 · 여 {slide.femaleLeft}석 남음
-        </p>
+        {/* 일시 한 줄, 장소(주소) 다음 줄 — 남은 자리는 표시하지 않는다 */}
+        <div className={pick(mode, "space-y-0.5 mb-4", "space-y-1 mb-10", "space-y-0.5 mb-4 md:space-y-1 md:mb-10")}>
+          {slide.dateString && <p className={`${metaSize} font-bold tabular-nums ${t("body")}`}>{slide.dateString}</p>}
+          {slide.location && <p className={`${metaSize} font-medium break-keep ${t("body")}`}>{slide.location}</p>}
+        </div>
         <span className={btnCls}>이 파티 신청하기 <ArrowRight size={18} /></span>
       </>
     );
