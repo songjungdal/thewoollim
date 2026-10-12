@@ -49,7 +49,7 @@ try {
 
 if (!$user) jsonFail('일치하는 회원 정보를 찾을 수 없습니다.', 404);
 
-if (preg_match('/^[ab](?:[1-9]|10)@naver\.com$/', $email) || str_ends_with($email, '@woollim.local')) {
+if (isTestUser($email) || str_ends_with($email, '@woollim.local')) {
     jsonFail('이 계정은 임시 비밀번호 문자 발송 대상이 아닙니다.', 403);
 }
 
