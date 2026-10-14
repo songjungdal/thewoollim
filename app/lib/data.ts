@@ -32,7 +32,7 @@ export const partyTypeOf = (party: { partyType?: string | null }): PartyType =>
 
 /**
  * 쿠폰 적용 불가 파티 안내 문구 — 서버와 같은 문구를 쓰도록 api/coupon-messages.json 한 곳에서 읽는다
- * (서버: api/lib.php couponDisabledMessage). 장바구니 쿠폰 입력창 placeholder·서버 거절 응답에 쓰인다.
+ * (서버: api/lib.php couponDisabledMessage). 장바구니 쿠폰 칸의 안내 박스(앞의 "※"는 빼고 표시)·서버 거절 응답에 쓰인다.
  */
 export const COUPON_DISABLED_MESSAGE: string = COUPON_MESSAGES.couponDisabled;
 
