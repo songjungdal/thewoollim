@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ShoppingBag, LogOut, User, Trash2, CheckSquare, Square, CreditCard, Pencil, AlertTriangle, X, Ticket, Clock, CheckCircle2, Check, KeyRound, ChevronDown } from "lucide-react";
+import { ShoppingBag, LogOut, User, Trash2, CheckSquare, Square, CreditCard, Pencil, AlertTriangle, X, Ticket, TicketX, Clock, CheckCircle2, Check, KeyRound, ChevronDown } from "lucide-react";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useAuth, calcCouponDiscount, type BookingStatus } from "../context/AuthContext";
@@ -570,7 +570,7 @@ export default function MyPage() {
                 <div className="space-y-3 lg:space-y-4">
                   {cartParties.map(party => {
                     const isSelected      = selectedIds.has(party.id);
-                    const couponOff       = !!party.couponDisabled; // 쿠폰 적용 불가 파티 — 쿠폰 입력·적용 비활성
+                    const couponOff       = !!party.couponDisabled; // 쿠폰 적용 불가 파티 — 쿠폰 입력칸 대신 안내 박스
                     const couponHere      = !couponOff && appliedCoupon?.partyId === party.id;
                     const couponElsewhere = !couponOff && !!appliedCoupon && appliedCoupon.partyId !== party.id;
                     const rowPrice        = computeRowPrice(party.id, party.price);
@@ -599,6 +599,10 @@ export default function MyPage() {
                                 <span className="inline-flex text-[11px] font-black text-brand-point-ink bg-brand-point/10 px-2 py-0.5 rounded-full" data-testid="cart-option">
                                   {partyOptionById(party, cartOptionOf(party.id))?.name}
                                 </span>
+                              )}
+                              {/* 쿠폰 적용 불가 파티 */}
+                              {couponOff && (
+                                <span className="inline-flex text-[11px] font-black text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">쿠폰 불가</span>
                               )}
                             </div>
                             <h3 className="mt-1.5 text-[17px] lg:text-xl font-black leading-snug group-hover:text-brand-point-ink transition-colors break-keep">
@@ -669,25 +673,15 @@ export default function MyPage() {
                                 </button>
                               </div>
                             ) : couponOff ? (
-                              // 쿠폰 적용 불가 — 입력창·적용 버튼 비활성, 안내 문구는 입력창 안(placeholder)에 회색으로 표시.
-                              // 모바일·PC(쿠폰 칸 340px)는 문구가 잘리지 않도록 입력창을 한 줄 전체로 쓰고 버튼을 아래로 내린다.
-                              <div className="flex flex-col sm:flex-row lg:flex-col gap-2">
-                                <input
-                                  type="text"
-                                  value=""
-                                  readOnly
-                                  disabled
-                                  placeholder={COUPON_DISABLED_MESSAGE}
-                                  aria-label="쿠폰 코드 입력"
-                                  className="sm:flex-[3] lg:flex-none min-w-0 h-12 px-3 rounded-xl border-2 border-gray-200 bg-gray-100 text-sm font-medium cursor-not-allowed placeholder:text-gray-600 placeholder:font-medium"
-                                />
-                                <button
-                                  type="button"
-                                  disabled
-                                  className="sm:flex-[1] lg:flex-none h-12 px-3 sm:px-5 rounded-xl font-black text-sm whitespace-nowrap bg-gray-200 text-gray-500 cursor-not-allowed"
-                                >
-                                  적용
-                                </button>
+                              // 쿠폰 적용 불가 — 입력창·적용 버튼 없이 안내 박스만 (점선 테두리 + 아이콘 + 문구).
+                              // 최소 높이 48px로 기본 입력행과 높이를 맞추고, 문구가 길면 줄바꿈(잘림 없음). 문구 앞 "※"는 아이콘이 대신한다.
+                              <div role="note" className="flex items-center gap-3 min-h-12 px-4 py-2 rounded-xl border-2 border-dashed border-gray-300 bg-gray-50">
+                                <span className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                                  <TicketX size={15} className="text-gray-600" strokeWidth={2.25} />
+                                </span>
+                                <p className="text-sm font-bold text-gray-700 leading-snug break-keep">
+                                  {COUPON_DISABLED_MESSAGE.replace(/^※\s*/, "")}
+                                </p>
                               </div>
                             ) : couponElsewhere ? (
                               <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl border-2 border-gray-200 bg-gray-50">
