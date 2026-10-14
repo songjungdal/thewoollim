@@ -4,7 +4,7 @@
  *
  * POST { email, password, phone } → { ok: true }
  *  - 비밀번호 8자 이상
- *  - 이메일 형식
+ *  - 이메일 형식, 테스트 회원 이메일(a1~a20·b1~b20@naver.com — api/lib.php isTestUser)은 가입 불가
  *  - 이름/성별/생년월일은 클라이언트가 보내도 무시 — verify-identity.php 가
  *    세션에 저장한 검증값만 신뢰 (본인인증을 우회해 임의 값으로 가입하는 것을 차단)
  *  - 연락처(phone)는 폼 입력값 사용 — 다날 "본인인증"(CI/DI) 상품 응답에는
@@ -38,6 +38,9 @@ $password = (string)            ($body['password'] ?? '');
 $phone    = preg_replace('/\D+/', '', (string)($body['phone'] ?? ''));
 
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) jsonFail('이메일 형식이 올바르지 않습니다.');
+// 테스트 회원 이메일은 관리자 [테스트 회원 만들기](api/admin/test-users.php)로만 만든다.
+// 일반 가입으로 만들어지면 그 회원에게는 알림 문자가 하나도 나가지 않고 프로필 핵심 5종 잠금도 풀린다.
+if (isTestUser($email)) jsonFail('사용할 수 없는 이메일입니다. 다른 이메일을 입력해주세요.');
 if (strlen($password) < 8)                      jsonFail('비밀번호는 8자 이상이어야 합니다.');
 if (!preg_match('/^01\d{8,9}$/', (string)$phone)) jsonFail('휴대폰 번호 형식이 올바르지 않습니다.');
 
