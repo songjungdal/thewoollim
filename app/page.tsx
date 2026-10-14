@@ -32,7 +32,7 @@ const SCHEDULE_STATUS_STYLE: Record<ScheduleStatus, { label: string; tone: strin
 const scheduleTypeBadgeTone = (isPast: boolean) => (isPast ? "bg-gray-200 text-gray-500" : "bg-gray-900 text-white");
 const SCHEDULE_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 /** 참가자 마키 — 카드 1장이 지나가는 시간(초). 한 바퀴 = 카드 수 × 이 값이라 인원이 늘어도 흐르는 속도가 같다 */
-const PARTICIPANT_SEC_PER_CARD = 2.5;
+const PARTICIPANT_SEC_PER_CARD = 2;
 /** 참가자 카드 키워드 칩 — 한 줄에 놓을 개수 */
 const KEYWORDS_PER_ROW = 3;
 /** Date → 로컬 기준 "YYYY-MM-DD" */
@@ -1182,10 +1182,11 @@ export default function SmoothOnePage() {
                 const isCopy = idx >= allParticipants.length;
                 const isMale = p.gender === "male";
                 return (
+                  /* 카드 폭 = 내용(직업 줄·키워드 첫 줄 중 긴 쪽)에 맞춤 → 오른쪽이 비지 않음. 최대 폭을 넘는 직업만 말줄임 */
                   <div
                     key={`${p.id}-${idx}`}
                     aria-hidden={isCopy || undefined}
-                    className={`participants-card w-[240px] md:w-[320px] flex-shrink-0 p-3.5 md:p-5 rounded-2xl bg-white border border-gray-100 transition-colors hover:border-brand-point${isCopy ? " participants-copy" : ""}`}
+                    className={`participants-card w-max max-w-[280px] md:max-w-[360px] flex-shrink-0 p-3.5 md:p-5 rounded-2xl bg-white border border-gray-100 transition-colors hover:border-brand-point${isCopy ? " participants-copy" : ""}`}
                   >
                     <div className="flex items-center gap-2.5 md:gap-3">
                       <div className={`w-[38px] h-[38px] md:w-12 md:h-12 flex-shrink-0 rounded-full flex items-center justify-center text-[13px] md:text-[15px] font-bold ${isMale ? "bg-[#E6F1FB] text-[#0C447C]" : "bg-[#FCE4EC] text-[#72243E]"}`}>
