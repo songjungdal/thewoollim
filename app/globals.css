@@ -92,6 +92,7 @@ section {
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
   mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
 }
+/* 80s 는 기본값 — 실제 한 바퀴 시간은 page.tsx 에서 카드 수 × PARTICIPANT_SEC_PER_CARD 로 지정(인원과 무관하게 같은 속도) */
 .participants-row { animation: participants-marquee 80s linear infinite; }
 .participants-track:hover .participants-row,
 .participants-track:active .participants-row { animation-play-state: paused; }

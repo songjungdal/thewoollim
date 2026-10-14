@@ -31,6 +31,8 @@ const SCHEDULE_STATUS_STYLE: Record<ScheduleStatus, { label: string; tone: strin
 /** 일정 카드·패널의 파티 종류 배지 — 지난 일정은 다른 표시처럼 흐리게 */
 const scheduleTypeBadgeTone = (isPast: boolean) => (isPast ? "bg-gray-200 text-gray-500" : "bg-gray-900 text-white");
 const SCHEDULE_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+/** 참가자 마키 — 카드 1장이 지나가는 시간(초). 한 바퀴 = 카드 수 × 이 값이라 인원이 늘어도 흐르는 속도가 같다 */
+const PARTICIPANT_SEC_PER_CARD = 2.5;
 /** Date → 로컬 기준 "YYYY-MM-DD" */
 const toYmd = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -1169,8 +1171,11 @@ export default function SmoothOnePage() {
 
           {/* v8.0 — 참가자 캐러셀이 /api/participants.php 응답으로 늘어나며 발생하는 깜빡임 차단 */}
           <div className={`participants-track transition-opacity duration-500 ease-out ${contentReady ? "opacity-100" : "opacity-0"}`}>
-            {/* 같은 목록을 2번 이어 붙여 -50% 이동으로 끊김 없이 반복. pr-3 = gap-3 → 절반 지점이 정확히 카드 경계 */}
-            <div className="participants-row flex items-stretch gap-3 pr-3 w-max">
+            {/* 같은 목록을 2번 이어 붙여 -50% 이동으로 끊김 없이 반복. pr = gap → 절반 지점이 정확히 카드 경계 */}
+            <div
+              className="participants-row flex items-stretch gap-3 md:gap-4 pr-3 md:pr-4 w-max"
+              style={{ animationDuration: `${allParticipants.length * PARTICIPANT_SEC_PER_CARD}s` }}
+            >
               {[...allParticipants, ...allParticipants].map((p, idx) => {
                 const isCopy = idx >= allParticipants.length;
                 const isMale = p.gender === "male";
@@ -1178,23 +1183,23 @@ export default function SmoothOnePage() {
                   <div
                     key={`${p.id}-${idx}`}
                     aria-hidden={isCopy || undefined}
-                    className={`participants-card w-[216px] md:w-[256px] flex-shrink-0 p-3.5 md:p-4 rounded-2xl bg-white border border-gray-100 transition-colors hover:border-brand-point${isCopy ? " participants-copy" : ""}`}
+                    className={`participants-card w-[216px] md:w-[320px] flex-shrink-0 p-3.5 md:p-5 rounded-2xl bg-white border border-gray-100 transition-colors hover:border-brand-point${isCopy ? " participants-copy" : ""}`}
                   >
-                    <div className="flex items-center gap-2.5">
-                      <div className={`w-[38px] h-[38px] flex-shrink-0 rounded-full flex items-center justify-center text-[13px] font-bold ${isMale ? "bg-[#E6F1FB] text-[#0C447C]" : "bg-[#FCE4EC] text-[#72243E]"}`}>
+                    <div className="flex items-center gap-2.5 md:gap-3">
+                      <div className={`w-[38px] h-[38px] md:w-12 md:h-12 flex-shrink-0 rounded-full flex items-center justify-center text-[13px] md:text-[15px] font-bold ${isMale ? "bg-[#E6F1FB] text-[#0C447C]" : "bg-[#FCE4EC] text-[#72243E]"}`}>
                         {isMale ? "남" : "여"}
                       </div>
                       <div className="min-w-0">
-                        <h3 className="text-[15px] font-bold text-gray-900 leading-snug truncate">{p.job}</h3>
+                        <h3 className="text-[15px] md:text-lg font-bold text-gray-900 leading-snug truncate">{p.job}</h3>
                         {p.age && (
-                          <p className="text-[13px] font-bold text-brand-point-ink leading-snug">{p.age}</p>
+                          <p className="text-[13px] md:text-[15px] font-bold text-brand-point-ink leading-snug">{p.age}</p>
                         )}
                       </div>
                     </div>
                     {p.keywords.length > 0 && (
-                      <div className="mt-2.5 flex flex-wrap gap-1.5">
+                      <div className="mt-2.5 md:mt-3 flex flex-wrap gap-1.5">
                         {p.keywords.map((k, kIdx) => (
-                          <span key={kIdx} className="bg-gray-50 text-gray-600 border border-gray-100 text-xs px-2.5 py-0.5 rounded-full whitespace-nowrap">#{k}</span>
+                          <span key={kIdx} className="bg-gray-50 text-gray-600 border border-gray-100 text-xs md:text-[13px] px-2.5 md:px-3 py-0.5 md:py-1 rounded-full whitespace-nowrap">#{k}</span>
                         ))}
                       </div>
                     )}
