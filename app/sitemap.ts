@@ -30,7 +30,6 @@ const STATIC_PATHS: { path: string; priority: number; changeFrequency: MetadataR
   { path: "/privacy",     priority: 0.5, changeFrequency: "yearly" },
   { path: "/partnership", priority: 0.6, changeFrequency: "monthly" },
   { path: "/report",      priority: 0.4, changeFrequency: "yearly" },
-  { path: "/support",     priority: 0.5, changeFrequency: "monthly" },
 ];
 
 /** 빌드 시점에 활성 파티 id 목록을 운영 API 에서 가져온다. 실패해도 빌드가 깨지지 않도록 best-effort. */

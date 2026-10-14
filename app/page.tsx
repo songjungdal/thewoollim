@@ -1328,7 +1328,7 @@ export default function SmoothOnePage() {
                 <p className="mt-1 text-sm md:text-base text-gray-300 break-keep">고객센터로 남겨주시면 확인 후 답변드릴게요.</p>
               </div>
               <Link
-                href="/support"
+                href="/report"
                 className="inline-flex items-center justify-center gap-1.5 h-12 px-6 rounded-full bg-brand-point text-black text-sm md:text-base font-bold hover:bg-white transition-colors"
               >
                 고객센터 문의하기
