@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef } from "react";
 import { motion, AnimatePresence, Variants } from "framer-motion";
-import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, Users, Calendar, MapPin, X } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, Calendar, MapPin, X } from "lucide-react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
@@ -1154,54 +1154,55 @@ export default function SmoothOnePage() {
           </div>
         </section>
 
-        {/* Participants List Section (Infinite Carousel) */}
-        <section id="participants" className="py-16 md:py-32 bg-brand-lightgray overflow-hidden">
-          <div className="max-w-7xl mx-auto px-4 md:px-6 mb-10 md:mb-16">
+        {/* Participants List Section — 한 줄 마키(app/globals.css .participants-track / .participants-row) */}
+        <section id="participants" className="py-16 md:py-24 bg-brand-lightgray overflow-hidden">
+          <div className="max-w-7xl mx-auto px-4 md:px-6 mb-8 md:mb-12">
             <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="text-center">
-              <h2 className="text-3xl md:text-6xl font-bold mb-4 md:mb-6 tracking-tight">어떤 사람들이 오나요?</h2>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E1F5EE] px-2.5 py-1 text-xs text-brand-point-ink mb-3 md:mb-4">
+                <span className="w-1.5 h-1.5 rounded-full bg-brand-point" aria-hidden="true" />
+                실시간 업데이트
+              </span>
+              <h2 className="text-3xl md:text-5xl font-bold mb-4 md:mb-6 tracking-tight">어떤 사람들이 오나요?</h2>
               <p className="text-sm md:text-lg text-gray-500">철저한 심사를 거친, 매력적인 참가자들이 기다리고 있습니다.</p>
             </motion.div>
           </div>
 
           {/* v8.0 — 참가자 캐러셀이 /api/participants.php 응답으로 늘어나며 발생하는 깜빡임 차단 */}
-          <div className={`relative flex transition-opacity duration-500 ease-out ${contentReady ? "opacity-100" : "opacity-0"}`}>
-            {/* Infinite Scroll Container */}
-            <motion.div
-              className="flex gap-4 md:gap-6 py-4"
-              animate={{ x: ["0%", "-50%"] }}
-              transition={{ repeat: Infinity, duration: 75, ease: "linear" }}
-              style={{ width: "fit-content" }}
-            >
-              {/* Combine participants twice for seamless loop */}
-              {[...allParticipants, ...allParticipants].map((p, idx) => (
-                <motion.div
-                  key={`${p.id}-${idx}`}
-                  whileHover={{ y: -12, scale: 1.04, boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.15)" }}
-                  className="bg-white p-5 md:p-10 rounded-2xl md:rounded-[2.5rem] shadow-sm border border-gray-100 min-w-[200px] md:min-w-[320px] transition-shadow flex flex-col items-center text-center group cursor-pointer"
-                >
-                  <div className={`w-11 h-11 md:w-16 md:h-16 rounded-full mb-3 md:mb-5 flex items-center justify-center transition-transform group-hover:scale-110 ${p.gender === 'male' ? 'bg-[#E3F2FD]' : 'bg-[#FCE4EC]'}`}>
-                    <Users size={16} className={`md:hidden ${p.gender === 'male' ? 'text-blue-400' : 'text-pink-400'}`} />
-                    <Users size={22} className={`hidden md:block ${p.gender === 'male' ? 'text-blue-400' : 'text-pink-400'}`} />
+          <div className={`participants-track transition-opacity duration-500 ease-out ${contentReady ? "opacity-100" : "opacity-0"}`}>
+            {/* 같은 목록을 2번 이어 붙여 -50% 이동으로 끊김 없이 반복. pr-3 = gap-3 → 절반 지점이 정확히 카드 경계 */}
+            <div className="participants-row flex items-stretch gap-3 pr-3 w-max">
+              {[...allParticipants, ...allParticipants].map((p, idx) => {
+                const isCopy = idx >= allParticipants.length;
+                const isMale = p.gender === "male";
+                return (
+                  <div
+                    key={`${p.id}-${idx}`}
+                    aria-hidden={isCopy || undefined}
+                    className={`participants-card w-[216px] md:w-[256px] flex-shrink-0 p-3.5 md:p-4 rounded-2xl bg-white border border-gray-100 transition-colors hover:border-brand-point${isCopy ? " participants-copy" : ""}`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-[38px] h-[38px] flex-shrink-0 rounded-full flex items-center justify-center text-[13px] font-bold ${isMale ? "bg-[#E6F1FB] text-[#0C447C]" : "bg-[#FCE4EC] text-[#72243E]"}`}>
+                        {isMale ? "남" : "여"}
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="text-[15px] font-bold text-gray-900 leading-snug truncate">{p.job}</h3>
+                        {p.age && (
+                          <p className="text-[13px] font-bold text-brand-point-ink leading-snug">{p.age}</p>
+                        )}
+                      </div>
+                    </div>
+                    {p.keywords.length > 0 && (
+                      <div className="mt-2.5 flex flex-wrap gap-1.5">
+                        {p.keywords.map((k, kIdx) => (
+                          <span key={kIdx} className="bg-gray-50 text-gray-600 border border-gray-100 text-xs px-2.5 py-0.5 rounded-full whitespace-nowrap">#{k}</span>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <h3 className="text-sm md:text-2xl font-black mb-1.5 md:mb-3 text-gray-900 leading-tight">{p.job}</h3>
-                  {p.age && (
-                    <p className="text-brand-point-ink font-bold text-xs md:text-lg mb-3 md:mb-8 whitespace-nowrap">{p.age}</p>
-                  )}
-                  <div className="flex flex-wrap justify-center gap-1.5 md:gap-2">
-                    {p.keywords.map((k, kIdx) => (
-                      <span key={kIdx} className="bg-gray-50 text-gray-500 text-xs md:text-sm font-bold px-2.5 md:px-4 py-1 md:py-1.5 rounded-full border border-gray-100">#{k}</span>
-                    ))}
-                  </div>
-                </motion.div>
-              ))}
-            </motion.div>
+                );
+              })}
+            </div>
           </div>
-
-          <style jsx global>{`
-            #participants .relative:hover .flex {
-              animation-play-state: paused !important;
-            }
-          `}</style>
         </section>
 
         {/* FAQ Accordion Section */}
