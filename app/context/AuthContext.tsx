@@ -260,9 +260,6 @@ const AuthContext = createContext<AuthContextType>({
   clearCoupon: () => {},
 });
 
-const ADMIN_EMAIL    = "pletora@naver.com";
-const ADMIN_PASSWORD = "wjdekf*0010";
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [mounted,    setMounted]    = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -522,14 +519,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       serverOk = false;
     }
 
-    // 백업 — 하드코딩 admin (다음 turn 에서 제거 예정, DB 마이그레이션 후 안전망 역할)
-    const adminFallback = email === ADMIN_EMAIL && password === ADMIN_PASSWORD;
-
-    if (!serverOk && !adminFallback) return false;
+    if (!serverOk) return false;
 
     setIsLoggedIn(true);
     setUserEmail(email);
-    setUserRole(serverOk ? "user" : "admin");
+    setUserRole("user");
     userEmailRef.current = email;
     localStorage.setItem("woollim_auth", JSON.stringify({ loggedIn: true, email }));
 
