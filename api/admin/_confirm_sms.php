@@ -16,11 +16,7 @@ if (!function_exists('notifyConfirmSms')) {
 
     /** 발송 제외 대상(테스트/관리자) 이메일 — 소문자 비교. _pending_sms.php / _cancel_sms.php 등과 동일 규칙 */
     function _confirmSmsIsTestAccount(string $email, string $role): bool {
-        if (isSmsExcludedAccount($email, $role)) return true;   // 관리자·테스트 회원 (api/lib.php)
-        $testList = [
-            'pletora@naver.com',
-        ];
-        return in_array(strtolower(trim($email)), $testList, true);
+        return isSmsExcludedAccount($email, $role);   // 관리자·테스트 회원 (api/lib.php)
     }
 
     /** dateString('2026년 05월 29일 (금) 19:00') → ['date'=>'2026년 05월 29일 (금)', 'time'=>'19:00'] */

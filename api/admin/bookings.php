@@ -3,6 +3,7 @@
  * 관리자 예약 관리.
  *  GET  : 모든 회원의 예약 + 회원 정보 조인 (status/gender 필터링용 데이터 포함)
  *  POST { action: "approve", email, bookingId } → status='paid_pending_profile'|'pending_approval' → 'confirmed'
+ *    (이미 확정·취소·취소요청·환불완료·모임종료·무통장 입금 전 예약은 거절 — 상태·문자 변경 없음)
  *  POST { action: "cancel",  email, bookingId } → status='cancelled' + party_counts -1 (atomic)
  *    (참가 구성 예약은 예약에 저장된 sessionIds 회차 인원도 함께 -1 / confirm_vbank 는 그 회차마다 정원 검사 후 +1)
  *  POST { action: "cancel_full_refund", email, bookingId } → 카드결제 전액 Toss 즉시취소 + status='cancelled' + party_counts -1
@@ -330,10 +331,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($action === 'approve') {
+        // 확정할 수 없는 상태 — 관리자 화면에서 [참가확정] 버튼을 숨기는 상태와 같다.
+        // 다른 관리자가 먼저 취소·확정한 예약을 갱신 전 화면에서 누르면 상태가 되돌아가고 확정 문자가 다시 나가던 것을 막는다.
+        $approveBlocked = [
+            'confirmed'        => '이미 참가확정된 예약입니다.',
+            'cancelled'        => '이미 취소된 예약입니다.',
+            'cancel_requested' => '취소요청 처리 중인 예약입니다. [취소요청] 탭에서 처리해주세요.',
+            'refund_completed' => '취소요청 처리 중인 예약입니다. [취소요청] 탭에서 처리해주세요.',
+            'completed'        => '모임이 종료된 예약입니다.',
+            'vbank_pending'    => '무통장 입금 확인 전인 예약입니다. [결제확인]을 먼저 해주세요.',
+        ];
         $found = false;
         $approvedBooking = null;
         foreach ($bookings as &$b) {
             if (($b['id'] ?? '') === $bid) {
+                $curStatus = (string)($b['status'] ?? '');
+                if (isset($approveBlocked[$curStatus])) {
+                    echo json_encode(['ok' => false, 'error' => $approveBlocked[$curStatus]]); exit;
+                }
                 $b['status']    = 'confirmed';
                 $b['updatedAt'] = date('c');
                 $approvedBooking = $b;
