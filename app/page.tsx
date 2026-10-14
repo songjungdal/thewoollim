@@ -33,6 +33,8 @@ const scheduleTypeBadgeTone = (isPast: boolean) => (isPast ? "bg-gray-200 text-g
 const SCHEDULE_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 /** 참가자 마키 — 카드 1장이 지나가는 시간(초). 한 바퀴 = 카드 수 × 이 값이라 인원이 늘어도 흐르는 속도가 같다 */
 const PARTICIPANT_SEC_PER_CARD = 2.5;
+/** 참가자 카드 키워드 칩 — 한 줄에 놓을 개수 */
+const KEYWORDS_PER_ROW = 3;
 /** Date → 로컬 기준 "YYYY-MM-DD" */
 const toYmd = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -180,7 +182,7 @@ function GallerySlider({
 
 export default function SmoothOnePage() {
   const [activeTab, setActiveTab] = useState("일정별");
-  const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(0);   // FAQ — 처음엔 첫 질문을 펼쳐 둔다
+  const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(null);   // FAQ — 처음엔 모두 접어 둔다
   const [selectedGalleryImage, setSelectedGalleryImage] = useState<string | null>(null);
   const [currentGalleryPage, setCurrentGalleryPage] = useState(0);   // 6장씩 가로 슬라이드 페이지 인덱스
   // 후기 갤러리 — DB 라이브 fetch (관리자가 수정 시 BroadcastChannel + 폴링으로 즉시 반영)
@@ -1183,7 +1185,7 @@ export default function SmoothOnePage() {
                   <div
                     key={`${p.id}-${idx}`}
                     aria-hidden={isCopy || undefined}
-                    className={`participants-card w-[216px] md:w-[320px] flex-shrink-0 p-3.5 md:p-5 rounded-2xl bg-white border border-gray-100 transition-colors hover:border-brand-point${isCopy ? " participants-copy" : ""}`}
+                    className={`participants-card w-[240px] md:w-[320px] flex-shrink-0 p-3.5 md:p-5 rounded-2xl bg-white border border-gray-100 transition-colors hover:border-brand-point${isCopy ? " participants-copy" : ""}`}
                   >
                     <div className="flex items-center gap-2.5 md:gap-3">
                       <div className={`w-[38px] h-[38px] md:w-12 md:h-12 flex-shrink-0 rounded-full flex items-center justify-center text-[13px] md:text-[15px] font-bold ${isMale ? "bg-[#E6F1FB] text-[#0C447C]" : "bg-[#FCE4EC] text-[#72243E]"}`}>
@@ -1197,9 +1199,16 @@ export default function SmoothOnePage() {
                       </div>
                     </div>
                     {p.keywords.length > 0 && (
-                      <div className="mt-2.5 md:mt-3 flex flex-wrap gap-1.5">
-                        {p.keywords.map((k, kIdx) => (
-                          <span key={kIdx} className="bg-gray-50 text-gray-600 border border-gray-100 text-xs md:text-[13px] px-2.5 md:px-3 py-0.5 md:py-1 rounded-full whitespace-nowrap">#{k}</span>
+                      /* 키워드는 3개씩 끊어 줄을 나눈다(5개 → 3+2). 한 줄이 넘칠 때만 그 줄 안에서 줄바꿈 */
+                      <div className="mt-2.5 md:mt-3 space-y-1.5">
+                        {Array.from({ length: Math.ceil(p.keywords.length / KEYWORDS_PER_ROW) }, (_, rIdx) =>
+                          p.keywords.slice(rIdx * KEYWORDS_PER_ROW, (rIdx + 1) * KEYWORDS_PER_ROW)
+                        ).map((row, rIdx) => (
+                          <div key={rIdx} className="flex flex-wrap gap-1.5">
+                            {row.map((k, kIdx) => (
+                              <span key={kIdx} className="bg-gray-50 text-gray-600 border border-gray-100 text-xs md:text-[13px] px-2.5 md:px-3 py-0.5 md:py-1 rounded-full whitespace-nowrap">#{k}</span>
+                            ))}
+                          </div>
                         ))}
                       </div>
                     )}
