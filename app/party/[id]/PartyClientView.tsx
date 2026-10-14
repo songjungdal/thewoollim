@@ -201,25 +201,26 @@ export default function PartyClientView({ id }: { id: string }) {
   // 참가 구성 파티는 회차별 인원도 함께 (withLiveCounts)
   const detailItem = baseItem ? withLiveCounts(baseItem, partyCounts[id]) : undefined;
 
+  // 실시간 파티 데이터 최초 fetch가 아직 끝나지 않은 구간 — 빌드 시점 샘플 목록만 있어
+  // 실제로는 존재하는 파티도 못 찾은 것처럼 보이거나, 샘플과 id가 겹치는 파티는 샘플 제목·가격이 잠깐 비친다.
+  // 그래서 fetch 완료 전까지는 파티를 찾았든 못 찾았든 로딩 화면만 보여준다 (정적 HTML도 이 화면으로 만들어짐).
+  // 로딩 화면엔 푸터를 그리지 않는다 — 화면 높이뿐인 짧은 화면이라 푸터가 첫 화면에 보였다가 본문이 뜨면 사라져 깜빡여 보임.
+  if (!partiesLoaded) {
+    return (
+      <div className="flex flex-col min-h-screen">
+        <Header />
+        <main className="flex-1 flex items-center justify-center px-4" aria-busy="true">
+          <span
+            role="status"
+            aria-label="불러오는 중"
+            className="block w-11 h-11 rounded-full border-[3px] border-gray-200 border-t-brand-point animate-spin"
+          />
+        </main>
+      </div>
+    );
+  }
+
   if (!detailItem) {
-    // 실시간 파티 데이터 최초 fetch가 아직 끝나지 않은 구간 — 빌드 시점 샘플 목록만 있어
-    // 실제로는 존재하는 파티도 일시적으로 못 찾은 것처럼 보일 수 있으므로, fetch 완료 전까지는
-    // "찾을 수 없음" 대신 로딩 상태를 보여줘 자연스럽게 진입되도록 함.
-    if (!partiesLoaded) {
-      return (
-        <div className="flex flex-col min-h-screen">
-          <Header />
-          <main className="flex-1 flex items-center justify-center px-4">
-            <span
-              role="status"
-              aria-label="불러오는 중"
-              className="block w-11 h-11 rounded-full border-[3px] border-gray-200 border-t-brand-point animate-spin"
-            />
-          </main>
-          <Footer />
-        </div>
-      );
-    }
     return (
       <div className="flex flex-col min-h-screen">
         <Header />
@@ -257,13 +258,12 @@ export default function PartyClientView({ id }: { id: string }) {
   const partyType: PartyType = detailRes?.partyType ?? partyTypeOf(detailItem);
   const typeLabel = PARTY_TYPE_LABELS[partyType];
   // 화면에 그릴 안내 — detail ?? 종류별 템플릿. 응답 전(null)이면 편집 영역을 그리지 않는다.
-  //   요청이 실패해 종류를 모르면 실시간 파티 목록을 받은 뒤에 그 종류로 템플릿을 고른다(빌드 시점 샘플로 오판 방지).
-  const detailReady = !!detailRes && detailRes.id === id && (detailRes.detail !== null || detailRes.partyType !== null || partiesLoaded);
+  //   요청이 실패해 종류를 모르면 실시간 파티 목록의 종류로 템플릿을 고른다 (여기까지 왔으면 실시간 목록은 이미 받은 상태).
+  const detailReady = !!detailRes && detailRes.id === id;
   const shownDetail: PartyDetail | null = detailReady && detailRes ? (detailRes.detail ?? templateFor(partyType)) : null;
-  // 고정 안내 문구(신청 전 확인·참가 신청 방법·필수 확인 사항) — 종류가 확인된 뒤에만 그린다
-  //   (솔로파티에 매칭파티 문구가 잠깐 비치지 않도록). 상세 안내 응답이나 실시간 파티 목록 중 먼저 온 쪽으로 확인한다
-  //   (빌드 시점 샘플 목록만 있을 때는 종류를 믿지 않는다). app/lib/partyGuides.ts
-  const guide = detailReady || partiesLoaded ? PARTY_GUIDES[partyType] : null;
+  // 고정 안내 문구(신청 전 확인·참가 신청 방법·필수 확인 사항) — 실시간 파티 목록으로 종류가 확인된 상태라 바로 그린다
+  //   (빌드 시점 샘플 목록만 있을 때는 위의 로딩 화면에서 멈추므로 솔로파티에 매칭파티 문구가 비치지 않음). app/lib/partyGuides.ts
+  const guide = PARTY_GUIDES[partyType];
   // 참가 신청 방법·필수 확인 사항 — 파티에 저장된 내용(detail.apply / notice)이 있으면 그것, 없으면 종류별 기본 문구.
   //   저장된 내용이 있을 수 있으므로 상세 안내 응답 뒤에 그린다 (기본 문구가 비쳤다가 바뀌지 않도록). docs/specs/party-guide-edit.md 3장
   const savedDetail = detailReady && detailRes ? detailRes.detail : null;
