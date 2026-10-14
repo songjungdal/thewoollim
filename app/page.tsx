@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef } from "react";
 import { motion, AnimatePresence, Variants } from "framer-motion";
-import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, Calendar, MapPin, X } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight, Calendar, MapPin, X } from "lucide-react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
@@ -180,7 +180,7 @@ function GallerySlider({
 
 export default function SmoothOnePage() {
   const [activeTab, setActiveTab] = useState("일정별");
-  const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(null);
+  const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(0);   // FAQ — 처음엔 첫 질문을 펼쳐 둔다
   const [selectedGalleryImage, setSelectedGalleryImage] = useState<string | null>(null);
   const [currentGalleryPage, setCurrentGalleryPage] = useState(0);   // 6장씩 가로 슬라이드 페이지 인덱스
   // 후기 갤러리 — DB 라이브 fetch (관리자가 수정 시 BroadcastChannel + 폴링으로 즉시 반영)
@@ -1210,40 +1210,130 @@ export default function SmoothOnePage() {
           </div>
         </section>
 
-        {/* FAQ Accordion Section */}
+        {/* FAQ Accordion Section — 가운데 1단. 데이터·추가 블록은 app/lib/data.ts FAQS */}
         <section id="faq" className="py-16 md:py-32 px-4 md:px-6 bg-white">
-          <div className="max-w-3xl mx-auto">
-            <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="mb-10 md:mb-16">
-              <h2 className="text-4xl md:text-5xl font-bold tracking-tight">자주 묻는 질문</h2>
+          <div className="max-w-[820px] mx-auto">
+            <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="text-center mb-10 md:mb-14">
+              <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight">자주 묻는 질문</h2>
+              <p className="mt-3 md:mt-4 text-sm md:text-lg text-gray-600 break-keep">참가 전 가장 많이 물어보시는 내용을 모았어요.</p>
             </motion.div>
 
-            <div className="space-y-4">
+            <div className="border-t-2 border-black">
               {FAQS.map((faq, index) => {
                 const isOpen = faqOpenIndex === index;
+                const qId = `faq-q-${faq.id}`;
+                const aId = `faq-a-${faq.id}`;
                 return (
-                  <div key={index} className="border border-gray-200 rounded-3xl overflow-hidden shadow-sm">
-                    <button 
-                      onClick={() => setFaqOpenIndex(isOpen ? null : index)}
-                      className="w-full px-5 md:px-8 py-5 md:py-6 flex justify-between items-center text-left bg-white hover:bg-brand-lightgray transition-colors"
-                    >
-                      <span className="text-base md:text-lg font-bold pr-4">{faq.q}</span>
-                      <ChevronDown className={`shrink-0 transform transition-transform duration-300 text-brand-point-ink ${isOpen ? 'rotate-180' : ''}`} />
-                    </button>
-                    <AnimatePresence>
+                  <div key={faq.id} className="border-b border-gray-200">
+                    <h3>
+                      <button
+                        type="button"
+                        id={qId}
+                        aria-expanded={isOpen}
+                        aria-controls={aId}
+                        onClick={() => setFaqOpenIndex(isOpen ? null : index)}
+                        className="group w-full min-h-[72px] py-4 flex items-center gap-3 md:gap-4 text-left"
+                      >
+                        <span aria-hidden="true" className="w-6 md:w-7 shrink-0 text-lg md:text-xl font-extrabold text-brand-point-ink">Q</span>
+                        <span className={`flex-1 text-base md:text-lg leading-snug break-keep transition-colors ${isOpen ? "font-bold text-black" : "font-medium text-gray-800 group-hover:text-black"}`}>
+                          {faq.q}
+                        </span>
+                        <span className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-colors duration-300 ${isOpen ? "bg-black text-white" : "bg-brand-lightgray text-gray-700 group-hover:bg-gray-200"}`}>
+                          <ChevronDown size={18} aria-hidden="true" className={`transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`} />
+                        </span>
+                      </button>
+                    </h3>
+                    <AnimatePresence initial={false}>
                       {isOpen && (
-                        <motion.div 
+                        <motion.div
+                          id={aId}
+                          role="region"
+                          aria-labelledby={qId}
                           initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-                          className="bg-brand-lightgray/50 px-5 md:px-8"
+                          className="overflow-hidden"
                         >
-                          <p className="text-gray-600 font-medium leading-relaxed md:leading-relaxed py-5 md:py-6 border-t border-gray-200/60 px-0 text-sm md:text-base whitespace-pre-line break-keep">
-                            {faq.a}
-                          </p>
+                          {/* 왼쪽 들여쓰기 = Q 너비 + 간격 (w-6+gap-3 / md:w-7+gap-4) */}
+                          <div className="pl-9 md:pl-11 pb-5 md:pb-6">
+                            <div className="bg-brand-lightgray rounded-2xl p-5 md:p-6">
+                              <p className="font-bold text-black text-[15px] md:text-base leading-relaxed break-keep">{faq.lead}</p>
+                              {faq.body && (
+                                <p className="mt-2 text-sm md:text-[15px] text-gray-600 leading-relaxed break-keep">{faq.body}</p>
+                              )}
+
+                              {faq.steps && (
+                                <ol className="mt-4 flex flex-wrap gap-2.5">
+                                  {faq.steps.map((step, sIdx, all) => {
+                                    const isLast = sIdx === all.length - 1;
+                                    return (
+                                      <li key={step.label} className={`grow basis-[150px] bg-white rounded-xl p-3.5 border ${isLast ? "border-brand-point-ink" : "border-transparent"}`}>
+                                        <div className="flex items-center gap-2">
+                                          <span className={`w-6 h-6 shrink-0 rounded-full flex items-center justify-center text-xs font-bold text-white ${isLast ? "bg-brand-point-ink" : "bg-black"}`}>{sIdx + 1}</span>
+                                          <span className="text-sm font-bold text-black">{step.label}</span>
+                                        </div>
+                                        <p className="mt-2 text-[13px] text-gray-600 leading-relaxed break-keep">{step.desc}</p>
+                                      </li>
+                                    );
+                                  })}
+                                </ol>
+                              )}
+
+                              {faq.refund && (
+                                <ul className="mt-4 bg-white rounded-xl p-4 md:p-5 space-y-3">
+                                  {faq.refund.map(r => (
+                                    <li key={r.when} className="flex items-center gap-2.5 md:gap-3">
+                                      <span className="w-[116px] shrink-0 text-[13px] md:text-sm font-medium text-gray-700 break-keep">{r.when}</span>
+                                      <span aria-hidden="true" className="flex-1 h-2 rounded-full bg-gray-100 overflow-hidden">
+                                        <span className="block h-full rounded-full bg-brand-point" style={{ width: `${r.value}%` }} />
+                                      </span>
+                                      <span className={`w-[60px] shrink-0 text-right text-[13px] md:text-sm font-bold ${r.value === 0 ? "text-red-700" : "text-black"}`}>{r.pct}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+
+                              {faq.chips && (
+                                <ul className="mt-4 flex flex-wrap gap-2">
+                                  {faq.chips.map(chip => (
+                                    <li key={chip} className="inline-flex items-center gap-1.5 bg-white rounded-full px-3.5 py-1.5 text-[13px] md:text-sm font-medium text-gray-800">
+                                      <Check size={15} strokeWidth={2.5} aria-hidden="true" className="text-brand-point-ink" />
+                                      {chip}
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+
+                              {faq.link && (
+                                <Link
+                                  href={faq.link.href}
+                                  className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-black px-4 py-2 text-sm font-bold text-black hover:bg-black hover:text-white transition-colors"
+                                >
+                                  {faq.link.label}
+                                  <ArrowRight size={16} aria-hidden="true" />
+                                </Link>
+                              )}
+                            </div>
+                          </div>
                         </motion.div>
                       )}
                     </AnimatePresence>
                   </div>
                 );
               })}
+            </div>
+
+            {/* 문의 카드 — 모바일은 flex-wrap 으로 버튼이 아래 줄로 */}
+            <div className="mt-10 md:mt-14 bg-black text-white rounded-[20px] p-6 md:p-8 flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
+              <div>
+                <p className="font-bold text-lg md:text-xl">원하는 답을 찾지 못하셨나요?</p>
+                <p className="mt-1 text-sm md:text-base text-gray-300 break-keep">고객센터로 남겨주시면 확인 후 답변드릴게요.</p>
+              </div>
+              <Link
+                href="/support"
+                className="inline-flex items-center justify-center gap-1.5 h-12 px-6 rounded-full bg-brand-point text-black text-sm md:text-base font-bold hover:bg-white transition-colors"
+              >
+                고객센터 문의하기
+                <ArrowRight size={18} aria-hidden="true" />
+              </Link>
             </div>
           </div>
         </section>
