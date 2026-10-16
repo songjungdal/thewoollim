@@ -122,7 +122,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## 9. Git·PR
 
-- `main`에 직접 push하지 않는다. 브랜치를 만들고 PR로 올린다. PR은 작성자가 아닌 다른 1명이 승인해야 병합된다.
+- `main`에 직접 push하지 않는다. 브랜치를 만들고 PR로 올린다. `main`에는 PR로만 병합한다. 별도 승인은 필요 없다.
 - 커밋 메시지는 `종류(범위): 한국어 요약` 형식을 쓴다. 예: `feat(payments): ...`, `fix(deploy): ...`, `docs: ...`
   - 종류: `feat`, `fix`, `docs`, `content`(문구), `chore`, `ci`, `security`
 

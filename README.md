@@ -67,7 +67,7 @@ npm run build        # 정적 빌드 → out/
 
 ## 협업 방식
 
-- `main`에 직접 올리지 않고 브랜치 → PR → 작성자가 아닌 1명 승인 → 병합 순서로 진행합니다.
+- `main`에 직접 올리지 않고 브랜치 → PR → 병합 순서로 진행합니다. `main`에는 PR로만 병합하며, 별도 승인은 필요 없습니다.
 - 커밋 메시지는 `종류(범위): 한국어 요약` 형식입니다. 예: `feat(payments): 파티별 정원 검사`
 - 운영 배포는 GitHub Actions → **Deploy (manual)** 로만 합니다. 서버에 직접 올리지 않습니다. 절차는 [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)를 참고하세요.
 - 화면 구성, 기능, 예약·결제 규칙이 바뀌면 같은 PR에서 `docs/PROJECT_OVERVIEW.md`도 고칩니다.
