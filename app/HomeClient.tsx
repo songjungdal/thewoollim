@@ -190,8 +190,10 @@ function GallerySlider({
 /**
  * 메인 화면 (화면이 열린 뒤 동작하는 부분). app/page.tsx(서버)가 빌드 시점 실제 파티를 initialParties 로 넘긴다.
  * 빌드 시점 조회에 실패하면 initialParties 가 없고, 파티 영역은 "불러오는 중"으로 시작한다.
+ * endedAtBuild: 빌드 시점에 이미 시작한 파티 id — 마운트 전(정적 HTML·하이드레이션)에만 "종료" 판단에 쓰고,
+ *   마운트 뒤에는 지금처럼 브라우저 시각(now)으로 실시간 판단한다.
  */
-export default function HomeClient({ initialParties }: { initialParties?: Party[] }) {
+export default function HomeClient({ initialParties, endedAtBuild }: { initialParties?: Party[]; endedAtBuild?: string[] }) {
   const [activeTab, setActiveTab] = useState("일정별");
   const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(null);   // FAQ — 처음엔 모두 접어 둔다
   const [selectedGalleryImage, setSelectedGalleryImage] = useState<string | null>(null);
@@ -339,6 +341,8 @@ export default function HomeClient({ initialParties }: { initialParties?: Party[
   // SSR/CSR 시간대 차이로 인한 hydration mismatch 방지 — now 는 mount 후에만 세팅,
   // 1분마다 갱신해 행사 종료 시점에 카드 UI 가 자연스럽게 전환되게 함
   const [now, setNow] = useState<Date | null>(null);
+  // 마운트 전 "종료" 판단 — 서버가 넘긴 값만 써서 정적 HTML 과 하이드레이션 첫 화면이 같게
+  const endedAtBuildSet = useMemo(() => new Set(endedAtBuild ?? []), [endedAtBuild]);
   useEffect(() => {
     setNow(new Date());
     const t = setInterval(() => setNow(new Date()), 60_000);
@@ -400,7 +404,13 @@ export default function HomeClient({ initialParties }: { initialParties?: Party[
     });
 
     // mount 전(SSR/초기 hydration) — 시간 의존 필터/정렬 생략, 기존 동작 유지
-    if (!now) return filtered.sort((a, b) => a.calendarDate.localeCompare(b.calendarDate));
+    // (빌드 시점에 지난 파티는 뒤로 — 마운트 뒤 active 우선 정렬과 같은 순서)
+    if (!now) return filtered.sort((a, b) => {
+      const ra = endedAtBuildSet.has(a.id) ? 1 : 0;
+      const rb = endedAtBuildSet.has(b.id) ? 1 : 0;
+      if (ra !== rb) return ra - rb;
+      return a.calendarDate.localeCompare(b.calendarDate);
+    });
 
     return filtered
       .filter(p => partyVisibility(p, now) !== "expired")        // 종료 21일 초과 → 노출 제외
@@ -411,7 +421,7 @@ export default function HomeClient({ initialParties }: { initialParties?: Party[
         return a.calendarDate.localeCompare(b.calendarDate);     // 그룹 내부는 기존 날짜 오름차순 유지
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selections, typeTab, PARTIES, now]);
+  }, [selections, typeTab, PARTIES, now, endedAtBuildSet]);
 
   // 신청 섹션 렌더용 slice — 위 sortedParties(필터/정렬 완료)를 가로채 노출 개수만 제한
   const applyLimit = isDesktop ? APPLY_LIMIT_DESKTOP : APPLY_LIMIT_MOBILE;
@@ -729,7 +739,8 @@ export default function HomeClient({ initialParties }: { initialParties?: Party[
                   // 모집 마감은 partyStockStatus 결과 (참가 구성 파티는 모든 항목이 마감일 때, 명세 8-3)
                   const stock = partyStockStatus(withLiveCounts(card, partyCounts[card.id]));
                   // 행사 일시 경과 → 모집 종료 카드 UI (배너 흐리게, [모집 종료된 파티] 표시). 카드는 다른 카드처럼 상세페이지로 이동
-                  const isEnded = now ? partyVisibility(card, now) === "ended" : false;
+                  // 마운트 뒤: 브라우저 시각으로 실시간 판단 / 마운트 전(정적 HTML): 빌드 시점 판단
+                  const isEnded = now ? partyVisibility(card, now) === "ended" : endedAtBuildSet.has(card.id);
                   // 모집 중 = 종료 전이고 마감 아님 — D-day 배지·솔로파티 사이키 테두리는 이때만
                   const recruiting = !isEnded && !stock.allFull;
                   const days = now && recruiting ? daysUntil(card.calendarDate, now) : null;

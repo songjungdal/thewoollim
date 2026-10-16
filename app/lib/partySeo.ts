@@ -17,17 +17,33 @@ export function partyPriceText(p: Party): string {
   return male === female ? won(male) : `남성 ${won(male)} · 여성 ${won(female)}`;
 }
 
-/** "파티이름 | 2026. 8. 1 (토) 강남 라운지 | 어울림 매칭파티" */
+const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+
+/** 제목·설명용 짧은 날짜 — "10월 17일(토)" (연도 없음). calendarDate 가 없으면 dateString 의 날짜 부분 */
+export function partyShortDate(p: Party): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(p.calendarDate);
+  if (!m) return dateOnly(p.dateString);
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const weekday = WEEKDAYS[new Date(Date.UTC(y, mo - 1, d)).getUTCDay()];
+  return `${mo}월 ${d}일(${weekday})`;
+}
+
+/** 제목·설명용 지역 — 메인 분류 지역(성남·수원·서울 등). 없거나 "기타"면 장소(location) 그대로 */
+export function partyPlaceLabel(p: Party): string {
+  return p.locationTag && p.locationTag !== "기타" ? p.locationTag : p.location;
+}
+
+/** "[3545] 티타임 소개팅 | 10월 17일(토) 성남 | 어울림 매칭파티" — 본문·Event 의 장소는 전체 주소 그대로 */
 export function partyTitle(p: Party): string {
-  const when = dateOnly(p.dateString);
-  const where = [when, p.location].filter(Boolean).join(" ");
+  const where = [partyShortDate(p), partyPlaceLabel(p)].filter(Boolean).join(" ");
   return [p.title, where, `어울림 ${PARTY_TYPE_LABELS[partyTypeOf(p)]}`].filter(Boolean).join(" | ");
 }
 
-/** 검색 결과 설명 — 일시·장소·대상·참가비 + 관리자 소개글 앞부분 (최대 약 160자) */
+/** 검색 결과 설명 — 일시·지역·대상·참가비 + 관리자 소개글 앞부분 (최대 약 160자) */
 export function partyDescription(p: Party): string {
   const type = PARTY_TYPE_LABELS[partyTypeOf(p)];
-  const head = `${[p.dateString, p.location].filter(Boolean).join(" ")}에서 열리는 어울림 ${type} '${p.title}'.`;
+  const time = (p.dateString || "").match(/\d{1,2}:\d{2}/)?.[0] ?? "";
+  const head = `${[partyShortDate(p), time, partyPlaceLabel(p)].filter(Boolean).join(" ")}에서 열리는 어울림 ${type} '${p.title}'.`;
   const facts = [p.target && `대상 ${p.target}`, `참가비 ${partyPriceText(p)}`].filter(Boolean).join(", ");
   const intro = (p.description || "").replace(/\s+/g, " ").trim();
   const text = [head, facts ? `${facts}.` : "", intro].filter(Boolean).join(" ");
@@ -48,11 +64,21 @@ const AVAIL = {
   ended: "https://schema.org/Discontinued",
 } as const;
 
-/** 구조화 데이터 Event — 이름·시작 시각·장소·가격·신청 상태 */
+/**
+ * 행사 시작 시각(한국 시간)이 now 보다 앞인지 — 빌드 시점 "종료" 판단용.
+ * 빌드 서버의 시간대와 상관없이 한국 시간으로 계산한다. 시각이 없으면 그날 23:59:59 기준 (partyEventDate 와 같은 규칙).
+ */
+export function partyStartedBy(p: Party, now: Date): boolean {
+  const start = partyStartIso(p);
+  if (!start) return false;
+  return Date.parse(start.length === 10 ? `${start}T23:59:59+09:00` : start) < now.getTime();
+}
+
+/** 구조화 데이터 Event — 이름·시작 시각·장소(전체 주소)·가격·신청 상태 */
 export function partyEventJsonLd(p: Party, now: Date = new Date()) {
   const url = absoluteUrl(`/party/${p.id}/`);
   const start = partyStartIso(p);
-  const ended = start ? Date.parse(start.length === 10 ? `${start}T23:59:59+09:00` : start) < now.getTime() : false;
+  const ended = partyStartedBy(p, now);
   const stock = partyStockStatus(p);
   const availability = (closed: boolean) => (ended ? AVAIL.ended : closed ? AVAIL.full : AVAIL.open);
 
