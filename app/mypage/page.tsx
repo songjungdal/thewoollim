@@ -8,8 +8,8 @@ import { ShoppingBag, LogOut, User, Trash2, CheckSquare, Square, CreditCard, Pen
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useAuth, calcCouponDiscount, type BookingStatus } from "../context/AuthContext";
-import { useParties } from "../lib/useParties";
-import { partyStockStatus, linePriceFor, partyHasOptions, partyOptionById, dateOnly, VBANK_INFO, COUPON_DISABLED_MESSAGE, PARTIES as SEED_PARTIES } from "../lib/data";
+import { useParties, PARTIES_NOT_LOADED } from "../lib/useParties";
+import { partyStockStatus, linePriceFor, partyHasOptions, partyOptionById, dateOnly, VBANK_INFO, COUPON_DISABLED_MESSAGE } from "../lib/data";
 
 // 관리자 페이지의 신청자 상태 배지 규격과 동일한 색상 조합 사용 (admin8888/dashboard STATUS_LABEL)
 const STATUS_DISPLAY: Record<BookingStatus, { label: string; tone: string; stripe: string; icon: typeof Clock; sub?: string }> = {
@@ -80,8 +80,8 @@ const STATUS_DISPLAY: Record<BookingStatus, { label: string; tone: string; strip
 export default function MyPage() {
   const { mounted, isLoggedIn, userEmail, userRole, logout, verifySession, cart, removeFromCart, profile, deleteAccount, bookings, appliedCoupon, applyCoupon, clearCoupon, partyCounts, refreshCart, refreshBookings } = useAuth();
   const PARTIES = useParties();
-  // API 응답을 받은 뒤에만 삭제된 파티 예약을 숨긴다 (빌드 시점 기본값/로딩 중에는 전부 표시)
-  const partiesLoaded = PARTIES !== SEED_PARTIES;
+  // API 응답을 받은 뒤에만 삭제된 파티 예약을 숨긴다 (불러오는 중에는 전부 표시)
+  const partiesLoaded = PARTIES !== PARTIES_NOT_LOADED;
   const visibleBookings = partiesLoaded ? bookings.filter(b => PARTIES.some(p => p.id === b.partyId)) : bookings;
   const router = useRouter();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());

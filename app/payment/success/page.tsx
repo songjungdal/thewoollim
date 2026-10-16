@@ -29,8 +29,8 @@ function PaymentSuccessContent() {
   const total = Number(searchParams.get("total") || 0);
   const isTest = searchParams.get("test") === "1";
   const parties = ids.map(id => PARTIES.find(p => p.id === id)).filter(Boolean) as typeof PARTIES;
-  // useParties 가 DEFAULT_PARTIES 로 초기화되고 서버 fetch 후 갱신 → 페이지 진입 직후엔
-  // 관리자 등록 파티(id 9+) 가 아직 안 들어왔을 수 있음. 일치 개수가 부족하면 로딩 표시.
+  // useParties 는 빈 목록(불러오는 중)으로 시작해 서버 fetch 후 갱신 → 페이지 진입 직후엔
+  // 파티가 아직 안 들어왔을 수 있음. 일치 개수가 부족하면 로딩 표시.
   const partiesLoading = ids.length > 0 && parties.length < ids.length;
 
   const [showLeaveModal, setShowLeaveModal] = useState(false);

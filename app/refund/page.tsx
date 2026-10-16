@@ -1,7 +1,15 @@
+import type { Metadata } from "next";
+import { pageMetadata } from "../lib/seo";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { AlertCircle, CreditCard, RefreshCw, Info, ScrollText, Ban, Clock } from "lucide-react";
 import Image from "next/image";
+
+export const metadata: Metadata = pageMetadata({
+  title: "이용안내 및 환불규정 | 어울림",
+  description: "어울림 매칭파티·솔로파티 신청 후 취소 시기별 환불 기준, 유효기간, 환불 방법과 환불이 어려운 경우를 안내합니다.",
+  path: "/refund/",
+});
 
 export default function RefundPage() {
   return (

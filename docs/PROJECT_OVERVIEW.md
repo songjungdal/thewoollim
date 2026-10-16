@@ -1,6 +1,6 @@
 # 어울림(thewoollim) 홈페이지 프로젝트 설명서
 
-> 기획·디자인 업무용 참고 문서입니다. 저장소의 실제 소스코드를 읽고 정리했습니다(2026-10-15 기준. 화면·기능은 커밋 `3148405` 기준이고, 배포 방식은 그 이후 GitHub 설정 변경까지, 파티별 정원 검사·결제 자동 취소, 디자인 구조(5장)의 시인성·모바일 정리, 메인 "파티 일정" 섹션 개편, 파티 종류(매칭파티·솔로파티)와 파티별 상세 안내, 솔로파티 참가 구성(회차·참가 항목)의 서버 처리·관리자 화면·회원 화면, 솔로파티 신청 흐름(프로필 단계 없음)·종류별 안내 문구·파티 소개글, 참가 신청 방법·필수 확인 사항·신청 전 확인 박스 편집과 진행 안내 자유 형식, 솔로파티 2시간 전 문자, 관리자 화면 시인성·모바일 정리, 메인 파티 카드 클릭·hover 강조, 테스트 계정 1~20번 확대와 관리자 [테스트 회원 만들기], 관리자 화면 데스크톱 정리, 메인 헤더·히어로 데스크톱(768px 이상) 반응형 정리, 테스트 회원 삭제·프로필 무작위·[프로필 다시 섞기], 알림 문자 점검 정리(2026-10-14), 화면 코드의 관리자 우회 로그인 삭제(2026-10-14), 장바구니 쿠폰 적용 불가 안내 박스, 메인 "어떤 사람들이 오나요?" 섹션 개편(2026-10-15), 메인 FAQ 레이아웃 개편, 고객센터(`/support/`) 페이지 삭제, 배포 후 옛 스크립트 오류 자동 새로고침(2026-10-15), 파티 상세 로딩 화면 정리(2026-10-15)는 그 이후 변경까지 반영).
+> 기획·디자인 업무용 참고 문서입니다. 저장소의 실제 소스코드를 읽고 정리했습니다(2026-10-16 기준. 화면·기능은 커밋 `3148405` 기준이고, 배포 방식은 그 이후 GitHub 설정 변경까지, 파티별 정원 검사·결제 자동 취소, 디자인 구조(5장)의 시인성·모바일 정리, 메인 "파티 일정" 섹션 개편, 파티 종류(매칭파티·솔로파티)와 파티별 상세 안내, 솔로파티 참가 구성(회차·참가 항목)의 서버 처리·관리자 화면·회원 화면, 솔로파티 신청 흐름(프로필 단계 없음)·종류별 안내 문구·파티 소개글, 참가 신청 방법·필수 확인 사항·신청 전 확인 박스 편집과 진행 안내 자유 형식, 솔로파티 2시간 전 문자, 관리자 화면 시인성·모바일 정리, 메인 파티 카드 클릭·hover 강조, 테스트 계정 1~20번 확대와 관리자 [테스트 회원 만들기], 관리자 화면 데스크톱 정리, 메인 헤더·히어로 데스크톱(768px 이상) 반응형 정리, 테스트 회원 삭제·프로필 무작위·[프로필 다시 섞기], 알림 문자 점검 정리(2026-10-14), 화면 코드의 관리자 우회 로그인 삭제(2026-10-14), 장바구니 쿠폰 적용 불가 안내 박스, 메인 "어떤 사람들이 오나요?" 섹션 개편(2026-10-15), 메인 FAQ 레이아웃 개편, 고객센터(`/support/`) 페이지 삭제, 배포 후 옛 스크립트 오류 자동 새로고침(2026-10-15), 파티 상세 로딩 화면 정리(2026-10-15), SEO 기본 정비(실제 파티 정적 HTML·페이지별 제목·구조화 데이터·현장스케치 WebP, 2026-10-16)는 그 이후 변경까지 반영).
 >
 > - 운영 서버 접속, 빌드, DB 조회는 하지 않았습니다. **코드에 적힌 내용만** 근거로 했습니다.
 > - 코드만 보고 알 수 없는 내용은 **[코드상 확인 불가]** 로 표시했습니다.
@@ -115,6 +115,10 @@ thewoollim/
 
 - `npm run build` 앞에 `prebuild` 로 `scripts/sync-company.mjs` 가 실행됩니다. 운영 API에서 회사정보를 받아 `app/lib/company-snapshot.json` 에 저장하는 스크립트입니다(푸터 깜빡임 방지용).
 - `app/sitemap.ts`: 빌드할 때 한 번 sitemap.xml을 만듭니다. 공개 페이지 7개와 모집 중인 파티 상세 페이지만 넣습니다.
+- **빌드할 때 실제 파티 목록을 받아 정적 HTML 에 넣습니다** (`app/lib/buildParties.ts`). sitemap 과 같은 운영 API(`/api/parties.php`)를 읽기만 하고, 빌드 한 번에 한 번만 요청합니다.
+  - 메인(`app/page.tsx`)과 파티 상세(`app/party/[id]/page.tsx`)가 이 목록을 화면 코드(`app/HomeClient.tsx`, `PartyClientView.tsx`)에 넘깁니다.
+  - 받지 못하면 예시 파티를 넣지 않고 "불러오는 중"으로 만듭니다. 빌드 기록에 `[build-parties]` 줄로 결과가 남습니다.
+  - 정적 HTML 의 파티 정보·신청 상태는 **마지막 빌드 시점** 기준입니다. 화면이 열린 뒤에는 지금처럼 실시간 데이터로 바뀝니다.
 - `public/robots.txt`: 관리자 경로와 매칭 투표 경로는 검색 노출을 막습니다.
 - `public/.htaccess`: HTML은 캐시하지 않고, JS/CSS는 1년 캐시합니다. 404 페이지 지정, OAuth 콜백 주소 연결 규칙이 있습니다.
 - 운영 배포는 GitHub Actions 수동 워크플로(`.github/workflows/deploy.yml`)로 합니다. 빌드·검사 → 배포 계획(dry-run) → 백업 → 반영 → 상태 확인 순서이며, 자세한 절차와 설정 항목은 `docs/DEPLOYMENT.md` 에 있습니다.
@@ -132,7 +136,7 @@ thewoollim/
 
 | URL | 화면 이름 | 로그인 필요 | 파일 |
 |---|---|---|---|
-| `/` | 메인(원페이지 랜딩) | 아니오 | `app/page.tsx` |
+| `/` | 메인(원페이지 랜딩) | 아니오 | `app/page.tsx`(빌드 시점 데이터·제목), `app/HomeClient.tsx`(화면) |
 | `/party/{id}/` | 파티 상세 | 아니오(신청 시 필요) | `app/party/[id]/page.tsx`, `PartyClientView.tsx` |
 | `/login/` | 로그인 / 회원가입 | 아니오 | `app/login/page.tsx` |
 | `/onboarding/` | 필수 회원정보 입력 | 예 | `app/onboarding/page.tsx` |
@@ -161,7 +165,10 @@ thewoollim/
 - **헤더·푸터 배치**: 레이아웃에서 한 번에 넣지 않고, 각 페이지가 직접 넣습니다. 그래서 온보딩·매칭 투표·관리자 화면처럼 헤더가 없는 페이지도 있습니다.
 - **로그인 후 이동**: 로그인에 성공하면 **항상 메인(`/`)으로 이동**합니다. `?redirect=` 값이 붙어 와도 쓰지 않으며, 코드 주석에 "사용자 정책"이라고 적혀 있습니다.
 
-### 3-2. 메인 `/` (`app/page.tsx`)
+### 3-2. 메인 `/` (`app/page.tsx` · `app/HomeClient.tsx`)
+
+- 화면 코드는 `app/HomeClient.tsx` 이고, `app/page.tsx` 는 빌드할 때 실제 파티 목록을 받아 넘기고 검색엔진용 제목·설명·구조화 데이터를 넣습니다(2-4, 7-2 16번 참고).
+- 파티를 하나도 받지 못한 동안(빌드 때 못 받았고 화면이 열린 뒤에도 아직 응답 전) 파티 카드 자리에 **"파티 일정을 불러오는 중입니다."** 가 나옵니다. 예시 파티는 보여주지 않습니다.
 
 위에서 아래로 다음 순서입니다.
 
@@ -182,7 +189,7 @@ thewoollim/
    - 첫 슬라이드 이미지만 먼저 받고 나머지는 필요할 때 받습니다(다음 슬라이드는 미리 받음).
 3. **파티 신청 (#apply)**
    - 부제(돌싱부터 싱글까지…)는 그대로입니다.
-   - **4축 필터 [종류 / 대상 / 테마 / 지역]** (`app/page.tsx`): 부제 아래 한 줄짜리 축 버튼 4개입니다. 축마다 값을 하나씩 골라 **겹쳐서(AND)** 거를 수 있습니다(예: 솔로파티 + 싱글 + 와인파티).
+   - **4축 필터 [종류 / 대상 / 테마 / 지역]** (`app/HomeClient.tsx`): 부제 아래 한 줄짜리 축 버튼 4개입니다. 축마다 값을 하나씩 골라 **겹쳐서(AND)** 거를 수 있습니다(예: 솔로파티 + 싱글 + 와인파티).
      - 축별 값
        - 종류: 매칭파티 / 솔로파티
        - 대상: 싱글 / 돌싱
@@ -220,9 +227,9 @@ thewoollim/
 4. **현장스케치 (#gallery)**
    - 사진 슬라이더입니다(PC 3열, 모바일 2열, 한 번에 6장).
    - 사진을 누르면 크게 보는 창(라이트박스)이 열립니다.
-   - 관리자가 올린 사진이 없으면 기본 이미지 9장을 보여줍니다.
+   - 관리자가 올린 사진이 없으면 기본 이미지 9장을 보여줍니다(`public/images/gallery/g1~g9.webp`). 관리자 목록이 예전 기본 이미지 `.png` 경로를 가리켜도 같은 이름의 `.webp` 로 바꿔 보여줍니다.
 5. **후기게시판 (#reviews)**: `ReviewBoard` 컴포넌트를 씁니다(아래 3-12 참고).
-6. **파티 일정 (#schedule)** (`app/page.tsx`)
+6. **파티 일정 (#schedule)** (`app/HomeClient.tsx`)
    - 부제: "신청 가능한 파티 일정을 확인하세요."
    - 제목 아래에 **상태 범례** 한 줄: 모집중 / 마감임박 / 마감 / 지난 일정
    - **일정 상태** (우선순위: 지난 일정 > 마감 > 마감임박 > 모집중)
@@ -260,7 +267,7 @@ thewoollim/
      - 1행: 원형 아바타(38px, PC 48px. 남성 연파랑 바탕 "남" / 여성 연분홍 바탕 "여") + 오른쪽에 직업(15px, PC 18px 굵게, 최대 폭을 넘을 때만 한 줄에서 말줄임)과 나이대(13px, PC 15px 굵게, 진한 청록. 값이 없으면 생략)
      - 2행: MBTI와 관심사를 같은 모양의 회색 칩(예: "#ENFJ", "#와인")으로 순서대로 **전부** 보여줍니다. MBTI도 따로 강조하지 않습니다. 한 줄에 3개씩 끊어 보여줍니다(5개면 3개 + 2개, 4개면 3개 + 1개. `app/page.tsx` `KEYWORDS_PER_ROW`). "+N" 줄임은 없습니다.
    - 실제 가입 회원 데이터(익명화)와 코드에 들어 있는 예시 9명을 섞어서 보여줍니다. 회원 데이터의 관심사는 최대 4개까지 내려옵니다(`api/participants.php`).
-   - 근거: `app/page.tsx` `#participants`, `app/globals.css` `.participants-track` · `.participants-row`
+   - 근거: `app/HomeClient.tsx` `#participants`, `app/globals.css` `.participants-track` · `.participants-row`
 8. **자주 묻는 질문 (#faq)**: 가운데 한 단(최대 폭 820px)으로, 위에서 아래로 다음 순서입니다.
    - **제목**: "자주 묻는 질문"과 그 아래 "참가 전 가장 많이 물어보시는 내용을 모았어요." (가운데 정렬)
    - **질문 목록**: 분류 없이 7개를 순서대로 나열합니다. 목록 맨 위에 굵은 검정 선, 질문 사이에는 얇은 회색 선만 있습니다(둥근 상자·그림자 없음). 질문 줄은 왼쪽 청록 "Q" + 질문 + 오른쪽 원형 화살표 버튼(닫힘 연회색, 열림 검정 + 뒤집힘)이고, 펼친 질문은 굵은 검정 글씨입니다.
@@ -279,7 +286,10 @@ thewoollim/
 
 ### 3-3. 파티 상세 `/party/{id}/` (`app/party/[id]/PartyClientView.tsx`)
 
-- **불러오는 중 화면**: 서버에서 파티 목록을 받기 전에는 헤더와 가운데 회전 아이콘만 보입니다. 푸터는 그리지 않습니다(짧은 로딩 화면 아래에 푸터가 보였다가 본문이 뜨면 사라지는 깜빡임 방지). 샘플 파티(`app/lib/data.ts`)와 번호가 같은 파티도 샘플 제목·가격이 잠깐 보이지 않고 이 화면을 거칩니다. 새로고침·주소 직접 입력 때 처음 받는 화면(정적 HTML)도 이 화면입니다.
+- **처음 받는 화면(정적 HTML)**: 빌드 때 받은 실제 파티 데이터에 이 번호가 있으면, 정적 HTML 에 파티 이름·소개·일시·장소·대상·참가비가 들어 있고 화면이 열린 뒤 실시간 값으로 바뀝니다(`app/party/[id]/page.tsx`).
+- **불러오는 중 화면**: 빌드 데이터에 없는 번호(빌드 뒤 새로 만든 파티, 빈 번호)는 서버에서 파티 목록을 받기 전까지 헤더와 가운데 회전 아이콘만 보입니다. 푸터는 그리지 않습니다(짧은 로딩 화면 아래에 푸터가 보였다가 본문이 뜨면 사라지는 깜빡임 방지).
+- **검색엔진용 정보**: 빌드 데이터가 있는 파티는 "파티이름 | 날짜 장소 | 어울림 매칭파티(또는 솔로파티)" 제목, 설명, canonical, 구조화 데이터(Event)가 들어갑니다. 데이터가 없는 번호는 검색 결과에 넣지 않도록(noindex) 표시합니다.
+- **"모집 종료" 판단 시점**: 상세의 모집 종료(행사 다음 날부터)는 화면이 열린 뒤 브라우저 날짜로 계산합니다. 정적 HTML 에는 종료 전 모습으로 들어갑니다.
 
 1. "목록으로 돌아가기"
 2. **상단 정보**: 아래 섹션들과 같은 폭의 한 단(단일 컬럼)으로, 위에서 아래로 다음 순서입니다.
@@ -632,7 +642,8 @@ thewoollim/
 
 **파티 정보**
 - 관리자가 등록한 파티는 서버 파일 `api/data/parties.json` 에 저장됩니다.
-- `app/lib/data.ts` 에 있는 샘플 8개는 **처음 로딩할 때와 서버에 연결되지 않을 때만** 보이는 기본값입니다. 파티 상세 화면은 샘플을 보여주지 않고, 서버 목록을 받을 때까지 불러오는 중 화면을 보여줍니다(3-3 참고).
+- 예시(샘플) 파티 목록은 **삭제했습니다(2026-10-16)**. 파티 데이터는 빌드할 때(`app/lib/buildParties.ts`)와 화면이 열린 뒤(`app/lib/useParties.ts`) 모두 `/api/parties.php` 에서 받습니다. 둘 다 받지 못한 동안은 "불러오는 중"으로 표시합니다(3-2, 3-3 참고).
+- 응답을 읽어 파티 정보로 바꾸는 규칙은 `app/lib/partyNormalize.ts` 한 곳에 있습니다(빌드·화면 공통).
 
 - 파티 종류는 **매칭파티(`matching`)와 솔로파티(`solo`)** 두 가지입니다. 종류 값이 없는 예전 파티는 매칭파티로 봅니다(`app/lib/data.ts` `partyTypeOf`). 신청·결제·환불·참가 자격 규칙은 두 종류가 같습니다.
 
@@ -867,7 +878,7 @@ thewoollim/
 - 배경: 흰색, 회색 50/100, 검정, 터쿼이즈(연한 투명도 포함)
 - 테두리: 회색 100/200, 터쿼이즈
 
-**상태 색상** (`app/mypage/page.tsx`, `app/page.tsx`, 관리자 대시보드)
+**상태 색상** (`app/mypage/page.tsx`, `app/HomeClient.tsx`, 관리자 대시보드)
 
 | 상태 | 배경 | 글자/포인트 |
 |---|---|---|
@@ -878,7 +889,7 @@ thewoollim/
 | 취소 요청 중 | #F4CCCC (연빨강) | `danger` |
 | 모집 종료 / 지난 일정 | #F8D8DD (연분홍) | `danger` |
 | 오류·경고 | red-50 | `danger` |
-| 메인 일정 섹션 (`app/page.tsx` #schedule) | 지난 일정 = 연한 회색(gray-50, 테두리 gray-200), 마감 = 진한 회색(gray-200), 마감임박 = amber(amber-50), 모집중 = 청록 15% | 지난 일정 = gray-400, 마감 = gray-600 + 취소선, 마감임박 = amber-800, 모집중 = `brand-point-ink` |
+| 메인 일정 섹션 (`app/HomeClient.tsx` #schedule) | 지난 일정 = 연한 회색(gray-50, 테두리 gray-200), 마감 = 진한 회색(gray-200), 마감임박 = amber(amber-50), 모집중 = 청록 15% | 지난 일정 = gray-400, 마감 = gray-600 + 취소선, 마감임박 = amber-800, 모집중 = `brand-point-ink` |
 
 **그 밖의 의미 색상**
 - 남성: 파스텔 블루(#E3F2FD 배경, `info` 글자)
@@ -1066,12 +1077,14 @@ thewoollim/
 | `og-main.jpg` | 공유 미리보기 이미지(카카오톡·SNS) |
 | `party_card_default_banner.jpg` | 대표 이미지가 없는 파티의 기본 배너(메인 파티 카드 상단, 파티 상세 상단) |
 | `page_a01~a05.webp`, `party_apply_guide_head.png`, `party_our_experience.webp`, `party_required_notice_bottom.png` | 파티 상세 안내 이미지 |
-| `gallery/g1~g9.png` | 현장스케치 기본 이미지 |
+| `gallery/g1~g9.webp` | 현장스케치 기본 이미지 (2026-10-16 WebP 변환, 9장 합계 7.29MB → 1.04MB) |
+| `gallery/g1~g9.png` | 변환 전 원본(실제 형식은 JPEG). 화면 코드는 쓰지 않지만, 관리자 현장스케치 목록(DB)이 이 경로를 가리킬 수 있어 남겨 둠 |
 | `sns/kakao.jpg`, `naver.jpg`, `google.jpg` | 소셜 로그인 버튼(현재 숨김) |
 | `hero-bg.png`, `party_vibe_1.png`, `party_vibe_2.png`, `public/*.svg` | **사용하는 곳 없음** |
 
 - 파비콘: `app/icon.jpeg`
-- 페이지 제목과 공유 정보는 `app/layout.tsx` 한 곳에만 있습니다. **모든 페이지의 브라우저 탭 제목과 공유 미리보기가 똑같습니다**(페이지별 설정 없음).
+- 페이지 제목·설명·공유 정보(og)·canonical 은 페이지마다 따로 있습니다(7-2 16번). 공통 기본값과 네이버 소유확인은 `app/layout.tsx`, 페이지별 값은 각 `page.tsx` 의 `metadata` 이고, 만드는 규칙은 `app/lib/seo.ts` 에 있습니다.
+- 메인 파티 카드 배너 이미지의 대체 텍스트(alt)는 파티 이름입니다(`app/HomeClient.tsx`).
 
 ### 5-6. 접근성 참고
 
@@ -1109,7 +1122,7 @@ thewoollim/
 | 브랜드 색·전역 스타일 | `app/globals.css` | - |
 | 로그인 상태·장바구니·예약 관리 | `app/context/AuthContext.tsx` | `api/auth/me.php`, `api/cart.php`, `api/bookings.php`, `api/profile.php` |
 | 헤더 / 푸터 | `app/components/Header.tsx`, `Footer.tsx` | `api/admin/company.php` (회사정보) |
-| 메인 | `app/page.tsx` | `api/parties.php`, `api/party-counts.php`, `api/gallery.php`, `api/participants.php` |
+| 메인 | `app/page.tsx`(빌드 시점 데이터·제목), `app/HomeClient.tsx`(화면) | `api/parties.php`, `api/party-counts.php`, `api/gallery.php`, `api/participants.php` |
 | 메인 히어로(롤링 슬라이드) | `app/components/HeroSlider.tsx`, `HeroSlide.tsx`, `heroTone.ts`, `app/lib/hero.ts` | `api/hero.php`, `api/_hero.php`(공통 규칙), `api/lib.php` `partyRemainingSeats()` |
 | 관리자 메인이미지 탭 | `app/admin****/dashboard/HeroEditor.tsx`, `heroAnalyze.ts` | `api/admin/hero.php`, `api/admin/upload-hero.php` |
 | 파티 데이터 규칙·FAQ | `app/lib/data.ts`, `app/lib/useParties.ts` | `api/parties.php`, `api/admin/parties.php` |
@@ -1135,7 +1148,7 @@ thewoollim/
 | 테스트 계정 규칙·테스트 회원 도구(만들기·프로필 다시 섞기·삭제) | `app/lib/testUsers.ts` (`isTestUser`, `TEST_USER_MAX`), `app/admin****/dashboard/TestUsersTools.tsx` | `api/lib.php` (`TEST_USER_MAX`, `isTestUser`, `testUserEmails`, `isSmsExcludedAccount`), `api/admin/test-users.php` |
 | 문자 발송 | - | `api/_pending_sms.php`, `api/_profile_notify_sms.php`, `api/admin/_confirm_sms.php`, `api/admin/_cancel_sms.php`, `api/cron/*.php` |
 | 공통 서버 함수(가격·쿠폰·전화번호) | - | `api/lib.php`, `api/db.php` |
-| 검색엔진 설정 | `app/sitemap.ts` | `public/robots.txt` |
+| 검색엔진 설정 | `app/sitemap.ts`, `app/lib/seo.ts`(제목·설명·canonical 규칙), `app/lib/partySeo.ts`(파티 상세 제목·설명·Event), `app/components/JsonLd.tsx`, `app/lib/buildParties.ts`(빌드 시점 파티) | `public/robots.txt`, `api/parties.php` |
 | DB 테이블 정의 | - | `db/migrations/*.sql` (users만) |
 
 ---
@@ -1173,7 +1186,7 @@ thewoollim/
 | 13 | 개인정보 동의 기록이 서버에 저장되지 않고, 이용약관 동의 항목도 없습니다. | `app/login/page.tsx`, `api/register.php` |
 | 14 | 소셜 로그인(현재 숨김)을 다시 켜면 그 경로로 가입한 회원은 **본인인증·만 19세 확인을 거치지 않습니다.** | `api/auth/oauth-helper.php` |
 | 15 | 탈퇴 시 이름·연락처·이메일은 지워지지만 성별·생년월일·직업 같은 프로필 항목은 남습니다. 개인정보처리방침의 파기 문구와 맞는지 검토가 필요합니다. | `api/delete-account.php` |
-| 16 | 모든 페이지의 브라우저 탭 제목과 공유 미리보기가 같습니다(페이지별 SEO 설정 없음). | `app/layout.tsx` |
+| 16 | ~~모든 페이지의 브라우저 탭 제목과 공유 미리보기가 같습니다(페이지별 SEO 설정 없음).~~ **해결(2026-10-16)**: 메인·회사소개·제휴·민원·약관·개인정보·환불·파티 상세에 페이지별 제목·설명·og:title·og:url·canonical(`https://thewoollim.com/…/`)을 넣었습니다. 메인에는 구조화 데이터 Organization, 파티 상세에는 Event(이름·시작 시각·장소·가격·신청 상태)가 들어갑니다. 정적 HTML 에 예시 파티 대신 빌드 시점 실제 파티가 들어가고, 받지 못하면 "불러오는 중"입니다. **남은 일**: ① www 주소(`www.thewoollim.com`)를 www 없는 주소로 넘기는 설정은 서버(웹 서버·DNS) 작업이라 하지 않았습니다. ② 정적 HTML 의 파티 정보·신청 상태는 마지막 빌드 기준이라, 파티를 추가·수정한 뒤 다시 배포해야 검색엔진용 정보에 반영됩니다. ③ 로그인·마이페이지·결제 등 검색 대상이 아닌 화면은 공통 기본 제목을 그대로 씁니다. | `app/lib/seo.ts`, `app/page.tsx`, `app/party/[id]/page.tsx`, 각 페이지 `page.tsx` |
 | 17 | ~~후기게시판 주석은 "10개씩"이라고 되어 있지만 실제로는 5개씩 보여줍니다.~~ **해결(2026-10-12)**: 주석을 "5개씩"으로 고쳤습니다. | `app/components/ReviewBoard.tsx` |
 | 18 | **메인과 파티 상세의 "모집 종료" 기준이 다릅니다.** 메인 카드는 행사 **시작 시각**이 지나면 모집 종료, 상세페이지는 행사 **다음 날**부터 모집 종료입니다. 그래서 행사 당일 시작 시각 이후에 메인의 모집 종료 카드를 눌러 상세로 가면 [참가하기]가 열려 있을 수 있습니다(정원이 남은 경우). 결제 서버에서 지난 파티를 막는 코드는 찾지 못했습니다(검색 기준, 확인 필요). | `app/lib/data.ts` `partyVisibility`, `app/party/[id]/PartyClientView.tsx` `isExpired` |
 

@@ -1,6 +1,14 @@
+import type { Metadata } from "next";
+import { pageMetadata } from "../lib/seo";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import Image from "next/image";
+
+export const metadata: Metadata = pageMetadata({
+  title: "이용약관 | 어울림",
+  description: "어울림 매칭파티·솔로파티 서비스 이용약관입니다. 회원가입, 파티 신청과 결제, 회원의 의무 등 서비스 이용 조건을 확인하세요.",
+  path: "/terms/",
+});
 
 export default function TermsPage() {
   return (

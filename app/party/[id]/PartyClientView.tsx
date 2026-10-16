@@ -1,18 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useSyncExternalStore } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Heart, Clock, ShoppingBag, X, ClipboardList, Users as UsersIcon, ShieldCheck, Info, BookOpen } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
-import { partyStockStatus, withLiveCounts, dateOnly, partyHasOptions, partyTypeOf, PARTY_TYPE_LABELS, PARTIES as SEED_PARTIES, type PartyType } from "../../lib/data";
+import { partyStockStatus, withLiveCounts, dateOnly, partyHasOptions, partyTypeOf, PARTY_TYPE_LABELS, type Party, type PartyType } from "../../lib/data";
 import PartyOptionPicker, { optionClosedFor } from "./PartyOptionPicker";
 import { PARTY_GUIDES, visibleNotices, markupToGuideText } from "../../lib/partyGuides";
 import { templateFor, normalizeDetail, DEFAULT_ABOUT_TITLE, DEFAULT_APPLY_TITLE, DEFAULT_NOTICE_TITLE, DEFAULT_BEFORE_APPLY_TITLE, type PartyDetail, type PartyDetailImage, type DetailImageSlot } from "../../lib/partyDetailTemplates";
 import { useAuth } from "../../context/AuthContext";
-import { useParties } from "../../lib/useParties";
+import { useParties, PARTIES_NOT_LOADED } from "../../lib/useParties";
 import { checkEligibility, eligibilitySummary, calculateAge } from "../../lib/eligibility";
 
 type Participant = {
@@ -129,13 +129,21 @@ function ParticipantColumn({
   );
 }
 
-export default function PartyClientView({ id }: { id: string }) {
-  const PARTIES = useParties();
-  // useParties()는 마운트 시 빌드타임 샘플(SEED_PARTIES)로 먼저 렌더된 뒤 실시간 데이터로 교체됨.
-  // 참조가 SEED_PARTIES 그대로라는 건 "이 마운트에서 아직 실시간 데이터를 못 받은 상태"라는 뜻이므로,
+/** 오늘 날짜(한국 시간) "YYYY-MM-DD" — useSyncExternalStore 용 (날짜가 바뀌어도 다시 구독할 필요는 없음) */
+const todayKSTString = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date());
+const noSubscribe = () => () => {};
+
+/**
+ * initialParties: 빌드 시점에 받은 이 파티 1건 (page.tsx 가 넘김). 빌드 데이터에 이 id 가 없으면 넘기지 않는다.
+ *   있으면 정적 HTML 에 파티 이름·일시·장소·대상·참가비가 들어가고, 화면이 열린 뒤 실시간 데이터로 바뀐다.
+ */
+export default function PartyClientView({ id, initialParties }: { id: string; initialParties?: Party[] }) {
+  const PARTIES = useParties(initialParties);
+  // useParties()는 빌드 시점 데이터가 없으면 PARTIES_NOT_LOADED 로 먼저 렌더된 뒤 실시간 데이터로 교체됨.
+  // 참조가 PARTIES_NOT_LOADED 그대로라는 건 "이 마운트에서 아직 파티 데이터를 못 받은 상태"라는 뜻이므로,
   // 이 경우엔 "찾을 수 없음"으로 오판하지 않도록 별도 로딩 상태로 처리 (라우트 이동 때마다 새로 계산되어
   // 이전 페이지의 로딩 상태를 물려받지 않음 — 전역/모듈 상태 없이 이 컴포넌트 렌더에서만 판단).
-  const partiesLoaded = PARTIES !== SEED_PARTIES;
+  const partiesLoaded = PARTIES !== PARTIES_NOT_LOADED;
   const baseItem = PARTIES.find(p => p.id === id);
   const router = useRouter();
   const { isLoggedIn, addToCart, profile, partyCounts, cart, bookings, verifySession } = useAuth();
@@ -143,9 +151,8 @@ export default function PartyClientView({ id }: { id: string }) {
   const alreadyBooked = bookings.some(b => b.partyId === id && b.status !== "cancelled");
 
   // 행사 일시 경과 여부 — KST 기준 오늘 날짜 > calendarDate (YYYY-MM-DD) 면 종료
-  const todayKST = typeof window !== "undefined"
-    ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date())
-    : "";
+  //   정적 HTML(빌드)과 첫 화면이 같도록 서버·하이드레이션 단계에선 "" (종료 아님), 그 뒤 브라우저 날짜로 다시 그린다
+  const todayKST = useSyncExternalStore(noSubscribe, todayKSTString, () => "");
   const [showCartModal, setShowCartModal] = useState(false);
   // 솔로파티 참가 구성 — 고른 참가 항목 id (명세 8-1)
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
@@ -201,9 +208,9 @@ export default function PartyClientView({ id }: { id: string }) {
   // 참가 구성 파티는 회차별 인원도 함께 (withLiveCounts)
   const detailItem = baseItem ? withLiveCounts(baseItem, partyCounts[id]) : undefined;
 
-  // 실시간 파티 데이터 최초 fetch가 아직 끝나지 않은 구간 — 빌드 시점 샘플 목록만 있어
-  // 실제로는 존재하는 파티도 못 찾은 것처럼 보이거나, 샘플과 id가 겹치는 파티는 샘플 제목·가격이 잠깐 비친다.
-  // 그래서 fetch 완료 전까지는 파티를 찾았든 못 찾았든 로딩 화면만 보여준다 (정적 HTML도 이 화면으로 만들어짐).
+  // 파티 데이터를 아직 하나도 받지 못한 구간(빌드 시점 데이터에 이 id 가 없고 실시간 fetch 전) —
+  // 실제로는 존재하는 파티도 못 찾은 것처럼 보이지 않도록 로딩 화면만 보여준다
+  // (빌드 시점 데이터가 없는 id 의 정적 HTML 은 이 화면으로 만들어짐).
   // 로딩 화면엔 푸터를 그리지 않는다 — 화면 높이뿐인 짧은 화면이라 푸터가 첫 화면에 보였다가 본문이 뜨면 사라져 깜빡여 보임.
   if (!partiesLoaded) {
     return (

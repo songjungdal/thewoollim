@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { normalizeSessions, normalizeOptions } from "./partyOptions";
-import { PARTIES as DEFAULT_PARTIES, TARGET_GROUPS, THEMES, LOCATION_TAGS, partyTypeOf, type Party, type TargetGroup, type Theme, type LocationTag } from "./data";
+import { normalizeParties } from "./partyNormalize";
+import type { Party } from "./data";
 
 const CHANNEL_NAME = "woollim_parties";
 const STORAGE_KEY  = "woollim_parties_updated_at";
@@ -26,13 +26,21 @@ export function broadcastPartiesUpdated() {
 }
 
 /**
+ * 아직 파티 데이터를 하나도 받지 못했다는 표시 (참조 비교용 빈 배열).
+ * 정적 HTML·첫 화면에 예시 파티를 넣지 않기 위해 시드 데이터 대신 이 값으로 시작한다.
+ * `parties === PARTIES_NOT_LOADED` 이면 "불러오는 중"으로 처리한다.
+ */
+export const PARTIES_NOT_LOADED: Party[] = [];
+
+/**
  * 파티 데이터 라이브 fetch.
+ *  - initial: 빌드 시점에 받은 실제 파티(서버 컴포넌트가 넘김). 없으면 PARTIES_NOT_LOADED 로 시작
  *  - 관리자 변경 → BroadcastChannel로 같은 브라우저 즉시 갱신
  *  - 다른 기기/브라우저는 10초 폴링 + focus / visibility / pageshow 이벤트로 갱신
- *  - 네트워크 실패 시 빌드 시점 디폴트로 폴백
+ *  - 네트워크 실패 시 지금 값(빌드 시점 데이터 또는 불러오는 중)을 유지
  */
-export function useParties(): Party[] {
-  const [parties, setParties] = useState<Party[]>(DEFAULT_PARTIES);
+export function useParties(initial?: Party[]): Party[] {
+  const [parties, setParties] = useState<Party[]>(initial ?? PARTIES_NOT_LOADED);
 
   useEffect(() => {
     let cancelled = false;
@@ -40,47 +48,10 @@ export function useParties(): Party[] {
       fetch("/api/parties.php", { cache: "no-store" })
         .then(r => r.ok ? r.json() : null)
         .then((data) => {
-          if (cancelled || !Array.isArray(data) || data.length === 0) return;
-          const normalized: Party[] = data.map((p: Record<string, unknown>) => {
-            const ams = p.allowedMaritalStatus;
-            return {
-              id:           String(p.id ?? ""),
-              title:        String(p.title ?? ""),
-              dateString:   String(p.dateString ?? ""),
-              calendarDate: String(p.calendarDate ?? ""),
-              location:     String(p.location ?? ""),
-              target:       String(p.target ?? ""),
-              price:        Number(p.price ?? 0),
-              priceMale:    p.priceMale   != null && p.priceMale   !== "" ? Number(p.priceMale)   : undefined,
-              priceFemale:  p.priceFemale != null && p.priceFemale !== "" ? Number(p.priceFemale) : undefined,
-              tag:          String(p.tag ?? "주제별"),
-              maleStock:    Number(p.maleStock ?? 12),
-              femaleStock:  Number(p.femaleStock ?? 12),
-              maleBooked:   Number(p.maleBooked ?? 0),
-              femaleBooked: Number(p.femaleBooked ?? 0),
-              // 콘텐츠 필드 (관리자 입력)
-              description:  typeof p.description === "string" ? p.description : "",
-              imageUrl:     typeof p.imageUrl    === "string" ? p.imageUrl    : "",
-              // 자격 제한
-              minAge:       p.minAge != null && p.minAge !== "" ? Number(p.minAge) : undefined,
-              maxAge:       p.maxAge != null && p.maxAge !== "" ? Number(p.maxAge) : undefined,
-              allowedMaritalStatus: (ams === "싱글" || ams === "돌싱") ? ams : "all",
-              // 카테고리 (화이트리스트 매칭 — 잘못된 값은 undefined로 폴백)
-              targetGroup: TARGET_GROUPS.includes(p.targetGroup as TargetGroup) ? (p.targetGroup as TargetGroup) : undefined,
-              theme:       THEMES.includes(p.theme as Theme)                   ? (p.theme       as Theme)       : undefined,
-              locationTag: LOCATION_TAGS.includes(p.locationTag as LocationTag) ? (p.locationTag as LocationTag) : undefined,
-              // 파티 종류 (없거나 잘못된 값은 matching)
-              partyType:   partyTypeOf({ partyType: typeof p.partyType === "string" ? p.partyType : undefined }),
-              couponDisabled: p.couponDisabled === true,
-              // 솔로파티 참가 구성 — 회차·항목이 모두 있을 때만 (없으면 기존 파티와 똑같이 동작)
-              ...(() => {
-                const sessions = normalizeSessions(p.sessions);
-                const options  = normalizeOptions(p.options);
-                return sessions.length > 0 && options.length > 0 ? { sessions, options } : {};
-              })(),
-            };
-          });
-          setParties(normalized);
+          if (cancelled || !Array.isArray(data)) return;
+          const normalized = normalizeParties(data);
+          // 빈 응답은 "불러오는 중"을 끝낼 때만 반영 — 이미 받은 목록이 일시적인 빈 응답으로 사라지지 않도록
+          setParties(prev => (normalized.length === 0 && prev.length > 0 ? prev : normalized));
         })
         .catch(() => {});
     };

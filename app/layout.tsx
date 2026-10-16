@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "어울림 | 세상을 울리는 새로운 연결",
     description: "진정성 있는 오프라인 매칭과 네트워킹의 시작. 어울림에서 감성적이고 깊이 있는 만남을 경험하세요.",
-    url: "https://thewoollim.com",
+    // og:url·canonical 은 페이지마다 따로 넣는다 (app/lib/seo.ts pageMetadata). 여기 두면 모든 페이지가 메인 주소로 표시됨
     siteName: "어울림",
     images: [
       {

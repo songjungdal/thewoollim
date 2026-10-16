@@ -1,6 +1,14 @@
+import type { Metadata } from "next";
+import { pageMetadata } from "../lib/seo";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import Image from "next/image";
+
+export const metadata: Metadata = pageMetadata({
+  title: "개인정보처리방침 | 어울림",
+  description: "어울림이 수집하는 개인정보 항목과 이용 목적, 보유 기간, 파기 절차, 회원의 권리를 안내하는 개인정보처리방침입니다.",
+  path: "/privacy/",
+});
 
 export default function PrivacyPage() {
   return (

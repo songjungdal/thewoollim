@@ -1,7 +1,15 @@
+import type { Metadata } from "next";
+import { pageMetadata } from "../lib/seo";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { Handshake, Mail, MessageSquare, Briefcase } from "lucide-react";
 import Image from "next/image";
+
+export const metadata: Metadata = pageMetadata({
+  title: "협업 및 제휴문의 | 어울림",
+  description: "매칭파티를 위한 라운지·카페·다이닝 공간 제휴와 브랜드 협업을 제안해 주세요. 어울림의 제휴 분야와 문의 창구를 안내합니다.",
+  path: "/partnership/",
+});
 
 export default function PartnershipPage() {
   return (
