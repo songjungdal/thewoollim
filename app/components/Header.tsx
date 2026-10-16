@@ -27,12 +27,12 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-50 bg-black backdrop-blur-md border-b border-gray-800">
-      <div className="max-w-7xl mx-auto px-6 h-[72px] md:h-24 flex items-center justify-between text-white">
+      <div className="max-w-7xl mx-auto px-6 lg:px-10 h-[72px] lg:h-24 flex items-center justify-between text-white">
         <Link href="/" className="cursor-pointer">
           <Image src="/images/logo_white.png" alt="어울림 로고" width={120} height={39} priority />
         </Link>
         
-        <nav className="hidden md:flex items-center gap-8 font-semibold text-sm">
+        <nav className="hidden lg:flex shrink-0 items-center lg:gap-6 xl:gap-8 font-semibold text-sm">
           {/*
             navItemClass: 호버 시 1.08배 확대 + 청록 시그니처 색상 + 0.3s ease-in-out 부드러운 전환
               - inline-block: <a> 기본 inline 이라 transform 미적용 → 변환 가능 형태로
@@ -52,16 +52,16 @@ export default function Header() {
               key={item.id}
               href={item.href}
               onClick={(e) => handleScroll(e, item.id)}
-              className="inline-block px-1 py-1.5 origin-center hover:text-brand-point hover:scale-[1.2] transition-all duration-300 ease-in-out"
+              className="inline-block shrink-0 whitespace-nowrap px-1 py-1.5 origin-center hover:text-brand-point hover:scale-[1.2] transition-all duration-300 ease-in-out"
             >
               {item.label}
             </Link>
           ))}
           {mounted && isLoggedIn ? (
-            <div className="flex items-center gap-4">
+            <div className="flex shrink-0 items-center gap-4">
               <Link
                 href="/mypage"
-                className="relative inline-block p-1.5 origin-center hover:text-brand-point hover:scale-[1.2] transition-all duration-300 ease-in-out"
+                className="relative inline-block shrink-0 p-1.5 origin-center hover:text-brand-point hover:scale-[1.2] transition-all duration-300 ease-in-out"
               >
                 <ShoppingBag size={22} />
                 {cart.length > 0 && (
@@ -70,7 +70,7 @@ export default function Header() {
               </Link>
               <Link
                 href="/mypage"
-                className="inline-block px-1 py-1.5 origin-center text-brand-point font-bold hover:scale-[1.2] transition-all duration-300 ease-in-out"
+                className="inline-block shrink-0 whitespace-nowrap px-1 py-1.5 origin-center text-brand-point font-bold hover:scale-[1.2] transition-all duration-300 ease-in-out"
               >
                 마이페이지
               </Link>
@@ -78,20 +78,20 @@ export default function Header() {
           ) : (
             <Link
               href="/login"
-              className="inline-block px-1 py-1.5 origin-center text-brand-point font-bold hover:scale-[1.2] transition-all duration-300 ease-in-out"
+              className="inline-block shrink-0 whitespace-nowrap px-1 py-1.5 origin-center text-brand-point font-bold hover:scale-[1.2] transition-all duration-300 ease-in-out"
             >
               로그인
             </Link>
           )}
         </nav>
 
-        <button className="md:hidden -mr-2 w-11 h-11 flex items-center justify-center" aria-label={isMenuOpen ? "메뉴 닫기" : "메뉴 열기"} onClick={() => setIsMenuOpen(!isMenuOpen)}>
+        <button className="lg:hidden -mr-2 w-11 h-11 flex items-center justify-center" aria-label={isMenuOpen ? "메뉴 닫기" : "메뉴 열기"} onClick={() => setIsMenuOpen(!isMenuOpen)}>
           {isMenuOpen ? <X size={28} /> : <Menu size={28} />}
         </button>
       </div>
 
       {isMenuOpen && (
-        <div className="md:hidden absolute top-[72px] left-0 w-full bg-black border-b border-gray-800 px-6 py-4 flex flex-col gap-1 font-semibold text-white shadow-2xl">
+        <div className="lg:hidden absolute top-[72px] left-0 w-full bg-black border-b border-gray-800 px-6 py-4 flex flex-col gap-1 font-semibold text-white shadow-2xl">
           <Link href="/#apply" className="py-2.5" onClick={(e) => handleScroll(e, 'apply')}>참여하기</Link>
           <Link href="/#gallery" className="py-2.5" onClick={(e) => handleScroll(e, 'gallery')}>현장스케치</Link>
           <Link href="/#reviews" className="py-2.5" onClick={(e) => handleScroll(e, 'reviews')}>후기게시판</Link>

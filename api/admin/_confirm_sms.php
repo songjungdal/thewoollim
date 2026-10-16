@@ -10,20 +10,13 @@
  */
 
 declare(strict_types=1);
+require_once __DIR__ . '/../lib.php';   // isSmsExcludedAccount()
 
 if (!function_exists('notifyConfirmSms')) {
 
     /** 발송 제외 대상(테스트/관리자) 이메일 — 소문자 비교. _pending_sms.php / _cancel_sms.php 등과 동일 규칙 */
     function _confirmSmsIsTestAccount(string $email, string $role): bool {
-        $email = strtolower(trim($email));
-        if ($role === 'admin') return true;                 // 관리자 role 제외
-        if (str_ends_with($email, '@woollim.local')) return true; // 관리자 계정 도메인 제외
-        // 테스트 계정 패턴: a1~a10@naver.com, b1~b10@naver.com
-        if (preg_match('/^[ab](?:[1-9]|10)@naver\.com$/', $email)) return true;
-        $testList = [
-            'pletora@naver.com',
-        ];
-        return in_array($email, $testList, true);
+        return isSmsExcludedAccount($email, $role);   // 관리자·테스트 회원 (api/lib.php)
     }
 
     /** dateString('2026년 05월 29일 (금) 19:00') → ['date'=>'2026년 05월 29일 (금)', 'time'=>'19:00'] */
@@ -63,10 +56,12 @@ if (!function_exists('notifyConfirmSms')) {
             // 2) 파티 정보 (제목/일시/장소)
             $partyId = (string)($booking['partyId'] ?? '');
             $title = $loc = $dateString = '';
+            $partyRow = null;   // 회차 시각은 파티의 현재 회차 기준 (bookingFirstSessionTime)
             $parties = json_decode((string)@file_get_contents(dataDir() . '/parties.json'), true);
             if (is_array($parties)) {
                 foreach ($parties as $p) {
                     if ((string)($p['id'] ?? '') === $partyId) {
+                        $partyRow   = $p;
                         $title      = (string)($p['title']      ?? '');
                         $loc        = (string)($p['location']   ?? '');
                         $dateString = (string)($p['dateString'] ?? '');
@@ -78,11 +73,16 @@ if (!function_exists('notifyConfirmSms')) {
             $pdate = $dt['date'] !== '' ? $dt['date'] : '추후 안내';
             $ptime = $dt['time'] !== '' ? $dt['time'] : '추후 안내';
 
+            // 참가 구성 예약 — 항목 이름 한 줄, 시각은 처음 참석하는 회차 기준 (항목 예약이 아니면 기존 문구 그대로)
+            $optLine = !empty($booking['optionName']) ? '참가: ' . (string)$booking['optionName'] . "\n" : '';
+            if (bookingFirstSessionTime($booking, $partyRow) !== '') $ptime = bookingFirstSessionTime($booking, $partyRow);
+
             // 3) 메시지 — 템플릿 (줄바꿈/특수문자 그대로 유지)
             $msg =
                 "[어울림] 참가확정 안내\n" .
                 "{$name}님, [어울림] 파티 참가가 최종 확정되었습니다.\n\n" .
                 "{$title}\n" .
+                $optLine .
                 "{$pdate} {$ptime}\n" .
                 "{$loc}\n\n" .
                 "첫인상을 더욱 빛내줄 깔끔하고 단정한 복장으로 늦지 않게 도착해 주시기 바랍니다.\n" .

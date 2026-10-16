@@ -254,6 +254,24 @@ jobs:
               echo; echo '```'; head -n 200 "$f"; echo '```'; echo "</details>"
             done
           } >> "$GITHUB_STEP_SUMMARY"
+          # 같은 결과를 작업 로그에도 남긴다 — 실행 요약(Summary)을 열 수 없는 곳에서도 로그로 확인할 수 있도록.
+          #   프론트엔드 목록이 길 수 있어 목록(frontend → api)을 먼저, 건수(PLAN_COUNT)를 맨 끝에 찍는다 (로그 끝부분만 봐도 api 목록과 건수가 보이게)
+          echo "===== 배포 계획 (서버 변경 없음) ====="
+          echo "커밋: $(grep '^commit=' payload/MANIFEST.txt | cut -d= -f2)  대상: $TARGET  프론트엔드 옛 파일 삭제: $FRONTEND_DELETE"
+          for n in frontend api; do
+            f="plan/$n.txt"; [ -f "$f" ] || continue
+            echo "::group::$n 변경 파일 목록 (새 파일·변경 파일)"
+            grep '^[<>]f' "$f" | awk '{print $2}' | sed "s#^#PLAN_FILE $n #" || true
+            echo "::endgroup::"
+            echo "::group::$n 삭제 예정 목록"
+            grep '^\*deleting' "$f" | awk '{print $2}' | sed "s#^#PLAN_DELETE $n #" || true
+            echo "::endgroup::"
+          done
+          for n in frontend api; do
+            f="plan/$n.txt"; [ -f "$f" ] || continue
+            echo "PLAN_COUNT $n changed=$(grep -c '^[<>]f' "$f" || true) new_dirs=$(grep -c '^cd' "$f" || true) delete=$(grep -c '^\*deleting' "$f" || true)"
+          done
+          echo "===== 배포 계획 끝 ====="
           # API 는 절대 삭제가 있으면 안 됨
           if [ -f plan/api.txt ] && grep -q '^\*deleting' plan/api.txt; then
             echo "::error::API 배포 계획에 삭제가 포함되어 있습니다. 중단합니다."; exit 1

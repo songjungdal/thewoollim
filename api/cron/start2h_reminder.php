@@ -6,8 +6,10 @@
  * 실제 SMS 비용이 발생하는 배치라 공개 HTTP 엔드포인트로 노출하지 않고 CLI 실행만 허용함.
  *
  * 흐름:
- *  1) 현재(Asia/Seoul) 시각이 '파티 시작 2시간 전 ~ 그 후 10분' 구간인 파티만 대상 (calendarDate + dateString 시각)
- *  2) 대상 파티의 status==='confirmed' 예약 중 start2hNotifiedAt 이 없는 건만 발송
+ *  1) 현재(Asia/Seoul) 시각이 '시작 2시간 전 ~ 그 후 10분' 구간인 예약만 대상
+ *     - 시작 시각 = calendarDate + 예약의 처음 참석 회차 시각(참가 구성 예약 — 파티의 현재 회차 시각, 못 찾으면 예약 사본) 또는 dateString 시각
+ *     - 2부만 신청한 회원은 2부 시작 2시간 전에, 1부+2부 신청자는 1부 기준으로 한 번만 받는다
+ *  2) status==='confirmed' 예약 중 start2hNotifiedAt 이 없는 건만 발송 (회원은 파티당 예약 1건 → 예약당 1번)
  *  3) 발송 성공(result_code==='1') 시에만 해당 booking 에 start2hNotifiedAt 기록 → 같은 구간 재실행돼도 중복 발송 없음
  *  4) 테스트/관리자 계정·연락처 없는 계정은 건너뜀. 수신자 1건의 실패/예외가 전체 배치를 막지 않도록 개별 try/catch
  *
@@ -37,21 +39,29 @@ function _s2hLog(string $status, string $detail): void {
 
 /** 발송 제외 대상(테스트/관리자) — 기존 SMS 배치와 동일 규칙 */
 function _s2hIsTestAccount(string $email, string $role): bool {
-    $email = strtolower(trim($email));
-    if ($role === 'admin') return true;
-    if (str_ends_with($email, '@woollim.local')) return true;
-    if (preg_match('/^[ab](?:[1-9]|10)@naver\.com$/', $email)) return true;
-    return false;
+    return isSmsExcludedAccount($email, $role);   // 관리자·테스트 회원 (api/lib.php)
+}
+
+/** calendarDate('2026-10-04') + 'HH:MM' → 시작 시각 (KST). 정보 부족 시 null */
+function _s2hAt(string $date, string $hhmm): ?DateTimeImmutable {
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) return null;
+    if (!preg_match('/^(\d{1,2}):(\d{2})$/', $hhmm, $m)) return null;
+    $time = sprintf('%02d:%s:00', (int)$m[1], $m[2]);
+    $dt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', "{$date} {$time}", new DateTimeZone('Asia/Seoul'));
+    return $dt ?: null;
 }
 
 /** calendarDate('2026-10-04') + dateString('2026. 10. 4 (일) 17:00') → 파티 시작 시각 (KST). 정보 부족 시 null */
 function _s2hPartyStart(array $party): ?DateTimeImmutable {
-    $date = (string)($party['calendarDate'] ?? '');
-    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) return null;
     if (!preg_match('/(\d{1,2}):(\d{2})/', (string)($party['dateString'] ?? ''), $m)) return null;
-    $time = sprintf('%02d:%s:00', (int)$m[1], $m[2]);
-    $dt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', "{$date} {$time}", new DateTimeZone('Asia/Seoul'));
-    return $dt ?: null;
+    return _s2hAt((string)($party['calendarDate'] ?? ''), "{$m[1]}:{$m[2]}");
+}
+
+/** 지금이 '시작 2시간 전 ~ 그 후 10분' 구간인지 */
+function _s2hInWindow(?DateTimeImmutable $startAt, DateTimeImmutable $now): bool {
+    if ($startAt === null) return false;
+    $remindAt = $startAt->modify('-2 hours');
+    return $now >= $remindAt && $now < $remindAt->modify('+10 minutes');
 }
 
 /** dateString('2026. 10. 4 (일) 17:00') → ['date'=>'2026. 10. 4 (일)', 'time'=>'17:00'] */
@@ -67,15 +77,17 @@ $now = new DateTimeImmutable('now', new DateTimeZone('Asia/Seoul'));
 $parties = json_decode((string)@file_get_contents($dataDir . '/parties.json'), true);
 if (!is_array($parties)) $parties = [];
 
-$targets = []; // partyId => ['party' => array, 'startAt' => DateTimeImmutable]
+// 파티 시작 시각 또는 (참가 구성이 있으면) 회차 시작 시각 중 하나라도 지금 구간이면 그 파티가 후보
+$targets = []; // partyId => ['party' => array]
 foreach ($parties as $p) {
     if (!is_array($p)) continue;
-    $startAt = _s2hPartyStart($p);
-    if ($startAt === null) continue;
-    $remindAt = $startAt->modify('-2 hours');
-    if ($now >= $remindAt && $now < $remindAt->modify('+10 minutes')) {
-        $targets[(string)($p['id'] ?? '')] = ['party' => $p, 'startAt' => $startAt];
+    $hit = _s2hInWindow(_s2hPartyStart($p), $now);
+    if (!$hit && partyHasOptions($p)) {
+        foreach ($p['sessions'] as $sess) {
+            if (_s2hInWindow(_s2hAt((string)($p['calendarDate'] ?? ''), (string)($sess['startTime'] ?? '')), $now)) { $hit = true; break; }
+        }
     }
+    if ($hit) $targets[(string)($p['id'] ?? '')] = ['party' => $p];
 }
 
 if (empty($targets)) exit(0);
@@ -112,6 +124,12 @@ foreach ($users as $u) {
         $partyId = (string)($b['partyId'] ?? '');
         if (!isset($targets[$partyId])) continue;
         if (!empty($b['start2hNotifiedAt'])) continue;
+        // 예약마다 처음 참석하는 회차 기준 (참가 구성 예약이 아니면 파티 시작 시각)
+        $firstTime = bookingFirstSessionTime($b, $targets[$partyId]['party']);
+        $bookingStart = $firstTime !== ''
+            ? _s2hAt((string)($targets[$partyId]['party']['calendarDate'] ?? ''), $firstTime)
+            : _s2hPartyStart($targets[$partyId]['party']);
+        if (!_s2hInWindow($bookingStart, $now)) continue;
 
         try {
             $role = (string)($u['role'] ?? '');
@@ -135,11 +153,35 @@ foreach ($users as $u) {
             $dt    = _s2hSplitDate((string)($party['dateString'] ?? ''));
             $pdate = $dt['date'] !== '' ? $dt['date'] : '추후 안내';
             $ptime = $dt['time'] !== '' ? $dt['time'] : '추후 안내';
+            if ($firstTime !== '') $ptime = $firstTime;
+            $optLine = !empty($b['optionName']) ? '참가: ' . (string)$b['optionName'] . "\n" : '';
 
+            $isSolo = partyTypeOf($party) === 'solo';
+            if ($isSolo) {
+                // 솔로파티 문구 (docs/specs/party-box-sms.md 2-2) — 입장 시각 = 시작 시각 10분 전
+                $entry = preg_match('/^(\d{1,2}):(\d{2})$/', $ptime, $tm)
+                    ? sprintf('%02d:%02d', intdiv(((int)$tm[1] * 60 + (int)$tm[2] - 10 + 1440) % 1440, 60), ((int)$tm[1] * 60 + (int)$tm[2] - 10 + 1440) % 60)
+                    : '';
+                $entryLine = $entry !== '' ? "- {$entry}부터 입장 가능합니다.\n" : "- 시작 10분 전부터 입장 가능합니다.\n";
+                $msg =
+                    "[어울림] 파티 시작 2시간 전 최종 안내\n" .
+                    "안녕하세요, {$name}님!\n" .
+                    "2시간 뒤 {$title}이 시작됩니다. 즐거운 파티를 위해 아래 안내사항을 꼭 확인해 주세요.\n" .
+                    $optLine .
+                    "{$pdate} {$ptime}\n" .
+                    "{$loc}\n\n" .
+                    "[참석 전 필수 체크사항]\n" .
+                    $entryLine .
+                    "- 늦게 도착하셔도 입장은 가능하지만, 파티가 이미 진행 중이니 가급적 시작 시각 전에 도착해 주세요.\n" .
+                    "- 입장 시 신분증으로 본인·성인 확인을 합니다. 신분증을 꼭 챙겨 주세요.\n" .
+                    "- 술과 함께하는 파티이니 차량은 두고 대중교통을 이용해 주세요.\n" .
+                    "즐거운 파티로 기다리고 있겠습니다. 오시는 길 조심히 오세요!";
+            } else {
             $msg =
                 "[어울림] 파티 시작 2시간 전 최종 안내\n" .
                 "안녕하세요, {$name}님!\n" .
                 "2시간 뒤 {$title}이 시작됩니다. 원활하고 편안한 진행을 위해 아래 안내사항을 꼭 확인해 주세요.\n" .
+                $optLine .
                 "{$pdate} {$ptime}\n" .
                 "{$loc}\n\n" .
                 "[참석 전 필수 체크사항]\n" .
@@ -147,6 +189,7 @@ foreach ($users as $u) {
                 "- 파티 시작 10분 이후부터는 입장이 절대 불가능합니다. 여유 있게 10분 전까지 도착해주세요.\n" .
                 "- 파티 장소 주변 주차 공간이 협소하오니 가급적 대중교통 이용을 부탁드립니다.\n" .
                 "설레는 마음으로 기다리고 있겠습니다. 오시는 길 조심히 오세요!";
+            }
 
             $msgType = strlen($msg) > 90 ? 'LMS' : 'SMS';
 
@@ -159,7 +202,7 @@ foreach ($users as $u) {
                 'msg_type'    => $msgType,
                 'testmode_yn' => 'N',
             ];
-            if ($msgType === 'LMS') $params['title'] = '[어울림] 파티 시작 2시간 전 최종 안내';
+            if ($msgType === 'LMS') $params['title'] = $isSolo ? '[어울림] 솔로파티 시작 2시간 전 안내' : '[어울림] 파티 시작 2시간 전 최종 안내';
 
             $ch = curl_init('https://apis.aligo.in/send/');
             curl_setopt_array($ch, [

@@ -3,7 +3,9 @@
  * 관리자 예약 관리.
  *  GET  : 모든 회원의 예약 + 회원 정보 조인 (status/gender 필터링용 데이터 포함)
  *  POST { action: "approve", email, bookingId } → status='paid_pending_profile'|'pending_approval' → 'confirmed'
+ *    (이미 확정·취소·취소요청·환불완료·모임종료·무통장 입금 전 예약은 거절 — 상태·문자 변경 없음)
  *  POST { action: "cancel",  email, bookingId } → status='cancelled' + party_counts -1 (atomic)
+ *    (참가 구성 예약은 예약에 저장된 sessionIds 회차 인원도 함께 -1 / confirm_vbank 는 그 회차마다 정원 검사 후 +1)
  *  POST { action: "cancel_full_refund", email, bookingId } → 카드결제 전액 Toss 즉시취소 + status='cancelled' + party_counts -1
  *
  *  'cancel' / 'cancel_full_refund' 공통: DB 상태 업데이트 성공 직후 _cancel_sms.php 의 notifyCancelSms() 로
@@ -95,6 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // ─── action === 'confirm_vbank' — 무통장 입금 확인 (v7.0 / v5.9) ──────────────
     //  vbank_pending → (프로필 완성 여부에 따라) paid_pending_profile/pending_approval 전환 + party_counts +1.
+    //  솔로파티는 프로필 완성 여부와 상관없이 pending_approval.
     //  카드결제 success.php 와 동일 분기 — 결제완료 후 프로필 작성/자동전환 흐름을 그대로 탄다.
     //  (카드는 결제 즉시 +1, 무통장은 입금 확인된 지금 +1)
     if ($action === 'confirm_vbank') {
@@ -126,6 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (isset($p['id']) && (string)$p['id'] === $partyId) { $vbankParty = $p; break; }
         }
         $stockLimit = partyStockLimit($vbankParty, $genderKey);
+        $vbankSids  = array_map('strval', (array)($target['sessionIds'] ?? [])); // 참가 구성 예약 — 신청 시점 사본의 회차
         $countsFile = "$dataDir/party_counts.json";
         $fp = fopen($countsFile, 'c+');
         if ($fp) {
@@ -136,11 +140,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!isset($counts[$partyId]) || !is_array($counts[$partyId])) {
                 $counts[$partyId] = ['male' => 0, 'female' => 0];
             }
-            if ((int)($counts[$partyId][$genderKey] ?? 0) + 1 > $stockLimit) {
+            if ($vbankSids) {
+                // 회차마다 정원 검사 — 회차가 파티에서 사라졌으면 마감으로 본다
+                $over = optionSessionsOverStock($vbankParty, ['sessionIds' => $vbankSids], $counts[$partyId], $genderKey);
+                if ($over) {
+                    flock($fp, LOCK_UN); fclose($fp);
+                    $names = array_map(fn($sid) => (string)(partySessionById($vbankParty, $sid)['name'] ?? $sid), $over);
+                    echo json_encode(['ok' => false, 'error' => '잔여 정원을 초과하여 입금 확인을 진행할 수 없습니다. (' . implode(', ', $names) . ')'], JSON_UNESCAPED_UNICODE); exit;
+                }
+            } elseif ((int)($counts[$partyId][$genderKey] ?? 0) + 1 > $stockLimit) {
                 flock($fp, LOCK_UN); fclose($fp);
                 echo json_encode(['ok' => false, 'error' => '잔여 정원을 초과하여 입금 확인을 진행할 수 없습니다.']); exit;
             }
-            $counts[$partyId][$genderKey] = (int)($counts[$partyId][$genderKey] ?? 0) + 1;
+            countsAdjust($counts, $partyId, $genderKey, $vbankSids, 1);
             ftruncate($fp, 0); rewind($fp); fwrite($fp, json_encode($counts));
             fflush($fp); flock($fp, LOCK_UN); fclose($fp);
         }
@@ -160,6 +172,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         } catch (Throwable $e) {}
         $newStatus = $profileComplete ? 'pending_approval' : 'paid_pending_profile';
+        // 솔로파티는 프로필 단계가 없다 — 입금 확인 즉시 확정 대기 중 (docs/specs/party-solo-guide.md 4-1)
+        if (partyTypeOf($vbankParty) === 'solo') $newStatus = 'pending_approval';
 
         $confirmedBooking = null;
         foreach ($bookings as &$b) {
@@ -233,21 +247,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if (!$found) { echo json_encode(['ok' => false, 'error' => 'booking not found']); exit; }
 
-        // 환불 금액 — 프론트(refund.ts)와 동일한 날짜 대조 tier 산정 (서버 권위):
-        //   파티까지 5일+ → 100% / 4일 → 80% / 3일 → 50% / 그 외 → 0%
-        $partiesJson = file_exists("$dataDir/parties.json") ? json_decode((string)file_get_contents("$dataDir/parties.json"), true) : [];
-        $calDate = '';
-        foreach ((array)$partiesJson as $p) {
-            if (isset($p['id']) && (string)$p['id'] === (string)($target['partyId'] ?? '')) { $calDate = (string)($p['calendarDate'] ?? ''); break; }
-        }
+        // 환불 금액 — 회원이 취소요청한 날 기준으로 고정 (cancel-request.php 가 저장한 refundRequestAmount).
+        //   승인이 늦어져도 줄지 않는다. 저장값이 없는 예전 요청은 요청 시각(cancelRequestedAt),
+        //   그것도 없으면 오늘 날짜로 같은 규정(refundQuote: 5일+ 100% / 4일 80% / 3일 50% / 그 외 0%)을 적용.
         $paidAmount = (int)($target['total'] ?? 0);
-        $refundAmount = 0;
-        if ($calDate !== '' && preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $calDate, $m)) {
-            $partyMid = mktime(0, 0, 0, (int)$m[2], (int)$m[3], (int)$m[1]);
-            $todayMid = mktime(0, 0, 0, (int)date('n'), (int)date('j'), (int)date('Y'));
-            $days = (int)floor(($partyMid - $todayMid) / 86400);
-            $rate = $days >= 5 ? 1.0 : ($days === 4 ? 0.8 : ($days === 3 ? 0.5 : 0.0));
-            $refundAmount = (int)floor(max(0, $paidAmount) * $rate);
+        if (isset($target['refundRequestAmount']) && is_numeric($target['refundRequestAmount'])) {
+            $refundAmount = min($paidAmount, max(0, (int)$target['refundRequestAmount']));
+        } else {
+            $reqTs = strtotime((string)($target['cancelRequestedAt'] ?? '')) ?: null;
+            $quote = refundQuote($paidAmount, partyCalendarDate((string)($target['partyId'] ?? '')), $reqTs);
+            $refundAmount = $quote['amount'] ?? 0;
         }
 
         $method = (string)($target['paymentMethod'] ?? '');
@@ -322,10 +331,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($action === 'approve') {
+        // 확정할 수 없는 상태 — 관리자 화면에서 [참가확정] 버튼을 숨기는 상태와 같다.
+        // 다른 관리자가 먼저 취소·확정한 예약을 갱신 전 화면에서 누르면 상태가 되돌아가고 확정 문자가 다시 나가던 것을 막는다.
+        $approveBlocked = [
+            'confirmed'        => '이미 참가확정된 예약입니다.',
+            'cancelled'        => '이미 취소된 예약입니다.',
+            'cancel_requested' => '취소요청 처리 중인 예약입니다. [취소요청] 탭에서 처리해주세요.',
+            'refund_completed' => '취소요청 처리 중인 예약입니다. [취소요청] 탭에서 처리해주세요.',
+            'completed'        => '모임이 종료된 예약입니다.',
+            'vbank_pending'    => '무통장 입금 확인 전인 예약입니다. [결제확인]을 먼저 해주세요.',
+        ];
         $found = false;
         $approvedBooking = null;
         foreach ($bookings as &$b) {
             if (($b['id'] ?? '') === $bid) {
+                $curStatus = (string)($b['status'] ?? '');
+                if (isset($approveBlocked[$curStatus])) {
+                    echo json_encode(['ok' => false, 'error' => $approveBlocked[$curStatus]]); exit;
+                }
                 $b['status']    = 'confirmed';
                 $b['updatedAt'] = date('c');
                 $approvedBooking = $b;
@@ -442,10 +465,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $raw = stream_get_contents($fp);
                 $counts = $raw ? json_decode($raw, true) : [];
                 if (!is_array($counts)) $counts = [];
-                if (!isset($counts[$partyId]) || !is_array($counts[$partyId])) {
-                    $counts[$partyId] = ['male' => 0, 'female' => 0];
-                }
-                $counts[$partyId][$genderKey] = max(0, (int)($counts[$partyId][$genderKey] ?? 0) - 1);
+                // 파티 신청 인원 -1, 참가 구성 예약이면 예약에 저장된 회차 인원도 각각 -1
+                countsAdjust($counts, $partyId, $genderKey, array_map('strval', (array)($beforeBooking['sessionIds'] ?? [])), -1);
                 ftruncate($fp, 0); rewind($fp); fwrite($fp, json_encode($counts));
                 fflush($fp); flock($fp, LOCK_UN); fclose($fp);
             }
@@ -515,10 +536,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $raw = stream_get_contents($fp);
             $counts = $raw ? json_decode($raw, true) : [];
             if (!is_array($counts)) $counts = [];
-            if (!isset($counts[$partyId]) || !is_array($counts[$partyId])) {
-                $counts[$partyId] = ['male' => 0, 'female' => 0];
-            }
-            $counts[$partyId][$genderKey] = max(0, (int)($counts[$partyId][$genderKey] ?? 0) - 1);
+            // 파티 신청 인원 -1, 참가 구성 예약이면 예약에 저장된 회차 인원도 각각 -1
+            countsAdjust($counts, $partyId, $genderKey, array_map('strval', (array)($beforeBooking['sessionIds'] ?? [])), -1);
             ftruncate($fp, 0); rewind($fp); fwrite($fp, json_encode($counts));
             fflush($fp); flock($fp, LOCK_UN); fclose($fp);
         }

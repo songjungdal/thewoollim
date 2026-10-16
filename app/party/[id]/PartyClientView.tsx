@@ -2,13 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Heart, Clock, ShoppingBag, X, ClipboardList, Users as UsersIcon, ShieldCheck, Info } from "lucide-react";
+import { ArrowLeft, Heart, Clock, ShoppingBag, X, ClipboardList, Users as UsersIcon, ShieldCheck, Info, BookOpen } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
-import { partyStockStatus, partyTypeOf, PARTY_TYPE_LABELS, PARTIES as SEED_PARTIES, type PartyType } from "../../lib/data";
-import { templateFor, normalizeDetail, type PartyDetail, type PartyDetailImage, type DetailImageSlot } from "../../lib/partyDetailTemplates";
+import { partyStockStatus, withLiveCounts, dateOnly, partyHasOptions, partyTypeOf, PARTY_TYPE_LABELS, PARTIES as SEED_PARTIES, type PartyType } from "../../lib/data";
+import PartyOptionPicker, { optionClosedFor } from "./PartyOptionPicker";
+import { PARTY_GUIDES, visibleNotices, markupToGuideText } from "../../lib/partyGuides";
+import { templateFor, normalizeDetail, DEFAULT_ABOUT_TITLE, DEFAULT_APPLY_TITLE, DEFAULT_NOTICE_TITLE, DEFAULT_BEFORE_APPLY_TITLE, type PartyDetail, type PartyDetailImage, type DetailImageSlot } from "../../lib/partyDetailTemplates";
 import { useAuth } from "../../context/AuthContext";
 import { useParties } from "../../lib/useParties";
 import { checkEligibility, eligibilitySummary, calculateAge } from "../../lib/eligibility";
@@ -20,6 +22,7 @@ type Participant = {
   mbti: string;
   job: string;
   status?: "confirmed" | "pending_approval" | "completed" | "paid_pending_profile" | string;
+  optionName?: string;   // 솔로파티 참가 구성 — 신청한 항목 이름
 };
 
 /** 상태 미니 배지 — 마이페이지 STATUS_DISPLAY 와 동일 색상/라벨, 사이즈만 컴팩트 */
@@ -57,13 +60,14 @@ function StatusMiniBadge({ status }: { status?: string }) {
 
 /** 성별별 참가자 컬럼 — 칩 카드 형태로 정렬 */
 function ParticipantColumn({
-  label, list, toneBg, toneAccent, toneBadge,
+  label, list, toneBg, toneAccent, toneBadge, hideProfile = false,
 }: {
   label: string;
   list: Participant[];
   toneBg: string;
   toneAccent: string;
   toneBadge: string;
+  hideProfile?: boolean;   // 솔로파티 — 프로필 카드를 받지 않으므로 MBTI·직업 칸을 그리지 않는다
 }) {
   return (
     <div className="p-4 md:p-4">
@@ -96,7 +100,14 @@ function ParticipantColumn({
                 )}
                 {/* 상태 미니 배지 — 연령대 바로 우측 */}
                 <StatusMiniBadge status={p.status} />
+                {/* 솔로파티 참가 구성 — 신청한 항목 이름 (명세 10-2 기본안) */}
+                {p.optionName && (
+                  <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-white border border-gray-200 text-gray-600 whitespace-nowrap">
+                    {p.optionName}
+                  </span>
+                )}
               </div>
+              {!hideProfile && (
               <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap">
                 {p.mbti && (
                   <span className="text-xs font-black text-brand-point-ink bg-brand-point/10 px-1.5 py-0.5 rounded-full">
@@ -109,6 +120,7 @@ function ParticipantColumn({
                   </span>
                 )}
               </div>
+              )}
             </li>
           ))}
         </ul>
@@ -135,6 +147,8 @@ export default function PartyClientView({ id }: { id: string }) {
     ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date())
     : "";
   const [showCartModal, setShowCartModal] = useState(false);
+  // 솔로파티 참가 구성 — 고른 참가 항목 id (명세 8-1)
+  const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
   const [participants, setParticipants] = useState<{ male: Participant[]; female: Participant[] }>({ male: [], female: [] });
 
   // 참가 확정자 fetch — 마운트 + 30초 폴링 + focus 갱신
@@ -184,34 +198,29 @@ export default function PartyClientView({ id }: { id: string }) {
   }, [id]);
 
   // 실시간 결제완료 인원만 노출 — DB 카운트가 없으면 0/12로 표시 (시드/테스트 데이터 무시)
-  const live = partyCounts[id];
-  const detailItem = baseItem
-    ? {
-        ...baseItem,
-        maleBooked:   live?.male   ?? 0,
-        femaleBooked: live?.female ?? 0,
-      }
-    : undefined;
+  // 참가 구성 파티는 회차별 인원도 함께 (withLiveCounts)
+  const detailItem = baseItem ? withLiveCounts(baseItem, partyCounts[id]) : undefined;
+
+  // 실시간 파티 데이터 최초 fetch가 아직 끝나지 않은 구간 — 빌드 시점 샘플 목록만 있어
+  // 실제로는 존재하는 파티도 못 찾은 것처럼 보이거나, 샘플과 id가 겹치는 파티는 샘플 제목·가격이 잠깐 비친다.
+  // 그래서 fetch 완료 전까지는 파티를 찾았든 못 찾았든 로딩 화면만 보여준다 (정적 HTML도 이 화면으로 만들어짐).
+  // 로딩 화면엔 푸터를 그리지 않는다 — 화면 높이뿐인 짧은 화면이라 푸터가 첫 화면에 보였다가 본문이 뜨면 사라져 깜빡여 보임.
+  if (!partiesLoaded) {
+    return (
+      <div className="flex flex-col min-h-screen">
+        <Header />
+        <main className="flex-1 flex items-center justify-center px-4" aria-busy="true">
+          <span
+            role="status"
+            aria-label="불러오는 중"
+            className="block w-11 h-11 rounded-full border-[3px] border-gray-200 border-t-brand-point animate-spin"
+          />
+        </main>
+      </div>
+    );
+  }
 
   if (!detailItem) {
-    // 실시간 파티 데이터 최초 fetch가 아직 끝나지 않은 구간 — 빌드 시점 샘플 목록만 있어
-    // 실제로는 존재하는 파티도 일시적으로 못 찾은 것처럼 보일 수 있으므로, fetch 완료 전까지는
-    // "찾을 수 없음" 대신 로딩 상태를 보여줘 자연스럽게 진입되도록 함.
-    if (!partiesLoaded) {
-      return (
-        <div className="flex flex-col min-h-screen">
-          <Header />
-          <main className="flex-1 flex items-center justify-center px-4">
-            <span
-              role="status"
-              aria-label="불러오는 중"
-              className="block w-11 h-11 rounded-full border-[3px] border-gray-200 border-t-brand-point animate-spin"
-            />
-          </main>
-          <Footer />
-        </div>
-      );
-    }
     return (
       <div className="flex flex-col min-h-screen">
         <Header />
@@ -226,13 +235,54 @@ export default function PartyClientView({ id }: { id: string }) {
     );
   }
 
+  // 남은 자리·마감 — 메인 카드·일정 섹션과 같은 계산 (참가 구성 파티는 회차 기준, 명세 8-3)
   const stock = partyStockStatus(detailItem);
+  // 회차별 남/여 인원/정원 한 묶음 (상세 상단 현황 — PC·모바일 같은 내용)
+  const sessionCounts = (
+    <div className="flex flex-wrap justify-end items-center gap-x-3 gap-y-0.5 bg-white/95 px-2.5 py-1 md:px-3 md:py-1.5 rounded-2xl shadow-lg text-xs font-bold border border-gray-100 md:border-0">
+      {stock.sessions.map(s => (
+        <span key={s.id} className="inline-flex items-center gap-1 whitespace-nowrap" data-testid="session-count">
+          <UsersIcon size={12} className="flex-shrink-0 text-gray-500" />
+          <span className="text-brand-black">{s.name}</span>
+          <span className="text-blue-400">남 {s.maleBooked ?? 0}/{s.maleStock}</span>
+          <span className="text-gray-400">·</span>
+          <span className="text-pink-400">여 {s.femaleBooked ?? 0}/{s.femaleStock}</span>
+        </span>
+      ))}
+    </div>
+  );
+  // 고른 참가 항목 — 그사이 내 성별 기준으로 마감됐으면 고르지 않은 것으로 본다
+  const selectedOption = stock.hasOptions
+    ? stock.options.find(o => o.id === selectedOptionId && !optionClosedFor(o, profile?.gender)) ?? null
+    : null;
   const partyType: PartyType = detailRes?.partyType ?? partyTypeOf(detailItem);
   const typeLabel = PARTY_TYPE_LABELS[partyType];
   // 화면에 그릴 안내 — detail ?? 종류별 템플릿. 응답 전(null)이면 편집 영역을 그리지 않는다.
-  //   요청이 실패해 종류를 모르면 실시간 파티 목록을 받은 뒤에 그 종류로 템플릿을 고른다(빌드 시점 샘플로 오판 방지).
-  const detailReady = !!detailRes && detailRes.id === id && (detailRes.detail !== null || detailRes.partyType !== null || partiesLoaded);
+  //   요청이 실패해 종류를 모르면 실시간 파티 목록의 종류로 템플릿을 고른다 (여기까지 왔으면 실시간 목록은 이미 받은 상태).
+  const detailReady = !!detailRes && detailRes.id === id;
   const shownDetail: PartyDetail | null = detailReady && detailRes ? (detailRes.detail ?? templateFor(partyType)) : null;
+  // 고정 안내 문구(신청 전 확인·참가 신청 방법·필수 확인 사항) — 실시간 파티 목록으로 종류가 확인된 상태라 바로 그린다
+  //   (빌드 시점 샘플 목록만 있을 때는 위의 로딩 화면에서 멈추므로 솔로파티에 매칭파티 문구가 비치지 않음). app/lib/partyGuides.ts
+  const guide = PARTY_GUIDES[partyType];
+  // 참가 신청 방법·필수 확인 사항 — 파티에 저장된 내용(detail.apply / notice)이 있으면 그것, 없으면 종류별 기본 문구.
+  //   저장된 내용이 있을 수 있으므로 상세 안내 응답 뒤에 그린다 (기본 문구가 비쳤다가 바뀌지 않도록). docs/specs/party-guide-edit.md 3장
+  const savedDetail = detailReady && detailRes ? detailRes.detail : null;
+  const applyView = !detailReady || !guide ? null
+    : savedDetail?.apply
+      ? { title: savedDetail.apply.title.trim() || DEFAULT_APPLY_TITLE, steps: savedDetail.apply.steps.map(s => ({ ...s, note: s.note || null })) }
+      : { title: DEFAULT_APPLY_TITLE, steps: guide.steps };
+  const noticeView = !detailReady || !guide ? null
+    : savedDetail?.notice
+      ? { title: savedDetail.notice.title.trim() || DEFAULT_NOTICE_TITLE, intro: savedDetail.notice.intro, items: savedDetail.notice.items.map(n => ({ ...n, warn: n.warn || null })) }
+      : { title: DEFAULT_NOTICE_TITLE, intro: guide.noticeIntro, items: visibleNotices(guide, partyHasOptions(detailItem)) };
+  // 신청 전 꼭 확인해주세요 — 저장된 내용(detail.beforeApply)이 있으면 그것(**글자** 만 굵게), 없으면 종류별 기본 문구.
+  //   저장된 내용이 있을 수 있으므로 상세 안내 응답 뒤에 그린다. 본문이 비면 숨김. docs/specs/party-box-sms.md 1장
+  const beforeApplyView = !detailReady || !guide ? null
+    : savedDetail?.beforeApply
+      ? { title: savedDetail.beforeApply.title.trim() || DEFAULT_BEFORE_APPLY_TITLE, segs: markupToGuideText(savedDetail.beforeApply.body.trim()) }
+      : { title: DEFAULT_BEFORE_APPLY_TITLE, segs: guide.beforeApply };
+  // 진행 안내 형식 — numbered 가 없으면 번호 형식(지금 모양)
+  const timelineNumbered = shownDetail?.timeline.numbered !== false;
   const renderDetailImage = (img: PartyDetailImage, i: number) => (
     // eslint-disable-next-line @next/next/no-img-element
     <img key={`${img.url}-${i}`} src={img.url} alt={img.alt} className="block w-full h-auto object-contain" />
@@ -284,6 +334,14 @@ export default function PartyClientView({ id }: { id: string }) {
     return true; // alreadyBooked 인 경우는 confirm 결과 무관 후속 로직 차단
   };
 
+  // 참가 구성 파티 — 같은 파티가 다른 항목으로 장바구니에 있으면 항목을 바꿀지 묻는다 (장바구니는 파티당 한 줄)
+  const confirmOptionChange = (oldOptionId: string | undefined, newName: string): boolean => {
+    const oldName = stock.options.find(o => o.id === oldOptionId)?.name;
+    return confirm(oldName
+      ? `장바구니에 담긴 참가 항목(${oldName})을 ${newName}(으)로 바꿀까요?`
+      : `장바구니에 담긴 이 파티의 참가 항목을 ${newName}(으)로 바꿀까요?`);
+  };
+
   // 참가신청 — 카트에 담고 마이페이지로 이동 (중복 신청/카트 시 차단)
   const handleCheckout = async () => {
     // 세션 만료 방어 (v5.1) — 미로그인/만료 시 이후 로직(중복체크·카트·결제) 전부 차단
@@ -304,13 +362,16 @@ export default function PartyClientView({ id }: { id: string }) {
     }
     const blocked = checkBlockedReason();
     if (blocked) { alert(blocked); return; }
+    if (stock.hasOptions && !selectedOption) { alert("참가 항목을 선택해주세요"); return; }
 
-    if (cart.some(c => c.partyId === id)) {
+    const inCart = cart.find(c => c.partyId === id);
+    if (inCart && !(selectedOption && inCart.optionId !== selectedOption.id)) {
       alert("이미 장바구니에 담겨 있습니다. 마이페이지에서 결제를 진행해주세요.");
       router.push("/mypage");
       return;
     }
-    addToCart(id);
+    if (inCart && selectedOption && !confirmOptionChange(inCart.optionId, selectedOption.name)) return;
+    addToCart(id, selectedOption?.id);
     router.push("/mypage");
   };
 
@@ -334,12 +395,15 @@ export default function PartyClientView({ id }: { id: string }) {
     }
     const blocked = checkBlockedReason();
     if (blocked) { alert(blocked); return; }
+    if (stock.hasOptions && !selectedOption) { alert("참가 항목을 선택해주세요"); return; }
 
-    if (cart.some(c => c.partyId === id)) {
+    const inCart = cart.find(c => c.partyId === id);
+    if (inCart && !(selectedOption && inCart.optionId !== selectedOption.id)) {
       alert("이미 장바구니에 담긴 파티입니다.");
       return;
     }
-    addToCart(id);
+    if (inCart && selectedOption && !confirmOptionChange(inCart.optionId, selectedOption.name)) return;
+    addToCart(id, selectedOption?.id);
     setShowCartModal(true);
   };
 
@@ -393,6 +457,12 @@ export default function PartyClientView({ id }: { id: string }) {
                 );
               })()}
               {/* 남녀 인원 — 이미지 우측 하단 오버레이 (아이콘 + 남성 파랑 / 여성 분홍), 가독성을 위해 흰색 pill 배경 */}
+              {stock.hasOptions ? (
+                // 참가 구성 파티 — 회차별 남/여 인원/정원 (명세 8-1). PC 는 이미지 오른쪽 아래, 모바일은 이미지 바로 아래(아래 sessionCounts)
+                <div className="hidden md:flex absolute bottom-4 right-4 left-4 justify-end z-10 pointer-events-none" data-testid="session-counts">
+                  {sessionCounts}
+                </div>
+              ) : (
               <div className="absolute bottom-3 right-3 md:bottom-4 md:right-4 flex items-center gap-2 bg-white/95 px-2.5 py-1 md:px-3 md:py-1.5 rounded-full shadow-lg z-10 text-xs font-bold">
                 <span className="flex items-center gap-1 text-blue-400">
                   <UsersIcon size={12} className="flex-shrink-0" />
@@ -403,8 +473,15 @@ export default function PartyClientView({ id }: { id: string }) {
                   여성 {detailItem.femaleBooked}/{detailItem.femaleStock}
                 </span>
               </div>
+              )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent pointer-events-none" />
             </div>
+            {/* 참가 구성 파티 — 모바일 회차별 현황 (납작한 배너에서 왼쪽 위 배지와 겹치지 않게 이미지 아래) */}
+            {stock.hasOptions && (
+              <div className="md:hidden flex justify-end -mt-4 mb-5" data-testid="session-counts-mobile">
+                {sessionCounts}
+              </div>
+            )}
 
             {/* 제목 — 중앙정렬 */}
             <h1 className="text-2xl md:text-3xl font-black tracking-tight mb-2 leading-snug text-center">{detailItem.title}</h1>
@@ -418,7 +495,18 @@ export default function PartyClientView({ id }: { id: string }) {
             {/* Info rows — 일시/장소/대상 */}
             <div className="space-y-0 mb-4 md:mb-5">
               {[
-                { label: "일시 (Date)", value: detailItem.dateString },
+                {
+                  label: "일시 (Date)",
+                  // 참가 구성 파티 — 날짜 + 회차 시간표 ("1부 19:00 · 2부 21:30")
+                  value: stock.hasOptions ? (
+                    <>
+                      {dateOnly(detailItem.dateString)}
+                      <span className="block text-xs md:text-sm text-gray-600 mt-0.5" data-testid="session-timetable">
+                        {stock.sessions.map(s => `${s.name} ${s.startTime}`).join(" · ")}
+                      </span>
+                    </>
+                  ) : detailItem.dateString,
+                },
                 { label: "장소 (Location)", value: detailItem.location },
                 { label: "대상 (Target)", value: detailItem.target },
               ].map((row) => (
@@ -427,8 +515,26 @@ export default function PartyClientView({ id }: { id: string }) {
                   <span className={`font-bold text-right ${row.label === "일시 (Date)" ? "text-sm md:text-base" : ""}`}>{row.value}</span>
                 </div>
               ))}
+              {/* 참가비 — 참가 구성 파티는 항목별 남/여 가격 목록 */}
+              {stock.hasOptions ? (
+                <div className="py-2.5 border-b border-gray-200 text-xs md:text-sm" data-testid="option-prices">
+                  <span className="text-gray-500 font-medium">참가비 (Price)</span>
+                  <ul className="mt-1.5 space-y-1">
+                    {stock.options.map(o => (
+                      <li key={o.id} className="flex items-baseline justify-between gap-2">
+                        <span className="font-bold break-keep">{o.name}</span>
+                        <span className="font-black text-brand-black flex flex-wrap items-baseline justify-end gap-x-2 tabular-nums">
+                          <span><span className="text-xs text-gray-500 font-bold">남성</span> ₩{o.priceMale.toLocaleString()}</span>
+                          <span className="text-gray-500">/</span>
+                          <span><span className="text-xs text-gray-500 font-bold">여성</span> ₩{o.priceFemale.toLocaleString()}</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
               {/* 참가비 — 성별별 분리 표시 (남성 / 여성). 미설정 시 price 폴백 단일 표시 */}
-              {(() => {
+              {!stock.hasOptions && (() => {
                 const pm = (detailItem as { priceMale?: number }).priceMale;
                 const pf = (detailItem as { priceFemale?: number }).priceFemale;
                 const hasSplit = (pm && pm > 0) || (pf && pf > 0);
@@ -457,18 +563,19 @@ export default function PartyClientView({ id }: { id: string }) {
               })()}
             </div>
 
-            {/* 신청 전 꼭 확인해주세요 */}
-            <div className="bg-white p-3.5 rounded-xl border border-gray-200 mb-3">
+            {/* 신청 전 꼭 확인해주세요 — 파티 종류별 문구 (app/lib/partyGuides.ts) */}
+            {beforeApplyView && beforeApplyView.segs.length > 0 && (
+            <div className="bg-white p-3.5 rounded-xl border border-gray-200 mb-3" data-testid="guide-before-apply">
               <h4 className="font-bold mb-1.5 flex items-center gap-1.5 text-xs md:text-sm">
-                <Heart size={14} className="text-brand-point-ink" /> 신청 전 꼭 확인해주세요.
+                <Heart size={14} className="text-brand-point-ink" /> {beforeApplyView.title}
               </h4>
-              <p className="text-[13px] md:text-xs text-gray-500 leading-relaxed break-keep">
-                어울림은 진정성 있는 만남을 위해 <strong className="font-bold text-brand-black">100% 사전 승인제</strong>로 운영됩니다.
-                결제 후 프로필 정보를 입력해 주시면 <strong className="font-bold text-brand-black">[확정 대기 중]</strong> 상태가 되며,
-                관리자의 꼼꼼한 확인을 거쳐 최종 <strong className="font-bold text-brand-black">[참가 확정]</strong>이 이루어집니다.
-                참가 확정 및 안내 문자는 확정 시점에 맞춰 순차적으로 발송됩니다.
+              <p className="text-[13px] md:text-xs text-gray-500 leading-relaxed break-keep whitespace-pre-line">
+                {beforeApplyView.segs.map((seg, i) => seg.strong
+                  ? <strong key={i} className="font-bold text-brand-black">{seg.text}</strong>
+                  : <span key={i}>{seg.text}</span>)}
               </p>
             </div>
+            )}
 
             {/* 참가 대상 표시 — 자격 제한이 설정된 경우 노출 (기존 로직 그대로) */}
             {eligibilityLabel && (
@@ -485,6 +592,16 @@ export default function PartyClientView({ id }: { id: string }) {
                   </span>
                 )}
               </div>
+            )}
+
+            {/* 참가 항목 선택 — 참가 구성 파티만, 모집 중일 때 (명세 8-1) */}
+            {stock.hasOptions && !isExpired && (
+              <PartyOptionPicker
+                stock={stock}
+                gender={isLoggedIn ? profile?.gender : null}
+                selectedId={selectedOption?.id ?? null}
+                onSelect={setSelectedOptionId}
+              />
             )}
 
             {/* 참가하기 / 장바구니 버튼 — 조건/비활성화 로직은 기존 그대로, 기본 문구만 "참가신청"→"참가하기" */}
@@ -548,6 +665,30 @@ export default function PartyClientView({ id }: { id: string }) {
             })()}
           </div>
 
+          {/* 소개글 — 참가 항목·버튼 바로 아래, 실시간 참가 인원 위 (docs/specs/party-solo-guide.md 7-2).
+               묶음이 0개면 영역 전체를 그리지 않는다. 본문은 글자 그대로(줄바꿈 유지), 사진은 폭에 맞춰 비율 유지 */}
+          {shownDetail && shownDetail.about.sections.length > 0 && (
+            <div className="max-w-4xl mx-auto mb-10 md:mb-16" data-testid="party-about">
+              <div className="flex items-center gap-3 mb-5 md:mb-7">
+                <BookOpen size={20} className="text-brand-point-ink flex-shrink-0" />
+                <h3 className="text-xl md:text-3xl font-bold tracking-tight break-keep">{shownDetail.about.title.trim() || DEFAULT_ABOUT_TITLE}</h3>
+              </div>
+              <div className="space-y-10 md:space-y-16">
+                {shownDetail.about.sections.map((sec, i) => (
+                  <section key={i} data-testid="party-about-section">
+                    {sec.heading && <h4 className="text-lg md:text-2xl font-black text-brand-black leading-snug mb-2 md:mb-3 break-keep">{sec.heading}</h4>}
+                    {sec.body && <p className="text-sm md:text-base text-gray-700 font-medium leading-relaxed whitespace-pre-line break-keep">{sec.body}</p>}
+                    {sec.images.length > 0 && (
+                      <div className={`space-y-3 md:space-y-4 ${sec.heading || sec.body ? "mt-4 md:mt-6" : ""}`}>
+                        {sec.images.map(renderDetailImage)}
+                      </div>
+                    )}
+                  </section>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* PARTICIPANTS PANEL — 다른 섹션들(참가 신청 방법/Party Timeline 등)과 동일 폭 max-w-4xl */}
           {(participants.male.length > 0 || participants.female.length > 0) && (
             <div className="max-w-4xl mx-auto mb-10 md:mb-16">
@@ -587,6 +728,7 @@ export default function PartyClientView({ id }: { id: string }) {
                       toneBg="bg-[#E3F2FD]"
                       toneAccent="text-info"
                       toneBadge="bg-[#E3F2FD] text-info"
+                      hideProfile={partyType === "solo"}
                     />
                   </div>
                   <div className="flex-1">
@@ -596,6 +738,7 @@ export default function PartyClientView({ id }: { id: string }) {
                       toneBg="bg-[#FCE4EC]"
                       toneAccent="text-rose-500"
                       toneBadge="bg-rose-100 text-rose-700"
+                      hideProfile={partyType === "solo"}
                     />
                   </div>
                 </div>
@@ -676,44 +819,29 @@ export default function PartyClientView({ id }: { id: string }) {
           {/* 사진 ① 참가 신청 방법 위 — 컨테이너 폭(max-w-4xl) 1:1 매칭, 라운드 X, 비율 보존. 사진이 없으면 영역째 그리지 않음 */}
           {renderWrappedSlot("beforeApply", "mb-7 md:mb-10")}
 
-          {/* HOW TO JOIN — Timeline-styled Application Guide */}
-          <div className="mb-10 md:mb-24">
+          {/* HOW TO JOIN — Timeline-styled Application Guide (파티 종류별 단계, app/lib/partyGuides.ts) */}
+          {applyView && applyView.steps.length > 0 && (
+          <div className="mb-10 md:mb-24" data-testid="guide-steps">
             <div className="max-w-4xl mx-auto">
               <div className="bg-white p-6 md:p-20 rounded-2xl md:rounded-[3rem] shadow-sm border border-gray-100">
                 <div className="flex items-center gap-3 md:gap-4 mb-7 md:mb-12">
                   <ClipboardList size={26} className="text-brand-point-ink md:hidden" />
                   <ClipboardList size={32} className="text-brand-point-ink hidden md:block" />
-                  <h3 className="text-xl md:text-3xl font-bold tracking-tight">참가 신청 방법</h3>
+                  <h3 className="text-xl md:text-3xl font-bold tracking-tight">{applyView.title}</h3>
                 </div>
 
                 <div className="space-y-7 md:space-y-12 relative before:absolute before:left-3.5 md:before:left-4 before:top-2 before:bottom-2 before:w-px before:bg-gray-100">
-                  {[
-                    {
-                      title: "파티 카드를 확인하고 결제하기",
-                      desc: "파티 카드의 일시, 장소, 연령대를 확인하고 결제해주세요.",
-                      note: null,
-                    },
-                    {
-                      title: "프로필 카드 작성하기",
-                      desc: "프로필 카드 작성을 완료해야 참가확정을 받으실 수 있습니다.",
-                      note: "마이페이지의 내 예약 현황에서 현재 참가 확정 여부를 확인하실 수 있습니다.",
-                    },
-                    {
-                      title: "파티 참가확정 확인 후 방문하기",
-                      desc: "참가확정이 되어야만 참석 가능하오니 알림 문자나 참가 확정 여부를 꼭 확인해주세요!",
-                      note: "성비가 맞지 않거나 주최측의 사정으로 파티가 취소될 경우 100% 환불이나 쿠폰 적립 후 다음 모임 선확정 중 선택하실 수 있습니다.",
-                    },
-                  ].map((item, idx) => (
+                  {applyView.steps.map((item, idx) => (
                     <div key={idx} className="relative pl-12 md:pl-14">
                       <div className="absolute left-0 top-0 w-7 h-7 md:w-8 md:h-8 bg-brand-point text-black rounded-full border-4 border-white shadow-md flex items-center justify-center font-black text-xs md:text-sm">
                         {idx + 1}
                       </div>
                       <div className="text-brand-point-ink font-black text-xs md:text-sm tracking-[0.15em] mb-1 md:mb-1.5">STEP {idx + 1}</div>
                       <div className="font-bold text-base md:text-xl mb-1.5 md:mb-2 text-brand-black leading-snug">{item.title}</div>
-                      <div className="text-gray-600 font-medium text-sm md:text-base leading-relaxed">{item.desc}</div>
+                      <div className="text-gray-600 font-medium text-sm md:text-base leading-relaxed whitespace-pre-line">{item.desc}</div>
                       {item.note && (
                         <div className="mt-2.5 md:mt-3 bg-brand-point/5 border-l-2 border-brand-point/40 pl-3 md:pl-4 py-2 md:py-2.5 rounded-r-lg">
-                          <p className="text-[13px] md:text-sm text-gray-600 leading-relaxed">{item.note}</p>
+                          <p className="text-[13px] md:text-sm text-gray-600 leading-relaxed whitespace-pre-line">{item.note}</p>
                         </div>
                       )}
                     </div>
@@ -722,6 +850,7 @@ export default function PartyClientView({ id }: { id: string }) {
               </div>
             </div>
           </div>
+          )}
 
           {/* 사진 ② 참가 신청 방법 아래 — 컨테이너 폭(max-w-4xl) 1:1, 비율 보존 */}
           {renderWrappedSlot("afterApply", "mb-10 md:mb-24")}
@@ -754,9 +883,9 @@ export default function PartyClientView({ id }: { id: string }) {
                     </p>
                   )}
 
-                  {/* STEP 카드 — 번호(01, 02…)는 순서대로 자동 */}
+                  {/* STEP 카드 — 번호(01, 02…)는 순서대로 자동. 자유 형식(numbered=false)은 제목·문구만 (번호·STEP·소요 시간·참고 문구 없음) */}
                   <div className="space-y-5 md:space-y-7">
-                    {shownDetail.timeline.steps.map((item, idx) => (
+                    {shownDetail.timeline.steps.map((item, idx) => timelineNumbered ? (
                       <div
                         key={idx}
                         className="relative pl-12 md:pl-16 pb-5 md:pb-7 border-b border-gray-100 last:border-b-0 last:pb-0"
@@ -784,6 +913,19 @@ export default function PartyClientView({ id }: { id: string }) {
                         {item.note && (
                           <p className="mt-2.5 md:mt-3 text-[13px] md:text-xs text-gray-500 italic bg-brand-point/5 border-l-2 border-brand-point/40 pl-3 py-2 rounded-r-md leading-relaxed whitespace-pre-line">
                             &ldquo;{item.note}&rdquo;
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div key={idx} className="pb-5 md:pb-7 border-b border-gray-100 last:border-b-0 last:pb-0" data-testid="timeline-free-block">
+                        {item.title && (
+                          <div className="font-bold text-base md:text-xl mb-2 md:mb-2.5 text-brand-black leading-snug">
+                            {item.title}
+                          </div>
+                        )}
+                        {item.desc && (
+                          <p className="text-sm md:text-base text-gray-600 leading-relaxed break-keep whitespace-pre-line">
+                            {item.desc}
                           </p>
                         )}
                       </div>
@@ -819,60 +961,38 @@ export default function PartyClientView({ id }: { id: string }) {
                 {/* 사진 ④ 필수 확인 사항 위 */}
                 {shownDetail?.images.beforeNotice.map(renderDetailImage)}
 
-                {/* ── 필수 확인 사항 — Final CTA 직전, 참가 신청 방법/Party Timeline 과 동일 톤 ── */}
-                <div className="bg-white p-6 md:p-20 rounded-2xl md:rounded-[3rem] shadow-sm border border-gray-100">
+                {/* ── 필수 확인 사항 — Final CTA 직전, 참가 신청 방법/Party Timeline 과 동일 톤 (파티 종류별 문구) ── */}
+                {noticeView && noticeView.items.length > 0 && (
+                <div className="bg-white p-6 md:p-20 rounded-2xl md:rounded-[3rem] shadow-sm border border-gray-100" data-testid="guide-notices">
                   <div className="flex items-center gap-3 md:gap-4 mb-3 md:mb-4">
                     <ShieldCheck size={26} className="text-brand-point-ink md:hidden" />
                     <ShieldCheck size={32} className="text-brand-point-ink hidden md:block" />
-                    <h3 className="text-xl md:text-3xl font-bold tracking-tight">필수 확인 사항</h3>
+                    <h3 className="text-xl md:text-3xl font-bold tracking-tight">{noticeView.title}</h3>
                   </div>
+                  {noticeView.intro && (
                   <p className="text-sm md:text-base text-gray-500 font-medium mb-7 md:mb-12 leading-relaxed">
-                    편안하고 신뢰할 수 있는 만남을 위해 아래 내용을 꼭 확인해 주세요.
+                    {noticeView.intro}
                   </p>
+                  )}
 
                   <div className="space-y-7 md:space-y-12 relative before:absolute before:left-3.5 md:before:left-4 before:top-2 before:bottom-2 before:w-px before:bg-gray-100">
-                    {[
-                      {
-                        title: "본인 확인을 위한 신분증 지참",
-                        desc:  "안전하고 투명한 만남을 위해 사전 인증이 완료된 분들만 참여 가능합니다. 현장에서 본인 확인 절차가 진행되오니, 신분증(주민등록증, 운전면허증 등)을 반드시 지참해 주세요.",
-                        warn:  "미지참 시 입장이 제한될 수 있으며, 이로 인한 환불은 불가합니다.",
-                      },
-                      {
-                        title: "드레스코드 — 깔끔하고 단정한 차림",
-                        desc:  "첫인상은 소중한 인연의 시작입니다. 상대방에 대한 예의를 갖춘 깔끔한 소개팅 복장(셔츠, 슬랙스, 원피스 등)을 권장합니다.",
-                        warn:  "트레이닝복, 슬리퍼 등 과하게 편안한 복장은 입장이 제한될 수 있습니다.",
-                      },
-                      {
-                        title: "성숙한 매너와 배려",
-                        desc:  "서로를 존중하는 따뜻한 분위기를 지향합니다. 과도한 음주, 무례한 언행 등 타인에게 불편을 주는 경우 운영진의 판단에 따라 즉시 퇴장 조치될 수 있으며 참가비는 환불되지 않습니다.",
-                        warn:  null,
-                      },
-                      {
-                        title: "신중한 참가 신청",
-                        desc:  "파티는 정해진 성비를 맞추어 세심하게 준비됩니다. 당일 무단 불참(No-Show)은 다른 참가자분들의 소중한 기회를 저해하므로 신중한 참가신청을 부탁드립니다.",
-                        warn:  "무단 불참 시 향후 모든 파티 참여가 제한될 수 있습니다.",
-                      },
-                      {
-                        title: "현장 기록 및 마케팅 활용 안내",
-                        desc:  "파티의 분위기를 기록하기 위해 현장 스케치 촬영이 진행될 수 있습니다. 촬영된 모든 사진은 참가자의 프라이버시 보호를 위해 얼굴 식별이 불가능하도록 블러/모자이크 처리 후 마케팅 자료로 활용됩니다.",
-                        warn:  null,
-                      },
-                    ].map((item, idx) => (
+                    {noticeView.items.map((item, idx) => (
                       <div key={idx} className="relative pl-12 md:pl-14">
                         <div className="absolute left-0 top-0 w-7 h-7 md:w-8 md:h-8 bg-brand-point text-black rounded-full border-4 border-white shadow-md flex items-center justify-center font-black text-xs md:text-sm">
                           {idx + 1}
                         </div>
                         <div className="font-bold text-base md:text-xl mb-1.5 md:mb-2 text-brand-black leading-snug">{item.title}</div>
-                        <div className="text-gray-600 font-medium text-sm md:text-base leading-relaxed break-keep">{item.desc}</div>
+                        <div className="text-gray-600 font-medium text-sm md:text-base leading-relaxed break-keep whitespace-pre-line">{item.desc}</div>
                         {item.warn && (
                           <div className="mt-2.5 md:mt-3 bg-red-50 border-l-2 border-red-400/60 pl-3 md:pl-4 py-2 md:py-2.5 rounded-r-lg">
-                            <p className="text-[13px] md:text-sm text-red-700 font-bold leading-relaxed break-keep">⚠ {item.warn}</p>
+                            <p className="text-[13px] md:text-sm text-red-700 font-bold leading-relaxed break-keep whitespace-pre-line">⚠ {item.warn}</p>
                           </div>
                         )}
                       </div>
                     ))}
                   </div>
                 </div>
+                )}
 
                 {/* 사진 ⑤ 필수 확인 사항 아래 */}
                 {shownDetail?.images.afterNotice.map(renderDetailImage)}

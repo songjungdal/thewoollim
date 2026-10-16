@@ -75,15 +75,39 @@ function normalizeEmail(string $email): string {
     return strtolower(trim($email));
 }
 
+/** 테스트 회원 번호 상한 — a1~a{N}(남성), b1~b{N}(여성). 범위를 바꿀 때는 이 값과 app/lib/testUsers.ts 만 고친다. */
+const TEST_USER_MAX = 20;
+
 /**
  * 테스트 회원 식별.
- *  패턴: a1@naver.com ~ a10@naver.com / b1@naver.com ~ b10@naver.com
+ *  패턴: a1@naver.com ~ a20@naver.com / b1@naver.com ~ b20@naver.com (번호 앞 0 은 인정하지 않음)
  *  → 프로필 핵심 5종 잠금 해제 (관리자 권한 부여 — 테스트 편의)
+ *  → 모든 알림 문자 발송 제외 (isSmsExcludedAccount), 임시 비밀번호 문자 대상 제외
  *  클라이언트 동일 로직: app/lib/testUsers.ts
  */
 function isTestUser(string $email): bool {
     $e = normalizeEmail($email);
-    return (bool)preg_match('/^(a|b)([1-9]|10)@naver\.com$/', $e);
+    if (!preg_match('/^[ab]([1-9]\d*)@naver\.com$/', $e, $m)) return false;
+    return (int)$m[1] <= TEST_USER_MAX;
+}
+
+/** 테스트 회원 이메일 전체 목록 — a1~a{N}, b1~b{N} 순서 */
+function testUserEmails(): array {
+    $out = [];
+    foreach (['a', 'b'] as $p) {
+        for ($i = 1; $i <= TEST_USER_MAX; $i++) $out[] = "{$p}{$i}@naver.com";
+    }
+    return $out;
+}
+
+/**
+ * 알림 문자 발송 제외 대상 — 관리자 role, 관리자 도메인(@woollim.local), 테스트 회원.
+ *  신청 접수·참가 확정·취소·프로필 안내 문자와 cron(D-1·2시간 전·프로필 24시간) 이 모두 이 규칙을 쓴다.
+ */
+function isSmsExcludedAccount(string $email, string $role): bool {
+    if ($role === 'admin') return true;
+    if (str_ends_with(normalizeEmail($email), '@woollim.local')) return true;
+    return isTestUser($email);
 }
 
 // ─── 회원·참가자 표시 헬퍼 ─────────────────────────────────────────
@@ -178,7 +202,14 @@ function withFileLock(string $path, callable $callback) {
 // ─── 성별별 참가비 ────────────────────────────────────────────────
 //   priceMale / priceFemale 우선, 미설정 또는 0 이면 price 폴백.
 //   클라이언트(priceForGender) 와 동일 규칙 — 결제 금액 검증 일치.
-function priceForGender(array $party, string $gender): int {
+//   참가 항목(options)이 있는 솔로파티는 고른 항목의 남/여 가격. 항목이 없거나 잘못된 optionId 면 null
+//   → 호출한 쪽에서 결제를 거절한다 (docs/specs/party-options-solo.md 6장).
+function priceForGender(array $party, string $gender, ?string $optionId = null): ?int {
+    if (partyHasOptions($party)) {
+        $opt = partyOptionById($party, (string)$optionId);
+        if ($opt === null) return null;
+        return $gender === '남성' ? (int)$opt['priceMale'] : (int)$opt['priceFemale'];
+    }
     $male   = (int)($party['priceMale']   ?? 0);
     $female = (int)($party['priceFemale'] ?? 0);
     if ($gender === '남성' && $male   > 0) return $male;
@@ -195,6 +226,40 @@ function partyStockLimit(array $party, string $genderKey): int {
     return $stock > 0 ? $stock : 12;
 }
 
+// ─── 파티 남은 자리 (남/여) — 메인 파티 카드의 마감 판정(app/lib/data.ts partyStockStatus)과 같은 규칙 ───
+//   $countsRow = party_counts.json 의 그 파티 값 { male, female, sessions?: { <sid>: { male, female } } }
+//   - 일반 파티: 정원 - 신청 인원
+//   - 참가 구성 솔로파티: 항목마다 포함 회차 중 가장 적은 남은 자리, 그중 가장 큰 값(마감되지 않은 항목 기준)
+//   사용처: api/_hero.php (메인 히어로 모집중·마감임박 판정)
+function partyRemainingSeats(array $party, array $countsRow): array {
+    if (partyHasOptions($party)) {
+        $sess = [];
+        foreach ((array)$party['sessions'] as $s) {
+            if (!is_array($s)) continue;
+            $sid = (string)($s['id'] ?? '');
+            $sess[$sid] = [
+                'male'   => max(0, sessionStockLimit($s, 'male')   - (int)($countsRow['sessions'][$sid]['male']   ?? 0)),
+                'female' => max(0, sessionStockLimit($s, 'female') - (int)($countsRow['sessions'][$sid]['female'] ?? 0)),
+            ];
+        }
+        $left = ['male' => 0, 'female' => 0];
+        foreach ((array)$party['options'] as $o) {
+            $ids = is_array($o) ? array_map('strval', (array)($o['sessionIds'] ?? [])) : [];
+            if (!$ids) continue;
+            foreach (['male', 'female'] as $g) {
+                $min = PHP_INT_MAX;
+                foreach ($ids as $id) $min = min($min, $sess[$id][$g] ?? 0); // 사라진 회차 = 마감
+                $left[$g] = max($left[$g], $min);
+            }
+        }
+        return $left;
+    }
+    return [
+        'male'   => max(0, partyStockLimit($party, 'male')   - (int)($countsRow['male']   ?? 0)),
+        'female' => max(0, partyStockLimit($party, 'female') - (int)($countsRow['female'] ?? 0)),
+    ];
+}
+
 // 결제 전 사전 검사 — 현재 인원 + 1 이 상한을 넘는 partyId 목록. (잠금 없는 읽기: 최종 판정은 success.php / confirm_vbank)
 function partiesOverStock(array $partyIds, array $partyMap, string $genderKey): array {
     $counts = json_decode((string)@file_get_contents(dataDir() . '/party_counts.json'), true);
@@ -205,6 +270,345 @@ function partiesOverStock(array $partyIds, array $partyMap, string $genderKey): 
         if ($cur + 1 > partyStockLimit($partyMap[$pid] ?? [], $genderKey)) $over[] = $pid;
     }
     return $over;
+}
+
+// ─── 참가 구성 (회차 sessions · 참가 항목 options) — 솔로파티 전용 ─────────────
+// 명세: docs/specs/party-options-solo.md. options 가 없는 파티는 지금과 똑같이 동작한다.
+//   회차   : { id:"s1", name, startTime:"HH:MM", maleStock, femaleStock }  1~5개, 시작 시각 순서
+//   항목   : { id:"o1", name, sessionIds:[...], priceMale, priceFemale }   1~6개
+//   인원   : party_counts.json[파티]['sessions'][회차id]['male'|'female'] — 항목에 포함된 회차마다 +1
+//   예약   : optionId · optionName · sessionIds · sessionTimes 를 결제 시점 사본으로 저장
+const PARTY_SESSIONS_MAX = 5;
+const PARTY_OPTIONS_MAX  = 6;
+const PARTY_OPTION_NAME_MAX = 20;
+const PARTY_SESSION_STOCK_MAX = 100;
+const PARTY_OPTION_PRICE_MAX = 10000000;
+
+function partyHasOptions(array $party): bool {
+    return partyTypeOf($party) === 'solo'
+        && !empty($party['options']) && is_array($party['options'])
+        && !empty($party['sessions']) && is_array($party['sessions']);
+}
+
+function partyOptionById(array $party, string $optionId): ?array {
+    if ($optionId === '' || !partyHasOptions($party)) return null;
+    foreach ($party['options'] as $o) {
+        if (is_array($o) && (string)($o['id'] ?? '') === $optionId) return $o;
+    }
+    return null;
+}
+
+function partySessionById(array $party, string $sessionId): ?array {
+    foreach ((array)($party['sessions'] ?? []) as $s) {
+        if (is_array($s) && (string)($s['id'] ?? '') === $sessionId) return $s;
+    }
+    return null;
+}
+
+/** 항목에 포함된 회차를 시작 시각 순서로 (파티 sessions 순서 = 시작 시각 순서) */
+function partyOptionSessions(array $party, array $option): array {
+    $ids = array_map('strval', (array)($option['sessionIds'] ?? []));
+    $out = [];
+    foreach ((array)($party['sessions'] ?? []) as $s) {
+        if (is_array($s) && in_array((string)($s['id'] ?? ''), $ids, true)) $out[] = $s;
+    }
+    return $out;
+}
+
+/** 예약에 남길 결제 시점 사본 — optionId · optionName · sessionIds · sessionTimes */
+function bookingOptionSnapshot(array $party, array $option): array {
+    $sessions = partyOptionSessions($party, $option);
+    return [
+        'optionId'     => (string)$option['id'],
+        'optionName'   => (string)$option['name'],
+        'sessionIds'   => array_map(fn($s) => (string)$s['id'], $sessions),
+        'sessionTimes' => array_map(fn($s) => (string)$s['startTime'], $sessions),
+    ];
+}
+
+/**
+ * 예약의 회차 시작 시각 목록 ("HH:MM", 이른 순) — 명세 5-3.
+ * 예약의 sessionIds 로 파티의 **현재** 회차를 찾아 그 시각을 쓰고, 못 찾을 때만 예약 사본(sessionTimes)을 쓴다.
+ * (관리자가 신청자가 있는 회차 시각을 바꾸면 안내 문자·2시간 전 안내·마이페이지가 바뀐 시각을 따른다)
+ * 항목 예약이 아니면 [].
+ */
+function bookingSessionTimes(array $booking, ?array $party = null): array {
+    $sids  = array_values(array_map('strval', (array)($booking['sessionIds'] ?? [])));
+    $saved = array_values(array_map('strval', (array)($booking['sessionTimes'] ?? [])));
+    $times = [];
+    foreach ($sids as $i => $sid) {
+        $s = $party !== null ? partySessionById($party, $sid) : null;
+        $t = $s !== null ? (string)($s['startTime'] ?? '') : (string)($saved[$i] ?? '');
+        if ($t !== '') $times[] = $t;
+    }
+    if (!$sids) $times = $saved;   // 예전 형식 방어 — sessionIds 없이 시각만 있는 경우
+    sort($times, SORT_STRING);
+    return $times;
+}
+
+/** 예약의 처음 참석 회차 시작 시각 ("HH:MM") — 항목 예약이 아니면 '' (bookingSessionTimes 규칙) */
+function bookingFirstSessionTime(array $booking, ?array $party = null): string {
+    $times = bookingSessionTimes($booking, $party);
+    return $times[0] ?? '';
+}
+
+/** 회차 정원 (1 이상, 없으면 0 → 항상 마감으로 본다) */
+function sessionStockLimit(array $session, string $genderKey): int {
+    return max(0, (int)($session[$genderKey === 'male' ? 'maleStock' : 'femaleStock'] ?? 0));
+}
+
+/**
+ * 항목에 포함된 회차 중 "현재 인원 + $add" 가 정원을 넘는 회차 id 목록.
+ * $countsRow = party_counts.json 의 그 파티 항목. 회차가 파티에서 사라졌으면 마감으로 본다.
+ */
+function optionSessionsOverStock(array $party, array $option, array $countsRow, string $genderKey, int $add = 1): array {
+    $over = [];
+    foreach (array_map('strval', (array)($option['sessionIds'] ?? [])) as $sid) {
+        $s = partySessionById($party, $sid);
+        $cur = (int)($countsRow['sessions'][$sid][$genderKey] ?? 0);
+        if ($s === null || $cur + $add > sessionStockLimit($s, $genderKey)) $over[] = $sid;
+    }
+    return $over;
+}
+
+/**
+ * 인원 증감 — 파티 신청 인원(male/female)과 회차별 인원을 함께. 0 미만으로 내려가지 않는다.
+ * 파일 잠금은 호출한 쪽에서 잡는다 (success.php · admin/bookings.php 의 flock 블록 안에서 호출).
+ */
+function countsAdjust(array &$counts, string $partyId, string $genderKey, array $sessionIds, int $delta): void {
+    if (!isset($counts[$partyId]) || !is_array($counts[$partyId])) $counts[$partyId] = ['male' => 0, 'female' => 0];
+    $row = &$counts[$partyId];
+    foreach (['male', 'female'] as $g) $row[$g] = (int)($row[$g] ?? 0);
+    $row[$genderKey] = max(0, $row[$genderKey] + $delta);
+    foreach (array_map('strval', $sessionIds) as $sid) {
+        if ($sid === '') continue;
+        if (!isset($row['sessions'][$sid]) || !is_array($row['sessions'][$sid])) $row['sessions'][$sid] = ['male' => 0, 'female' => 0];
+        $cur = (int)($row['sessions'][$sid][$genderKey] ?? 0);
+        $row['sessions'][$sid][$genderKey] = max(0, $cur + $delta);
+    }
+    unset($row);
+}
+
+/**
+ * 결제 전 항목 확인 — 성공 시 ['option'=>..., 'price'=>int], 실패 시 회원에게 보여줄 문구(string).
+ * 항목이 없는 파티는 ['option'=>null, 'price'=>기존 성별 가격].
+ */
+function resolvePartyOption(array $party, string $gender, string $optionId) {
+    if (!partyHasOptions($party)) return ['option' => null, 'price' => (int)priceForGender($party, $gender)];
+    $title = (string)($party['title'] ?? '파티');
+    if ($optionId === '') return "참가 항목을 선택해주세요. ($title)";
+    $opt = partyOptionById($party, $optionId);
+    if ($opt === null) return "선택한 참가 항목을 찾을 수 없습니다. 다시 선택해주세요. ($title)";
+    return ['option' => $opt, 'price' => (int)priceForGender($party, $gender, $optionId)];
+}
+
+/**
+ * 파티별 신청자 집계 — 취소되지 않은 예약 기준 (입금 대기 무통장 포함).
+ * 반환: [partyId => ['total'=>n, 'options'=>[oid=>n], 'sessions'=>[sid=>['male'=>n,'female'=>n]]]]
+ * $partyIds 가 비어 있으면 모든 파티. 관리자 저장 검사(6-1)와 관리자 화면 표시에 쓴다.
+ */
+function partyApplicantStats(array $partyIds = []): array {
+    $want = array_flip(array_map('strval', $partyIds));
+    $stats = [];
+    foreach (glob(dataDir() . '/bookings_*.json') ?: [] as $f) {
+        $list = json_decode((string)@file_get_contents($f), true);
+        if (!is_array($list)) continue;
+        foreach ($list as $b) {
+            if (!is_array($b) || (string)($b['status'] ?? '') === 'cancelled') continue;
+            $pid = (string)($b['partyId'] ?? '');
+            if ($pid === '' || ($want && !isset($want[$pid]))) continue;
+            $st = &$stats[$pid];
+            if ($st === null) $st = ['total' => 0, 'options' => [], 'sessions' => []];
+            $st['total']++;
+            $oid = (string)($b['optionId'] ?? '');
+            if ($oid !== '') $st['options'][$oid] = ($st['options'][$oid] ?? 0) + 1;
+            $g = (string)($b['gender'] ?? '') === '남성' ? 'male' : 'female';
+            foreach (array_map('strval', (array)($b['sessionIds'] ?? [])) as $sid) {
+                if (!isset($st['sessions'][$sid])) $st['sessions'][$sid] = ['male' => 0, 'female' => 0];
+                $st['sessions'][$sid][$g]++;
+            }
+            unset($st);
+        }
+    }
+    return $stats;
+}
+
+/** "일시" 글자 속 시각을 첫 회차 시작 시각으로 (시각이 없으면 뒤에 붙인다) */
+function dateStringWithTime(string $dateString, string $time): string {
+    $dateString = trim($dateString);
+    if (preg_match('/\d{1,2}:\d{2}/', $dateString)) return (string)preg_replace('/\d{1,2}:\d{2}/', $time, $dateString, 1);
+    return $dateString === '' ? $time : "$dateString $time";
+}
+
+/**
+ * 관리자 저장 — 회차·항목 검사·정리 (6-1). 규칙을 어기면 RuntimeException(회원·관리자에게 보여줄 문구).
+ *  - $in   : 요청의 party (sessions / options 키를 본다. 새 회차·항목은 임시 id 를 써도 되고, 서버가 새 id 를 붙인다)
+ *  - $prev : 저장되어 있던 파티 (create 면 null)
+ *  - $clean: sanitizeParty 결과 — 여기에 sessions/options/대표 가격·정원/일시를 반영해 돌려준다
+ * 요청에 sessions·options 키가 모두 없으면 기존 값을 그대로 둔다. 매칭파티면 회차·항목을 지운다.
+ * 신청자가 있는 회차·항목을 지우거나(단일 가격·매칭파티 전환 포함), 항목의 포함 회차를 바꾸거나,
+ * 회차 정원을 신청 인원보다 적게 바꾸면 거절한다.
+ */
+function sanitizePartyOptions(array $in, ?array $prev, array $clean): array {
+    $prevSessions = is_array($prev['sessions'] ?? null) ? $prev['sessions'] : [];
+    $prevOptions  = is_array($prev['options']  ?? null) ? $prev['options']  : [];
+    $hasKeys = array_key_exists('sessions', $in) || array_key_exists('options', $in);
+    $clean['sessionSeq'] = (int)($prev['sessionSeq'] ?? 0);
+    $clean['optionSeq']  = (int)($prev['optionSeq']  ?? 0);
+
+    $isSolo = ($clean['partyType'] ?? 'matching') === 'solo';
+    if ($isSolo && array_key_exists('sessions', $in) !== array_key_exists('options', $in)) {
+        throw new RuntimeException('회차와 참가 항목을 함께 보내야 합니다.');
+    }
+    $wantOptions = $isSolo && $hasKeys && is_array($in['options'] ?? null) && count($in['options']) > 0;
+    if ($isSolo && !$hasKeys) {
+        // 요청에 없으면 기존 구성을 그대로 둔다
+        if ($prevOptions) { $clean['sessions'] = $prevSessions; $clean['options'] = $prevOptions; }
+        return $prevOptions ? syncOptionSummary($clean) : dropZeroOptionSeq($clean);
+    }
+
+    $stats = null;
+    if ($prev !== null && $prevOptions) {
+        $stats = partyApplicantStats([(string)$prev['id']])[(string)$prev['id']] ?? ['total' => 0, 'options' => [], 'sessions' => []];
+    }
+
+    if (!$wantOptions) {
+        // 참가 구성을 지운다 (단일 가격 또는 매칭파티) — 신청자가 있는 항목이 있으면 거절
+        if ($stats && array_sum($stats['options']) > 0) {
+            throw new RuntimeException('신청자가 있는 참가 구성은 지울 수 없습니다. (신청자 ' . array_sum($stats['options']) . '명)');
+        }
+        return dropZeroOptionSeq($clean);
+    }
+
+    $sessIn = is_array($in['sessions'] ?? null) ? array_values($in['sessions']) : [];
+    $optIn  = array_values($in['options']);
+    if (count($sessIn) < 1 || count($sessIn) > PARTY_SESSIONS_MAX) throw new RuntimeException('회차는 1~' . PARTY_SESSIONS_MAX . '개까지 등록할 수 있습니다.');
+    if (count($optIn) < 1 || count($optIn) > PARTY_OPTIONS_MAX)    throw new RuntimeException('참가 항목은 1~' . PARTY_OPTIONS_MAX . '개까지 등록할 수 있습니다.');
+
+    $prevSessIds = array_map(fn($s) => (string)($s['id'] ?? ''), $prevSessions);
+    $prevOptById = [];
+    foreach ($prevOptions as $o) if (is_array($o)) $prevOptById[(string)($o['id'] ?? '')] = $o;
+
+    // 회차
+    $idMap = []; $sessions = []; $names = [];
+    foreach ($sessIn as $i => $s) {
+        if (!is_array($s)) throw new RuntimeException('회차 정보가 올바르지 않습니다.');
+        $n = $i + 1;
+        $name = trim(preg_replace('/[\x00-\x1F\x7F]/u', '', (string)($s['name'] ?? '')));
+        if ($name === '') throw new RuntimeException("회차 {$n}의 이름을 입력해주세요.");
+        if (mb_strlen($name) > PARTY_OPTION_NAME_MAX) throw new RuntimeException("회차 이름은 " . PARTY_OPTION_NAME_MAX . "자 이하로 입력해주세요. ({$name})");
+        if (isset($names[$name])) throw new RuntimeException("회차 이름이 겹칩니다: {$name}");
+        $names[$name] = true;
+        $time = trim((string)($s['startTime'] ?? ''));
+        if (!preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $time)) throw new RuntimeException("{$name}의 시작 시각을 HH:MM 형식(예: 19:00)으로 입력해주세요.");
+        $ms = $s['maleStock'] ?? null; $fs = $s['femaleStock'] ?? null;
+        foreach ([['남', $ms], ['여', $fs]] as [$g, $v]) {
+            if (!is_numeric($v) || (int)$v != $v || (int)$v < 1 || (int)$v > PARTY_SESSION_STOCK_MAX) {
+                throw new RuntimeException("{$name}의 {$g} 정원은 1~" . PARTY_SESSION_STOCK_MAX . "명으로 입력해주세요.");
+            }
+        }
+        $key = (string)($s['id'] ?? '');
+        if ($key !== '' && in_array($key, $prevSessIds, true) && !isset($idMap[$key])) {
+            $id = $key;
+        } else {
+            $clean['sessionSeq']++;
+            $id = 's' . $clean['sessionSeq'];
+            while (in_array($id, $prevSessIds, true)) { $clean['sessionSeq']++; $id = 's' . $clean['sessionSeq']; }
+        }
+        if ($key !== '') $idMap[$key] = $id;
+        $sessions[] = ['id' => $id, 'name' => $name, 'startTime' => $time, 'maleStock' => (int)$ms, 'femaleStock' => (int)$fs];
+    }
+    usort($sessions, fn($a, $b) => strcmp($a['startTime'], $b['startTime']));
+    $finalSessIds = array_map(fn($s) => $s['id'], $sessions);
+
+    // 항목
+    $options = []; $names = []; $usedOptIds = [];
+    $prevOptIds = array_keys($prevOptById);
+    foreach ($optIn as $i => $o) {
+        if (!is_array($o)) throw new RuntimeException('참가 항목 정보가 올바르지 않습니다.');
+        $n = $i + 1;
+        $name = trim(preg_replace('/[\x00-\x1F\x7F]/u', '', (string)($o['name'] ?? '')));
+        if ($name === '') throw new RuntimeException("참가 항목 {$n}의 이름을 입력해주세요.");
+        if (mb_strlen($name) > PARTY_OPTION_NAME_MAX) throw new RuntimeException("참가 항목 이름은 " . PARTY_OPTION_NAME_MAX . "자 이하로 입력해주세요. ({$name})");
+        if (isset($names[$name])) throw new RuntimeException("참가 항목 이름이 겹칩니다: {$name}");
+        $names[$name] = true;
+        $sids = [];
+        foreach ((array)($o['sessionIds'] ?? []) as $k) {
+            $k = (string)$k;
+            $mapped = $idMap[$k] ?? null;
+            if ($mapped === null) throw new RuntimeException("{$name}에 없는 회차가 포함되어 있습니다.");
+            if (!in_array($mapped, $sids, true)) $sids[] = $mapped;
+        }
+        if (!$sids) throw new RuntimeException("{$name}에 포함할 회차를 1개 이상 선택해주세요.");
+        usort($sids, fn($a, $b) => array_search($a, $finalSessIds, true) <=> array_search($b, $finalSessIds, true));
+        $pm = $o['priceMale'] ?? null; $pf = $o['priceFemale'] ?? null;
+        foreach ([['남', $pm], ['여', $pf]] as [$g, $v]) {
+            if (!is_numeric($v) || (int)$v != $v || (int)$v < 1 || (int)$v > PARTY_OPTION_PRICE_MAX) {
+                throw new RuntimeException("{$name}의 {$g} 가격은 1원 이상으로 입력해주세요.");
+            }
+        }
+        $key = (string)($o['id'] ?? '');
+        if ($key !== '' && isset($prevOptById[$key]) && !isset($usedOptIds[$key])) {
+            $id = $key;
+        } else {
+            $clean['optionSeq']++;
+            $id = 'o' . $clean['optionSeq'];
+            while (in_array($id, $prevOptIds, true)) { $clean['optionSeq']++; $id = 'o' . $clean['optionSeq']; }
+        }
+        $usedOptIds[$id] = true;
+        $options[] = ['id' => $id, 'name' => $name, 'sessionIds' => $sids, 'priceMale' => (int)$pm, 'priceFemale' => (int)$pf];
+    }
+
+    // 신청자가 있을 때 막는 수정
+    if ($stats) {
+        $optApplicants = $stats['options'];
+        foreach ($prevOptById as $oid => $po) {
+            $cnt = (int)($optApplicants[$oid] ?? 0);
+            if ($cnt <= 0) continue;
+            $now = null;
+            foreach ($options as $o) if ($o['id'] === $oid) { $now = $o; break; }
+            $pname = (string)($po['name'] ?? $oid);
+            if ($now === null) throw new RuntimeException("신청자가 있는 참가 항목은 삭제할 수 없습니다: {$pname} (신청자 {$cnt}명)");
+            $a = array_map('strval', (array)($po['sessionIds'] ?? [])); sort($a);
+            $b = $now['sessionIds']; sort($b);
+            if ($a !== $b) throw new RuntimeException("신청자가 있는 참가 항목의 포함 회차는 바꿀 수 없습니다: {$pname} (신청자 {$cnt}명)");
+        }
+        foreach ($prevSessions as $ps) {
+            $sid = (string)($ps['id'] ?? '');
+            $sc = $stats['sessions'][$sid] ?? ['male' => 0, 'female' => 0];
+            if ($sc['male'] + $sc['female'] <= 0) continue;
+            $now = null;
+            foreach ($sessions as $s) if ($s['id'] === $sid) { $now = $s; break; }
+            $pname = (string)($ps['name'] ?? $sid);
+            if ($now === null) throw new RuntimeException("신청자가 있는 회차는 삭제할 수 없습니다: {$pname} (신청자 " . ($sc['male'] + $sc['female']) . "명)");
+            if ($now['maleStock'] < $sc['male'])     throw new RuntimeException("{$now['name']}의 남 정원을 현재 신청 인원({$sc['male']}명)보다 적게 바꿀 수 없습니다.");
+            if ($now['femaleStock'] < $sc['female']) throw new RuntimeException("{$now['name']}의 여 정원을 현재 신청 인원({$sc['female']}명)보다 적게 바꿀 수 없습니다.");
+        }
+    }
+
+    $clean['sessions'] = $sessions;
+    $clean['options']  = $options;
+    return syncOptionSummary($clean);
+}
+
+/** id 번호(sessionSeq/optionSeq)는 한 번 쓰면 계속 남겨 지운 회차·항목의 id 를 다시 쓰지 않는다. 쓴 적 없으면 필드를 두지 않는다. */
+function dropZeroOptionSeq(array $clean): array {
+    if ((int)($clean['sessionSeq'] ?? 0) <= 0) unset($clean['sessionSeq']);
+    if ((int)($clean['optionSeq']  ?? 0) <= 0) unset($clean['optionSeq']);
+    return $clean;
+}
+
+/** 참가 구성이 있는 파티의 대표 가격(항목 최솟값)·대표 정원(회차 최댓값)·일시(첫 회차 시각)를 맞춘다 (5-1) */
+function syncOptionSummary(array $clean): array {
+    $pm = array_map(fn($o) => (int)$o['priceMale'], $clean['options']);
+    $pf = array_map(fn($o) => (int)$o['priceFemale'], $clean['options']);
+    $clean['priceMale']   = min($pm);
+    $clean['priceFemale'] = min($pf);
+    $clean['price']       = min(min($pm), min($pf));
+    $clean['maleStock']   = max(array_map(fn($s) => (int)$s['maleStock'], $clean['sessions']));
+    $clean['femaleStock'] = max(array_map(fn($s) => (int)$s['femaleStock'], $clean['sessions']));
+    $clean['dateString']  = dateStringWithTime((string)($clean['dateString'] ?? ''), (string)$clean['sessions'][0]['startTime']);
+    return $clean;
 }
 
 // ─── 파티 종류 (매칭파티 / 솔로파티) ───────────────────────────────
@@ -247,6 +651,92 @@ function detailTextField(array $src, string $key, int $max, bool $multiline, str
     return $s;
 }
 
+// 사진 한 장 — /uploads/parties/파일명 또는 /images/파일명 만 허용 (외부 주소 불가). '.', '..' 같은 이름도 막는다.
+function detailImageField($img, string $label, int $n): array {
+    if (!is_array($img)) throw new RuntimeException("{$label}: 사진 형식이 올바르지 않습니다.");
+    $url = trim((string)($img['url'] ?? ''));
+    if (!preg_match('#^/(uploads/parties|images)/[A-Za-z0-9._-]+$#', $url) || preg_match('#/\.+$#', $url)) {
+        throw new RuntimeException("{$label}: 허용되지 않은 사진 주소입니다.");
+    }
+    return ['url' => $url, 'alt' => detailTextField($img, 'alt', 100, false, "{$label} {$n}번째 사진 대체 텍스트")];
+}
+
+/**
+ * 소개글(about) — 소제목·본문·사진 묶음 0~10개 (docs/specs/party-solo-guide.md 7-1).
+ * 영역 제목 40자, 소제목 40자, 본문 2,000자(줄바꿈 유지, 글자로만 다룸), 묶음당 사진 10장. 셋 다 빈 묶음은 거절.
+ */
+function sanitizePartyAbout($ab): array {
+    $ab = is_array($ab) ? $ab : [];
+    $secIn = is_array($ab['sections'] ?? null) ? array_values($ab['sections']) : [];
+    if (count($secIn) > 10) throw new RuntimeException('소개 묶음은 10개까지 넣을 수 있습니다.');
+    $sections = [];
+    foreach ($secIn as $i => $sec) {
+        $n = $i + 1;
+        if (!is_array($sec)) throw new RuntimeException("소개 묶음 {$n} 형식이 올바르지 않습니다.");
+        $imgsIn = is_array($sec['images'] ?? null) ? array_values($sec['images']) : [];
+        if (count($imgsIn) > 10) throw new RuntimeException("소개 묶음 {$n}: 사진은 10장까지 넣을 수 있습니다.");
+        $images = [];
+        foreach ($imgsIn as $j => $img) $images[] = detailImageField($img, "소개 묶음 {$n}", $j + 1);
+        $row = [
+            'heading' => detailTextField($sec, 'heading', 40,   false, "소개 묶음 {$n} 소제목"),
+            'body'    => detailTextField($sec, 'body',    2000, true,  "소개 묶음 {$n} 본문"),
+            'images'  => $images,
+        ];
+        if ($row['heading'] === '' && $row['body'] === '' && !$images) {
+            throw new RuntimeException("소개 묶음 {$n}에 소제목·본문·사진 중 하나 이상을 입력해주세요.");
+        }
+        $sections[] = $row;
+    }
+    return ['title' => detailTextField($ab, 'title', 40, false, '소개글 제목'), 'sections' => $sections];
+}
+
+/**
+ * 참가 신청 방법 (detail.apply) — 제목 40자, 단계 0~8개(제목 60·설명 500·참고 박스 300자, 제목·설명 필수).
+ * docs/specs/party-guide-edit.md 3-1. 단계 0개면 상세페이지에서 영역을 숨긴다.
+ */
+function sanitizePartyApply(array $a): array {
+    $in = is_array($a['steps'] ?? null) ? array_values($a['steps']) : [];
+    if (count($in) > 8) throw new RuntimeException('참가 신청 방법 단계는 8개까지 입력할 수 있습니다.');
+    $steps = [];
+    foreach ($in as $i => $st) {
+        $n = $i + 1;
+        if (!is_array($st)) throw new RuntimeException("참가 신청 방법 {$n}단계 형식이 올바르지 않습니다.");
+        $row = [
+            'title' => detailTextField($st, 'title', 60,  false, "참가 신청 방법 {$n}단계 제목"),
+            'desc'  => detailTextField($st, 'desc',  500, true,  "참가 신청 방법 {$n}단계 설명"),
+            'note'  => detailTextField($st, 'note',  300, true,  "참가 신청 방법 {$n}단계 참고 박스"),
+        ];
+        if ($row['title'] === '' || $row['desc'] === '') throw new RuntimeException("참가 신청 방법 {$n}단계의 제목과 설명을 입력해주세요.");
+        $steps[] = $row;
+    }
+    return ['title' => detailTextField($a, 'title', 40, false, '참가 신청 방법 제목'), 'steps' => $steps];
+}
+
+/**
+ * 필수 확인 사항 (detail.notice) — 제목 40자, 머리말 200자, 항목 0~10개(제목 60·설명 500·경고 200자, 제목·설명 필수).
+ */
+function sanitizePartyNotice(array $nt): array {
+    $in = is_array($nt['items'] ?? null) ? array_values($nt['items']) : [];
+    if (count($in) > 10) throw new RuntimeException('필수 확인 사항은 10개까지 입력할 수 있습니다.');
+    $items = [];
+    foreach ($in as $i => $it) {
+        $n = $i + 1;
+        if (!is_array($it)) throw new RuntimeException("필수 확인 사항 {$n}번 형식이 올바르지 않습니다.");
+        $row = [
+            'title' => detailTextField($it, 'title', 60,  false, "필수 확인 사항 {$n}번 제목"),
+            'desc'  => detailTextField($it, 'desc',  500, true,  "필수 확인 사항 {$n}번 설명"),
+            'warn'  => detailTextField($it, 'warn',  200, true,  "필수 확인 사항 {$n}번 경고"),
+        ];
+        if ($row['title'] === '' || $row['desc'] === '') throw new RuntimeException("필수 확인 사항 {$n}번의 제목과 설명을 입력해주세요.");
+        $items[] = $row;
+    }
+    return [
+        'title' => detailTextField($nt, 'title', 40,  false, '필수 확인 사항 제목'),
+        'intro' => detailTextField($nt, 'intro', 200, false, '필수 확인 사항 머리말'),
+        'items' => $items,
+    ];
+}
+
 /**
  * 관리자 입력 detail 정규화 + 입력 제한 검사. 알려진 필드만 남긴다.
  * 넘치거나 허용되지 않은 값이면 RuntimeException (저장 거절).
@@ -257,6 +747,8 @@ function sanitizePartyDetail($d): array {
     $du   = is_array($d['durations'] ?? null) ? $d['durations'] : [];
     $imgs = is_array($d['images'] ?? null)    ? $d['images']    : [];
 
+    // numbered: 번호 형식(기본, 값 없음 = true) / false = 자유 형식(제목·문구만). docs/specs/party-guide-edit.md 4장
+    $numbered = !array_key_exists('numbered', $tl) || $tl['numbered'] !== false;
     $stepsIn = is_array($tl['steps'] ?? null) ? array_values($tl['steps']) : [];
     if (count($stepsIn) > 10) throw new RuntimeException('진행 단계는 10개까지 입력할 수 있습니다.');
     $steps = [];
@@ -269,8 +761,12 @@ function sanitizePartyDetail($d): array {
             'desc'  => detailTextField($st, 'desc',  500, true,  "단계 {$n} 설명"),
             'note'  => detailTextField($st, 'note',  200, true,  "단계 {$n} 참고 문구"),
         ];
-        if ($step['title'] === '') throw new RuntimeException("단계 {$n}의 제목을 입력해주세요.");
-        if ($step['desc'] === '')  throw new RuntimeException("단계 {$n}의 설명을 입력해주세요.");
+        if ($numbered) {
+            if ($step['title'] === '') throw new RuntimeException("단계 {$n}의 제목을 입력해주세요.");
+            if ($step['desc'] === '')  throw new RuntimeException("단계 {$n}의 설명을 입력해주세요.");
+        } elseif ($step['title'] === '' && $step['desc'] === '') {
+            throw new RuntimeException("진행 안내 {$n}번째 블록에 제목이나 문구를 입력해주세요.");
+        }
         $steps[] = $step;
     }
 
@@ -292,19 +788,11 @@ function sanitizePartyDetail($d): array {
         $label = PARTY_DETAIL_IMAGE_SLOT_LABELS[$slot];
         if (count($list) > 10) throw new RuntimeException("{$label}: 사진은 10장까지 넣을 수 있습니다.");
         $out = [];
-        foreach ($list as $i => $img) {
-            if (!is_array($img)) throw new RuntimeException("{$label}: 사진 형식이 올바르지 않습니다.");
-            $url = trim((string)($img['url'] ?? ''));
-            // /uploads/parties/파일명 또는 /images/파일명 만 허용 (외부 주소 불가). '.', '..' 같은 이름도 막는다.
-            if (!preg_match('#^/(uploads/parties|images)/[A-Za-z0-9._-]+$#', $url) || preg_match('#/\.+$#', $url)) {
-                throw new RuntimeException("{$label}: 허용되지 않은 사진 주소입니다.");
-            }
-            $out[] = ['url' => $url, 'alt' => detailTextField($img, 'alt', 100, false, "{$label} " . ($i + 1) . "번째 사진 대체 텍스트")];
-        }
+        foreach ($list as $i => $img) $out[] = detailImageField($img, $label, $i + 1);
         $images[$slot] = $out;
     }
 
-    return [
+    $out = [
         'timeline'  => [
             'title' => detailTextField($tl, 'title', 60,  false, '진행 안내 제목'),
             'intro' => detailTextField($tl, 'intro', 200, false, '소개 문구'),
@@ -316,6 +804,22 @@ function sanitizePartyDetail($d): array {
         ],
         'images'    => $images,
     ];
+    // 자유 형식만 저장한다 — 값이 없으면 번호 형식(지금 모양). 예전 파티를 그대로 다시 저장해도 detail 이 바뀌지 않도록
+    if (!$numbered) $out['timeline']['numbered'] = false;
+    // 참가 신청 방법·필수 확인 사항 — 요청에 있을 때만 저장 (없으면 화면은 종류별 기본 문구)
+    // 신청 전 꼭 확인해주세요 — 요청에 있을 때만 저장 (없으면 종류별 기본 문구). 본문의 **글자** 만 굵게, 나머지는 글자 그대로
+    if (is_array($d['beforeApply'] ?? null)) {
+        $out['beforeApply'] = [
+            'title' => detailTextField($d['beforeApply'], 'title', 40,  false, '신청 전 확인 박스 제목'),
+            'body'  => detailTextField($d['beforeApply'], 'body',  500, true,  '신청 전 확인 박스 본문'),
+        ];
+    }
+    if (is_array($d['apply'] ?? null))  $out['apply']  = sanitizePartyApply($d['apply']);
+    if (is_array($d['notice'] ?? null)) $out['notice'] = sanitizePartyNotice($d['notice']);
+    // 소개글은 묶음이 있을 때만 저장한다 — 없던 예전 파티를 그대로 다시 저장해도 detail 이 바뀌지 않도록 (묶음 0개 = about 없음)
+    $about = sanitizePartyAbout($d['about'] ?? null);
+    if ($about['sections']) $out['about'] = $about;
+    return $out;
 }
 
 // 관리자 활동 기록용 요약 — detail 전체 대신 개수만 남긴다.
@@ -323,7 +827,9 @@ function partyDetailCounts(array $detail): string {
     $steps  = count($detail['timeline']['steps'] ?? []);
     $photos = 0;
     foreach (PARTY_DETAIL_IMAGE_SLOTS as $slot) $photos += count($detail['images'][$slot] ?? []);
-    return "단계 {$steps}개, 사진 {$photos}장";
+    $about = (array)($detail['about']['sections'] ?? []);
+    foreach ($about as $sec) $photos += count($sec['images'] ?? []);
+    return "단계 {$steps}개, " . ($about ? '소개 묶음 ' . count($about) . '개, ' : '') . "사진 {$photos}장";
 }
 
 // ─── 쿠폰 할인 계산 ────────────────────────────────────────────────
@@ -363,6 +869,45 @@ function countCouponUsages(array $usages, string $code): int {
         if (strtoupper((string)($u['code'] ?? '')) === $code) $n++;
     }
     return $n;
+}
+
+// ─── 취소 시기별 환불 금액 (app/lib/refund.ts 와 같은 규정) ─────────────────
+//   파티 자정까지 남은 일수: 5일 이상 100% / 4일 80% / 3일 50% / 그 외(2일 전~당일·지난 파티) 0%.
+//   환불액은 원 단위 이하 버림. $atTs 시점(기본: 지금)의 날짜로 계산한다.
+//   파티 날짜("YYYY-MM-DD")를 알 수 없으면 null.
+function refundQuote(int $paidAmount, string $calendarDate, ?int $atTs = null): ?array {
+    if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $calendarDate, $m)) return null;
+    $atTs ??= time();
+    $partyMid = mktime(0, 0, 0, (int)$m[2], (int)$m[3], (int)$m[1]);
+    $dayMid   = mktime(0, 0, 0, (int)date('n', $atTs), (int)date('j', $atTs), (int)date('Y', $atTs));
+    $days = (int)floor(($partyMid - $dayMid) / 86400);
+    $rate = $days >= 5 ? 1.0 : ($days === 4 ? 0.8 : ($days === 3 ? 0.5 : 0.0));
+    return ['days' => $days, 'rate' => $rate, 'amount' => (int)floor(max(0, $paidAmount) * $rate)];
+}
+
+// parties.json 에서 파티 날짜(calendarDate)를 찾는다. 없으면 "".
+function partyCalendarDate(string $partyId): string {
+    $parties = json_decode((string)@file_get_contents(dataDir() . '/parties.json'), true);
+    foreach ((array)$parties as $p) {
+        if (is_array($p) && isset($p['id']) && (string)$p['id'] === $partyId) return (string)($p['calendarDate'] ?? '');
+    }
+    return '';
+}
+
+// ─── 쿠폰 적용 불가 파티 (parties.json 의 couponDisabled, 매칭·솔로 공통) ─────────
+//   안내 문구는 api/coupon-messages.json 한 곳에만 둔다 — 프론트(app/lib/data.ts COUPON_DISABLED_MESSAGE)도
+//   같은 파일을 빌드 때 읽어 쓴다. 파일을 못 읽는 비상시에만 아래 대체 문구를 쓴다.
+function couponDisabledMessage(): string {
+    static $msg = null;
+    if ($msg === null) {
+        $j = json_decode((string)@file_get_contents(__DIR__ . '/coupon-messages.json'), true);
+        $msg = (is_array($j) && is_string($j['couponDisabled'] ?? null)) ? $j['couponDisabled'] : '쿠폰을 사용할 수 없는 파티입니다.';
+    }
+    return $msg;
+}
+
+function partyCouponDisabled(array $party): bool {
+    return !empty($party['couponDisabled']);
 }
 
 // ─── 쿠폰 사용 이력 해제 (취소/환불 시 "사용 안 한 것처럼" 복원) ──────────────

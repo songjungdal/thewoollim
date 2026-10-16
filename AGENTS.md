@@ -18,10 +18,10 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 | 구분 | 내용 |
 |---|---|
-| 서비스 | thewoollim.com. 오프라인 매칭파티(1:1 로테이션 소개팅) 신청·결제·운영 사이트. 솔로파티 도입 진행 중(`docs/specs/party-type-solo.md`) |
+| 서비스 | thewoollim.com. 오프라인 파티 신청·결제·운영 사이트. 파티 종류는 매칭파티(1:1 로테이션 소개팅)와 솔로파티 두 가지다. 솔로파티 규칙은 `docs/specs/party-*.md` 명세서에 있다 |
 | 화면 | Next.js 16 App Router + React 19 + Tailwind CSS 4 + TypeScript. `next.config.ts`의 `output: "export"`로 **정적 HTML(`out/`)** 을 만든다 |
 | 서버 | `api/` 아래 PHP 파일. 브라우저가 `/api/*.php`를 직접 호출한다 |
-| 데이터 | 회원·후기·현장스케치·관리자 메모·매칭 투표는 MySQL/MariaDB(PDO, `api/db.php`). 파티·예약·장바구니·쿠폰·관리자 활동 기록은 서버의 `api/data/*.json` 파일 |
+| 데이터 | 회원·후기·현장스케치·관리자 메모·매칭 투표는 MySQL/MariaDB(PDO, `api/db.php`). 파티·예약·장바구니·쿠폰·메인이미지 설정·관리자 활동 기록은 서버의 `api/data/*.json` 파일 |
 | 외부 연동 | 토스페이먼츠(결제), 포트원 V2 + 다날(본인인증), 알리고(SMS), 카카오·네이버·구글 로그인(현재 화면에서 숨김) |
 | 운영 | AWS EC2. 배포는 GitHub Actions 수동 워크플로로만 한다(13장) |
 
@@ -84,14 +84,21 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 | 규칙 | 화면 | 서버 |
 |---|---|---|
-| 성별별 참가비 | `app/lib/data.ts` | `api/lib.php`(`priceForGender`), `api/payments/pending.php`·`success.php`·`vbank-submit.php` |
-| 환불 비율 | `app/lib/refund.ts` | `api/admin/bookings.php`(관리자 취소 처리) |
-| 테스트 회원 | `app/lib/testUsers.ts` | `api/lib.php`(`isTestUser`) |
-| 문자 발송 제외 대상 | — | `api/_pending_sms.php`, `api/_profile_notify_sms.php`, `api/admin/_confirm_sms.php`, `api/admin/_cancel_sms.php`, `api/cron/*.php`, `api/auth/reset-password.php`(임시 비밀번호 문자) |
+| 성별별 참가비·참가 항목 가격 | `app/lib/data.ts`(`priceForGender`, `linePriceFor`) | `api/lib.php`(`priceForGender`, `resolvePartyOption`), `api/payments/pending.php`·`success.php`·`vbank-submit.php` |
+| 남은 자리·마감 판정 | `app/lib/data.ts`(`partyStockStatus`) | `api/lib.php`(`partyRemainingSeats`) |
+| 파티 종류(매칭파티·솔로파티) | `app/lib/data.ts`(`PARTY_TYPES`, `partyTypeOf`) | `api/lib.php`(`partyTypeOf`, `partyTypeLabel`) |
+| 솔로파티 참가 구성(회차·항목) 제한 | `app/lib/partyOptions.ts` | `api/lib.php`(`sanitizePartyOptions`) |
+| 파티 상세 안내 입력 제한 | `app/lib/partyDetailTemplates.ts`(`DETAIL_LIMITS`) | `api/lib.php`(`sanitizePartyDetail`) |
+| 메인 이미지 슬라이드 계산 | `app/lib/hero.ts`(`buildHeroSlides`) | `api/_hero.php`(`heroBuildSlides`) |
+| 환불 비율 | `app/lib/refund.ts` | `api/lib.php`(`refundQuote`) — `api/payments/cancel-request.php`(취소 요청한 날 기준 금액 저장), `api/admin/bookings.php`(관리자 승인) |
+| 테스트 회원 범위 | `app/lib/testUsers.ts`(`TEST_USER_MAX`, `isTestUser`) | `api/lib.php`(`TEST_USER_MAX`, `isTestUser`) |
+| 문자 발송 제외 대상 | — | `api/lib.php`(`isSmsExcludedAccount`) 한 곳. 신청 접수·참가 확정·취소·프로필 안내 문자와 `api/cron/*.php`가 이 함수를 쓴다. 임시 비밀번호 문자(`api/auth/reset-password.php`)는 이 함수를 쓰지 않고 테스트 회원(`isTestUser`)과 관리자 계정 도메인을 따로 검사한다 |
+
+쿠폰 적용 불가 안내 문구는 `api/coupon-messages.json` 한 파일을 화면(`app/lib/data.ts`)과 서버(`api/lib.php`)가 함께 읽는다.
 
 참가 자격(나이·혼인 여부)은 지금 화면(`app/lib/eligibility.ts`)에서만 검사한다.
 
-`api/payments/refund.php`에는 예전 환불 규칙(파티 5일 전 이상 100%, 그 외 0%)이 남아 있다. 지금 화면은 이 파일을 호출하지 않고 `api/payments/cancel-request.php`로 취소를 요청한다. 환불 규칙을 바꿀 때 이 파일을 기준으로 삼지 않는다.
+`api/payments/refund.php`(예전 즉시 취소·환불 API)는 사용 중지됨. 어떤 요청에도 410을 돌려주도록 막아 두었다(PR #22). 회원 취소는 `api/payments/cancel-request.php`로 요청하고 관리자가 `api/admin/bookings.php`에서 처리한다.
 
 ## 7. 조심해서 다룰 영역
 
@@ -178,12 +185,18 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 운영 배포는 GitHub Actions 워크플로 `.github/workflows/deploy.yml`("Deploy (manual)")로만 한다. 절차와 설정은 `docs/DEPLOYMENT.md`를 따른다.
 
-- 서버에 직접 SSH·rsync로 배포하지 않는다. 서버 접속, AWS 설정 변경은 사용자의 명시적 허락 없이는 하지 않는다.
-- 배포 대상은 PR로 리뷰되어 `main`에 병합된 코드뿐이다.
-- "배포해 줘" 요청을 받으면 다음 순서를 지킨다.
-  1. 배포할 `main` 커밋과 대상(`frontend` / `api` / `all`)을 확인한다.
-  2. `mode=plan`으로 실행하고, 실행 요약의 변경 파일 수·삭제 예정·검사 결과를 사용자에게 보고한다.
-  3. 사용자가 그 계획을 보고 명시적으로 승인한 경우에만 `mode=deploy`, `confirm=DEPLOY`로 실행한다.
-  4. 결과(상태 확인, 백업 이름)를 보고한다. 실패하면 롤백 여부를 사용자에게 묻는다.
+- 서버에 직접 SSH·rsync 로 배포하지 않는다. 서버 접속, AWS 설정 변경은 사용자의 명시적 허락 없이는 하지 않는다.
+- 배포 대상은 PR 로 리뷰되어 `main`에 병합된 코드뿐이다.
+- 사용자가 "배포해"(또는 "배포해 줘")라고 하면 다음 순서로 진행한다. 아래 조건을 모두 만족하면 사용자의 추가 승인 없이 `deploy`까지 실행한다.
+  1. 배포할 변경을 `main`에 병합하고, 배포할 `main` 커밋과 대상(`frontend` / `api` / `all`, 따로 말이 없으면 `all`)을 정한다.
+  2. 그 커밋으로 `mode=plan`(`frontend_delete=false`)을 실행한다.
+  3. plan 작업 로그에서 결과를 확인한다. 로그의 `PLAN_FILE api …`(api 변경 파일), `PLAN_DELETE …`(삭제 예정), `PLAN_COUNT …`(건수) 줄과 빌드·검사 단계 결과를 본다.
+  4. 다음 조건을 **모두** 만족하면 `mode=deploy`, `confirm=DEPLOY`, 같은 대상, `frontend_delete=false`로 실행한다.
+     - (a) 서버 기준 api 변경 파일 목록(`PLAN_FILE api`)이 **지난 배포 커밋** 이후 git 변경 목록(`git diff --name-only <지난 배포 커밋> <배포할 커밋> -- api`)과 같다. 지난 배포 커밋은 "운영 반영" 작업이 성공한 가장 최근 `deploy` 실행의 커밋이다.
+     - (b) 삭제 예정이 0건이다(api·frontend 모두, `frontend_delete=false`).
+     - (c) 빌드·검사(타입 검사, 린트, 빌드, PHP 문법·금지 파일 검사)와 plan 작업이 모두 통과했다.
+     - (d) plan과 deploy가 같은 `main` 커밋이다(deploy 직전에 `main` 커밋이 plan 때와 같은지 다시 확인한다).
+  5. 조건이 하나라도 다르거나 확인할 수 없으면 **배포하지 말고 멈춰서** 무엇이 달랐는지 사용자에게 보고한다.
+  6. 배포 후 결과(상태 확인, 백업 이름)를 보고한다. 실패하거나 문제가 보이면 롤백하지 말고 먼저 사용자에게 묻는다. 롤백은 사용자가 승인한 경우에만 한다.
 - `deploy.yml`의 `DEPLOY_UNLOCKED` 값, 보호 규칙(`scripts/deploy/*.rsync-filter`)은 사용자 승인 없이 바꾸지 않는다.
-- SSH 개인키, 서버 주소, API 키 등 인증정보는 코드·문서·대화에 기록하지 않는다. GitHub Secrets에만 둔다.
+- SSH 개인키, 서버 주소, API 키 등 인증정보는 코드·문서·대화에 기록하지 않는다. GitHub Secrets 에만 둔다.

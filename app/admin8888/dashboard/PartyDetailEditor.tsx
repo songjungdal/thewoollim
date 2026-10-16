@@ -2,21 +2,24 @@
 
 /**
  * 관리자 파티 등록 모달 — [상세페이지 안내] 탭 편집기.
- * 화면 순서는 상세페이지와 같다: 사진 ①②③ → 진행 안내 → 소요 시간 → 사진 ④⑤
+ * 화면 순서(상세페이지 순서): 신청 전 꼭 확인해주세요 → 소개글 → 사진 ① → 참가 신청 방법 → 사진 ②③ → 진행 안내 → 소요 시간 → 사진 ④ → 필수 확인 사항 → 사진 ⑤
+ * 참가 신청 방법·필수 확인 사항·진행 안내 형식: docs/specs/party-guide-edit.md
  * 구조·입력 제한·기본 내용: app/lib/partyDetailTemplates.ts (서버도 같은 제한을 강제)
  */
 import { useState } from "react";
 import { ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Trash2, Plus, ImageIcon, RotateCcw, Download } from "lucide-react";
 import { PARTY_TYPE_LABELS, type PartyType } from "../../lib/data";
 import {
-  DETAIL_IMAGE_SLOT_LABELS, DETAIL_LIMITS, templateFor, cloneDetail,
-  type PartyDetail, type DetailImageSlot, type PartyDetailStep, type PartyDetailDurationRow,
+  DETAIL_IMAGE_SLOT_LABELS, DETAIL_LIMITS, DEFAULT_ABOUT_TITLE, DEFAULT_APPLY_TITLE, DEFAULT_NOTICE_TITLE,
+  templateFor, cloneDetail, withGuideDefaults, defaultApply, defaultNotice, defaultBeforeApply, DEFAULT_BEFORE_APPLY_TITLE,
+  type PartyApplyStep, type PartyNoticeItem,
+  type PartyDetail, type DetailImageSlot, type PartyDetailStep, type PartyDetailDurationRow, type PartyDetailImage, type PartyAboutSection,
 } from "../../lib/partyDetailTemplates";
 
 export type DetailSourceParty = { id: string; title: string; partyType: PartyType; dateString: string; detail: PartyDetail | null };
 
-const inputCls = "w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none";
-const smallBtn = "inline-flex items-center gap-1 whitespace-nowrap px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-bold bg-white hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed";
+const inputCls = "w-full min-h-11 md:min-h-0 px-3 py-2.5 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none";
+const smallBtn = "inline-flex items-center justify-center gap-1 whitespace-nowrap min-h-11 md:min-h-0 px-2.5 py-1.5 rounded-lg border border-gray-200 text-[13px] md:text-xs font-bold bg-white hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed";
 const UPLOAD_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const UPLOAD_MAX = 10 * 1024 * 1024;
 
@@ -28,49 +31,74 @@ function move<T>(list: T[], from: number, to: number): T[] {
   return next;
 }
 
+const APPLY_FIELD = { title: "제목", desc: "설명", note: "참고 박스" } as const;
+const NOTICE_FIELD = { title: "제목", desc: "설명", warn: "경고" } as const;
+
+/** 사진을 넣는 곳 — 사진 칸(①~⑤) 또는 소개 묶음 */
+type PhotoTarget = { kind: "slot"; slot: DetailImageSlot } | { kind: "about"; index: number };
+const targetKey = (t: PhotoTarget) => (t.kind === "slot" ? `slot:${t.slot}` : `about:${t.index}`);
+const photosOf = (d: PartyDetail, t: PhotoTarget): PartyDetailImage[] =>
+  t.kind === "slot" ? d.images[t.slot] : d.about.sections[t.index].images;
+const photoLimit = (t: PhotoTarget) => (t.kind === "slot" ? DETAIL_LIMITS.imagesPerSlot : DETAIL_LIMITS.aboutImages);
+const photoLabel = (t: PhotoTarget) => (t.kind === "slot" ? DETAIL_IMAGE_SLOT_LABELS[t.slot] : `소개 묶음 ${t.index + 1}`);
+
 function Counter({ value, max }: { value: string; max: number }) {
-  return <span className="text-[11px] text-gray-500 tabular-nums">{value.length}/{max}</span>;
+  return <span className="text-[13px] md:text-sm text-gray-500 tabular-nums">{value.length}/{max}</span>;
 }
 
-export default function PartyDetailEditor({ value, onChange, partyType, usingDefault, sources, currentId }: {
+export default function PartyDetailEditor({ value, onChange, partyType, hasSessions = false, usingDefault, sources, currentId }: {
   value: PartyDetail;
   onChange: (next: PartyDetail | ((prev: PartyDetail) => PartyDetail)) => void;
   partyType: PartyType;
+  hasSessions?: boolean;          // 참가 구성(회차) 사용 — 솔로 필수 확인 사항 기본 문구의 "신청한 회차 시간 지키기" 포함 여부
   usingDefault: boolean;          // 수정 모드에서 저장된 detail 이 없는 파티 (기본 안내 사용 중)
   sources: DetailSourceParty[];   // [다른 파티에서 불러오기] 후보 (최근 등록 순)
   currentId?: string;
 }) {
   const [sourceId, setSourceId] = useState("");
-  const [upload, setUpload] = useState<{ slot: DetailImageSlot; done: number; total: number } | null>(null);
+  const [upload, setUpload] = useState<{ key: string; done: number; total: number } | null>(null);
 
   const set = (fn: (d: PartyDetail) => void) => { const d = cloneDetail(value); fn(d); onChange(d); };
   const setSteps = (steps: PartyDetailStep[]) => set(d => { d.timeline.steps = steps; });
   const setRows  = (rows: PartyDetailDurationRow[]) => set(d => { d.durations.rows = rows; });
+  const setSections = (sections: PartyAboutSection[]) => set(d => { d.about.sections = sections; });
+  // 참가 신청 방법·필수 확인 사항 — 진입 시 항상 채워 두지만 혹시 없으면 기본 문구
+  const apply = value.apply ?? defaultApply(partyType);
+  const notice = value.notice ?? defaultNotice(partyType, hasSessions);
+  const setApply = (fn: (a: typeof apply) => void) => set(d => { const a = d.apply ?? defaultApply(partyType); fn(a); d.apply = a; });
+  const setNotice = (fn: (n: typeof notice) => void) => set(d => { const n = d.notice ?? defaultNotice(partyType, hasSessions); fn(n); d.notice = n; });
+  const numbered = value.timeline.numbered !== false;
+  const beforeApply = value.beforeApply ?? defaultBeforeApply(partyType);
+  const setBeforeApply = (k: "title" | "body", v: string) => set(d => { d.beforeApply = { ...(d.beforeApply ?? defaultBeforeApply(partyType)), [k]: v }; });
 
   const loadFromParty = () => {
     const src = sources.find(s => s.id === sourceId);
     if (!src) { alert("불러올 파티를 선택해주세요."); return; }
     if (!confirm(`지금 상세페이지 안내를 #${src.id} 파티의 내용으로 바꿀까요?\n(지금 입력한 내용은 사라집니다.)`)) return;
-    onChange(src.detail ? cloneDetail(src.detail) : templateFor(src.partyType));
+    // 원본에 참가 신청 방법·필수 확인 사항이 저장돼 있지 않으면 원본 종류의 기본 문구를 함께 가져온다
+    onChange(src.detail ? withGuideDefaults(cloneDetail(src.detail), src.partyType, hasSessions) : templateFor(src.partyType, hasSessions));
   };
   const resetToTemplate = () => {
     if (!confirm(`상세페이지 안내를 ${PARTY_TYPE_LABELS[partyType]} 기본 내용으로 되돌릴까요?\n(지금 입력한 내용은 사라집니다.)`)) return;
-    onChange(templateFor(partyType));
+    onChange(templateFor(partyType, hasSessions));
   };
 
   // 여러 장을 고르면 기존 업로드 API(/api/admin/upload.php)로 한 장씩 차례로 올린다.
-  const addPhotos = async (slot: DetailImageSlot, files: File[]) => {
-    const room = DETAIL_LIMITS.imagesPerSlot - value.images[slot].length;
-    if (room <= 0) { alert(`한 위치에는 사진을 ${DETAIL_LIMITS.imagesPerSlot}장까지 넣을 수 있습니다.`); return; }
+  const addPhotos = async (t: PhotoTarget, files: File[]) => {
+    const limit = photoLimit(t);
+    const where = t.kind === "slot" ? "한 위치" : "한 묶음";
+    const room = limit - photosOf(value, t).length;
+    if (room <= 0) { alert(`${where}에는 사진을 ${limit}장까지 넣을 수 있습니다.`); return; }
     const skipped: string[] = [];
     const picked = files.filter(f => {
       if (!UPLOAD_TYPES.includes(f.type)) { skipped.push(`${f.name} (JPG·PNG·WebP만 가능)`); return false; }
       if (f.size > UPLOAD_MAX) { skipped.push(`${f.name} (10MB 초과)`); return false; }
       return true;
     });
-    if (picked.length > room) skipped.push(`${picked.length - room}장 (한 위치에 최대 ${DETAIL_LIMITS.imagesPerSlot}장)`);
+    if (picked.length > room) skipped.push(`${picked.length - room}장 (${where}에 최대 ${limit}장)`);
     const queue = picked.slice(0, room);
-    setUpload({ slot, done: 0, total: queue.length });
+    const key = targetKey(t);
+    setUpload({ key, done: 0, total: queue.length });
     for (let i = 0; i < queue.length; i++) {
       try {
         const fd = new FormData();
@@ -78,67 +106,78 @@ export default function PartyDetailEditor({ value, onChange, partyType, usingDef
         const res = await fetch("/api/admin/upload.php", { method: "POST", credentials: "include", body: fd });
         const d = await res.json();
         if (d?.ok && typeof d.url === "string") {
-          // 업로드 중에 다른 칸을 고쳐도 덮어쓰지 않도록 최신 값에 이어 붙인다
+          // 업로드 중에 다른 칸을 고쳐도 덮어쓰지 않도록 최신 값에 이어 붙인다 (업로드 중에는 묶음 순서 바꾸기·삭제를 막는다)
           const url: string = d.url;
-          onChange(prev => { const next = cloneDetail(prev); next.images[slot].push({ url, alt: "" }); return next; });
+          onChange(prev => { const next = cloneDetail(prev); photosOf(next, t).push({ url, alt: "" }); return next; });
         } else {
           skipped.push(`${queue[i].name} (${d?.error || "업로드 실패"})`);
         }
       } catch {
         skipped.push(`${queue[i].name} (네트워크 오류)`);
       }
-      setUpload({ slot, done: i + 1, total: queue.length });
+      setUpload({ key, done: i + 1, total: queue.length });
     }
     setUpload(null);
     if (skipped.length) alert(`다음 사진은 추가하지 못했습니다.\n- ${skipped.join("\n- ")}`);
   };
 
-  const photoSlot = (slot: DetailImageSlot) => {
-    const list = value.images[slot];
-    const busy = upload?.slot === slot;
+  // 사진 목록 (썸네일·앞으로/뒤로/삭제·대체 텍스트·사진 추가) — 사진 칸과 소개 묶음이 같이 쓴다
+  const photoList = (t: PhotoTarget, emptyText: string) => {
+    const list = photosOf(value, t);
+    const limit = photoLimit(t);
+    const label = photoLabel(t);
+    const busy = upload?.key === targetKey(t);
+    const edit = (fn: (l: PartyDetailImage[], d: PartyDetail) => void) => set(d => fn(photosOf(d, t), d));
     return (
-      <div className="rounded-xl border border-gray-200 p-3 md:p-4">
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <p className="text-sm font-black text-gray-700">{DETAIL_IMAGE_SLOT_LABELS[slot]}</p>
-          <span className="text-[11px] text-gray-500">{list.length}/{DETAIL_LIMITS.imagesPerSlot}장</span>
-        </div>
+      <>
         {list.length > 0 ? (
-          <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1">
+          <div className="grid grid-cols-2 gap-2 md:flex md:gap-3 md:overflow-x-auto md:pb-2 md:-mx-1 md:px-1 lg:grid lg:grid-cols-3 lg:overflow-visible lg:mx-0 lg:px-0">
             {list.map((img, i) => (
-              <div key={`${img.url}-${i}`} className="w-48 flex-shrink-0">
-                <div className="w-48 h-28 bg-gray-100 rounded-lg overflow-hidden">
+              <div key={`${img.url}-${i}`} className="min-w-0 md:w-48 md:flex-shrink-0 lg:w-auto">
+                <div className="w-full aspect-[12/7] md:aspect-auto md:w-48 md:h-28 lg:w-full lg:h-auto lg:aspect-[12/7] bg-gray-100 rounded-lg overflow-hidden">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={img.url} alt="" className="w-full h-full object-cover" />
                 </div>
-                <div className="flex gap-1 mt-1.5">
+                <div className="grid grid-cols-3 gap-1 md:flex mt-1.5">
                   <button type="button" className={`${smallBtn} px-2`} disabled={i === 0} aria-label="앞으로"
-                    onClick={() => set(d => { d.images[slot] = move(d.images[slot], i, i - 1); })}><ChevronLeft size={12} />앞으로</button>
+                    onClick={() => edit(l => { const m = move(l, i, i - 1); l.splice(0, l.length, ...m); })}><ChevronLeft size={14} /><span className="hidden md:inline">앞으로</span></button>
                   <button type="button" className={`${smallBtn} px-2`} disabled={i === list.length - 1} aria-label="뒤로"
-                    onClick={() => set(d => { d.images[slot] = move(d.images[slot], i, i + 1); })}>뒤로<ChevronRight size={12} /></button>
+                    onClick={() => edit(l => { const m = move(l, i, i + 1); l.splice(0, l.length, ...m); })}><span className="hidden md:inline">뒤로</span><ChevronRight size={14} /></button>
                   <button type="button" className={`${smallBtn} text-red-600`} aria-label="삭제"
-                    onClick={() => set(d => { d.images[slot] = d.images[slot].filter((_, j) => j !== i); })}><Trash2 size={12} /></button>
+                    onClick={() => edit(l => { l.splice(i, 1); })}><Trash2 size={14} /></button>
                 </div>
                 <input value={img.alt} maxLength={DETAIL_LIMITS.imageAlt} placeholder="대체 텍스트 (사진 설명)"
-                  aria-label={`${DETAIL_IMAGE_SLOT_LABELS[slot]} ${i + 1}번째 사진 대체 텍스트`}
-                  onChange={e => set(d => { d.images[slot][i].alt = e.target.value; })}
-                  className="mt-1.5 w-full px-2 py-1.5 rounded-md border border-gray-200 text-xs bg-white focus:ring-2 focus:ring-brand-point outline-none" />
+                  aria-label={`${label} ${i + 1}번째 사진 대체 텍스트`}
+                  onChange={e => { const v = e.target.value; edit(l => { l[i].alt = v; }); }}
+                  className="mt-1.5 w-full min-h-11 md:min-h-0 px-2 py-1.5 rounded-md border border-gray-200 text-base md:text-xs bg-white focus:ring-2 focus:ring-brand-point outline-none" />
               </div>
             ))}
           </div>
         ) : (
-          <div className="flex items-center gap-2 text-xs text-gray-500 py-2"><ImageIcon size={14} />사진 없음 — 상세페이지에서 이 위치는 표시되지 않습니다.</div>
+          <div className="flex items-center gap-2 text-[13px] md:text-sm text-gray-500 py-2"><ImageIcon size={14} />{emptyText}</div>
         )}
-        <label className={`mt-2 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold cursor-pointer ${busy || list.length >= DETAIL_LIMITS.imagesPerSlot ? "bg-gray-100 text-gray-400 pointer-events-none" : "bg-brand-black text-white hover:bg-brand-point hover:text-black"}`}>
+        <label className={`mt-2 inline-flex items-center gap-1.5 min-h-11 md:min-h-0 px-3 py-2 rounded-lg text-[13px] md:text-xs font-bold cursor-pointer ${busy || list.length >= limit ? "bg-gray-100 text-gray-500 pointer-events-none" : "bg-brand-black text-white hover:bg-brand-point hover:text-black"}`}>
           <Plus size={12} />사진 추가
-          <input type="file" multiple accept="image/jpeg,image/png,image/webp" className="hidden"
-            disabled={!!upload || list.length >= DETAIL_LIMITS.imagesPerSlot}
-            onChange={e => { const files = Array.from(e.target.files ?? []); e.target.value = ""; if (files.length) addPhotos(slot, files); }} />
+          <input type="file" multiple accept="image/jpeg,image/png,image/webp" className="hidden" aria-label={`${label} 사진 추가`}
+            disabled={!!upload || list.length >= limit}
+            onChange={e => { const files = Array.from(e.target.files ?? []); e.target.value = ""; if (files.length) addPhotos(t, files); }} />
         </label>
-        {busy && <span className="ml-2 text-xs font-bold text-brand-point-ink">업로드 중 {upload.done}/{upload.total}</span>}
-      </div>
+        {busy && <span className="ml-2 text-[13px] md:text-sm font-bold text-brand-point-ink">업로드 중 {upload.done}/{upload.total}</span>}
+      </>
     );
   };
 
+  const photoSlot = (slot: DetailImageSlot) => (
+    <div className="rounded-xl border border-gray-200 p-3 md:p-4">
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <p className="text-sm font-black text-gray-700">{DETAIL_IMAGE_SLOT_LABELS[slot]}</p>
+        <span className="text-[13px] md:text-sm text-gray-500">{value.images[slot].length}/{DETAIL_LIMITS.imagesPerSlot}장</span>
+      </div>
+      {photoList({ kind: "slot", slot }, "사진 없음 — 상세페이지에서 이 위치는 표시되지 않습니다.")}
+    </div>
+  );
+
+  const sections = value.about.sections;
   const steps = value.timeline.steps;
   const rows = value.durations.rows;
 
@@ -159,72 +198,188 @@ export default function PartyDetailEditor({ value, onChange, partyType, usingDef
               <option key={s.id} value={s.id}>#{s.id} {s.title} · {PARTY_TYPE_LABELS[s.partyType]} · {s.dateString}</option>
             ))}
           </select>
-          <button type="button" onClick={loadFromParty} className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-sm font-bold bg-brand-black text-white hover:bg-brand-point hover:text-black whitespace-nowrap">
+          <button type="button" onClick={loadFromParty} className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-sm font-bold bg-brand-black text-white hover:bg-brand-point hover:text-black whitespace-nowrap min-h-11 md:min-h-0">
             <Download size={14} />다른 파티에서 불러오기
           </button>
         </div>
-        <button type="button" onClick={resetToTemplate} className="inline-flex items-center gap-1.5 text-xs md:text-sm font-bold text-gray-600 underline">
+        <button type="button" onClick={resetToTemplate} className="inline-flex items-center gap-1.5 text-xs md:text-sm font-bold text-gray-600 underline min-h-11 md:min-h-0">
           <RotateCcw size={13} />기본 내용으로 되돌리기 ({PARTY_TYPE_LABELS[partyType]})
         </button>
-        <p className="text-[11px] md:text-xs text-gray-500 leading-relaxed">
+        <p className="text-[13px] md:text-sm text-gray-500 leading-relaxed">
           JPG·PNG·WebP, 10MB 이하. 원본 비율 그대로 화면 폭에 맞춰 표시됩니다. 가로 900px 이상 권장.
         </p>
       </div>
 
+      {/* 신청 전 꼭 확인해주세요 — 상세페이지 참가하기 버튼 위 박스 (docs/specs/party-box-sms.md 1-2) */}
+      <div className="rounded-xl border border-gray-200 p-3 md:p-4 space-y-3" data-testid="before-apply-editor">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <p className="text-sm font-black text-gray-700">신청 전 꼭 확인해주세요 <span className="text-gray-500 font-medium">· 본문을 비우면 상세페이지에서 박스가 숨겨집니다</span></p>
+          <button type="button" className={smallBtn}
+            onClick={() => { if (confirm(`신청 전 꼭 확인해주세요를 ${PARTY_TYPE_LABELS[partyType]} 기본 문구로 되돌릴까요?`)) set(d => { d.beforeApply = defaultBeforeApply(partyType); }); }}>
+            <RotateCcw size={12} />기본 문구로 되돌리기
+          </button>
+        </div>
+        <div>
+          <div className="flex justify-between mb-1"><label className="text-[13px] md:text-sm font-bold text-gray-500">제목</label><Counter value={beforeApply.title} max={DETAIL_LIMITS.beforeApplyTitle} /></div>
+          <input value={beforeApply.title} maxLength={DETAIL_LIMITS.beforeApplyTitle} placeholder={DEFAULT_BEFORE_APPLY_TITLE} aria-label="신청 전 확인 박스 제목"
+            onChange={e => setBeforeApply("title", e.target.value)} className={inputCls} />
+        </div>
+        <div>
+          <div className="flex justify-between mb-1"><label className="text-[13px] md:text-sm font-bold text-gray-500">본문</label><Counter value={beforeApply.body} max={DETAIL_LIMITS.beforeApplyBody} /></div>
+          <textarea value={beforeApply.body} maxLength={DETAIL_LIMITS.beforeApplyBody} rows={4} aria-label="신청 전 확인 박스 본문"
+            onChange={e => setBeforeApply("body", e.target.value)} className={`${inputCls} resize-y`} />
+          <p className="mt-1 text-[13px] md:text-sm text-gray-500">**굵게**처럼 감싸면 굵은 글씨로 보입니다. 줄바꿈은 그대로 보입니다.</p>
+        </div>
+      </div>
+
+      {/* 소개글 — 소제목·본문·사진 묶음 (docs/specs/party-solo-guide.md 7-3) */}
+      <div className="rounded-xl border-2 border-brand-point/40 p-3 md:p-4 space-y-3" data-testid="about-editor">
+        <p className="text-sm font-black text-gray-700">소개글 <span className="text-gray-500 font-medium">· 상세페이지의 참가 항목·버튼 바로 아래에 보입니다. 묶음이 없으면 표시되지 않습니다</span></p>
+        <div>
+          <div className="flex justify-between mb-1"><label className="text-[13px] md:text-sm font-bold text-gray-500">제목</label><Counter value={value.about.title} max={DETAIL_LIMITS.aboutTitle} /></div>
+          <input value={value.about.title} maxLength={DETAIL_LIMITS.aboutTitle} placeholder={DEFAULT_ABOUT_TITLE} aria-label="소개글 제목"
+            onChange={e => set(d => { d.about.title = e.target.value; })} className={inputCls} />
+        </div>
+        {sections.map((sec, i) => (
+          <div key={i} className="rounded-lg bg-gray-50 border border-gray-200 p-3 space-y-2" data-testid="about-section-editor">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <span className="text-[13px] md:text-sm font-black text-brand-point-ink">소개 묶음 {i + 1}</span>
+              <div className="flex gap-1">
+                <button type="button" className={smallBtn} disabled={i === 0 || !!upload} aria-label={`소개 묶음 ${i + 1} 위로`} onClick={() => setSections(move(sections, i, i - 1))}><ArrowUp size={12} />위로</button>
+                <button type="button" className={smallBtn} disabled={i === sections.length - 1 || !!upload} aria-label={`소개 묶음 ${i + 1} 아래로`} onClick={() => setSections(move(sections, i, i + 1))}><ArrowDown size={12} />아래로</button>
+                <button type="button" className={`${smallBtn} text-red-600`} disabled={!!upload} aria-label={`소개 묶음 ${i + 1} 삭제`} onClick={() => setSections(sections.filter((_, j) => j !== i))}><Trash2 size={12} />삭제</button>
+              </div>
+            </div>
+            <div>
+              <div className="flex justify-between mb-1"><label className="text-[13px] md:text-sm font-bold text-gray-500">소제목(선택)</label><Counter value={sec.heading} max={DETAIL_LIMITS.aboutHeading} /></div>
+              <input value={sec.heading} maxLength={DETAIL_LIMITS.aboutHeading} aria-label={`소개 묶음 ${i + 1} 소제목`}
+                onChange={e => set(d => { d.about.sections[i].heading = e.target.value; })} className={inputCls} />
+            </div>
+            <div>
+              <div className="flex justify-between mb-1"><label className="text-[13px] md:text-sm font-bold text-gray-500">본문(선택, 줄바꿈 그대로 표시)</label><Counter value={sec.body} max={DETAIL_LIMITS.aboutBody} /></div>
+              <textarea value={sec.body} maxLength={DETAIL_LIMITS.aboutBody} rows={5} aria-label={`소개 묶음 ${i + 1} 본문`}
+                onChange={e => set(d => { d.about.sections[i].body = e.target.value; })} className={`${inputCls} resize-y`} />
+            </div>
+            <div>
+              <div className="flex justify-between mb-1"><label className="text-[13px] md:text-sm font-bold text-gray-500">사진(선택)</label><span className="text-[13px] md:text-sm text-gray-500">{sec.images.length}/{DETAIL_LIMITS.aboutImages}장</span></div>
+              {photoList({ kind: "about", index: i }, "사진 없음")}
+            </div>
+          </div>
+        ))}
+        <button type="button" disabled={sections.length >= DETAIL_LIMITS.aboutSections}
+          onClick={() => setSections([...sections, { heading: "", body: "", images: [] }])}
+          className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border-2 border-dashed border-gray-300 text-sm font-bold text-gray-600 hover:border-brand-point disabled:opacity-40 min-h-11 md:min-h-0">
+          <Plus size={14} />소개 묶음 추가 ({sections.length}/{DETAIL_LIMITS.aboutSections})
+        </button>
+        <p className="text-[13px] md:text-sm text-gray-500">묶음마다 소제목·본문·사진 중 하나 이상을 넣어 주세요.</p>
+      </div>
+
       {photoSlot("beforeApply")}
+
+      {/* 참가 신청 방법 */}
+      <div className="rounded-xl border border-gray-200 p-3 md:p-4 space-y-3" data-testid="apply-editor">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <p className="text-sm font-black text-gray-700">참가 신청 방법 <span className="text-gray-500 font-medium">· 단계가 없으면 상세페이지에서 이 영역이 숨겨집니다</span></p>
+          <button type="button" className={smallBtn}
+            onClick={() => { if (confirm(`참가 신청 방법을 ${PARTY_TYPE_LABELS[partyType]} 기본 문구로 되돌릴까요?`)) set(d => { d.apply = defaultApply(partyType); }); }}>
+            <RotateCcw size={12} />기본 문구로 되돌리기
+          </button>
+        </div>
+        <div>
+          <div className="flex justify-between mb-1"><label className="text-[13px] md:text-sm font-bold text-gray-500">제목</label><Counter value={apply.title} max={DETAIL_LIMITS.applyTitle} /></div>
+          <input value={apply.title} maxLength={DETAIL_LIMITS.applyTitle} placeholder={DEFAULT_APPLY_TITLE} aria-label="참가 신청 방법 제목"
+            onChange={e => { const v = e.target.value; setApply(a => { a.title = v; }); }} className={inputCls} />
+        </div>
+        {apply.steps.map((st, i) => (
+          <div key={i} className="rounded-lg bg-gray-50 border border-gray-200 p-3 space-y-2" data-testid="apply-step-editor">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <span className="text-[13px] md:text-sm font-black tracking-[0.15em] text-brand-point-ink">STEP {i + 1}</span>
+              <div className="flex gap-1">
+                <button type="button" className={smallBtn} disabled={i === 0} aria-label={`참가 신청 방법 ${i + 1}단계 위로`} onClick={() => setApply(a => { a.steps = move(a.steps, i, i - 1); })}><ArrowUp size={12} />위로</button>
+                <button type="button" className={smallBtn} disabled={i === apply.steps.length - 1} aria-label={`참가 신청 방법 ${i + 1}단계 아래로`} onClick={() => setApply(a => { a.steps = move(a.steps, i, i + 1); })}><ArrowDown size={12} />아래로</button>
+                <button type="button" className={`${smallBtn} text-red-600`} aria-label={`참가 신청 방법 ${i + 1}단계 삭제`} onClick={() => setApply(a => { a.steps = a.steps.filter((_, j) => j !== i); })}><Trash2 size={12} />삭제</button>
+              </div>
+            </div>
+            {([["title", "제목 *", DETAIL_LIMITS.applyStepTitle, false], ["desc", "설명 *", DETAIL_LIMITS.applyStepDesc, true], ["note", "참고 박스(선택)", DETAIL_LIMITS.applyStepNote, true]] as const).map(([k, label, max, multi]) => (
+              <div key={k}>
+                <div className="flex justify-between mb-1"><label className="text-[13px] md:text-sm font-bold text-gray-500">{label}</label><Counter value={st[k]} max={max} /></div>
+                {multi ? (
+                  <textarea value={st[k]} maxLength={max} rows={2} aria-label={`참가 신청 방법 ${i + 1}단계 ${APPLY_FIELD[k]}`}
+                    onChange={e => { const v = e.target.value; setApply(a => { a.steps[i][k as keyof PartyApplyStep] = v; }); }} className={`${inputCls} resize-y`} />
+                ) : (
+                  <input value={st[k]} maxLength={max} aria-label={`참가 신청 방법 ${i + 1}단계 ${APPLY_FIELD[k]}`}
+                    onChange={e => { const v = e.target.value; setApply(a => { a.steps[i][k as keyof PartyApplyStep] = v; }); }} className={inputCls} />
+                )}
+              </div>
+            ))}
+          </div>
+        ))}
+        <button type="button" disabled={apply.steps.length >= DETAIL_LIMITS.applySteps}
+          onClick={() => setApply(a => { a.steps = [...a.steps, { title: "", desc: "", note: "" }]; })}
+          className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border-2 border-dashed border-gray-300 text-sm font-bold text-gray-600 hover:border-brand-point disabled:opacity-40 min-h-11 md:min-h-0">
+          <Plus size={14} />참가 신청 단계 추가 ({apply.steps.length}/{DETAIL_LIMITS.applySteps})
+        </button>
+      </div>
+
       {photoSlot("afterApply")}
       {photoSlot("beforeTimeline")}
 
       {/* 진행 안내 */}
       <div className="rounded-xl border border-gray-200 p-3 md:p-4 space-y-3">
         <p className="text-sm font-black text-gray-700">진행 안내 <span className="text-gray-500 font-medium">· 단계가 없으면 상세페이지에서 진행 안내 전체가 숨겨집니다</span></p>
+        <label className="flex items-center gap-2 text-sm font-bold text-gray-700 cursor-pointer w-fit">
+          <input type="checkbox" className="w-4 h-4 accent-black" checked={numbered} aria-label="번호 붙이기"
+            onChange={e => { const on = e.target.checked; set(d => { d.timeline.numbered = on; }); }} />
+          번호 붙이기
+          <span className="text-[13px] md:text-sm font-medium text-gray-500">{numbered ? "· 번호·STEP·소요 시간·참고 문구 표시" : "· 끄면 제목과 문구만 보입니다 (소요 시간·참고 문구는 지우지 않고 숨김)"}</span>
+        </label>
         <div>
-          <div className="flex justify-between mb-1"><label className="text-xs font-bold text-gray-500">제목</label><Counter value={value.timeline.title} max={DETAIL_LIMITS.timelineTitle} /></div>
+          <div className="flex justify-between mb-1"><label className="text-[13px] md:text-sm font-bold text-gray-500">제목</label><Counter value={value.timeline.title} max={DETAIL_LIMITS.timelineTitle} /></div>
           <input value={value.timeline.title} maxLength={DETAIL_LIMITS.timelineTitle} aria-label="진행 안내 제목"
             onChange={e => set(d => { d.timeline.title = e.target.value; })} className={inputCls} />
         </div>
         <div>
-          <div className="flex justify-between mb-1"><label className="text-xs font-bold text-gray-500">소개 문구</label><Counter value={value.timeline.intro} max={DETAIL_LIMITS.intro} /></div>
+          <div className="flex justify-between mb-1"><label className="text-[13px] md:text-sm font-bold text-gray-500">소개 문구</label><Counter value={value.timeline.intro} max={DETAIL_LIMITS.intro} /></div>
           <input value={value.timeline.intro} maxLength={DETAIL_LIMITS.intro} aria-label="진행 안내 소개 문구"
             onChange={e => set(d => { d.timeline.intro = e.target.value; })} className={inputCls} />
         </div>
         {steps.map((st, i) => (
           <div key={i} className="rounded-lg bg-gray-50 border border-gray-200 p-3 space-y-2">
             <div className="flex items-center justify-between gap-2 flex-wrap">
-              <span className="text-xs font-black tracking-[0.2em] text-brand-point-ink">STEP {String(i + 1).padStart(2, "0")}</span>
+              <span className="text-[13px] md:text-sm font-black tracking-[0.2em] text-brand-point-ink">{numbered ? `STEP ${String(i + 1).padStart(2, "0")}` : `블록 ${i + 1}`}</span>
               <div className="flex gap-1">
                 <button type="button" className={smallBtn} disabled={i === 0} onClick={() => setSteps(move(steps, i, i - 1))}><ArrowUp size={12} />위로</button>
                 <button type="button" className={smallBtn} disabled={i === steps.length - 1} onClick={() => setSteps(move(steps, i, i + 1))}><ArrowDown size={12} />아래로</button>
                 <button type="button" className={`${smallBtn} text-red-600`} onClick={() => setSteps(steps.filter((_, j) => j !== i))}><Trash2 size={12} />삭제</button>
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-[1fr_9rem] gap-2">
+            <div className={`grid grid-cols-1 gap-2 ${numbered ? "sm:grid-cols-[1fr_9rem]" : ""}`}>
               <div>
-                <div className="flex justify-between mb-1"><label className="text-xs font-bold text-gray-500">제목 *</label><Counter value={st.title} max={DETAIL_LIMITS.stepTitle} /></div>
+                <div className="flex justify-between mb-1"><label className="text-[13px] md:text-sm font-bold text-gray-500">{numbered ? "제목 *" : "제목"}</label><Counter value={st.title} max={DETAIL_LIMITS.stepTitle} /></div>
                 <input value={st.title} maxLength={DETAIL_LIMITS.stepTitle} aria-label={`단계 ${i + 1} 제목`}
                   onChange={e => set(d => { d.timeline.steps[i].title = e.target.value; })} className={inputCls} />
               </div>
-              <div>
-                <div className="flex justify-between mb-1"><label className="text-xs font-bold text-gray-500">소요시간(선택)</label></div>
+              {numbered && <div>
+                <div className="flex justify-between mb-1"><label className="text-[13px] md:text-sm font-bold text-gray-500">소요시간(선택)</label></div>
                 <input value={st.time} maxLength={DETAIL_LIMITS.stepTime} placeholder="예: 10분" aria-label={`단계 ${i + 1} 소요시간`}
                   onChange={e => set(d => { d.timeline.steps[i].time = e.target.value; })} className={inputCls} />
-              </div>
+              </div>}
             </div>
             <div>
-              <div className="flex justify-between mb-1"><label className="text-xs font-bold text-gray-500">설명 *</label><Counter value={st.desc} max={DETAIL_LIMITS.stepDesc} /></div>
+              <div className="flex justify-between mb-1"><label className="text-[13px] md:text-sm font-bold text-gray-500">{numbered ? "설명 *" : "문구 (제목·문구 중 하나 이상)"}</label><Counter value={st.desc} max={DETAIL_LIMITS.stepDesc} /></div>
               <textarea value={st.desc} maxLength={DETAIL_LIMITS.stepDesc} rows={3} aria-label={`단계 ${i + 1} 설명`}
                 onChange={e => set(d => { d.timeline.steps[i].desc = e.target.value; })} className={`${inputCls} resize-y`} />
             </div>
-            <div>
-              <div className="flex justify-between mb-1"><label className="text-xs font-bold text-gray-500">참고 문구(선택)</label><Counter value={st.note} max={DETAIL_LIMITS.stepNote} /></div>
+            {numbered && <div>
+              <div className="flex justify-between mb-1"><label className="text-[13px] md:text-sm font-bold text-gray-500">참고 문구(선택)</label><Counter value={st.note} max={DETAIL_LIMITS.stepNote} /></div>
               <textarea value={st.note} maxLength={DETAIL_LIMITS.stepNote} rows={2} aria-label={`단계 ${i + 1} 참고 문구`}
-                onChange={e => set(d => { d.timeline.steps[i].note = e.target.value; })} className={`${inputCls} resize-y`} />
-            </div>
+                onChange={e => set(d => { d.timeline.steps[i].note = e.target.value; })} className={`${inputCls} resize-y text-base md:text-sm`} />
+            </div>}
           </div>
         ))}
         <button type="button" disabled={steps.length >= DETAIL_LIMITS.steps}
           onClick={() => setSteps([...steps, { title: "", time: "", desc: "", note: "" }])}
-          className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border-2 border-dashed border-gray-300 text-sm font-bold text-gray-600 hover:border-brand-point disabled:opacity-40">
+          className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border-2 border-dashed border-gray-300 text-sm font-bold text-gray-600 hover:border-brand-point disabled:opacity-40 min-h-11 md:min-h-0">
           <Plus size={14} />단계 추가 ({steps.length}/{DETAIL_LIMITS.steps})
         </button>
       </div>
@@ -233,7 +388,7 @@ export default function PartyDetailEditor({ value, onChange, partyType, usingDef
       <div className="rounded-xl border border-gray-200 p-3 md:p-4 space-y-3">
         <p className="text-sm font-black text-gray-700">소요 시간 안내 <span className="text-gray-500 font-medium">· 줄이 없으면 이 블록만 숨겨집니다</span></p>
         <div>
-          <div className="flex justify-between mb-1"><label className="text-xs font-bold text-gray-500">제목</label><Counter value={value.durations.title} max={DETAIL_LIMITS.durationsTitle} /></div>
+          <div className="flex justify-between mb-1"><label className="text-[13px] md:text-sm font-bold text-gray-500">제목</label><Counter value={value.durations.title} max={DETAIL_LIMITS.durationsTitle} /></div>
           <input value={value.durations.title} maxLength={DETAIL_LIMITS.durationsTitle} aria-label="소요 시간 안내 제목"
             onChange={e => set(d => { d.durations.title = e.target.value; })} className={inputCls} />
         </div>
@@ -246,7 +401,7 @@ export default function PartyDetailEditor({ value, onChange, partyType, usingDef
             <div className="flex gap-1">
               <button type="button" className={smallBtn} disabled={i === 0} onClick={() => setRows(move(rows, i, i - 1))}><ArrowUp size={12} />위로</button>
               <button type="button" className={smallBtn} disabled={i === rows.length - 1} onClick={() => setRows(move(rows, i, i + 1))}><ArrowDown size={12} />아래로</button>
-              <button type="button" className={`${smallBtn} text-red-600`} onClick={() => setRows(rows.filter((_, j) => j !== i))}><Trash2 size={12} />삭제</button>
+              <button type="button" className={`${smallBtn} text-red-600 min-h-11 md:min-h-0`} onClick={() => setRows(rows.filter((_, j) => j !== i))}><Trash2 size={12} />삭제</button>
             </div>
           </div>
         ))}
@@ -258,6 +413,57 @@ export default function PartyDetailEditor({ value, onChange, partyType, usingDef
       </div>
 
       {photoSlot("beforeNotice")}
+
+      {/* 필수 확인 사항 */}
+      <div className="rounded-xl border border-gray-200 p-3 md:p-4 space-y-3" data-testid="notice-editor">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <p className="text-sm font-black text-gray-700">필수 확인 사항 <span className="text-gray-500 font-medium">· 항목이 없으면 상세페이지에서 이 영역이 숨겨집니다</span></p>
+          <button type="button" className={smallBtn}
+            onClick={() => { if (confirm(`필수 확인 사항을 ${PARTY_TYPE_LABELS[partyType]} 기본 문구로 되돌릴까요?`)) set(d => { d.notice = defaultNotice(partyType, hasSessions); }); }}>
+            <RotateCcw size={12} />기본 문구로 되돌리기
+          </button>
+        </div>
+        <div>
+          <div className="flex justify-between mb-1"><label className="text-[13px] md:text-sm font-bold text-gray-500">제목</label><Counter value={notice.title} max={DETAIL_LIMITS.noticeTitle} /></div>
+          <input value={notice.title} maxLength={DETAIL_LIMITS.noticeTitle} placeholder={DEFAULT_NOTICE_TITLE} aria-label="필수 확인 사항 제목"
+            onChange={e => { const v = e.target.value; setNotice(n => { n.title = v; }); }} className={inputCls} />
+        </div>
+        <div>
+          <div className="flex justify-between mb-1"><label className="text-[13px] md:text-sm font-bold text-gray-500">머리말</label><Counter value={notice.intro} max={DETAIL_LIMITS.noticeIntro} /></div>
+          <input value={notice.intro} maxLength={DETAIL_LIMITS.noticeIntro} aria-label="필수 확인 사항 머리말"
+            onChange={e => { const v = e.target.value; setNotice(n => { n.intro = v; }); }} className={inputCls} />
+        </div>
+        {notice.items.map((it, i) => (
+          <div key={i} className="rounded-lg bg-gray-50 border border-gray-200 p-3 space-y-2" data-testid="notice-item-editor">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <span className="text-[13px] md:text-sm font-black text-brand-point-ink">{i + 1}번</span>
+              <div className="flex gap-1">
+                <button type="button" className={smallBtn} disabled={i === 0} aria-label={`필수 확인 사항 ${i + 1}번 위로`} onClick={() => setNotice(n => { n.items = move(n.items, i, i - 1); })}><ArrowUp size={12} />위로</button>
+                <button type="button" className={smallBtn} disabled={i === notice.items.length - 1} aria-label={`필수 확인 사항 ${i + 1}번 아래로`} onClick={() => setNotice(n => { n.items = move(n.items, i, i + 1); })}><ArrowDown size={12} />아래로</button>
+                <button type="button" className={`${smallBtn} text-red-600`} aria-label={`필수 확인 사항 ${i + 1}번 삭제`} onClick={() => setNotice(n => { n.items = n.items.filter((_, j) => j !== i); })}><Trash2 size={12} />삭제</button>
+              </div>
+            </div>
+            {([["title", "제목 *", DETAIL_LIMITS.noticeItemTitle, false], ["desc", "설명 *", DETAIL_LIMITS.noticeItemDesc, true], ["warn", "⚠ 경고(선택)", DETAIL_LIMITS.noticeItemWarn, true]] as const).map(([k, label, max, multi]) => (
+              <div key={k}>
+                <div className="flex justify-between mb-1"><label className="text-[13px] md:text-sm font-bold text-gray-500">{label}</label><Counter value={it[k]} max={max} /></div>
+                {multi ? (
+                  <textarea value={it[k]} maxLength={max} rows={2} aria-label={`필수 확인 사항 ${i + 1}번 ${NOTICE_FIELD[k]}`}
+                    onChange={e => { const v = e.target.value; setNotice(n => { n.items[i][k as keyof PartyNoticeItem] = v; }); }} className={`${inputCls} resize-y`} />
+                ) : (
+                  <input value={it[k]} maxLength={max} aria-label={`필수 확인 사항 ${i + 1}번 ${NOTICE_FIELD[k]}`}
+                    onChange={e => { const v = e.target.value; setNotice(n => { n.items[i][k as keyof PartyNoticeItem] = v; }); }} className={inputCls} />
+                )}
+              </div>
+            ))}
+          </div>
+        ))}
+        <button type="button" disabled={notice.items.length >= DETAIL_LIMITS.noticeItems}
+          onClick={() => setNotice(n => { n.items = [...n.items, { title: "", desc: "", warn: "" }]; })}
+          className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border-2 border-dashed border-gray-300 text-sm font-bold text-gray-600 hover:border-brand-point disabled:opacity-40 min-h-11 md:min-h-0">
+          <Plus size={14} />항목 추가 ({notice.items.length}/{DETAIL_LIMITS.noticeItems})
+        </button>
+      </div>
+
       {photoSlot("afterNotice")}
     </div>
   );
@@ -266,9 +472,18 @@ export default function PartyDetailEditor({ value, onChange, partyType, usingDef
 /** 저장 전 확인 — 문제 목록 (비어 있으면 통과). 서버도 같은 규칙으로 다시 검사한다. */
 export function validateDetail(d: PartyDetail): string[] {
   const errs: string[] = [];
-  d.timeline.steps.forEach((s, i) => {
-    if (!s.title.trim()) errs.push(`진행 안내 단계 ${i + 1}: 제목`);
-    if (!s.desc.trim())  errs.push(`진행 안내 단계 ${i + 1}: 설명`);
+  d.about.sections.forEach((s, i) => {
+    if (!s.heading.trim() && !s.body.trim() && s.images.length === 0) errs.push(`소개 묶음 ${i + 1}: 소제목·본문·사진 중 하나 이상`);
   });
+  if (d.timeline.numbered === false) {
+    d.timeline.steps.forEach((s, i) => { if (!s.title.trim() && !s.desc.trim()) errs.push(`진행 안내 블록 ${i + 1}: 제목이나 문구`); });
+  } else {
+    d.timeline.steps.forEach((s, i) => {
+      if (!s.title.trim()) errs.push(`진행 안내 단계 ${i + 1}: 제목`);
+      if (!s.desc.trim())  errs.push(`진행 안내 단계 ${i + 1}: 설명`);
+    });
+  }
+  d.apply?.steps.forEach((s, i) => { if (!s.title.trim() || !s.desc.trim()) errs.push(`참가 신청 방법 ${i + 1}단계: 제목·설명`); });
+  d.notice?.items.forEach((s, i) => { if (!s.title.trim() || !s.desc.trim()) errs.push(`필수 확인 사항 ${i + 1}번: 제목·설명`); });
   return errs;
 }

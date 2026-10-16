@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef } from "react";
 import { motion, AnimatePresence, Variants } from "framer-motion";
-import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, Users, Calendar, MapPin, X } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight, Calendar, MapPin, X } from "lucide-react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
@@ -10,11 +10,13 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import Header from "./components/Header";
+import HeroSlider from "./components/HeroSlider";
 import Footer from "./components/Footer";
 import ReviewBoard from "./components/ReviewBoard";
-import { PARTICIPANTS, FAQS, partyStockStatus, partyVisibility, categoryLabel, partyTypeOf, PARTY_TYPES, PARTY_TYPE_LABELS, type PartyType } from "./lib/data";
+import { PARTICIPANTS, FAQS, partyStockStatus, withLiveCounts, partyVisibility, categoryLabel, partyTypeOf, PARTY_TYPES, PARTY_TYPE_LABELS, type PartyType } from "./lib/data";
 import { useAuth } from "./context/AuthContext";
 import { useParties } from "./lib/useParties";
+import { daysUntil } from "./lib/refund";
 
 /* ── #schedule(파티 일정) 섹션 전용 — 일정 상태별 표시 스타일 ──────────────
  * 우선순위: 지난 일정 > 마감 > 마감임박 > 모집중 (계산은 컴포넌트의 scheduleStatus 참고) */
@@ -29,6 +31,10 @@ const SCHEDULE_STATUS_STYLE: Record<ScheduleStatus, { label: string; tone: strin
 /** 일정 카드·패널의 파티 종류 배지 — 지난 일정은 다른 표시처럼 흐리게 */
 const scheduleTypeBadgeTone = (isPast: boolean) => (isPast ? "bg-gray-200 text-gray-500" : "bg-gray-900 text-white");
 const SCHEDULE_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+/** 참가자 마키 — 카드 1장이 지나가는 시간(초). 한 바퀴 = 카드 수 × 이 값이라 인원이 늘어도 흐르는 속도가 같다 */
+const PARTICIPANT_SEC_PER_CARD = 2;
+/** 참가자 카드 키워드 칩 — 한 줄에 놓을 개수 */
+const KEYWORDS_PER_ROW = 3;
 /** Date → 로컬 기준 "YYYY-MM-DD" */
 const toYmd = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -176,7 +182,7 @@ function GallerySlider({
 
 export default function SmoothOnePage() {
   const [activeTab, setActiveTab] = useState("일정별");
-  const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(null);
+  const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(null);   // FAQ — 처음엔 모두 접어 둔다
   const [selectedGalleryImage, setSelectedGalleryImage] = useState<string | null>(null);
   const [currentGalleryPage, setCurrentGalleryPage] = useState(0);   // 6장씩 가로 슬라이드 페이지 인덱스
   // 후기 갤러리 — DB 라이브 fetch (관리자가 수정 시 BroadcastChannel + 폴링으로 즉시 반영)
@@ -254,25 +260,34 @@ export default function SmoothOnePage() {
     [liveMembers]
   );
 
-  // 계층형 카테고리: 상위 축(대상별/테마별/지역별) 선택 후 세부 값 선택.
-  // null = 미선택, "all" = 축 선택했지만 세부 미선택(전체 노출).
-  type Axis = "대상별" | "테마별" | "지역별";
-  const [activeAxis, setActiveAxis] = useState<Axis | null>(null);
-  const [filterValue, setFilterValue] = useState<string | null>(null);
-
+  // 4축 필터 [종류 / 대상 / 테마 / 지역] — 축마다 값을 하나씩 골라 겹쳐(AND) 거른다.
+  //   openAxis = 세부 옵션 줄이 열린 축(1개 또는 null), selections = 대상·테마·지역 선택값(없으면 null).
+  //   종류 축의 선택값은 아래 typeTab(?type= 주소 연동)을 그대로 쓴다.
+  type Axis = "type" | "targetGroup" | "theme" | "locationTag";
+  type CategoryAxis = Exclude<Axis, "type">;
+  const AXES: { key: Axis; label: string }[] = [
+    { key: "type", label: "종류" }, { key: "targetGroup", label: "대상" },
+    { key: "theme", label: "테마" }, { key: "locationTag", label: "지역" },
+  ];
+  const CATEGORY_AXES: CategoryAxis[] = ["targetGroup", "theme", "locationTag"];
   const AXIS_OPTIONS: Record<Axis, readonly string[]> = {
-    "대상별": ["싱글", "돌싱"],
-    "테마별": ["티타임", "와인파티", "사케파티", "쿠킹클래스"],
+    type: PARTY_TYPES,
+    targetGroup: ["싱글", "돌싱"],
+    theme: ["티타임", "와인파티", "사케파티", "쿠킹클래스"],
     // '기타' 는 필터 버튼에서 노출 제외 — 기존 '기타' 파티는 전체보기에 그대로 노출됨
     // 표시 순서만: 인천 ↔ 용인 교체 (DB 값/매칭 로직 무영향)
-    "지역별": ["서울", "성남", "수원", "용인", "인천"],
+    locationTag: ["서울", "성남", "수원", "용인", "인천"],
   };
-  const AXIS_FIELD: Record<Axis, "targetGroup" | "theme" | "locationTag"> = {
-    "대상별": "targetGroup", "테마별": "theme", "지역별": "locationTag",
-  };
+  // 화면 표시 라벨 — 종류는 매칭파티/솔로파티, 나머지는 categoryLabel (테마 "쿠킹클래스" → "세션")
+  const optionLabel = (axis: Axis, value: string) =>
+    axis === "type" ? PARTY_TYPE_LABELS[value as PartyType] : categoryLabel(value);
+  const [openAxis, setOpenAxis] = useState<Axis | null>(null);
+  // 지금 열린 축 — 닫히는 애니메이션(0.22초) 동안 화면에 남은 옵션 줄의 클릭을 걸러내는 데 쓴다 (pickOption)
+  const openAxisRef = useRef<Axis | null>(null);
+  useEffect(() => { openAxisRef.current = openAxis; }, [openAxis]);
+  const [selections, setSelections] = useState<Record<CategoryAxis, string | null>>({ targetGroup: null, theme: null, locationTag: null });
 
-  // 파티 종류 탭 [전체 / 매칭파티 / 솔로파티] — 기존 대상·테마·지역 필터와 둘 다 만족하는 파티만 보여준다.
-  //   /?type=solo#apply 로 들어오면 솔로파티 탭이 선택된 채 열리고, 탭을 바꾸면 주소만 바꾼다(history.replaceState).
+  // 종류 축 선택값 — /?type=solo#apply 로 들어오면 솔로파티가 선택된 채 열리고, 바꾸면 주소만 바꾼다(history.replaceState).
   const [typeTab, setTypeTab] = useState<"all" | PartyType>("all");
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get("type");
@@ -287,16 +302,27 @@ export default function SmoothOnePage() {
     } catch { /* 주소 갱신 실패는 무시 */ }
   };
 
-  const pickAxis = (axis: Axis) => {
-    if (axis === activeAxis) {
-      // 같은 축 다시 클릭 → 전체로 복귀
-      setActiveAxis(null);
-      setFilterValue(null);
-    } else {
-      setActiveAxis(axis);
-      setFilterValue(null); // 축 변경 시 세부 값 초기화
-    }
+  const selectedOf = (axis: Axis): string | null =>
+    axis === "type" ? (typeTab === "all" ? null : typeTab) : selections[axis];
+  // 축 버튼 = 그 축의 옵션 줄 열기/닫기 (다른 축 선택값은 유지)
+  const toggleAxis = (axis: Axis) => setOpenAxis(cur => (cur === axis ? null : axis));
+  // 옵션 클릭 = 그 축 값 선택(null = "전체", 선택 해제) + 옵션 줄 닫기
+  const pickOption = (axis: Axis, value: string | null) => {
+    // 닫히는 중인(사라지는) 옵션 줄은 반응하지 않는다 — 지금 열린 축의 줄만 선택 가능
+    if (openAxisRef.current !== axis) return;
+    if (axis === "type") pickType((value as PartyType | null) ?? "all");
+    else setSelections(s => ({ ...s, [axis]: value }));
+    setOpenAxis(null);
   };
+  const resetFilters = () => {
+    setSelections({ targetGroup: null, theme: null, locationTag: null });
+    pickType("all");
+    setOpenAxis(null);
+  };
+  const selectedLabels = AXES.flatMap(({ key }) => {
+    const v = selectedOf(key);
+    return v ? [optionLabel(key, v)] : [];
+  });
 
   // SSR/CSR 시간대 차이로 인한 hydration mismatch 방지 — now 는 mount 후에만 세팅,
   // 1분마다 갱신해 행사 종료 시점에 카드 UI 가 자연스럽게 전환되게 함
@@ -342,10 +368,10 @@ export default function SmoothOnePage() {
     return () => mq.removeEventListener("change", update);
   }, []);
 
-  // 카테고리 탭(상위 축/세부 값) 전환 시 더보기 상태 초기화 → 새 탭은 항상 접힌 채 처음부터 노출
+  // 필터(종류·대상·테마·지역) 변경 시 더보기 상태 초기화 → 새 결과는 항상 접힌 채 처음부터 노출
   useEffect(() => {
     setApplyMoreOpen(false);
-  }, [activeAxis, filterValue, typeTab]);
+  }, [selections, typeTab]);
 
   // 모바일 일정 섹션 — 마운트 1회, 현재 날짜 기준 연/월 초기화
   useEffect(() => {
@@ -355,10 +381,10 @@ export default function SmoothOnePage() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sortedParties = useMemo(() => {
+    // 선택된 모든 축을 동시에 만족(AND)하는 파티만
     const filtered = [...PARTIES].filter(p => {
       if (typeTab !== "all" && partyTypeOf(p) !== typeTab) return false;
-      if (!activeAxis || !filterValue) return true;
-      return p[AXIS_FIELD[activeAxis]] === filterValue;
+      return CATEGORY_AXES.every(ax => !selections[ax] || p[ax] === selections[ax]);
     });
 
     // mount 전(SSR/초기 hydration) — 시간 의존 필터/정렬 생략, 기존 동작 유지
@@ -373,7 +399,7 @@ export default function SmoothOnePage() {
         return a.calendarDate.localeCompare(b.calendarDate);     // 그룹 내부는 기존 날짜 오름차순 유지
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeAxis, filterValue, typeTab, PARTIES, now]);
+  }, [selections, typeTab, PARTIES, now]);
 
   // 신청 섹션 렌더용 slice — 위 sortedParties(필터/정렬 완료)를 가로채 노출 개수만 제한
   const applyLimit = isDesktop ? APPLY_LIMIT_DESKTOP : APPLY_LIMIT_MOBILE;
@@ -382,21 +408,20 @@ export default function SmoothOnePage() {
 
   // #schedule 전용 — 파티별 일정 상태(지난 일정 > 마감 > 마감임박 > 모집중)와 남은 자리.
   // 남은 자리는 신청 카드와 같은 실시간 결제 인원(partyCounts, 없으면 0)으로 계산.
+  // 마감·마감임박·남은 자리는 partyStockStatus 결과 그대로 (참가 구성 파티는 회차 기준, 명세 8-3).
   // now 가 없으면(마운트 전) 상태 계산을 건너뜀 → 하이드레이션 안전 (기존 방식과 동일).
   const scheduleStatus = useMemo(() => {
-    const map: Record<string, { status: ScheduleStatus | null; maleRemaining: number; femaleRemaining: number }> = {};
+    const map: Record<string, { status: ScheduleStatus | null; maleRemaining: number; femaleRemaining: number; hasOptions: boolean; remainingLabel: string }> = {};
     PARTIES.forEach(p => {
-      const live = partyCounts[p.id];
-      const stock = partyStockStatus({ ...p, maleBooked: live?.male ?? 0, femaleBooked: live?.female ?? 0 });
+      const stock = partyStockStatus(withLiveCounts(p, partyCounts[p.id]));
       let status: ScheduleStatus | null = null;
       if (now) {
-        const left = stock.maleRemaining + stock.femaleRemaining;
         if (partyVisibility(p, now) !== "active") status = "past";
         else if (stock.allFull) status = "full";
-        else if (left >= 1 && left <= 3) status = "soon";
+        else if (stock.nearlyFull) status = "soon";
         else status = "open";
       }
-      map[p.id] = { status, maleRemaining: stock.maleRemaining, femaleRemaining: stock.femaleRemaining };
+      map[p.id] = { status, maleRemaining: stock.maleRemaining, femaleRemaining: stock.femaleRemaining, hasOptions: stock.hasOptions, remainingLabel: stock.remainingLabel };
     });
     return map;
   }, [PARTIES, partyCounts, now]);
@@ -422,7 +447,10 @@ export default function SmoothOnePage() {
         status: info?.status ?? null,
         maleRemaining: info?.maleRemaining ?? 0,
         femaleRemaining: info?.femaleRemaining ?? 0,
+        hasOptions: info?.hasOptions ?? false,          // 참가 구성 파티 — 남은 자리를 회차별로
+        remainingLabel: info?.remainingLabel ?? "",
         time: m ? `${m[1].padStart(2, "0")}:${m[2]}` : "",
+        targetGroup: p.targetGroup ?? "",
         theme: p.theme ?? "",
         locationTag: p.locationTag ?? "",
         partyType: partyTypeOf(p),
@@ -489,7 +517,7 @@ export default function SmoothOnePage() {
     else mobileMonthGroups.push([ymd, [e]]);
   });
 
-  // #schedule 모바일 카드 — 기존 디자인 유지 + 오른쪽 위 상태 배지 + "남 N · 여 N 남음" 한 줄.
+  // #schedule 모바일 카드 — 기존 디자인 유지 + 오른쪽 위 상태·대상(싱글/돌싱) 배지 + "남 N · 여 N 남음" 한 줄.
   // 지난 일정은 연한 회색, 누르면 기존처럼 /party/{id} 로 이동.
   const renderScheduleCard = (event: ScheduleEvent) => {
     const party = PARTIES.find(p => p.id === event.id);
@@ -524,15 +552,24 @@ export default function SmoothOnePage() {
               </span>
               {event.title}
             </div>
-            {status && (
-              <span className={`flex-shrink-0 text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${SCHEDULE_STATUS_STYLE[status].tone}`}>
-                {SCHEDULE_STATUS_STYLE[status].label}
-              </span>
+            {(status || xp.targetGroup) && (
+              <div className="flex-shrink-0 flex flex-col items-end gap-1">
+                {status && (
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${SCHEDULE_STATUS_STYLE[status].tone}`}>
+                    {SCHEDULE_STATUS_STYLE[status].label}
+                  </span>
+                )}
+                {xp.targetGroup && (
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap bg-gray-100 ${isPast ? "text-gray-400" : "text-gray-600"}`}>
+                    {xp.targetGroup}
+                  </span>
+                )}
+              </div>
             )}
           </div>
           <div className={`text-sm ${isPast ? "text-gray-400" : "text-gray-500"}`}>{party?.dateString}</div>
           <div className={`text-xs mt-0.5 truncate ${isPast ? "text-gray-400" : "text-gray-500"}`}>{party?.location} · {party?.target}</div>
-          <div className={`text-xs mt-1 font-bold ${isPast ? "text-gray-400" : "text-gray-600"}`}>남 {xp.maleRemaining} · 여 {xp.femaleRemaining} 남음</div>
+          <div className={`text-xs mt-1 font-bold break-keep ${isPast ? "text-gray-400" : "text-gray-600"}`}>{xp.hasOptions ? `${xp.remainingLabel} 남음` : `남 ${xp.maleRemaining} · 여 ${xp.femaleRemaining} 남음`}</div>
         </div>
         <ArrowRight size={16} className={`flex-shrink-0 ${isPast ? "text-gray-400" : "text-gray-500"}`} />
       </button>
@@ -551,45 +588,8 @@ export default function SmoothOnePage() {
       <Header />
       
       <main className="flex-1">
-        {/* Hero Section — 모바일/PC 통합 풀블리드 오버레이 구조 */}
-        <section className="relative flex flex-col bg-brand-black overflow-hidden min-h-[70vh] md:h-[88vh] md:min-h-[700px]">
-
-          {/* 풀블리드 배경 이미지 — 모바일/PC 공통, object-cover 로 잘림 허용 */}
-          <Image
-            src="/images/hero-bg.webp"
-            alt=""
-            fill
-            priority
-            className="object-cover object-[center_30%] pointer-events-none"
-          />
-
-          {/* Overlay — 모바일: 균일 다크, PC: 하단으로 진해지는 그라디언트 */}
-          <div className="absolute inset-0 bg-black/40 md:hidden" />
-          <div className="hidden md:block absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-black/20" />
-
-          {/* Content — 두 환경 모두 하단 정렬 (mt-auto), fade-in 유지 */}
-          <div className="relative z-10 mt-auto max-w-7xl mx-auto px-5 md:px-10 w-full text-white pb-12 md:pb-24 md:pt-[160px]">
-            <motion.div initial="hidden" animate="visible" variants={fadeInUp}>
-              <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black tracking-tighter leading-[1.15] mb-4 md:mb-10 drop-shadow-2xl">
-                세상을 울리는<br />
-                새로운 연결, <span className="text-brand-point">어울림</span>
-              </h1>
-              <p className="text-sm sm:text-lg md:text-2xl text-white/85 font-semibold max-w-3xl leading-relaxed mb-8 md:mb-14 flex flex-col gap-1 md:gap-2 drop-shadow-lg">
-                <span>숫자와 스펙으로 재단되는 관계를 넘어,</span>
-                <span>모든 인연과 깊게 마주하는 로테이션 매칭파티를 경험하세요.</span>
-              </p>
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  document.getElementById('apply')?.scrollIntoView({ behavior: 'smooth' });
-                }}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-3 bg-brand-black text-white px-7 py-4 md:px-10 md:py-6 rounded-full text-base md:text-lg font-bold hover:bg-brand-point hover:text-black hover:-translate-y-1 transition-all shadow-xl hover:shadow-brand-point/30 cursor-pointer border border-white/20"
-              >
-                어울림 매칭파티 신청하기 <ArrowRight size={20} />
-              </button>
-            </motion.div>
-          </div>
-        </section>
+        {/* Hero Section — 롤링 히어로 (1번 브랜드 + 모집중 파티 최대 3장, app/components/HeroSlider.tsx) */}
+        <HeroSlider />
 
         {/* 참여하기 (Apply Cards) Section */}
         <section id="apply" className="py-16 md:py-32 px-4 md:px-6 bg-white rounded-t-3xl md:rounded-t-[3rem] shadow-[0_-20px_40px_rgba(0,0,0,0.02)]">
@@ -605,55 +605,42 @@ export default function SmoothOnePage() {
                 seed → live 데이터 swap 깜빡임 방지. 컨테이너 레이아웃은 유지되어 layout shift 없음. */}
             <div className={`transition-opacity duration-500 ease-out ${contentReady ? "opacity-100" : "opacity-0"}`}>
 
-            {/* 파티 종류 탭 — 밑줄형 텍스트 탭. 선택: 검정 굵은 글씨 + 터쿼이즈 밑줄 2px / 미선택: 회색. 모바일 한 줄 */}
-            <div className="flex justify-center gap-6 md:gap-10 mb-6 md:mb-8" role="tablist" aria-label="파티 종류">
-              {(["all", ...PARTY_TYPES] as const).map(t => {
-                const isActive = typeTab === t;
-                return (
-                  <button
-                    key={t}
-                    type="button"
-                    role="tab"
-                    aria-selected={isActive}
-                    onClick={() => pickType(t)}
-                    className={`pt-3 pb-1.5 text-base md:text-xl whitespace-nowrap border-b-2 transition-colors ${
-                      isActive ? "text-brand-black font-black border-brand-point" : "text-gray-500 font-bold border-transparent hover:text-gray-700"
-                    }`}
-                  >
-                    {t === "all" ? "전체" : PARTY_TYPE_LABELS[t]}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* 계층형 카테고리 — 중앙 정렬, 상위 축 클릭 → 세부 옵션 전개 */}
+            {/* 4축 필터 [종류 / 대상 / 테마 / 지역] — 축 버튼 = 옵션 줄 열기/닫기, 옵션 = 그 축 값 선택(AND)
+                모바일은 4칸 그리드 한 줄(320px 에서도 "솔로파티 ▾"가 한 줄), md 이상은 가운데 정렬 */}
             <div className="mb-10 md:mb-16 border-b border-gray-100 pb-6 md:pb-8">
-              {/* 1단계: 상위 축 (대상별 / 테마별 / 지역별) — 중앙 정렬 */}
-              <div className="flex justify-center flex-wrap gap-2 md:gap-3">
-                {(["대상별", "테마별", "지역별"] as const).map(axis => {
-                  const isActive = activeAxis === axis;
+              <div className="grid grid-cols-4 gap-1.5 md:flex md:justify-center md:gap-3">
+                {AXES.map(({ key, label }) => {
+                  const isOpen = openAxis === key;
+                  const sel = selectedOf(key);
+                  const text = sel ? optionLabel(key, sel) : label;
                   return (
                     <button
-                      key={axis}
+                      key={key}
                       type="button"
-                      onClick={() => pickAxis(axis)}
-                      className={`px-5 md:px-7 py-2.5 md:py-3 text-base md:text-lg font-black rounded-full transition-all whitespace-nowrap ${
-                        isActive
-                          ? "bg-brand-point text-black shadow-md"
-                          : "bg-gray-50 text-gray-500 hover:bg-gray-100 border border-gray-200"
+                      onClick={() => toggleAxis(key)}
+                      aria-expanded={isOpen}
+                      aria-controls="apply-filter-options"
+                      aria-label={sel ? `${label}: ${text}` : label}
+                      className={`py-2 px-1 md:px-7 md:py-3 text-[12px] min-[360px]:text-[13px] md:text-lg font-black rounded-full transition-all whitespace-nowrap truncate ${
+                        isOpen
+                          ? "bg-brand-point text-black shadow-md border-2 border-brand-point"
+                          : sel
+                            ? "bg-white text-brand-black border-2 border-brand-point"
+                            : "bg-gray-50 text-gray-500 hover:bg-gray-100 border border-gray-200"
                       }`}
                     >
-                      {axis}
+                      {text} <span aria-hidden="true">{isOpen ? "▴" : "▾"}</span>
                     </button>
                   );
                 })}
               </div>
 
-              {/* 2단계: 세부 카테고리 (active axis가 있을 때만 노출) — 중앙 정렬, 부드러운 reveal */}
+              {/* 세부 옵션 줄 (열린 축이 있을 때만) — 맨 앞 "전체" = 그 축 선택 해제. 고르면 줄이 닫힌다 */}
               <AnimatePresence initial={false}>
-                {activeAxis && (
+                {openAxis && (
                   <motion.div
-                    key={activeAxis}
+                    key={openAxis}
+                    id="apply-filter-options"
                     initial={{ opacity: 0, height: 0, y: -6 }}
                     animate={{ opacity: 1, height: "auto", y: 0 }}
                     exit={{ opacity: 0, height: 0, y: -6 }}
@@ -663,41 +650,52 @@ export default function SmoothOnePage() {
                     <div className="flex justify-center flex-wrap gap-2 md:gap-2.5 mt-5 md:mt-6">
                       <button
                         type="button"
-                        onClick={() => setFilterValue(null)}
+                        onClick={() => pickOption(openAxis, null)}
                         className={`px-3.5 md:px-5 py-1.5 md:py-2 text-xs md:text-sm font-bold rounded-full transition-all ${
-                          !filterValue
+                          !selectedOf(openAxis)
                             ? "bg-brand-point/10 text-brand-point-ink border border-brand-point/30"
                             : "bg-white text-gray-500 hover:bg-gray-50 border border-gray-200"
                         }`}
                       >
                         전체
                       </button>
-                      {AXIS_OPTIONS[activeAxis].map(opt => {
-                        const isSelected = filterValue === opt;
+                      {AXIS_OPTIONS[openAxis].map(opt => {
+                        const isSelected = selectedOf(openAxis) === opt;
                         return (
                           <button
                             key={opt}
                             type="button"
-                            onClick={() => setFilterValue(opt)}
+                            onClick={() => pickOption(openAxis, opt)}
                             className={`px-3.5 md:px-5 py-1.5 md:py-2 text-xs md:text-sm font-bold rounded-full transition-all ${
                               isSelected
                                 ? "bg-brand-point text-black shadow-md"
                                 : "bg-white text-gray-500 hover:bg-gray-50 border border-gray-200"
                             }`}
                           >
-                            {categoryLabel(opt)}
+                            {optionLabel(openAxis, opt)}
                           </button>
                         );
                       })}
                     </div>
-                    {filterValue && (
-                      <p className="text-center text-xs md:text-sm text-gray-500 font-medium mt-3">
-                        {activeAxis} · <span className="text-brand-point-ink font-bold">{categoryLabel(filterValue)}</span> · {sortedParties.length}건
-                      </p>
-                    )}
                   </motion.div>
                 )}
               </AnimatePresence>
+
+              {/* 요약 줄 — 선택이 있을 때만: "솔로파티 · 싱글 · 와인파티 · N건  초기화" */}
+              {selectedLabels.length > 0 && (
+                <div className="flex flex-wrap justify-center items-baseline gap-x-2 gap-y-1 mt-4 text-xs md:text-sm text-gray-500 font-medium">
+                  <span>
+                    <span className="text-brand-point-ink font-bold">{selectedLabels.join(" · ")}</span> · {sortedParties.length}건
+                  </span>
+                  <button
+                    type="button"
+                    onClick={resetFilters}
+                    className="py-3 -my-3 px-1 text-gray-500 font-bold underline underline-offset-2 hover:text-brand-black"
+                  >
+                    초기화
+                  </button>
+                </div>
+              )}
             </div>
 
             {sortedParties.length === 0 ? (
@@ -706,19 +704,21 @@ export default function SmoothOnePage() {
                 <p className="text-xs md:text-sm text-gray-500 mt-2">다른 카테고리를 선택하거나 조건을 초기화해주세요.</p>
               </div>
             ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-8">
+              {/* 카드 목록 — 모바일 1열(간격 20px), md 이상 2열(간격 32px) */}
               <AnimatePresence mode="popLayout">
                 {visibleParties.map(card => {
                   // 실시간 결제완료 인원만 노출 — 카운트 없으면 0으로 강제 (시드/테스트 데이터 무시)
-                  const live = partyCounts[card.id];
-                  const liveCard = {
-                    ...card,
-                    maleBooked:   live?.male   ?? 0,
-                    femaleBooked: live?.female ?? 0,
-                  };
-                  const stock = partyStockStatus(liveCard);
-                  // 행사 일시 경과 → 모집 종료 카드 UI (배지/버튼 색·문구만 교체, 링크 동작은 유지)
+                  // 모집 마감은 partyStockStatus 결과 (참가 구성 파티는 모든 항목이 마감일 때, 명세 8-3)
+                  const stock = partyStockStatus(withLiveCounts(card, partyCounts[card.id]));
+                  // 행사 일시 경과 → 모집 종료 카드 UI (배너 흐리게, [모집 종료된 파티] 표시). 카드는 다른 카드처럼 상세페이지로 이동
                   const isEnded = now ? partyVisibility(card, now) === "ended" : false;
+                  // 모집 중 = 종료 전이고 마감 아님 — D-day 배지·솔로파티 사이키 테두리는 이때만
+                  const recruiting = !isEnded && !stock.allFull;
+                  const days = now && recruiting ? daysUntil(card.calendarDate, now) : null;
+                  const dDay = days === null || days < 0 ? null : days === 0 ? "D-DAY" : `D-${days}`;
+                  const psyche = recruiting && partyTypeOf(card) === "solo";
+                  const badgeCls = "text-[11px] md:text-xs font-bold leading-none px-2.5 py-1.5 md:px-[11px] md:py-[7px] rounded-full whitespace-nowrap";
                   return (
                   <motion.div
                     key={card.id}
@@ -727,74 +727,86 @@ export default function SmoothOnePage() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -12 }}
                     transition={{ duration: 0.35, type: "spring", stiffness: 300, damping: 28 }}
-                    className="bg-brand-lightgray border border-gray-100 p-5 md:p-8 rounded-2xl md:rounded-3xl hover:border-brand-point transition-all flex flex-col h-full group relative overflow-hidden"
+                    className="h-full"
                   >
-                    {/* 매칭파티 카드 상단 이미지 — 관리자페이지의 "대표 이미지"(imageUrl)를 그대로 노출, 미등록 파티는 공통 디폴트로 대체.
-                         카드 좌/우/상단 끝까지 꽉 차게 — 폭을 calc()로 명시해 카드 패딩만큼 정확히 확장(음수 마진만으로는
-                         우측이 살짝 안 맞는 경우가 있어 폭 자체를 계산). 이미지 자체는 라운드 처리하지 않고
-                         부모의 overflow-hidden + rounded-2xl/3xl 에 의해 상단 모서리만 자연스럽게 잘려 보임.
-                         싱글/돌싱/모집마감/모집종료 배지는 absolute 로 이미지 위에 그대로 겹쳐서 뜬다.
-                         max-w-none 필수 — Tailwind preflight 의 'img{max-width:100%}' 가 없으면 calc() 확장폭을 다시 100%로 깎아버림 */}
-                    <img
-                      src={card.imageUrl || "/images/party_card_default_banner.jpg"}
-                      alt=""
-                      className="block max-w-none w-[calc(100%+2.5rem)] md:w-[calc(100%+4rem)] h-20 md:h-24 object-cover -ml-5 -mt-5 md:-ml-8 md:-mt-8 mb-4 md:mb-5"
-                    />
-                    {/* 좌측 상단 — 파티 종류 배지 (기존 배지와 같은 크기, 검정 배경·흰 글자, 모집 종료 카드에도 표시) */}
-                    <div className="absolute top-4 left-4 md:top-5 md:left-5 z-10">
-                      <span className="bg-gray-900 text-white text-xs font-black px-2.5 py-1 rounded-full shadow-md whitespace-nowrap">
-                        {PARTY_TYPE_LABELS[partyTypeOf(card)]}
-                      </span>
-                    </div>
-                    {/* 우측 상단 배지 영역 — 종료 시 [모집종료] 단일 배지, 아니면 대상(싱글/돌싱) + 모집마감 스택 */}
-                    <div className="absolute top-4 right-4 md:top-5 md:right-5 flex flex-col items-end gap-1.5 z-10">
-                      {isEnded ? (
-                        <span className="bg-[#f8d8dd] text-danger text-xs font-black px-2.5 py-1 rounded-full shadow-md whitespace-nowrap tracking-tight">
-                          모집종료
+                    {/* 카드 전체가 상세페이지 링크(모집 중·마감·종료 모두 같은 URL). 배경은 투명(솔로파티 사이키 글로우가 카드 뒤에 깔림), 배너·본문에 각각 배경.
+                         hover·키보드 포커스: 들어올림은 md 이상만, 청록 강조는 모집 종료 카드 제외 — 전환 시간은 globals.css .party-card.
+                         motion.div 가 transform 을 쓰므로 안쪽 요소에 준다 */}
+                    <Link
+                      href={`/party/${card.id}`}
+                      className={`party-card group h-full flex flex-col rounded-2xl md:rounded-[20px] border border-[#E6E8EC] shadow-[0_2px_8px_rgba(0,0,0,0.04)] md:hover:-translate-y-1 md:hover:shadow-[0_10px_24px_rgba(0,0,0,0.08)] md:focus-visible:-translate-y-1 md:focus-visible:shadow-[0_10px_24px_rgba(0,0,0,0.08)] ${
+                        isEnded ? "" : "hover:border-brand-point focus-visible:border-brand-point"
+                      } ${psyche ? "card--psyche" : ""}`}
+                    >
+                      {/* 배너 9:2 — 관리자 "대표 이미지"(imageUrl), 없으면 공통 기본 배너. 배너에만 overflow-hidden + 상단 radius */}
+                      <div className="relative aspect-[9/2] overflow-hidden rounded-t-[15px] md:rounded-t-[19px] bg-[#F4F5F7]">
+                        <img
+                          src={card.imageUrl || "/images/party_card_default_banner.jpg"}
+                          alt=""
+                          className={`absolute inset-0 w-full h-full object-cover ${isEnded ? "grayscale-60 opacity-70 transition-[filter,opacity] duration-[250ms] group-hover:grayscale-30 group-hover:opacity-85 group-focus-visible:grayscale-30 group-focus-visible:opacity-85" : ""}`}
+                        />
+                        {/* 배지 대비용 오버레이 */}
+                        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.25)_0%,rgba(0,0,0,0)_45%,rgba(0,0,0,0.2)_100%)]" />
+                        {/* 좌상단 — 파티 종류 */}
+                        <span className="absolute top-2.5 left-2.5 md:top-3.5 md:left-3.5 z-10 bg-[rgba(17,17,17,0.85)] text-white text-[11px] md:text-xs font-bold leading-none px-2.5 py-1.5 md:px-[11px] md:py-[7px] rounded-full whitespace-nowrap">
+                          {PARTY_TYPE_LABELS[partyTypeOf(card)]}
                         </span>
-                      ) : (
-                        <>
-                          {(card.targetGroup === "싱글" || card.targetGroup === "돌싱") && (
-                            <span className={`${card.targetGroup === "돌싱" ? "bg-[#b4a7d6]" : "bg-brand-point"} text-black text-xs font-black px-2.5 py-1 rounded-full shadow-md whitespace-nowrap`}>
-                              {card.targetGroup}
-                            </span>
+                        {/* 우상단 — D-day(모집 중일 때만) → 대상(싱글/돌싱)·모집 마감 / 종료 시 [모집종료] 하나 */}
+                        <div className="absolute top-2.5 right-2.5 md:top-3.5 md:right-3.5 z-10 flex items-center justify-end gap-1.5">
+                          {isEnded ? (
+                            <span className={`${badgeCls} bg-[#FDE2E4] text-[#C81E33]`}>모집종료</span>
+                          ) : (
+                            <>
+                              {dDay && <span className={`${badgeCls} bg-white text-[#D61F45] tabular-nums`}>{dDay}</span>}
+                              {card.targetGroup === "싱글" && <span className={`${badgeCls} bg-[#3EE0C5] text-[#0B3B34]`}>싱글</span>}
+                              {card.targetGroup === "돌싱" && <span className={`${badgeCls} bg-[#b4a7d6] text-black`}>돌싱</span>}
+                              {stock.allFull && <span className={`${badgeCls} bg-gray-900 text-white`}>모집 마감</span>}
+                            </>
                           )}
-                          {stock.allFull && (
-                            <span className="bg-gray-900 text-white text-xs font-black px-2.5 py-1 rounded-full shadow-md whitespace-nowrap">
-                              모집 마감
-                            </span>
-                          )}
-                        </>
-                      )}
-                    </div>
-                    {/* 제목 → 내용(소개) → 일시 → 장소 순서, 전체적으로 폰트 축소 — 우측 상단 배지가 가리지 않도록 우측 패딩 확보 */}
-                    <h3 className="text-base md:text-lg font-bold mb-1 group-hover:text-brand-point-ink transition-colors leading-snug pr-16 md:pr-20">{card.title}</h3>
-                    {card.description && (
-                      <p className="text-xs md:text-sm text-gray-500 font-medium mb-2.5 md:mb-3 line-clamp-2 break-keep">{card.description}</p>
-                    )}
-                    <div className="space-y-1.5 mb-4 md:mb-5 text-gray-600 font-medium flex-1 text-xs md:text-sm">
-                      <div className="flex items-center gap-2"><Calendar size={13} className="text-gray-500 group-hover:text-brand-point-ink transition-colors flex-shrink-0" /> <span className="font-bold">{card.dateString}</span></div>
-                      <div className="flex items-center gap-2"><MapPin size={13} className="text-gray-500 group-hover:text-brand-point-ink transition-colors flex-shrink-0" /> {card.location}</div>
-                    </div>
+                        </div>
+                      </div>
 
-                    {/* 대상 + 신청 버튼 — 한 줄에 좌(대상) · 우(버튼) 배치, 신청하기와 동일한 가로 레이아웃 유지 */}
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs md:text-sm text-gray-500 font-medium truncate min-w-0">{card.target}</span>
+                      {/* 본문 — 제목 → 소개 → 일시·장소 → (구분선) 참가조건 + 버튼 */}
+                      <div className="flex-1 flex flex-col bg-[#F4F5F7] rounded-b-[15px] md:rounded-b-[19px] px-4 pt-[18px] pb-4 md:px-7 md:pt-6 md:pb-[22px]">
+                        <h3 className={`text-lg md:text-xl font-bold leading-snug truncate ${isEnded ? "text-[#6B7280]" : "text-[#111]"}`}>{card.title}</h3>
+                        {card.description && (
+                          <p className="mt-1 text-[13px] md:text-sm text-[#6B7280] truncate">{card.description}</p>
+                        )}
+                        <div className="mt-3.5 md:mt-4 space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <Calendar size={16} className="text-[#9CA3AF] flex-shrink-0" />
+                            <span className="text-sm md:text-[15px] font-bold text-[#111]">{card.dateString}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <MapPin size={16} className="text-[#9CA3AF] flex-shrink-0" />
+                            <span className="min-w-0 text-[13px] md:text-sm leading-[1.45] text-[#4B5563] line-clamp-2 break-keep">{card.location}</span>
+                          </div>
+                        </div>
 
-                      {/* 종료 카드는 파스텔 빨강(#f8d8dd) 버튼, disabled/pointer-events 적용 X (링크 정상 동작) */}
-                      <Link
-                        href={`/party/${card.id}`}
-                        className={`relative flex-shrink-0 text-center font-bold px-4 py-2 text-xs md:text-sm rounded-xl transition-colors duration-300 whitespace-nowrap before:absolute before:inset-x-0 before:-inset-y-1.5 ${
-                          isEnded
-                            ? "bg-[#f8d8dd] text-danger hover:bg-[#f4c5cd]"
-                            : stock.allFull
-                              ? "bg-gray-200 text-gray-500 hover:bg-gray-300"
-                              : "bg-brand-black text-white hover:bg-brand-point hover:text-black"
-                        }`}
-                      >
-                        {isEnded ? "모집 종료된 파티" : stock.allFull ? "모집 마감 · 상세보기" : "신청하기"}
-                      </Link>
-                    </div>
+                        {/* 하단 — 참가조건(왼쪽) · 버튼(오른쪽), 위 구분선 */}
+                        <div className="mt-auto pt-3.5 md:pt-4">
+                          <div className="flex items-center justify-between gap-3 pt-3.5 md:pt-4 border-t border-[#E6E8EC]">
+                            <span className="min-w-0 text-xs md:text-[13px] text-[#6B7280] break-keep md:truncate">{card.target}</span>
+                            {/* 버튼 모양 표시 — 카드 전체가 링크라서 안쪽은 링크·버튼이 아닌 span. 색은 카드 hover·포커스 때 바뀜 */}
+                            {isEnded ? (
+                              <span className="flex-shrink-0 inline-flex items-center h-10 px-[18px] rounded-[10px] bg-[#FDE2E4] text-[#C81E33] text-sm font-bold whitespace-nowrap">
+                                모집 종료된 파티
+                              </span>
+                            ) : (
+                              <span
+                                className={`apply-btn relative flex-shrink-0 inline-flex items-center h-10 px-[18px] rounded-[10px] text-sm font-bold whitespace-nowrap transition-colors duration-300 ${
+                                  stock.allFull
+                                    ? "bg-gray-200 text-gray-500 group-hover:bg-gray-300 group-focus-visible:bg-gray-300"
+                                    : "bg-[#111] text-white group-hover:bg-brand-point group-focus-visible:bg-brand-point"
+                                }`}
+                              >
+                                {stock.allFull ? "모집 마감 · 상세보기" : "신청하기"}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
                   </motion.div>
                   );
                 })}
@@ -1117,7 +1129,7 @@ export default function SmoothOnePage() {
                                     {SCHEDULE_STATUS_STYLE[status].label}
                                   </span>
                                 )}
-                                {[xp.theme && categoryLabel(xp.theme), xp.locationTag].filter(Boolean).map(tag => (
+                                {[xp.targetGroup, xp.theme && categoryLabel(xp.theme), xp.locationTag].filter(Boolean).map(tag => (
                                   <span key={tag as string} className={`text-xs font-bold px-2 py-0.5 rounded-full bg-gray-100 ${isPast ? "text-gray-400" : "text-gray-600"}`}>
                                     {tag}
                                   </span>
@@ -1131,7 +1143,7 @@ export default function SmoothOnePage() {
                                 {xp.location} · {xp.target}
                               </div>
                               <div className={`text-sm mt-1 font-bold ${isPast ? "text-gray-400" : "text-gray-700"}`}>
-                                남 {xp.maleRemaining}석 · 여 {xp.femaleRemaining}석 남음
+                                {xp.hasOptions ? `${xp.remainingLabel} 남음` : `남 ${xp.maleRemaining}석 · 여 ${xp.femaleRemaining}석 남음`}
                               </div>
                             </div>
                             <ArrowRight size={18} className={`flex-shrink-0 transition-transform group-hover:translate-x-0.5 ${isPast ? "text-gray-400" : "text-gray-500"}`} />
@@ -1146,90 +1158,192 @@ export default function SmoothOnePage() {
           </div>
         </section>
 
-        {/* Participants List Section (Infinite Carousel) */}
-        <section id="participants" className="py-16 md:py-32 bg-brand-lightgray overflow-hidden">
-          <div className="max-w-7xl mx-auto px-4 md:px-6 mb-10 md:mb-16">
+        {/* Participants List Section — 한 줄 마키(app/globals.css .participants-track / .participants-row) */}
+        <section id="participants" className="py-16 md:py-24 bg-brand-lightgray overflow-hidden">
+          <div className="max-w-7xl mx-auto px-4 md:px-6 mb-8 md:mb-12">
             <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="text-center">
-              <h2 className="text-3xl md:text-6xl font-bold mb-4 md:mb-6 tracking-tight">어떤 사람들이 오나요?</h2>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E1F5EE] px-2.5 py-1 text-xs text-brand-point-ink mb-3 md:mb-4">
+                <span className="w-1.5 h-1.5 rounded-full bg-brand-point" aria-hidden="true" />
+                실시간 업데이트
+              </span>
+              <h2 className="text-3xl md:text-5xl font-bold mb-4 md:mb-6 tracking-tight">어떤 사람들이 오나요?</h2>
               <p className="text-sm md:text-lg text-gray-500">철저한 심사를 거친, 매력적인 참가자들이 기다리고 있습니다.</p>
             </motion.div>
           </div>
 
           {/* v8.0 — 참가자 캐러셀이 /api/participants.php 응답으로 늘어나며 발생하는 깜빡임 차단 */}
-          <div className={`relative flex transition-opacity duration-500 ease-out ${contentReady ? "opacity-100" : "opacity-0"}`}>
-            {/* Infinite Scroll Container */}
-            <motion.div
-              className="flex gap-4 md:gap-6 py-4"
-              animate={{ x: ["0%", "-50%"] }}
-              transition={{ repeat: Infinity, duration: 75, ease: "linear" }}
-              style={{ width: "fit-content" }}
+          <div className={`participants-track transition-opacity duration-500 ease-out ${contentReady ? "opacity-100" : "opacity-0"}`}>
+            {/* 같은 목록을 2번 이어 붙여 -50% 이동으로 끊김 없이 반복. pr = gap → 절반 지점이 정확히 카드 경계 */}
+            <div
+              className="participants-row flex items-stretch gap-3 md:gap-4 pr-3 md:pr-4 w-max"
+              style={{ animationDuration: `${allParticipants.length * PARTICIPANT_SEC_PER_CARD}s` }}
             >
-              {/* Combine participants twice for seamless loop */}
-              {[...allParticipants, ...allParticipants].map((p, idx) => (
-                <motion.div
-                  key={`${p.id}-${idx}`}
-                  whileHover={{ y: -12, scale: 1.04, boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.15)" }}
-                  className="bg-white p-5 md:p-10 rounded-2xl md:rounded-[2.5rem] shadow-sm border border-gray-100 min-w-[200px] md:min-w-[320px] transition-shadow flex flex-col items-center text-center group cursor-pointer"
-                >
-                  <div className={`w-11 h-11 md:w-16 md:h-16 rounded-full mb-3 md:mb-5 flex items-center justify-center transition-transform group-hover:scale-110 ${p.gender === 'male' ? 'bg-[#E3F2FD]' : 'bg-[#FCE4EC]'}`}>
-                    <Users size={16} className={`md:hidden ${p.gender === 'male' ? 'text-blue-400' : 'text-pink-400'}`} />
-                    <Users size={22} className={`hidden md:block ${p.gender === 'male' ? 'text-blue-400' : 'text-pink-400'}`} />
+              {[...allParticipants, ...allParticipants].map((p, idx) => {
+                const isCopy = idx >= allParticipants.length;
+                const isMale = p.gender === "male";
+                return (
+                  /* 카드 폭 = 내용(직업 줄·키워드 첫 줄 중 긴 쪽)에 맞춤 → 오른쪽이 비지 않음. 최대 폭을 넘는 직업만 말줄임 */
+                  <div
+                    key={`${p.id}-${idx}`}
+                    aria-hidden={isCopy || undefined}
+                    className={`participants-card w-max max-w-[280px] md:max-w-[360px] flex-shrink-0 p-3.5 md:p-5 rounded-2xl bg-white border border-gray-100 transition-colors hover:border-brand-point${isCopy ? " participants-copy" : ""}`}
+                  >
+                    <div className="flex items-center gap-2.5 md:gap-3">
+                      <div className={`w-[38px] h-[38px] md:w-12 md:h-12 flex-shrink-0 rounded-full flex items-center justify-center text-[13px] md:text-[15px] font-bold ${isMale ? "bg-[#E6F1FB] text-[#0C447C]" : "bg-[#FCE4EC] text-[#72243E]"}`}>
+                        {isMale ? "남" : "여"}
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="text-[15px] md:text-lg font-bold text-gray-900 leading-snug truncate">{p.job}</h3>
+                        {p.age && (
+                          <p className="text-[13px] md:text-[15px] font-bold text-brand-point-ink leading-snug">{p.age}</p>
+                        )}
+                      </div>
+                    </div>
+                    {p.keywords.length > 0 && (
+                      /* 키워드는 3개씩 끊어 줄을 나눈다(5개 → 3+2). 한 줄이 넘칠 때만 그 줄 안에서 줄바꿈 */
+                      <div className="mt-2.5 md:mt-3 space-y-1.5">
+                        {Array.from({ length: Math.ceil(p.keywords.length / KEYWORDS_PER_ROW) }, (_, rIdx) =>
+                          p.keywords.slice(rIdx * KEYWORDS_PER_ROW, (rIdx + 1) * KEYWORDS_PER_ROW)
+                        ).map((row, rIdx) => (
+                          <div key={rIdx} className="flex flex-wrap gap-1.5">
+                            {row.map((k, kIdx) => (
+                              <span key={kIdx} className="bg-gray-50 text-gray-600 border border-gray-100 text-xs md:text-[13px] px-2.5 md:px-3 py-0.5 md:py-1 rounded-full whitespace-nowrap">#{k}</span>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <h3 className="text-sm md:text-2xl font-black mb-1.5 md:mb-3 text-gray-900 leading-tight">{p.job}</h3>
-                  {p.age && (
-                    <p className="text-brand-point-ink font-bold text-xs md:text-lg mb-3 md:mb-8 whitespace-nowrap">{p.age}</p>
-                  )}
-                  <div className="flex flex-wrap justify-center gap-1.5 md:gap-2">
-                    {p.keywords.map((k, kIdx) => (
-                      <span key={kIdx} className="bg-gray-50 text-gray-500 text-xs md:text-sm font-bold px-2.5 md:px-4 py-1 md:py-1.5 rounded-full border border-gray-100">#{k}</span>
-                    ))}
-                  </div>
-                </motion.div>
-              ))}
-            </motion.div>
+                );
+              })}
+            </div>
           </div>
-
-          <style jsx global>{`
-            #participants .relative:hover .flex {
-              animation-play-state: paused !important;
-            }
-          `}</style>
         </section>
 
-        {/* FAQ Accordion Section */}
+        {/* FAQ Accordion Section — 가운데 1단. 데이터·추가 블록은 app/lib/data.ts FAQS */}
         <section id="faq" className="py-16 md:py-32 px-4 md:px-6 bg-white">
-          <div className="max-w-3xl mx-auto">
-            <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="mb-10 md:mb-16">
-              <h2 className="text-4xl md:text-5xl font-bold tracking-tight">자주 묻는 질문</h2>
+          <div className="max-w-[820px] mx-auto">
+            <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="text-center mb-10 md:mb-14">
+              <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight">자주 묻는 질문</h2>
+              <p className="mt-3 md:mt-4 text-sm md:text-lg text-gray-600 break-keep">참가 전 가장 많이 물어보시는 내용을 모았어요.</p>
             </motion.div>
 
-            <div className="space-y-4">
+            <div className="border-t-2 border-black">
               {FAQS.map((faq, index) => {
                 const isOpen = faqOpenIndex === index;
+                const qId = `faq-q-${faq.id}`;
+                const aId = `faq-a-${faq.id}`;
                 return (
-                  <div key={index} className="border border-gray-200 rounded-3xl overflow-hidden shadow-sm">
-                    <button 
-                      onClick={() => setFaqOpenIndex(isOpen ? null : index)}
-                      className="w-full px-5 md:px-8 py-5 md:py-6 flex justify-between items-center text-left bg-white hover:bg-brand-lightgray transition-colors"
-                    >
-                      <span className="text-base md:text-lg font-bold pr-4">{faq.q}</span>
-                      <ChevronDown className={`shrink-0 transform transition-transform duration-300 text-brand-point-ink ${isOpen ? 'rotate-180' : ''}`} />
-                    </button>
-                    <AnimatePresence>
+                  <div key={faq.id} className="border-b border-gray-200">
+                    <h3>
+                      <button
+                        type="button"
+                        id={qId}
+                        aria-expanded={isOpen}
+                        aria-controls={aId}
+                        onClick={() => setFaqOpenIndex(isOpen ? null : index)}
+                        className="group w-full min-h-[72px] py-4 flex items-center gap-3 md:gap-4 text-left"
+                      >
+                        <span aria-hidden="true" className="w-6 md:w-7 shrink-0 text-lg md:text-xl font-extrabold text-brand-point-ink">Q</span>
+                        <span className={`flex-1 text-base md:text-lg leading-snug break-keep transition-colors ${isOpen ? "font-bold text-black" : "font-medium text-gray-800 group-hover:text-black"}`}>
+                          {faq.q}
+                        </span>
+                        <span className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-colors duration-300 ${isOpen ? "bg-black text-white" : "bg-brand-lightgray text-gray-700 group-hover:bg-gray-200"}`}>
+                          <ChevronDown size={18} aria-hidden="true" className={`transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`} />
+                        </span>
+                      </button>
+                    </h3>
+                    <AnimatePresence initial={false}>
                       {isOpen && (
-                        <motion.div 
+                        <motion.div
+                          id={aId}
+                          role="region"
+                          aria-labelledby={qId}
                           initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-                          className="bg-brand-lightgray/50 px-5 md:px-8"
+                          className="overflow-hidden"
                         >
-                          <p className="text-gray-600 font-medium leading-relaxed md:leading-relaxed py-5 md:py-6 border-t border-gray-200/60 px-0 text-sm md:text-base whitespace-pre-line break-keep">
-                            {faq.a}
-                          </p>
+                          {/* 왼쪽 들여쓰기 = Q 너비 + 간격 (w-6+gap-3 / md:w-7+gap-4) */}
+                          <div className="pl-9 md:pl-11 pb-5 md:pb-6">
+                            <div className="bg-brand-lightgray rounded-2xl p-5 md:p-6">
+                              <p className="font-bold text-black text-[15px] md:text-base leading-relaxed break-keep">{faq.lead}</p>
+                              {faq.body && (
+                                <p className="mt-2 text-sm md:text-[15px] text-gray-600 leading-relaxed break-keep">{faq.body}</p>
+                              )}
+
+                              {faq.steps && (
+                                <ol className="mt-4 flex flex-wrap gap-2.5">
+                                  {faq.steps.map((step, sIdx, all) => {
+                                    const isLast = sIdx === all.length - 1;
+                                    return (
+                                      <li key={step.label} className={`grow basis-[150px] bg-white rounded-xl p-3.5 border ${isLast ? "border-brand-point-ink" : "border-transparent"}`}>
+                                        <div className="flex items-center gap-2">
+                                          <span className={`w-6 h-6 shrink-0 rounded-full flex items-center justify-center text-xs font-bold text-white ${isLast ? "bg-brand-point-ink" : "bg-black"}`}>{sIdx + 1}</span>
+                                          <span className="text-sm font-bold text-black">{step.label}</span>
+                                        </div>
+                                        <p className="mt-2 text-[13px] text-gray-600 leading-relaxed break-keep">{step.desc}</p>
+                                      </li>
+                                    );
+                                  })}
+                                </ol>
+                              )}
+
+                              {faq.refund && (
+                                <ul className="mt-4 bg-white rounded-xl p-4 md:p-5 space-y-3">
+                                  {faq.refund.map(r => (
+                                    <li key={r.when} className="flex items-center gap-2.5 md:gap-3">
+                                      <span className="w-[116px] shrink-0 text-[13px] md:text-sm font-medium text-gray-700 break-keep">{r.when}</span>
+                                      <span aria-hidden="true" className="flex-1 h-2 rounded-full bg-gray-100 overflow-hidden">
+                                        <span className="block h-full rounded-full bg-brand-point" style={{ width: `${r.value}%` }} />
+                                      </span>
+                                      <span className={`w-[60px] shrink-0 text-right text-[13px] md:text-sm font-bold ${r.value === 0 ? "text-red-700" : "text-black"}`}>{r.pct}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+
+                              {faq.chips && (
+                                <ul className="mt-4 flex flex-wrap gap-2">
+                                  {faq.chips.map(chip => (
+                                    <li key={chip} className="inline-flex items-center gap-1.5 bg-white rounded-full px-3.5 py-1.5 text-[13px] md:text-sm font-medium text-gray-800">
+                                      <Check size={15} strokeWidth={2.5} aria-hidden="true" className="text-brand-point-ink" />
+                                      {chip}
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+
+                              {faq.link && (
+                                <Link
+                                  href={faq.link.href}
+                                  className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-black px-4 py-2 text-sm font-bold text-black hover:bg-black hover:text-white transition-colors"
+                                >
+                                  {faq.link.label}
+                                  <ArrowRight size={16} aria-hidden="true" />
+                                </Link>
+                              )}
+                            </div>
+                          </div>
                         </motion.div>
                       )}
                     </AnimatePresence>
                   </div>
                 );
               })}
+            </div>
+
+            {/* 문의 카드 — 모바일은 flex-wrap 으로 버튼이 아래 줄로 */}
+            <div className="mt-10 md:mt-14 bg-black text-white rounded-[20px] p-6 md:p-8 flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
+              <div>
+                <p className="font-bold text-lg md:text-xl">원하는 답을 찾지 못하셨나요?</p>
+                <p className="mt-1 text-sm md:text-base text-gray-300 break-keep">고객센터로 남겨주시면 확인 후 답변드릴게요.</p>
+              </div>
+              <Link
+                href="/report"
+                className="inline-flex items-center justify-center gap-1.5 h-12 px-6 rounded-full bg-brand-point text-black text-sm md:text-base font-bold hover:bg-white transition-colors"
+              >
+                고객센터 문의하기
+                <ArrowRight size={18} aria-hidden="true" />
+              </Link>
             </div>
           </div>
         </section>

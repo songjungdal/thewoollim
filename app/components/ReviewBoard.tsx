@@ -6,13 +6,13 @@ import { Star, ChevronDown, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
 
+// 공개 목록 — 작성일은 받지 않는다(api/reviews.php 가 보내지 않음, 정렬은 서버에서 최신순)
 type Review = {
   id: number;
   gender: string;
   age_group: string;
   rating: number;
   content: string;
-  created_at: string;
 };
 
 type MineReview = { id: number; rating: number; content: string; created_at: string };
@@ -26,7 +26,7 @@ function StarRow({ rating, size = 14 }: { rating: number; size?: number }) {
   return (
     <span className="flex items-center gap-0.5 flex-shrink-0">
       {[1, 2, 3, 4, 5].map(i => (
-        <Star key={i} size={size} className={i <= rating ? "fill-brand-point text-brand-point-ink" : "text-gray-200"} />
+        <Star key={i} size={size} className={i <= rating ? "fill-brand-point text-brand-point-ink" : "text-gray-300"} />
       ))}
     </span>
   );
@@ -52,7 +52,7 @@ export default function ReviewBoard() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
-  // 메인페이지 후기 목록 — 10개씩 페이지 단위로 표시
+  // 메인페이지 후기 목록 — 5개씩 페이지 단위로 표시
   const PAGE_SIZE = 5;
   const [page, setPage] = useState(0);
   const totalPages = Math.max(1, Math.ceil(reviews.length / PAGE_SIZE));
@@ -204,44 +204,46 @@ export default function ReviewBoard() {
           <div className="space-y-2.5 md:space-y-3">
             {pageReviews.map(r => {
               const expanded = expandedId === r.id;
+              // 카드 전체가 버튼 — 접힘: 내용 한 줄 + 말줄임 / 펼침: 같은 자리에서 전체 내용
+              // 모바일: 1줄 성별·나이대·별점, 2줄 내용·화살표 / 데스크톱(md↑): 한 줄(배지·내용·별점·화살표), 위쪽 정렬
               return (
-                <div key={r.id} className="border border-gray-200 rounded-2xl overflow-hidden bg-white">
-                  <button
-                    type="button"
-                    onClick={() => setExpandedId(expanded ? null : r.id)}
-                    className="w-full flex items-center gap-2.5 md:gap-4 px-4 md:px-6 py-3.5 md:py-4 text-left hover:bg-gray-50 transition-colors"
-                  >
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => setExpandedId(expanded ? null : r.id)}
+                  aria-expanded={expanded}
+                  className="w-full min-h-[44px] text-left bg-white border border-gray-200 rounded-2xl px-4 py-3 md:px-6 md:py-4 hover:bg-gray-50 transition-colors md:flex md:items-start md:gap-4"
+                >
+                  {/* 메타 — 모바일은 한 줄(별점 오른쪽 끝), 데스크톱은 내용 앞 배지로 풀린다(md:contents) */}
+                  <span className="flex items-center gap-2 md:contents">
                     <GenderBadge gender={r.gender} />
-                    <span className="text-xs font-bold px-2 py-1 rounded-full bg-gray-100 text-gray-600 flex-shrink-0 whitespace-nowrap">
+                    <span className="text-xs font-bold px-2 py-1 rounded-full bg-gray-100 text-gray-600 flex-shrink-0 whitespace-nowrap md:mt-1.5">
                       {r.age_group}
                     </span>
-                    <span className="flex-1 min-w-0 truncate text-sm md:text-base text-gray-700 font-medium">
+                    <span className="ml-auto md:hidden">
+                      <StarRow rating={r.rating} size={12} />
+                    </span>
+                  </span>
+                  <span className="mt-2 flex items-start gap-1.5 md:mt-0 md:flex-1 md:min-w-0 md:gap-4">
+                    <span
+                      className={`flex-1 min-w-0 text-[15px] md:text-base text-gray-800 leading-relaxed md:pt-[5px] ${
+                        expanded ? "whitespace-pre-wrap break-words" : "truncate"
+                      }`}
+                    >
                       {r.content}
                     </span>
-                    <StarRow rating={r.rating} />
+                    <span className="hidden md:flex flex-shrink-0 md:mt-[11px]">
+                      <StarRow rating={r.rating} size={14} />
+                    </span>
                     <ChevronDown
                       size={16}
-                      className={`flex-shrink-0 text-gray-500 transition-transform ${expanded ? "rotate-180" : ""}`}
+                      aria-hidden="true"
+                      className={`flex-shrink-0 mt-1 md:mt-[9px] md:w-[18px] md:h-[18px] transition-transform ${
+                        expanded ? "rotate-180 text-brand-point-ink" : "text-gray-400"
+                      }`}
                     />
-                  </button>
-                  <AnimatePresence initial={false}>
-                    {expanded && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.25, ease: "easeOut" }}
-                        className="overflow-hidden"
-                      >
-                        <div className="px-4 md:px-6 pb-4 pt-1 border-t border-gray-100">
-                          <p className="text-sm md:text-base text-gray-600 leading-relaxed whitespace-pre-wrap break-words">
-                            {r.content}
-                          </p>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
+                  </span>
+                </button>
               );
             })}
           </div>

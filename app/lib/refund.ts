@@ -1,5 +1,5 @@
 /**
- * 어울림 환불 규정 (서버 권위 동일 규정 — api/payments/refund.php와 일치 유지).
+ * 어울림 환불 규정 (서버 권위 동일 규정 — api/admin/bookings.php의 관리자 취소 처리와 일치 유지).
  *
  *  파티 5일 전 이상 : 100% 환불
  *  파티 4일 전      :  80% 환불
@@ -37,6 +37,11 @@ export function daysUntil(calendarDate: string, now: Date = new Date()): number 
   const partyMidnight = new Date(Y, M, D).getTime();
   const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   return Math.floor((partyMidnight - todayMidnight) / 86400000);
+}
+
+/** 환불 비율 → 라벨 ("100% 환불" 등). 서버에 저장된 비율(refundRequestRate) 표시용 */
+export function refundRateLabel(rate: number): string {
+  return rate > 0 ? `${Math.round(rate * 100)}% 환불` : "환불 불가";
 }
 
 export function calculateRefund(paidAmount: number, calendarDate: string, now?: Date): RefundResult {

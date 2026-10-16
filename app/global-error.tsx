@@ -7,6 +7,7 @@
  */
 
 import { useEffect } from "react";
+import { isChunkLoadError, reloadOnceForChunkError } from "./lib/chunkReload";
 
 export default function GlobalError({
   error,
@@ -15,10 +16,14 @@ export default function GlobalError({
   error: Error & { digest?: string };
   unstable_retry: () => void;
 }) {
+  // 배포 전에 열어 둔 탭이 옛 스크립트 파일을 못 찾은 경우 — 새로고침이 필요 (app/lib/chunkReload.ts)
+  const chunkError = isChunkLoadError(error);
+
   useEffect(() => {
     // eslint-disable-next-line no-console
     console.error("[woollim] global error:", error);
-  }, [error]);
+    if (chunkError) reloadOnceForChunkError();
+  }, [error, chunkError]);
 
   return (
     <html lang="ko">
@@ -82,7 +87,7 @@ export default function GlobalError({
           )}
           <button
             type="button"
-            onClick={() => unstable_retry()}
+            onClick={() => (chunkError ? window.location.reload() : unstable_retry())}
             style={{
               width: "100%",
               background: "#111",

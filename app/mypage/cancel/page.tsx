@@ -9,7 +9,7 @@ import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import { useAuth } from "../../context/AuthContext";
 import { useParties } from "../../lib/useParties";
-import { calculateRefund, REFUND_TABLE } from "../../lib/refund";
+import { calculateRefund, refundRateLabel, REFUND_TABLE } from "../../lib/refund";
 
 export default function CancelRequestPage() {
   const { mounted, isLoggedIn, userEmail, bookings, refreshBookings } = useAuth();
@@ -74,7 +74,11 @@ export default function CancelRequestPage() {
       });
       const d = await res.json();
       if (d?.ok) {
-        alert(`어울림 운영팀으로 취소 요청이 정상적으로 접수되었습니다.\n운영팀에서 확인 후 빠르게 처리해 드리겠습니다. 감사합니다.`);
+        // 서버가 요청한 날 기준으로 확정한 환불 금액 (파티 날짜를 몰라 계산하지 못했으면 생략)
+        const fixed = typeof d.refundAmount === "number"
+          ? `\n환불 예정 금액: ₩${d.refundAmount.toLocaleString()} (${refundRateLabel(d.refundRate ?? 0)}, 오늘 요청 기준으로 확정)`
+          : "";
+        alert(`어울림 운영팀으로 취소 요청이 정상적으로 접수되었습니다.${fixed}\n운영팀에서 확인 후 빠르게 처리해 드리겠습니다. 감사합니다.`);
         await refreshBookings();
         router.push("/mypage");
       } else {
@@ -146,6 +150,12 @@ export default function CancelRequestPage() {
                         <div className="flex-1 min-w-0">
                           <h3 className="font-black text-base md:text-xl mb-2 leading-snug break-keep">
                             {party?.title ?? `파티 #${b.partyId}`}
+                            {/* 솔로파티 참가 구성 — 결제 당시 항목 이름 */}
+                            {b.optionName && (
+                              <span className="ml-2 align-middle inline-flex text-xs md:text-sm font-black text-brand-point-ink bg-brand-point/10 px-2 py-0.5 rounded-full whitespace-nowrap" data-testid="cancel-option">
+                                {b.optionName}
+                              </span>
+                            )}
                           </h3>
                           <div className="flex flex-col gap-1.5 text-sm md:text-base text-gray-600 font-medium mb-3">
                             {party && <span className="flex items-center gap-2"><Calendar size={14} className="text-brand-point-ink flex-shrink-0" /> {party.dateString}</span>}
@@ -231,7 +241,7 @@ export default function CancelRequestPage() {
               <h2 className="text-base md:text-lg font-black">환불 안내</h2>
             </div>
             <p className="text-xs md:text-sm text-gray-500 font-medium mb-4 leading-relaxed">
-              취소 요청은 파티 시작일 기준 일수에 따라 환불 비율이 자동 적용됩니다. 카드 결제 건은 결제 카드사로 즉시 환불 처리됩니다.
+              환불 금액은 취소를 요청한 날부터 파티 시작일까지 남은 일수로 정해지며, 요청한 뒤에는 바뀌지 않습니다. 운영팀이 요청을 확인한 뒤 카드 결제는 결제하신 카드사로 취소해 드리고, 무통장 입금은 환불받으실 계좌로 송금해 드립니다.
             </p>
             <div className="overflow-x-auto">
               <table className="w-full text-sm md:text-base">
@@ -284,7 +294,7 @@ export default function CancelRequestPage() {
               {/* 핵심 정보 — 폰트 강조 */}
               <dl className="rounded-2xl bg-brand-lightgray/60 border border-gray-100 p-4 md:p-5 space-y-2.5 mb-4">
                 {[
-                  { l: "대상", v: selectedParty.title },
+                  { l: "대상", v: selected.optionName ? `${selectedParty.title} · ${selected.optionName}` : selectedParty.title },
                   { l: "파티 일정", v: selectedParty.dateString },
                   { l: "결제 금액", v: `₩${(selected.total ?? selectedParty.price).toLocaleString()}` },
                 ].map(r => (
@@ -303,9 +313,9 @@ export default function CancelRequestPage() {
 
               {/* 안내 문구 — 보조 폰트 */}
               <div className="text-xs md:text-sm text-gray-600 font-medium leading-relaxed break-keep space-y-2 mb-6">
-                <p>취소를 진행하시면 운영팀으로 환불 요청이 접수됩니다.</p>
+                <p>취소를 진행하시면 운영팀으로 환불 요청이 접수됩니다. 위 환불 예정 금액은 오늘 요청 기준으로 확정되며, 처리 날짜에 따라 줄어들지 않습니다.</p>
                 <p className="text-gray-500">※ 원활한 성비 조율 및 좌석 배치 재조율을 위해, 실시간 취소가 어려울 수 있는 점 양해 부탁드립니다.</p>
-                <p><span className="font-bold text-brand-black">카드 결제 :</span> 확인 즉시 결제하신 카드사를 통해 취소 처리를 진행합니다. (카드사에 따라 영업일 기준 3~5일 소요)</p>
+                <p><span className="font-bold text-brand-black">카드 결제 :</span> 운영팀 확인 후 결제하신 카드사를 통해 취소 처리를 진행합니다. (카드사에 따라 영업일 기준 3~5일 소요)</p>
                 <p><span className="font-bold text-brand-black">무통장 입금 :</span> 운영팀에서 확인 후, 환불받으실 계좌번호로 직접 송금해 드립니다.</p>
               </div>
 
