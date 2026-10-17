@@ -8,7 +8,7 @@ import { ArrowLeft, CreditCard, ShieldCheck, Tag, Check, FileText, ExternalLink 
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useAuth, calcCouponDiscount } from "../context/AuthContext";
-import { useParties } from "../lib/useParties";
+import { useParties, PARTIES_NOT_LOADED } from "../lib/useParties";
 import { linePriceFor, partyHasOptions, partyOptionById, VBANK_ACCOUNT_LINE } from "../lib/data";
 
 // ── Toss Payments v2 SDK 타입 선언 ────────────────────────────────────────
@@ -152,6 +152,15 @@ function CheckoutContent() {
   }, [totalAmount]);
 
   if (!mounted || !isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-brand-lightgray flex items-center justify-center">
+        <div className="font-bold text-lg">Loading...</div>
+      </div>
+    );
+  }
+
+  // 파티 목록을 아직 받기 전 — "찾을 수 없습니다"로 오해하지 않도록 불러오는 중으로 둔다 (결제 실패 안내는 그대로 아래에서)
+  if (PARTIES === PARTIES_NOT_LOADED && partyIds.length > 0 && !errorMsg) {
     return (
       <div className="min-h-screen bg-brand-lightgray flex items-center justify-center">
         <div className="font-bold text-lg">Loading...</div>

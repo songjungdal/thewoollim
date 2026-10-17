@@ -1,7 +1,15 @@
+import type { Metadata } from "next";
+import { pageMetadata } from "../lib/seo";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { ShieldAlert, UserCheck, Lock, Phone, Mail, MessageCircle } from "lucide-react";
 import Image from "next/image";
+
+export const metadata: Metadata = pageMetadata({
+  title: "문의 / 민원접수 | 어울림",
+  description: "어울림 서비스 이용 중 궁금한 점, 매너 위반 제보, 민원을 접수하는 방법을 안내합니다. 제보자 정보는 상대방에게 공개되지 않습니다.",
+  path: "/report/",
+});
 
 export default function ReportPage() {
   return (

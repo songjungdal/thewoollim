@@ -1,7 +1,15 @@
+import type { Metadata } from "next";
+import { pageMetadata } from "../lib/seo";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { Star, Users, Zap } from "lucide-react";
 import Image from "next/image";
+
+export const metadata: Metadata = pageMetadata({
+  title: "회사소개 | 어울림 로테이션 소개팅 매칭파티",
+  description: "어울림(The Woollim)은 1:1 로테이션 대화로 진짜 연결을 만드는 오프라인 매칭파티·솔로파티 플랫폼입니다. 어울림이 추구하는 만남의 방식과 가치를 소개합니다.",
+  path: "/about/",
+});
 
 export default function AboutPage() {
   return (
