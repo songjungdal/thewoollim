@@ -63,8 +63,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 ## 4. 화면(Next.js) 작성 규칙
 
 - **정적 export 제약**: 요청마다 서버에서 실행되는 기능은 쓸 수 없다(Server Actions, middleware, 요청 시점 렌더링, `cookies()`·`headers()`, 이미지 최적화 등). 확신이 없으면 `node_modules/next/dist/docs/`에서 static export 제약을 확인한다. 서버 로직이 필요하면 PHP API로 만든다.
-- **동적 경로**는 `generateStaticParams`로 미리 만든 경로만 존재한다. 파티 상세(`app/party/[id]/page.tsx`)는 id 1~500만 만든다. 501번 이후 파티는 상세 페이지가 없을 수 있다.
+- **동적 경로**는 `generateStaticParams`로 미리 만든 경로만 존재한다. 파티 상세(`app/party/[id]/page.tsx`)는 id 1~500과 빌드 시점에 있는 실제 파티 id를 만든다. 빌드 뒤에 새로 만든 501번 이후 파티는 다음 배포 전까지 상세 페이지가 없다.
 - **데이터 호출**: 화면이 열린 뒤 `fetch("/api/....php")`로 받는다. 로그인이 필요한 호출은 기존 코드처럼 `credentials: "include"`, `cache: "no-store"`를 쓴다.
+  - 예외: 파티 목록은 빌드할 때도 한 번 받아(`app/lib/buildParties.ts`) 메인·파티 상세 정적 HTML과 검색엔진용 제목·구조화 데이터를 만든다. 받지 못하면 예시 데이터 없이 "불러오는 중"으로 만든다. 예시(가짜) 데이터를 정적 HTML에 넣지 않는다.
 - **주소**: `trailingSlash: true`라서 내부 링크는 `/mypage/`처럼 `/`로 끝낸다.
 - **`NEXT_PUBLIC_*` 값**은 빌드할 때 화면 파일에 박히고 브라우저에 공개된다. 비밀값을 넣지 않는다. 값이 바뀌면 다시 빌드해야 한다.
 - **시간**: 모든 시간은 한국 시간(KST)이다. 화면 표시는 `app/lib/datetime.ts`의 `formatKST`를 쓴다.
