@@ -2,17 +2,20 @@
 
 import { useState, useMemo, useEffect, useRef } from "react";
 import { motion, AnimatePresence, Variants } from "framer-motion";
-import { ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight, Calendar, MapPin, X } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight, Calendar, MapPin } from "lucide-react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import Header from "./components/Header";
 import HeroSlider from "./components/HeroSlider";
 import Footer from "./components/Footer";
 import ReviewBoard from "./components/ReviewBoard";
+import GalleryGrid from "./components/gallery/GalleryGrid";
+import GalleryAllSheet from "./components/gallery/GalleryAllSheet";
+import GalleryLightbox from "./components/gallery/GalleryLightbox";
+import type { GalleryItem } from "./components/gallery/types";
 import { PARTICIPANTS, FAQS, partyStockStatus, withLiveCounts, partyVisibility, categoryLabel, partyTypeOf, PARTY_TYPES, PARTY_TYPE_LABELS, type Party, type PartyType } from "./lib/data";
 import { useAuth } from "./context/AuthContext";
 import { useParties, PARTIES_NOT_LOADED } from "./lib/useParties";
@@ -56,136 +59,13 @@ const scheduleLongLabel = (ymd: string) => {
   return `${d.getMonth() + 1}월 ${d.getDate()}일 (${SCHEDULE_WEEKDAYS[d.getDay()]})`;
 };
 
-/**
- * 후기 갤러리 가로 슬라이더 — 페이지당 6장 (PC 2x3 / 모바일 3x2).
- * 마우스 드래그 + 터치 스와이프로 페이지 전환. 클릭 vs 드래그 구분.
- */
-type GalleryItem = { id: number; image_path: string; alt_text: string; sort_order: number };
-
-function GallerySlider({
-  source, currentPage, setCurrentPage, onImageClick,
-}: {
-  source: GalleryItem[];
-  currentPage: number;
-  setCurrentPage: (updater: (p: number) => number) => void;
-  onImageClick: (path: string) => void;
-}) {
-  const PAGE_SIZE  = 6;
-  const totalPages = Math.max(1, Math.ceil(source.length / PAGE_SIZE));
-  const safePage   = Math.min(currentPage, totalPages - 1);
-
-  // 컨테이너 폭 + 페이지 간 gap 을 픽셀 단위로 측정 → 정확한 위치로 슬라이드.
-  const viewportRef = useRef<HTMLDivElement>(null);
-  const [viewportW, setViewportW] = useState(0);
-  const [pageGap,   setPageGap]   = useState(24); // 24px (PC) / 12px (모바일)
-
-  useEffect(() => {
-    const update = () => {
-      setViewportW(viewportRef.current?.offsetWidth ?? 0);
-      setPageGap(window.innerWidth >= 768 ? 24 : 12);
-    };
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, []);
-
-  const pageStride = viewportW + pageGap;
-  const goPrev = () => setCurrentPage(p => Math.max(0, p - 1));
-  const goNext = () => setCurrentPage(p => Math.min(totalPages - 1, p + 1));
-
-  // 화살표 공통 스타일 — 원형/사각형 박스 X, 화살표 기호만.
-  // 이미지 위에 오버레이되므로 기본 흰색(밝은 가독성) + hover 시 brand-point 청록.
-  const arrowBase =
-    "absolute top-1/2 -translate-y-1/2 z-10 p-2 text-white hover:text-brand-point " +
-    "transition-colors disabled:text-white/30 disabled:cursor-not-allowed " +
-    "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#008080]/40 rounded-md " +
-    "drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]";
-
-  return (
-    <div className="relative">
-      {/* 슬라이드 윈도우 — 페이지 폭 전체를 사용 (max-w-7xl) */}
-      <div ref={viewportRef} className="overflow-hidden">
-        <motion.div
-          className="flex"
-          style={{ gap: `${pageGap}px`, willChange: "transform" }}
-          animate={{ x: -safePage * pageStride }}
-          transition={{ type: "tween", ease: [0.22, 1, 0.36, 1], duration: 0.7 }}
-        >
-          {Array.from({ length: totalPages }).map((_, pageIdx) => {
-            const pageItems = source.slice(pageIdx * PAGE_SIZE, (pageIdx + 1) * PAGE_SIZE);
-            return (
-              <div
-                key={pageIdx}
-                style={{ width: viewportW || undefined }}
-                className="flex-shrink-0 grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6"
-              >
-                {pageItems.map((item, idx) => (
-                  <div
-                    key={`${item.id}-${idx}`}
-                    className="aspect-square bg-gray-800 rounded-2xl md:rounded-3xl relative overflow-hidden group cursor-pointer border border-white/5"
-                    onClick={() => onImageClick(item.image_path)}
-                  >
-                    <div className="absolute inset-0 transition-transform duration-700 group-hover:scale-110 group-hover:brightness-110 pointer-events-none">
-                      <Image
-                        src={item.image_path}
-                        alt={item.alt_text || `갤러리 이미지 ${idx + 1}`}
-                        fill
-                        sizes="(max-width: 768px) 50vw, 33vw"
-                        className="object-cover"
-                      />
-                    </div>
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
-                  </div>
-                ))}
-              </div>
-            );
-          })}
-        </motion.div>
-      </div>
-
-      {/* 좌/우 화살표 — 그리드 위에 겹쳐 배치 (이미지 가독성을 위해 drop-shadow) */}
-      {totalPages > 1 && (
-        <>
-          <button
-            type="button"
-            onClick={goPrev}
-            disabled={safePage === 0}
-            aria-label="이전 갤러리"
-            className={`${arrowBase} left-1 md:left-3`}
-          >
-            <ChevronLeft className="w-8 h-8 md:w-12 md:h-12" strokeWidth={3} />
-          </button>
-          <button
-            type="button"
-            onClick={goNext}
-            disabled={safePage === totalPages - 1}
-            aria-label="다음 갤러리"
-            className={`${arrowBase} right-1 md:right-3`}
-          >
-            <ChevronRight className="w-8 h-8 md:w-12 md:h-12" strokeWidth={3} />
-          </button>
-        </>
-      )}
-
-      {/* 페이지 인디케이터 (dots) */}
-      {totalPages > 1 && (
-        <div className="flex justify-center gap-2 mt-6 md:mt-8">
-          {Array.from({ length: totalPages }).map((_, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => setCurrentPage(() => i)}
-              aria-label={`갤러리 ${i + 1} 페이지`}
-              className={`relative h-2 rounded-full transition-all before:absolute before:-inset-x-1 before:-inset-y-[18px] ${
-                i === safePage ? "w-6 bg-[#008080]" : "w-2 bg-white/30 hover:bg-white/50"
-              }`}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+/** 관리자가 올린 현장스케치가 없을 때 보여줄 기본 이미지 9장 */
+const GALLERY_FALLBACK: GalleryItem[] = [1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => ({
+  id: -i,
+  image_path: `/images/gallery/g${i}.webp`,
+  alt_text: `갤러리 이미지 ${i}`,
+  sort_order: i * 10,
+}));
 
 /**
  * 메인 화면 (화면이 열린 뒤 동작하는 부분). app/page.tsx(서버)가 빌드 시점 실제 파티를 initialParties 로 넘긴다.
@@ -196,11 +76,13 @@ function GallerySlider({
 export default function HomeClient({ initialParties, endedAtBuild }: { initialParties?: Party[]; endedAtBuild?: string[] }) {
   const [activeTab, setActiveTab] = useState("일정별");
   const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(null);   // FAQ — 처음엔 모두 접어 둔다
-  const [selectedGalleryImage, setSelectedGalleryImage] = useState<string | null>(null);
+  const [selectedGalleryIndex, setSelectedGalleryIndex] = useState<number | null>(null);   // 라이트박스로 크게 보는 사진 순번
+  const [galleryAllOpen, setGalleryAllOpen] = useState(false);   // 현장스케치 "전체 사진 보기" 시트
   const [currentGalleryPage, setCurrentGalleryPage] = useState(0);   // 6장씩 가로 슬라이드 페이지 인덱스
   // 후기 갤러리 — DB 라이브 fetch (관리자가 수정 시 BroadcastChannel + 폴링으로 즉시 반영)
-  type GalleryItem = { id: number; image_path: string; alt_text: string; sort_order: number };
   const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
+  // 화면에 보여줄 사진 — 관리자 사진이 없으면 기본 이미지 (그리드·전체보기·라이트박스 공통)
+  const galleryShown = galleryItems.length > 0 ? galleryItems : GALLERY_FALLBACK;
   const [liveMembers, setLiveMembers] = useState<typeof PARTICIPANTS>([]);
   const { partyCounts } = useAuth();
   const PARTIES = useParties(initialParties);
@@ -869,19 +751,15 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
               </p>
             </motion.div>
             
-            {/* 슬라이더 — 페이지당 6장 (PC 2x3 / 모바일 3x2), 마우스 드래그 + 터치 스와이프 */}
+            {/* 그리드 — 페이지당 6장 (PC 3x2 / 모바일 2x3), 화살표·점·스와이프·마우스 드래그 + 아래 컨트롤 바. app/components/gallery/ */}
             {/* v8.0 — 갤러리 이미지가 fetch 응답 후 swap 되며 발생하는 깜빡임을 mounted gate 로 차단 */}
             <div className={`transition-opacity duration-500 ease-out ${contentReady ? "opacity-100" : "opacity-0"}`}>
-              <GallerySlider
-                source={galleryItems.length > 0 ? galleryItems : [1,2,3,4,5,6,7,8,9].map(i => ({
-                  id: -i,
-                  image_path: `/images/gallery/g${i}.webp`,
-                  alt_text: `갤러리 이미지 ${i}`,
-                  sort_order: i*10,
-                }))}
-                currentPage={currentGalleryPage}
-                setCurrentPage={setCurrentGalleryPage}
-                onImageClick={setSelectedGalleryImage}
+              <GalleryGrid
+                items={galleryShown}
+                page={currentGalleryPage}
+                setPage={setCurrentGalleryPage}
+                onOpen={setSelectedGalleryIndex}
+                onOpenAll={() => setGalleryAllOpen(true)}
               />
             </div>
           </div>
@@ -1379,43 +1257,19 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
 
       <Footer />
 
-      {/* Gallery Lightbox Modal */}
-      <AnimatePresence>
-        {selectedGalleryImage && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setSelectedGalleryImage(null)}
-            className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 md:p-10 cursor-pointer"
-          >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="relative max-w-5xl w-full h-full flex items-center justify-center"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <img 
-                src={selectedGalleryImage} 
-                alt="Gallery Preview" 
-                className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
-              />
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedGalleryImage(null);
-                }}
-                className="absolute top-4 right-4 text-white hover:text-brand-point bg-black/50 p-4 rounded-full transition-all z-[110] hover:scale-110 active:scale-95"
-                title="닫기"
-              >
-                <X size={28} />
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* 현장스케치 전체 사진 보기 시트 → 사진을 누르면 그 위에 라이트박스 */}
+      <GalleryAllSheet
+        open={galleryAllOpen}
+        items={galleryShown}
+        onClose={() => setGalleryAllOpen(false)}
+        onSelect={setSelectedGalleryIndex}
+      />
+      <GalleryLightbox
+        items={galleryShown}
+        index={selectedGalleryIndex}
+        onClose={() => setSelectedGalleryIndex(null)}
+        onIndexChange={setSelectedGalleryIndex}
+      />
     </div>
   );
 }
