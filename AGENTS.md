@@ -127,6 +127,18 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - 커밋 메시지는 `종류(범위): 한국어 요약` 형식을 쓴다. 예: `feat(payments): ...`, `fix(deploy): ...`, `docs: ...`
   - 종류: `feat`, `fix`, `docs`, `content`(문구), `chore`, `ci`, `security`
 
+### 작업을 마친 뒤 PR·병합·배포 (사용자가 따로 말하지 않아도 진행)
+
+1. 작업이 끝나면 PR을 만든다.
+2. 검사(`npx tsc --noEmit`, `npx eslint .`, `npm run build`, 바꾼 PHP 파일마다 `php -l`)가 모두 통과하면 바로 `main`에 병합한다.
+3. 병합 뒤에는 13장 "배포해" 절차(조건 (a)~(d))대로 바로 배포까지 진행한다. 배포 대상은 13장 "배포 대상 정하기"를 따른다. 문서만 바뀐 경우는 배포하지 않는다.
+4. 다음 경우에는 **병합·배포하지 말고 멈춰서** 사용자에게 보고한다.
+   - 검사가 하나라도 실패했을 때
+   - 배포 조건 (a)~(d) 중 하나라도 다르거나 확인할 수 없을 때 (조건은 병합 뒤 plan 으로만 확인할 수 있으므로, 이 경우는 병합된 상태에서 배포만 하지 않는다)
+   - 사용자가 "PR까지만" 또는 "배포하지 마"라고 말했을 때 (PR까지만 만들고 병합·배포하지 않는다)
+5. 롤백은 사용자가 승인했을 때만 한다.
+6. 작업 보고에는 8장 항목과 함께 **PR 링크, 병합 커밋, 배포 실행 링크, 상태 확인 결과, 백업 이름**을 적는다. 배포하지 않았으면 그 이유를 적는다.
+
 ## 10. 비밀 정보
 
 - 실제 설정 파일(`api/db-config.php`, `api/auth/*-config.php`, `api/payments/toss-config.php`), `.env*`, `api/data/`, `api/uploads/`, 세션 폴더는 커밋하지 않는다(`.gitignore`). 설정 항목을 바꾸면 `*.example.php` 템플릿만 고친다.
@@ -188,7 +200,13 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 - 서버에 직접 SSH·rsync 로 배포하지 않는다. 서버 접속, AWS 설정 변경은 사용자의 명시적 허락 없이는 하지 않는다.
 - 배포 대상은 PR 로 리뷰되어 `main`에 병합된 코드뿐이다.
-- 사용자가 "배포해"(또는 "배포해 줘")라고 하면 다음 순서로 진행한다. 아래 조건을 모두 만족하면 사용자의 추가 승인 없이 `deploy`까지 실행한다.
+- 작업을 마치고 PR을 병합했으면 사용자가 "배포해"라고 하지 않아도 아래 절차대로 바로 배포한다(9장). 사용자가 "PR까지만" 또는 "배포하지 마"라고 했으면 배포하지 않는다.
+- **배포 대상 정하기** — 지난 배포 커밋 이후 바뀐 파일로 정한다.
+  - `api/`만 바뀜 → `api`
+  - 화면 빌드에 들어가는 파일만 바뀜(`app/`, `public/`, `package.json`·`package-lock.json`, `next.config.ts`, `tsconfig.json`, `postcss.config.mjs`, `scripts/sync-company.mjs` 등) → `frontend`
+  - 둘 다 바뀜 → `all`
+  - 문서(`docs/`, `*.md`)만 바뀜 → 배포하지 않는다. 배포 설정(`.github/`, `scripts/deploy/`)만 바뀐 경우도 서버에 올라갈 파일이 없으므로 배포하지 않는다.
+- 사용자가 "배포해"(또는 "배포해 줘")라고 하거나 작업 뒤 자동 배포를 할 때 다음 순서로 진행한다. 아래 조건을 모두 만족하면 사용자의 추가 승인 없이 `deploy`까지 실행한다.
   1. 배포할 변경을 `main`에 병합하고, 배포할 `main` 커밋과 대상(`frontend` / `api` / `all`, 따로 말이 없으면 `all`)을 정한다.
   2. 그 커밋으로 `mode=plan`(`frontend_delete=false`)을 실행한다.
   3. plan 작업 로그에서 결과를 확인한다. 로그의 `PLAN_FILE api …`(api 변경 파일), `PLAN_DELETE …`(삭제 예정), `PLAN_COUNT …`(건수) 줄과 빌드·검사 단계 결과를 본다.
