@@ -68,6 +68,7 @@ npm run build        # 정적 빌드 → out/
 ## 협업 방식
 
 - `main`에 직접 올리지 않고 브랜치 → PR → 병합 순서로 진행합니다. `main`에는 PR로만 병합하며, 별도 승인은 필요 없습니다.
+- AI 코딩 도구는 작업을 마치면 PR을 만들고, 검사가 통과하면 바로 병합한 뒤 배포 조건을 확인해 배포까지 진행합니다(문서만 바뀌면 배포하지 않음). "PR까지만"·"배포하지 마"라고 하면 거기서 멈춥니다. 자세한 규칙은 [`AGENTS.md`](AGENTS.md) 9장·13장에 있습니다.
 - 커밋 메시지는 `종류(범위): 한국어 요약` 형식입니다. 예: `feat(payments): 파티별 정원 검사`
 - 운영 배포는 GitHub Actions → **Deploy (manual)** 로만 합니다. 서버에 직접 올리지 않습니다. 절차는 [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)를 참고하세요.
 - 화면 구성, 기능, 예약·결제 규칙이 바뀌면 같은 PR에서 `docs/PROJECT_OVERVIEW.md`도 고칩니다.

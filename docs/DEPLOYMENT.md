@@ -204,7 +204,9 @@ PLAN_COUNT frontend changed=… new_dirs=… delete=…
 PLAN_COUNT api changed=… new_dirs=… delete=…   ← 건수는 로그 끝부분에
 ```
 
-### Claude Code 에게 "배포해"라고 할 때
+### Claude Code 에게 "배포해"라고 할 때 (작업 뒤 자동 배포도 같음)
+
+Claude 는 작업을 마치면 PR 을 만들고, 검사가 통과하면 바로 병합한 뒤 아래 절차로 배포까지 진행합니다. 배포 대상은 바뀐 파일로 정하고(`api`/`frontend`/`all`), 문서만 바뀌면 배포하지 않습니다. 요청자가 "PR까지만" 또는 "배포하지 마"라고 하면 거기서 멈춥니다(`AGENTS.md` 9장·13장).
 
 Claude 는 아래 순서로 진행하고, **조건을 모두 만족하면 요청자의 추가 승인 없이 `deploy` 까지 실행**합니다. (CLAUDE.md 의 "운영 배포 규칙"과 같은 내용)
 
