@@ -42,6 +42,7 @@ yarn-error.log*
 /api/auth/oauth-config.php
 /api/payments/toss-config.php
 /api/auth/portone-config.php
+/api/integrations/autoinsta-config.php
 
 # Server-side runtime data (preserved on server, not in repo)
 /api/data/
