@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * 관리자 파티 등록/수정 — "대표이미지"(상세페이지 맨 위 16:9) 자르기 창 (docs/specs/party-detail-relayout.md A-3).
+ * 관리자 파티 등록/수정 — "상단이미지"(heroImageUrl, 상세페이지 맨 위 16:9) 자르기 창 (docs/specs/party-detail-relayout.md A-3).
  *  - 16:9 틀 안에서 사진을 끌어 위치를 옮기고, 슬라이더로 확대/축소한다 (방향키로도 이동).
  *  - 상세페이지에서 겹치는 자리 표시: 왼쪽 위 상태 배지(가로 30%·세로 20%), 오른쪽 아래 인원 표시(가로 35%·세로 15%).
  *  - [적용] → 1600×900 JPEG(품질 0.85)로 만든다. 고른 영역이 1600px 보다 작으면 늘리지 않고 그 크기(16:9 유지) 그대로.
@@ -121,10 +121,10 @@ export default function PartyHeroCropModal({ file, onCancel, onApply, onPickOthe
   };
 
   return (
-    <div className="fixed inset-0 z-[230] flex items-center justify-center bg-black/60 p-0 md:p-4" role="dialog" aria-modal="true" aria-label="대표이미지 16:9 자르기">
+    <div className="fixed inset-0 z-[230] flex items-center justify-center bg-black/60 p-0 md:p-4" role="dialog" aria-modal="true" aria-label="상단이미지 16:9 자르기">
       <div className="flex max-h-full w-full flex-col overflow-y-auto bg-white p-4 md:max-w-2xl md:rounded-2xl md:p-6">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <h3 className="text-base font-black md:text-lg">대표이미지 자르기 (16:9)</h3>
+          <h3 className="text-base font-black md:text-lg">상단이미지 자르기 (16:9)</h3>
           <button type="button" onClick={onCancel} aria-label="닫기" className="-m-2 p-2 text-gray-500 hover:text-brand-black"><X size={20} /></button>
         </div>
         <p className="mb-3 text-[13px] text-gray-600 md:text-sm">사진을 끌어 위치를 맞추고, 아래 막대로 크기를 조절하세요. 어두운 칸은 상세페이지에서 배지·인원 표시가 겹치는 자리예요.</p>

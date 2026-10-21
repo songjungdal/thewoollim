@@ -513,7 +513,7 @@ export default function PartyClientView({ id, initialParties }: { id: string; in
       </span>
     </button>
   );
-  // 참가 구성 파티 + 납작한 메인이미지(대표이미지 없음) — 모바일은 회차 표시를 이미지 바로 아래에 (왼쪽 위 배지와 겹치지 않게)
+  // 참가 구성 파티 + 납작한 대표이미지(상단이미지 없음) — 모바일은 회차 표시를 이미지 바로 아래에 (왼쪽 위 배지와 겹치지 않게)
   const pillBelowOnMobile = stock.hasOptions && !detailItem.heroImageUrl;
 
   // 정보 패널 한 줄 — 아이콘 원 + (태블릿·PC만) 회색 라벨 + 값. 모바일 라벨은 화면 낭독기에만
@@ -758,13 +758,13 @@ export default function PartyClientView({ id, initialParties }: { id: string; in
           transition={{ duration: 0.5 }}
           className="pb-16 pt-3 md:pb-20 md:pt-8 lg:pb-24 lg:pt-10"
         >
-          {/* ── 상단: 대표이미지 → 제목·소개 → 정보 패널 → 사전 승인제 한 줄 → 참가 항목 선택 → 소개글 (E-1, 가운데 한 단) ── */}
+          {/* ── 상단: 상단이미지 → 제목·소개 → 정보 패널 → 사전 승인제 한 줄 → 참가 항목 선택 → 소개글 (E-1, 가운데 한 단) ── */}
           <div className={CONTAINER}>
             <Link href="/#apply" className="mb-3 inline-flex items-center gap-2 py-2 text-sm font-bold text-gray-500 transition-colors hover:text-brand-black md:mb-5 md:text-base">
               <ArrowLeft size={18} /> 목록으로 돌아가기
             </Link>
 
-            {/* 대표이미지 — 관리자 "대표이미지"(16:9) 우선. 없으면 "메인이미지"를 자르지 않고 원본 비율, 둘 다 없으면 공통 기본 배너(원본 비율) */}
+            {/* 상단이미지 — 관리자 "상단이미지"(heroImageUrl, 16:9) 우선. 없으면 "대표이미지"(imageUrl, 파티 카드 이미지)를 자르지 않고 원본 비율, 둘 다 없으면 공통 기본 배너(원본 비율) */}
             <div className="relative overflow-hidden rounded-2xl bg-gray-100">
               {detailItem.heroImageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element

@@ -69,7 +69,7 @@ foreach ($parties as $p) {
         'maxAge'               => isset($p['maxAge'])   ? (int)$p['maxAge']   : null,
         'allowedMaritalStatus' => $p['allowedMaritalStatus'] ?? null,
         'imageUrl'             => $p['imageUrl']    ?? null,
-        'heroImageUrl'         => $p['heroImageUrl'] ?? null,   // 대표이미지 — 상세페이지 맨 위 16:9
+        'heroImageUrl'         => $p['heroImageUrl'] ?? null,   // 상단이미지 — 상세페이지 맨 위 16:9
         'description'          => $p['description'] ?? null,
         'targetGroup'          => $p['targetGroup'] ?? null,
         'theme'                => $p['theme']       ?? null,

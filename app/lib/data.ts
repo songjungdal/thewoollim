@@ -60,8 +60,8 @@ export type Party = {
   maxAge?: number;                            // 최대 나이 (만 나이)
   allowedMaritalStatus?: AllowedMaritalStatus; // "all" | "싱글" | "돌싱"
   // 콘텐츠 (관리자가 등록 폼에서 입력) — 누락 시 placeholder
-  imageUrl?: string;     // 메인이미지 — 메인페이지·파티 목록 카드. /uploads/parties/<file> 형태의 절대경로 또는 외부 URL
-  heroImageUrl?: string; // 대표이미지 — 상세페이지 맨 위 16:9 (관리자가 16:9로 잘라 올림). 없으면 상세는 메인이미지를 원본 비율로
+  imageUrl?: string;     // 대표이미지 — 파티신청(메인페이지)·파티 목록 카드. /uploads/parties/<file> 형태의 절대경로 또는 외부 URL
+  heroImageUrl?: string; // 상단이미지 — 상세페이지 맨 위 16:9 (관리자가 16:9로 잘라 올림). 없으면 상세는 대표이미지를 원본 비율로
   description?: string;  // 파티 소개/내용 (multiline 가능)
   locationShort?: string; // 짧은 장소명(최대 10자) — 상세페이지 하단 바. 없으면 locationTag
   // 메인 페이지 필터 카테고리 (선택 — 누락 시 해당 필터에서 제외, "전체" 탭에서만 노출)
