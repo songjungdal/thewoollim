@@ -9,6 +9,7 @@ type Company = { name: string; ceo: string; biz_no: string; address: string; tel
 
 const STORAGE_KEY = "woollim_company";
 const CHANNEL_NAME = "woollim_company";
+const SUPPORT_EMAIL = "info@thewoollim.com";
 
 /**
  * 빌드 타임에 production /api/admin/company.php 응답을 가져와
@@ -82,6 +83,12 @@ export default function Footer() {
                  <p>
                    상호명 : {company.name}
                    {company.tel ? <> <span className="text-gray-500">|</span> Tel. {company.tel}</> : null}
+                   {/* 카드사 심사 필수 항목(고객센터 이메일). 줄이 넘치면 Email 항목만 통째로 다음 줄로 내려간다 */}
+                   {" "}
+                   <span className="inline-block whitespace-nowrap">
+                     <span className="text-gray-500">|</span> Email.{" "}
+                     <a href={`mailto:${SUPPORT_EMAIL}`} className="hover:text-brand-point transition-colors">{SUPPORT_EMAIL}</a>
+                   </span>
                  </p>
                  <p>대표자 : {company.ceo} <span className="text-gray-500">|</span> 사업자등록번호: {company.biz_no}</p>
                  <p>주소 : {company.address}</p>
