@@ -8,6 +8,7 @@ import { ShoppingBag, LogOut, User, Trash2, CheckSquare, Square, CreditCard, Pen
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useAuth, calcCouponDiscount, type BookingStatus } from "../context/AuthContext";
+import MembershipSection from "./MembershipSection";
 import { useParties, PARTIES_NOT_LOADED } from "../lib/useParties";
 import { partyStockStatus, linePriceFor, partyHasOptions, partyOptionById, dateOnly, VBANK_INFO, COUPON_DISABLED_MESSAGE } from "../lib/data";
 
@@ -391,6 +392,9 @@ export default function MyPage() {
 
             {/* 섹션 이동 여백 — 모바일: 헤더 72px + 고정 탭 70px 아래, lg: 헤더 96px 아래.
                 globals.css 의 section { scroll-margin-top: 5rem } 보다 우선하도록 ! 사용 */}
+            {/* 멤버십 — 멤버십 기록이 있는 회원에게만 보인다 */}
+            <MembershipSection />
+
             {/* 내 예약 현황 — 진행 중은 카드, 지난 예약(모임종료·환불 완료·취소됨)은 아래 접기 */}
             {visibleBookings.length > 0 && (
               <section id="bookings" className="scroll-mt-[156px]! lg:scroll-mt-28!">

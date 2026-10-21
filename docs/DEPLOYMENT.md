@@ -70,7 +70,7 @@ rsync 필터의 `P`(삭제 금지)와 `-`(전송 제외)를 함께 적용합니�
 
 | 구분 | 서버 경로 (웹 루트 기준) |
 |---|---|
-| 비밀 설정 | `api/db-config.php`, `api/auth/sms-config.php`, `api/auth/oauth-config.php`, `api/auth/portone-config.php`, `api/payments/toss-config.php`, 그 밖의 `*-config.php` |
+| 비밀 설정 | `api/db-config.php`, `api/auth/sms-config.php`, `api/auth/oauth-config.php`, `api/auth/portone-config.php`, `api/payments/toss-config.php`, 그 밖의 `*-config.php`(멤버십 자동결제 `api/payments/toss-billing-config.php` 포함) |
 | 운영 데이터 | `api/data/` |
 | 세션 | `api/auth/sessions/`, `api/admin/sessions/` (그 밖의 `sessions/` 포함) |
 | 업로드 | `uploads/`, `api/uploads/` |

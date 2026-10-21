@@ -163,6 +163,33 @@ export default function RefundPage() {
                 </ul>
               </section>
 
+              {/* 멤버십(정기결제) 해지·환불 — 이용약관 제15조 ⑤⑥⑦⑨ 요약 */}
+              <section id="membership" className="scroll-mt-28">
+                <div className="flex items-center gap-3 mb-6 md:mb-8">
+                  <CreditCard className="text-brand-point-ink flex-shrink-0" size={24} />
+                  <h2 className="text-2xl md:text-3xl font-black tracking-tight">멤버십(정기결제) 해지·환불</h2>
+                </div>
+                <ul className="bg-gray-50 border border-gray-100 rounded-2xl md:rounded-3xl p-6 md:p-9 space-y-4 md:space-y-5 text-sm md:text-base text-gray-700 leading-relaxed">
+                  <li className="flex gap-3">
+                    <span className="text-brand-point-ink font-black flex-shrink-0">·</span>
+                    <span><span className="font-bold text-gray-900">해지</span>: 마이페이지에서 언제든지 해지할 수 있습니다. 해지하면 다음 결제부터 청구되지 않고, 이미 결제한 이용 기간이 끝날 때까지 이용할 수 있습니다.</span>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="text-brand-point-ink font-black flex-shrink-0">·</span>
+                    <span><span className="font-bold text-gray-900">환불</span>: 결제일로부터 7일 이내이고 그 이용 기간에 멤버십으로 파티를 예약하거나 참여한 이력이 없으면 <span className="font-bold text-gray-900">전액 환불</span>하며, 멤버십은 즉시 종료됩니다. 그 밖의 경우 해당 이용 기간의 요금은 환불되지 않습니다.</span>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="text-brand-point-ink font-black flex-shrink-0">·</span>
+                    <span><span className="font-bold text-gray-900">자동결제 실패</span>: 회원에게 알리고 재결제를 시도합니다. 재결제가 이루어지지 않으면 멤버십은 종료되며, 종료일 이후의 멤버십 예약은 취소됩니다.</span>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="text-brand-point-ink font-black flex-shrink-0">·</span>
+                    <span><span className="font-bold text-gray-900">예약 제한</span>: 파티 2일 전부터 멤버십 예약을 취소하거나 참석하지 않으면 운영정책에 따라 일정 기간 멤버십 예약이 제한될 수 있습니다.</span>
+                  </li>
+                </ul>
+                <p className="text-xs md:text-sm text-gray-500 mt-3 pl-1">자세한 내용은 이용약관 제15조(멤버십(정기결제) 서비스)를 따릅니다.</p>
+              </section>
+
               {/* ⑤ 환불 기본 규정 — 법적 컨텍스트 (가장 약하게) */}
               <section>
                 <div className="flex items-center gap-3 mb-5 md:mb-6 text-gray-500">

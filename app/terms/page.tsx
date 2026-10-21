@@ -78,7 +78,7 @@ export default function TermsPage() {
                 <h2 className="text-xl md:text-2xl font-black text-black mb-4 md:mb-6">제6조 서비스 제공기간 및 유효기간 안내</h2>
                 <div className="space-y-3 md:space-y-4 text-gray-800">
                   <ul className="list-disc pl-5 md:pl-6 space-y-3 md:space-y-4">
-                    <li><span className="font-bold">서비스 제공 기간(유효기간):</span> 본 파티 예약 서비스의 제공 기간은 결제일(구매일)로부터 3개월(90일)까지입니다.</li>
+                    <li><span className="font-bold">서비스 제공 기간(유효기간):</span> 본 파티 예약 서비스의 제공 기간은 결제일(구매일)로부터 3개월(90일)까지입니다(단건 이용권에 한함).</li>
                     <li><span className="font-bold">예약 소멸 기준:</span> 결제 후 3개월 이내에 파티 참가 예약을 완료하지 않거나 참가하지 않은 이용권은 기간 만료로 소멸되며, 이후에는 환불 및 서비스 제공이 불가합니다.</li>
                   </ul>
                 </div>
@@ -162,9 +162,25 @@ export default function TermsPage() {
                 </div>
               </section>
 
+              <section id="membership" className="scroll-mt-28">
+                <h2 className="text-xl md:text-2xl font-black text-black mb-4 md:mb-6">제15조 멤버십(정기결제) 서비스</h2>
+                <ol className="space-y-3 md:space-y-4 text-gray-800">
+                  <li>① &ldquo;멤버십&rdquo;은 회원이 매월 정해진 요금을 자동결제하고, 이용 기간 동안 회사가 정한 조건에 맞는 파티에 별도 참가비 없이 참여를 신청할 수 있는 서비스입니다.</li>
+                  <li>② 이용 요금은 월 99,000원입니다. 가입일에 첫 결제가 이루어지고, 이후 매월 같은 날 회원이 등록한 카드로 자동결제됩니다. 해당 날짜가 없는 달은 그달 말일에 결제됩니다.</li>
+                  <li>③ 이용 기간은 결제일부터 다음 결제일 전날까지입니다.</li>
+                  <li>④ 멤버십으로 참여할 수 있는 파티, 파티별 멤버십 좌석 수, 동시에 보유할 수 있는 예약 수 등 세부 이용 조건은 멤버십 안내 페이지에 게시합니다.</li>
+                  <li>⑤ 회원은 마이페이지에서 언제든지 멤버십을 해지할 수 있습니다. 해지하면 다음 결제부터 청구되지 않으며, 이미 결제한 이용 기간이 끝날 때까지 이용할 수 있습니다.</li>
+                  <li>⑥ 결제일로부터 7일 이내이고 해당 이용 기간에 멤버십으로 파티를 예약하거나 참여한 이력이 없는 경우 전액 환불하며, 이때 멤버십은 즉시 종료됩니다. 그 밖의 경우 해당 이용 기간의 요금은 환불되지 않습니다.</li>
+                  <li>⑦ 자동결제가 실패하면 회사는 회원에게 알리고 재결제를 시도합니다. 재결제가 이루어지지 않으면 멤버십은 종료되며, 종료일 이후의 멤버십 예약은 취소됩니다.</li>
+                  <li>⑧ 회사가 이용 요금을 인상하는 경우 인상 전에 회원에게 알리고 별도의 동의를 받으며, 동의하지 않은 회원에게는 인상된 요금으로 결제하지 않습니다.</li>
+                  <li>⑨ 파티 2일 전부터 멤버십 예약을 취소하거나 참석하지 않은 경우 운영정책에 따라 일정 기간 멤버십 예약이 제한될 수 있습니다.</li>
+                </ol>
+              </section>
+
               <section className="bg-gray-50 p-5 md:p-8 rounded-xl md:rounded-2xl border border-gray-100">
                 <h2 className="text-lg md:text-xl font-bold text-black mb-3 md:mb-4">부칙</h2>
                 <p className="text-gray-700">이 약관은 사이트 개설일부터 시행합니다.</p>
+                <p className="text-gray-700 mt-2">제15조(멤버십(정기결제) 서비스)와 제6조의 &ldquo;(단건 이용권에 한함)&rdquo; 문구는 2026년 10월 22일부터 시행합니다.</p>
               </section>
             </div>
           </div>

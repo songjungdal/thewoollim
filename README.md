@@ -64,6 +64,7 @@ npm run build        # 정적 빌드 → out/
 | `api/auth/oauth-config.example.php` | `api/auth/oauth-config.php` | 소셜 로그인 |
 | `api/auth/portone-config.example.php` | `api/auth/portone-config.php` | 포트원 본인인증 |
 | `api/payments/toss-config.example.php` | `api/payments/toss-config.php` | 토스 결제 |
+| `api/payments/toss-billing-config.example.php` | `api/payments/toss-billing-config.php` | 토스 자동결제(멤버십) 키·빌링키 암호화 키 |
 
 ## 협업 방식
 
