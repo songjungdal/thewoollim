@@ -8,7 +8,8 @@ import type { PartyDetailImage } from "../../lib/partyDetailTemplates";
  *  - 0장: 그리지 않음
  *  - 1장: 컨테이너 전체 폭, 원본 비율 그대로
  *  - 2장 이상: 모바일은 옆으로 넘겨 보기(한 장 폭 85% — 다음 사진이 살짝 보임, 아래 "1 / n"),
- *             태블릿·PC(768px~)는 2열 그리드(4:3, 3장 이상이면 다음 줄)
+ *             태블릿·PC(768px~)는 2열 그리드(3장 이상이면 다음 줄).
+ *             사진은 자르지 않고 원본 비율 그대로 — 명세의 4:3 자르기 대신 (글자가 든 세로 안내 이미지가 잘리지 않게, 2026-10-21 사용자 결정)
  * alt 는 관리자 대체 텍스트. 모두 lazy 로딩(대표이미지는 이 컴포넌트를 쓰지 않음).
  */
 export default function DetailPhotos({ images, className = "" }: { images: PartyDetailImage[]; className?: string }) {
@@ -39,7 +40,7 @@ export default function DetailPhotos({ images, className = "" }: { images: Party
     <div className={className} data-testid="detail-photos">
       <div
         onScroll={onScroll}
-        className="-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:grid md:grid-cols-2 md:gap-4 md:overflow-visible md:px-0"
+        className="-mx-4 flex snap-x snap-mandatory scroll-px-4 items-start gap-3 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:grid md:grid-cols-2 md:gap-4 md:overflow-visible md:px-0"
       >
         {images.map((img, i) => (
           // eslint-disable-next-line @next/next/no-img-element
@@ -48,7 +49,7 @@ export default function DetailPhotos({ images, className = "" }: { images: Party
             src={img.url}
             alt={img.alt}
             loading="lazy"
-            className="block aspect-[4/3] w-[85%] flex-shrink-0 snap-start rounded-2xl bg-gray-100 object-cover md:w-full"
+            className="block h-auto w-[85%] flex-shrink-0 snap-start rounded-2xl md:w-full"
           />
         ))}
       </div>
