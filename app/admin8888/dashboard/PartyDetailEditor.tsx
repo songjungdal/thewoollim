@@ -2,8 +2,8 @@
 
 /**
  * 관리자 파티 등록 모달 — [상세페이지 안내] 탭 편집기.
- * 화면 순서(상세페이지 순서, docs/specs/party-detail-relayout.md D-1): 신청 전 꼭 확인해주세요(접힘) → 소개글 → [바로가기 탭·실시간 참가자 명단]
- *   → 사진 ③ → 진행방식 → 소요 시간 → 사진 ① → 참가 신청 방법 → 사진 ② → 사진 ④ → 필수 확인 사항 → 사진 ⑤
+ * 화면 순서(상세페이지 순서, docs/specs/party-detail-relayout.md D-1 — 신청방법을 진행방식 앞으로 2026-10-21): 신청 전 꼭 확인해주세요(접힘) → 소개글
+ *   → [바로가기 탭·실시간 참가자 명단] → 사진 ① → 참가 신청 방법 → 사진 ② → 사진 ③ → 진행방식 → 소요 시간 → 사진 ④ → 필수 확인 사항 → 사진 ⑤
  * 사진 칸 키(beforeTimeline 등)와 라벨은 그대로 두고 나열 순서만 화면 순서에 맞춘다.
  * 참가 신청 방법·필수 확인 사항·진행 안내 형식: docs/specs/party-guide-edit.md
  * 구조·입력 제한·기본 내용: app/lib/partyDetailTemplates.ts (서버도 같은 제한을 강제)
@@ -44,7 +44,7 @@ const photosOf = (d: PartyDetail, t: PhotoTarget): PartyDetailImage[] =>
 const photoLimit = (t: PhotoTarget) => (t.kind === "slot" ? DETAIL_LIMITS.imagesPerSlot : DETAIL_LIMITS.aboutImages);
 const photoLabel = (t: PhotoTarget) => (t.kind === "slot" ? DETAIL_IMAGE_SLOT_LABELS[t.slot] : `소개 묶음 ${t.index + 1}`);
 /** 상세페이지 화면 순서 — 편집 블록도 이 순서로 나열한다 */
-const SCREEN_ORDER = "신청 전 꼭 확인해주세요 → 소개글 → (바로가기 탭·실시간 참가자 명단) → 사진 ③ → 진행방식 → 소요 시간 → 사진 ① → 참가 신청 방법 → 사진 ② → 사진 ④ → 필수 확인 사항 → 사진 ⑤";
+const SCREEN_ORDER = "신청 전 꼭 확인해주세요 → 소개글 → (바로가기 탭·실시간 참가자 명단) → 사진 ① → 참가 신청 방법 → 사진 ② → 사진 ③ → 진행방식 → 소요 시간 → 사진 ④ → 필수 확인 사항 → 사진 ⑤";
 /** 사진 칸 표시 규칙 안내 (상세페이지 DetailPhotos 와 같은 규칙) */
 const PHOTO_SLOT_HINT = "사진은 장수와 상관없이 화면 전체 폭으로 크게, 여러 장이면 위에서 아래로 차례로 표시돼요(자르지 않고 원본 비율). 가로 1600px 이상 사진을 권장해요.";
 
@@ -332,6 +332,54 @@ export default function PartyDetailEditor({ value, onChange, partyType, hasSessi
         <p className="text-[13px] md:text-sm text-gray-500">묶음마다 소제목·본문·사진 중 하나 이상을 넣어 주세요.</p>
       </div>
 
+      {photoSlot("beforeApply")}
+
+      {/* 참가 신청 방법 */}
+      <div className="rounded-xl border border-gray-200 p-3 md:p-4 space-y-3" data-testid="apply-editor">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <p className="text-sm font-black text-gray-700">참가 신청 방법 <span className="text-gray-500 font-medium">· 단계가 없으면 상세페이지에서 이 영역이 숨겨집니다</span></p>
+          <button type="button" className={smallBtn}
+            onClick={() => { if (confirm(`참가 신청 방법을 ${PARTY_TYPE_LABELS[partyType]} 기본 문구로 되돌릴까요?`)) set(d => { d.apply = defaultApply(partyType); }); }}>
+            <RotateCcw size={12} />기본 문구로 되돌리기
+          </button>
+        </div>
+        <div>
+          <div className="flex justify-between mb-1"><label className="text-[13px] md:text-sm font-bold text-gray-500">제목</label><Counter value={apply.title} max={DETAIL_LIMITS.applyTitle} /></div>
+          <input value={apply.title} maxLength={DETAIL_LIMITS.applyTitle} placeholder={DEFAULT_APPLY_TITLE} aria-label="참가 신청 방법 제목"
+            onChange={e => { const v = e.target.value; setApply(a => { a.title = v; }); }} className={inputCls} />
+        </div>
+        {apply.steps.map((st, i) => (
+          <div key={i} className="rounded-lg bg-gray-50 border border-gray-200 p-3 space-y-2" data-testid="apply-step-editor">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <span className="text-[13px] md:text-sm font-black tracking-[0.15em] text-brand-point-ink">STEP {i + 1}</span>
+              <div className="flex gap-1">
+                <button type="button" className={smallBtn} disabled={i === 0} aria-label={`참가 신청 방법 ${i + 1}단계 위로`} onClick={() => setApply(a => { a.steps = move(a.steps, i, i - 1); })}><ArrowUp size={12} />위로</button>
+                <button type="button" className={smallBtn} disabled={i === apply.steps.length - 1} aria-label={`참가 신청 방법 ${i + 1}단계 아래로`} onClick={() => setApply(a => { a.steps = move(a.steps, i, i + 1); })}><ArrowDown size={12} />아래로</button>
+                <button type="button" className={`${smallBtn} text-red-600`} aria-label={`참가 신청 방법 ${i + 1}단계 삭제`} onClick={() => setApply(a => { a.steps = a.steps.filter((_, j) => j !== i); })}><Trash2 size={12} />삭제</button>
+              </div>
+            </div>
+            {([["title", "제목 *", DETAIL_LIMITS.applyStepTitle, false], ["desc", "설명 *", DETAIL_LIMITS.applyStepDesc, true], ["note", "참고 박스(선택)", DETAIL_LIMITS.applyStepNote, true]] as const).map(([k, label, max, multi]) => (
+              <div key={k}>
+                <div className="flex justify-between mb-1"><label className="text-[13px] md:text-sm font-bold text-gray-500">{label}</label><Counter value={st[k]} max={max} /></div>
+                {multi ? (
+                  <textarea value={st[k]} maxLength={max} rows={2} aria-label={`참가 신청 방법 ${i + 1}단계 ${APPLY_FIELD[k]}`}
+                    onChange={e => { const v = e.target.value; setApply(a => { a.steps[i][k as keyof PartyApplyStep] = v; }); }} className={`${inputCls} resize-y`} />
+                ) : (
+                  <input value={st[k]} maxLength={max} aria-label={`참가 신청 방법 ${i + 1}단계 ${APPLY_FIELD[k]}`}
+                    onChange={e => { const v = e.target.value; setApply(a => { a.steps[i][k as keyof PartyApplyStep] = v; }); }} className={inputCls} />
+                )}
+              </div>
+            ))}
+          </div>
+        ))}
+        <button type="button" disabled={apply.steps.length >= DETAIL_LIMITS.applySteps}
+          onClick={() => setApply(a => { a.steps = [...a.steps, { title: "", desc: "", note: "" }]; })}
+          className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border-2 border-dashed border-gray-300 text-sm font-bold text-gray-600 hover:border-brand-point disabled:opacity-40 min-h-11 md:min-h-0">
+          <Plus size={14} />참가 신청 단계 추가 ({apply.steps.length}/{DETAIL_LIMITS.applySteps})
+        </button>
+      </div>
+
+      {photoSlot("afterApply")}
       {photoSlot("beforeTimeline")}
 
       {/* 진행 안내 */}
@@ -416,54 +464,6 @@ export default function PartyDetailEditor({ value, onChange, partyType, hasSessi
         </button>
       </div>
 
-      {photoSlot("beforeApply")}
-
-      {/* 참가 신청 방법 */}
-      <div className="rounded-xl border border-gray-200 p-3 md:p-4 space-y-3" data-testid="apply-editor">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <p className="text-sm font-black text-gray-700">참가 신청 방법 <span className="text-gray-500 font-medium">· 단계가 없으면 상세페이지에서 이 영역이 숨겨집니다</span></p>
-          <button type="button" className={smallBtn}
-            onClick={() => { if (confirm(`참가 신청 방법을 ${PARTY_TYPE_LABELS[partyType]} 기본 문구로 되돌릴까요?`)) set(d => { d.apply = defaultApply(partyType); }); }}>
-            <RotateCcw size={12} />기본 문구로 되돌리기
-          </button>
-        </div>
-        <div>
-          <div className="flex justify-between mb-1"><label className="text-[13px] md:text-sm font-bold text-gray-500">제목</label><Counter value={apply.title} max={DETAIL_LIMITS.applyTitle} /></div>
-          <input value={apply.title} maxLength={DETAIL_LIMITS.applyTitle} placeholder={DEFAULT_APPLY_TITLE} aria-label="참가 신청 방법 제목"
-            onChange={e => { const v = e.target.value; setApply(a => { a.title = v; }); }} className={inputCls} />
-        </div>
-        {apply.steps.map((st, i) => (
-          <div key={i} className="rounded-lg bg-gray-50 border border-gray-200 p-3 space-y-2" data-testid="apply-step-editor">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <span className="text-[13px] md:text-sm font-black tracking-[0.15em] text-brand-point-ink">STEP {i + 1}</span>
-              <div className="flex gap-1">
-                <button type="button" className={smallBtn} disabled={i === 0} aria-label={`참가 신청 방법 ${i + 1}단계 위로`} onClick={() => setApply(a => { a.steps = move(a.steps, i, i - 1); })}><ArrowUp size={12} />위로</button>
-                <button type="button" className={smallBtn} disabled={i === apply.steps.length - 1} aria-label={`참가 신청 방법 ${i + 1}단계 아래로`} onClick={() => setApply(a => { a.steps = move(a.steps, i, i + 1); })}><ArrowDown size={12} />아래로</button>
-                <button type="button" className={`${smallBtn} text-red-600`} aria-label={`참가 신청 방법 ${i + 1}단계 삭제`} onClick={() => setApply(a => { a.steps = a.steps.filter((_, j) => j !== i); })}><Trash2 size={12} />삭제</button>
-              </div>
-            </div>
-            {([["title", "제목 *", DETAIL_LIMITS.applyStepTitle, false], ["desc", "설명 *", DETAIL_LIMITS.applyStepDesc, true], ["note", "참고 박스(선택)", DETAIL_LIMITS.applyStepNote, true]] as const).map(([k, label, max, multi]) => (
-              <div key={k}>
-                <div className="flex justify-between mb-1"><label className="text-[13px] md:text-sm font-bold text-gray-500">{label}</label><Counter value={st[k]} max={max} /></div>
-                {multi ? (
-                  <textarea value={st[k]} maxLength={max} rows={2} aria-label={`참가 신청 방법 ${i + 1}단계 ${APPLY_FIELD[k]}`}
-                    onChange={e => { const v = e.target.value; setApply(a => { a.steps[i][k as keyof PartyApplyStep] = v; }); }} className={`${inputCls} resize-y`} />
-                ) : (
-                  <input value={st[k]} maxLength={max} aria-label={`참가 신청 방법 ${i + 1}단계 ${APPLY_FIELD[k]}`}
-                    onChange={e => { const v = e.target.value; setApply(a => { a.steps[i][k as keyof PartyApplyStep] = v; }); }} className={inputCls} />
-                )}
-              </div>
-            ))}
-          </div>
-        ))}
-        <button type="button" disabled={apply.steps.length >= DETAIL_LIMITS.applySteps}
-          onClick={() => setApply(a => { a.steps = [...a.steps, { title: "", desc: "", note: "" }]; })}
-          className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border-2 border-dashed border-gray-300 text-sm font-bold text-gray-600 hover:border-brand-point disabled:opacity-40 min-h-11 md:min-h-0">
-          <Plus size={14} />참가 신청 단계 추가 ({apply.steps.length}/{DETAIL_LIMITS.applySteps})
-        </button>
-      </div>
-
-      {photoSlot("afterApply")}
 
       {photoSlot("beforeNotice")}
 

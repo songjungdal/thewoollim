@@ -37,11 +37,11 @@ const DEFAULT_IMAGE = "/images/party_card_default_banner.jpg";
 
 /** 앵커 이동 때 섹션 제목과 sticky 탭 사이에 남길 여백(px) */
 const ANCHOR_GAP = 16;
-/** 앵커 탭 — 실시간 참가자 / 진행방식 / 신청방법 / 유의사항 (D-2). 섹션이 없는 탭은 그리지 않는다 */
+/** 앵커 탭 — 실시간 참가자 / 신청방법 / 진행방식 / 유의사항 (D-2, 신청방법을 진행방식 앞으로 — 2026-10-21 사용자 요청). 섹션이 없는 탭은 그리지 않는다 */
 const ANCHOR_TABS = [
   { id: "participants", label: "실시간 참가자" },
-  { id: "timeline",     label: "진행방식" },
   { id: "apply-guide",  label: "신청방법" },
+  { id: "timeline",     label: "진행방식" },
   { id: "notice",       label: "유의사항" },
 ] as const;
 type AnchorId = typeof ANCHOR_TABS[number]["id"];
@@ -539,7 +539,8 @@ export default function PartyClientView({ id, initialParties }: { id: string; in
     return !!m && Number(m[1]) === detailItem.maleStock && Number(m[2]) === detailItem.femaleStock;
   };
 
-  // ── 본문 섹션 (D-1 순서) — 사진과 섹션 사이는 24~40px, 섹션끼리는 48~64px ──
+  // ── 본문 섹션 — 실시간 참가자 → 사진 ① → 참가 신청 방법 → 사진 ② → 사진 ③ → 진행방식·소요 시간 → 사진 ④ → 필수 확인 사항 → 사진 ⑤
+  //    (명세 D-1 에서 신청방법을 진행방식 앞으로, 2026-10-21 사용자 요청). 사진과 섹션 사이는 24~40px, 섹션끼리는 48~64px ──
   type Block = { key: string; kind: "section" | "photo"; node: ReactNode };
   const blocks: Block[] = [];
   const pushPhotos = (slot: DetailImageSlot) => {
@@ -565,6 +566,42 @@ export default function PartyClientView({ id, initialParties }: { id: string; in
       </section>
     ),
   });
+
+  // 사진 ① 참가 신청 방법 위
+  pushPhotos("beforeApply");
+
+  // 참가 신청 방법 (D-8) — 위에서 아래로 세로 카드. 단계가 없으면 숨김
+  if (applyView && applyView.steps.length > 0) {
+    blocks.push({
+      key: "apply", kind: "section", node: (
+        <section {...anchorProps("apply-guide")} data-testid="guide-steps">
+          <h2 className={SECTION_TITLE}>{applyView.title}</h2>
+          <ol className="mt-5 space-y-3 md:mt-6">
+            {applyView.steps.map((item, idx) => (
+              <li key={idx} className="flex gap-3 rounded-2xl bg-brand-lightgray p-4 md:gap-4 md:p-5">
+                <span className="flex size-7 flex-shrink-0 items-center justify-center rounded-full bg-brand-black text-[13px] font-black text-white md:size-[34px] md:text-[15px] lg:size-9">
+                  {idx + 1}
+                </span>
+                <div className="min-w-0 flex-1 md:pt-0.5">
+                  <p className="text-[11px] font-bold tracking-[0.15em] text-gray-500 md:text-xs">STEP {idx + 1}</p>
+                  <h3 className="mt-0.5 text-[15px] font-bold leading-snug text-brand-black md:text-[17px]">{item.title}</h3>
+                  <p className="mt-1.5 text-[14px] leading-[1.65] text-gray-600 whitespace-pre-line break-keep md:text-[15px]">{item.desc}</p>
+                  {item.note && (
+                    <p className="mt-3 max-w-[640px] rounded-lg bg-white px-3.5 py-2.5 text-[13px] leading-relaxed text-gray-600 whitespace-pre-line break-keep md:text-[14px]">
+                      {item.note}
+                    </p>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ),
+    });
+  }
+
+  // 사진 ② 참가 신청 방법 아래
+  pushPhotos("afterApply");
 
   // 사진 ③ 진행 안내 위
   pushPhotos("beforeTimeline");
@@ -641,41 +678,7 @@ export default function PartyClientView({ id, initialParties }: { id: string; in
     });
   }
 
-  // 사진 ① 참가 신청 방법 위
-  pushPhotos("beforeApply");
-
-  // 참가 신청 방법 (D-8) — 위에서 아래로 세로 카드. 단계가 없으면 숨김
-  if (applyView && applyView.steps.length > 0) {
-    blocks.push({
-      key: "apply", kind: "section", node: (
-        <section {...anchorProps("apply-guide")} data-testid="guide-steps">
-          <h2 className={SECTION_TITLE}>{applyView.title}</h2>
-          <ol className="mt-5 space-y-3 md:mt-6">
-            {applyView.steps.map((item, idx) => (
-              <li key={idx} className="flex gap-3 rounded-2xl bg-brand-lightgray p-4 md:gap-4 md:p-5">
-                <span className="flex size-7 flex-shrink-0 items-center justify-center rounded-full bg-brand-black text-[13px] font-black text-white md:size-[34px] md:text-[15px] lg:size-9">
-                  {idx + 1}
-                </span>
-                <div className="min-w-0 flex-1 md:pt-0.5">
-                  <p className="text-[11px] font-bold tracking-[0.15em] text-gray-500 md:text-xs">STEP {idx + 1}</p>
-                  <h3 className="mt-0.5 text-[15px] font-bold leading-snug text-brand-black md:text-[17px]">{item.title}</h3>
-                  <p className="mt-1.5 text-[14px] leading-[1.65] text-gray-600 whitespace-pre-line break-keep md:text-[15px]">{item.desc}</p>
-                  {item.note && (
-                    <p className="mt-3 max-w-[640px] rounded-lg bg-white px-3.5 py-2.5 text-[13px] leading-relaxed text-gray-600 whitespace-pre-line break-keep md:text-[14px]">
-                      {item.note}
-                    </p>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ol>
-        </section>
-      ),
-    });
-  }
-
-  // 사진 ② 참가 신청 방법 아래 → 사진 ④ 필수 확인 사항 위
-  pushPhotos("afterApply");
+  // 사진 ④ 필수 확인 사항 위
   pushPhotos("beforeNotice");
 
   // 필수 확인 사항 (D-9) — 머리말 + 아코디언. 첫 항목과 대상별 안내(싱글 전용 등)는 기본 펼침
