@@ -54,7 +54,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko" className={`font-sans`}>
+    <html lang="ko" className={`font-sans`} data-scroll-behavior="smooth">
       <head>
         <meta name="format-detection" content="telephone=no" />
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
