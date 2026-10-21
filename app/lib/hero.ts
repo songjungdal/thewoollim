@@ -31,7 +31,7 @@ export type HeroPartySlide = HeroImageSet & {
   femaleLeft: number;
   almostFull: boolean;
   href: string;
-  fallbackImage: string | null; // 전용 이미지가 없을 때 쓰는 파티 메인이미지(imageUrl) (흐린 배경 + 원본 비율 앞장)
+  fallbackImage: string | null; // 전용 이미지가 없을 때 쓰는 파티 대표이미지(imageUrl) (흐린 배경 + 원본 비율 앞장)
 };
 export type HeroSlideData = HeroBrandSlide | HeroPartySlide;
 
@@ -148,7 +148,7 @@ export const DEFAULT_HERO_CONFIG: HeroConfig = {
  *  1) 브랜드 1장
  *  2) 관리자가 고른 파티 중 모집중인 것만 순서대로
  *  3) 3개 미만이고 autoFill 이면 날짜가 가까운 모집중 파티로 채움(중복 제외)
- *  전용 이미지가 없으면 imagePc/imageMo = null, fallbackImage = 파티 메인이미지(imageUrl), 톤은 "dark" 고정.
+ *  전용 이미지가 없으면 imagePc/imageMo = null, fallbackImage = 파티 대표이미지(imageUrl), 톤은 "dark" 고정.
  */
 export function buildHeroSlides(config: HeroConfig, infos: HeroPartyInfo[]): HeroSlideData[] {
   const b = config.brand;

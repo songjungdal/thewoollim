@@ -648,7 +648,7 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
                         isEnded ? "" : "hover:border-brand-point focus-visible:border-brand-point"
                       } ${psyche ? "card--psyche" : ""}`}
                     >
-                      {/* 배너 9:2 — 관리자 "메인이미지"(imageUrl), 없으면 공통 기본 배너. 배너에만 overflow-hidden + 상단 radius */}
+                      {/* 배너 9:2 — 관리자 "대표이미지"(imageUrl), 없으면 공통 기본 배너. 배너에만 overflow-hidden + 상단 radius */}
                       <div className="relative aspect-[9/2] overflow-hidden rounded-t-[15px] md:rounded-t-[19px] bg-[#F4F5F7]">
                         <img
                           src={card.imageUrl || "/images/party_card_default_banner.jpg"}

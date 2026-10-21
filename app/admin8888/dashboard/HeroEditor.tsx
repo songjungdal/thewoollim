@@ -112,7 +112,7 @@ export default function HeroEditor() {
       .catch(e => setLoadError(e instanceof Error ? e.message : "불러오지 못했습니다."));
   }, []);
 
-  // 쓰는 이미지마다 한 번씩 분석 (자동 톤·비율·가독성) — 파티 메인이미지(imageUrl, 전용 이미지 없을 때 배경)도 포함
+  // 쓰는 이미지마다 한 번씩 분석 (자동 톤·비율·가독성) — 파티 대표이미지(imageUrl, 전용 이미지 없을 때 배경)도 포함
   const slides: HeroSlideData[] = useMemo(() => {
     const resolved: HeroConfig = {
       ...config,
@@ -411,7 +411,7 @@ function PartyCard({ cfg, info, index, total, onMove, onRemove, onChange, analys
       </div>
       <div className="mt-4 pt-4 border-t border-gray-100">
         <p className="text-sm font-black text-gray-700 mb-1">메인 전용 이미지 (선택)</p>
-        {!own && <p className="text-[13px] md:text-sm text-gray-500 mb-3">비워두면 파티 카드의 메인이미지를 사용합니다(흰 글자 고정).</p>}
+        {!own && <p className="text-[13px] md:text-sm text-gray-500 mb-3">비워두면 파티 대표이미지를 사용합니다(흰 글자 고정).</p>}
         <ImageSetEditor value={{ ...NEW_PARTY_SET, ...cfg }} onChange={onChange} analyses={analyses} onUploaded={onUploaded} optional />
       </div>
     </div>
@@ -483,7 +483,7 @@ function ImageSide({ view, value, onChange, analyses, onUploaded, optional }: {
           <input type="file" accept="image/webp,image/jpeg,image/png" className="hidden" disabled={busy}
             onChange={e => { pickFile(e.target.files?.[0]); e.target.value = ""; }} />
         </label>
-        {/* 파티 전용 이미지만 비울 수 있다 (비우면 파티 메인이미지 사용). 브랜드 이미지는 [이미지 바꾸기]로만 교체 */}
+        {/* 파티 전용 이미지만 비울 수 있다 (비우면 파티 대표이미지 사용). 브랜드 이미지는 [이미지 바꾸기]로만 교체 */}
         {img && optional && (
           <button type="button" onClick={() => onChange({ [key("image")]: null } as Partial<ImageSet>)}
             className="px-3 py-2 rounded-lg text-[13px] md:text-xs font-bold border border-gray-200 hover:bg-gray-50 min-h-11 md:min-h-9">

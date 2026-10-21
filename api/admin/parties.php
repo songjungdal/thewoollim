@@ -13,7 +13,7 @@
  *   id, title, dateString, calendarDate, location, target, price, tag,
  *   maleStock, femaleStock, maleBooked, femaleBooked,
  *   minAge?, maxAge?, allowedMaritalStatus?,
- *   imageUrl? (메인이미지), heroImageUrl? (대표이미지 16:9), description?, targetGroup?, theme?, locationTag?,
+ *   imageUrl? (대표이미지 — 파티 카드), heroImageUrl? (상단이미지 — 상세페이지 맨 위 16:9), description?, targetGroup?, theme?, locationTag?,
  *   locationShort? (짧은 장소명, 최대 10자), host_name?,
  *   partyType ('matching'|'solo', create 시 필수), detail? (상세페이지 안내 — lib.php sanitizePartyDetail)
  *   couponDisabled (쿠폰 적용 불가 — true 면 이 파티 결제에 쿠폰을 쓸 수 없다. 없으면 false)
@@ -229,7 +229,7 @@ function sanitizeParty(array $p, bool $isUpdate = false): array {
         $clean['allowedMaritalStatus'] = $ams;
     }
 
-    // 콘텐츠 — 메인이미지(imageUrl, 메인·목록 카드)와 대표이미지(heroImageUrl, 상세페이지 맨 위 16:9).
+    // 콘텐츠 — 대표이미지(imageUrl, 파티신청·목록 카드)와 상단이미지(heroImageUrl, 상세페이지 맨 위 16:9).
     //   수정(update) 때 키가 있는데 비어 있으면 null 로 저장한다 — 관리자가 [이미지 제거] 후 저장한 것을 그대로 반영. 등록은 비면 넣지 않는다.
     foreach (['imageUrl', 'heroImageUrl'] as $k) {
         if (!empty($p[$k]))                                $clean[$k] = (string)$p[$k];
