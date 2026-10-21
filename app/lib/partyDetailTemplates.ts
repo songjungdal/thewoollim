@@ -84,7 +84,10 @@ export const DETAIL_LIMITS = {
 /** 사진 주소 허용 규칙 — /uploads/parties/파일명 또는 /images/파일명 만 (외부 주소 불가) */
 export const DETAIL_IMAGE_URL_RE = /^\/(uploads\/parties|images)\/[A-Za-z0-9._-]+$/;
 
-const DEFAULT_TIMELINE_TITLE  = "Party Timeline";
+/** 진행 안내 기본 제목 — 상세페이지 섹션 이름 "진행방식" (docs/specs/party-detail-relayout.md D-6) */
+export const DEFAULT_TIMELINE_TITLE = "진행방식";
+/** 예전 기본 제목 — 이 제목으로 저장된 파티도 상세페이지에는 "진행방식"으로 보인다 */
+const LEGACY_TIMELINE_TITLE = "Party Timeline";
 const DEFAULT_TIMELINE_INTRO  = "편안한 분위기 속에서, 자연스럽게 이어지는 인연의 시작";
 const DEFAULT_DURATIONS_TITLE = "인원별 소요 시간 안내";
 
@@ -192,6 +195,12 @@ export function compactDetailForSave(d: PartyDetail, type: PartyType): PartyDeta
   // 필수 확인 사항은 회차 항목 포함/미포함 기본 문구 둘 다 "기본 문구"로 본다 — 빠지면 화면이 참가 구성 여부에 맞춰 기본 문구를 고른다
   if (out.notice && (same(out.notice, defaultNotice(type, true)) || same(out.notice, defaultNotice(type, false)))) delete out.notice;
   return out;
+}
+
+/** 상세페이지에 보일 진행 안내 제목 — 비어 있거나 예전 기본값("Party Timeline")이면 "진행방식", 관리자가 직접 쓴 제목은 그대로 */
+export function timelineTitleOf(title: string): string {
+  const t = title.trim();
+  return !t || t === LEGACY_TIMELINE_TITLE ? DEFAULT_TIMELINE_TITLE : title;
 }
 
 export function cloneDetail(d: PartyDetail): PartyDetail {

@@ -19,7 +19,8 @@ export type PartyGuide = {
   notices: GuideNotice[];        // 필수 확인 사항 (onlyWithSessions: 회차가 있는 파티에서만)
 };
 
-const REFUND_NOTE = "성비가 맞지 않거나 주최측의 사정으로 파티가 취소될 경우 100% 환불이나 쿠폰 적립 후 다음 모임 선확정 중 선택하실 수 있습니다.";
+/** 참가 신청 방법 3단계 참고 박스 — 취소·환불 안내 (2026-10-21 문구 변경, docs/specs/party-detail-relayout.md D-8) */
+const REFUND_NOTE = "남녀 성비 미달 또는 주최 측의 사정으로 모임이 취소될 경우, 참가비는 100% 전액 환불 처리됩니다.";
 const PHOTO_NOTICE: GuideNotice = {
   title: "현장 기록 및 마케팅 활용 안내",
   desc:  "파티의 분위기를 기록하기 위해 현장 스케치 촬영이 진행될 수 있습니다. 촬영된 모든 사진은 참가자의 프라이버시 보호를 위해 얼굴 식별이 불가능하도록 블러/모자이크 처리 후 마케팅 자료로 활용됩니다.",

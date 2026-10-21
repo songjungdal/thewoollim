@@ -27,6 +27,8 @@ export function normalizeParty(p: Record<string, unknown>): Party {
     // 콘텐츠 필드 (관리자 입력)
     description:  typeof p.description === "string" ? p.description : "",
     imageUrl:     typeof p.imageUrl    === "string" ? p.imageUrl    : "",
+    heroImageUrl: typeof p.heroImageUrl === "string" ? p.heroImageUrl : "",
+    locationShort: typeof p.locationShort === "string" ? p.locationShort : "",
     // 자격 제한
     minAge:       p.minAge != null && p.minAge !== "" ? Number(p.minAge) : undefined,
     maxAge:       p.maxAge != null && p.maxAge !== "" ? Number(p.maxAge) : undefined,
