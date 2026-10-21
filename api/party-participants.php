@@ -13,7 +13,8 @@
  *    (cancelled = 취소 → 제외. paid_pending_profile 은 mbti/job 이 비어있는 채로 노출되며,
  *     프로필 작성 완료로 pending_approval 전환 시 프론트 30초 폴링으로 자동 반영됨)
  *  - paymentId 가 'test-' 로 시작하면 제외 (테스트 데이터 필터)
- *  - 이름은 maskName() 으로 마스킹, 생년월일은 ageBand() 으로 변환
+ *  - 이름은 성(첫 글자)만 남기고 나머지 글자 수만큼 "*" (김민준 → 김**, 한 글자 이름도 "김*") — participantMaskedName().
+ *    원본 이름은 응답에 넣지 않는다 (docs/specs/party-detail-relayout.md D-4). 생년월일은 ageBand() 으로 변환
  *  - 직업·MBTI 는 그대로 노출 (관리자 폼에서 입력한 공개 의도). 단 솔로파티는 프로필 카드를 받지 않으므로
  *    mbti·job 을 빈 값으로 내려준다 (docs/specs/party-solo-guide.md 4-2)
  *  - 탈퇴 회원: 진행 예정/진행 중 파티(행사일 미경과)는 기존과 동일하게 제외.
@@ -102,12 +103,12 @@ foreach ($users as $u) {
         if (trim((string)$u['name']) === '' || trim((string)$u['gender']) === '') continue;
 
         // 탈퇴 회원은 "탈퇴회원" 익명화 이름을 그대로 마스킹하면 "탈***"처럼 탈퇴 사실이 드러나므로,
-        // 이 명단에서만 성 없이 "***"로 노출 (다른 화면의 maskName() 사용처는 그대로 둠)
+        // 이 명단에서만 성 없이 "***"로 노출
         $isWithdrawnUser = (string)($u['status'] ?? '') === 'withdrawn';
 
         $entry = [
             'id'         => (string)($b['id'] ?? bin2hex(random_bytes(4))),
-            'maskedName' => $isWithdrawnUser ? '***' : maskName((string)$u['name']),
+            'maskedName' => $isWithdrawnUser ? '***' : participantMaskedName((string)$u['name']),
             'ageBand'    => $u['birth_date'] ? ageBand((string)$u['birth_date']) : '',
             'mbti'       => $partyIsSolo ? '' : (string)($u['mbti'] ?? ''),
             'job'        => $partyIsSolo ? '' : (string)($u['job']  ?? ''),
@@ -139,3 +140,14 @@ echo json_encode([
     'male'   => $male,
     'female' => $female,
 ], JSON_UNESCAPED_UNICODE);
+
+/**
+ * 실시간 참가자 명단용 이름 — 첫 글자 + 나머지 글자 수만큼 "*" (김민준 → 김**).
+ * 두 글자 성(남궁 등)도 첫 글자만 남긴다(남궁민 → 남**). 한 글자 이름은 이름이 그대로 보이지 않게 "*" 하나를 붙인다.
+ * 화면(app/party/[id]/PartyClientView.tsx maskParticipantName)도 같은 규칙으로 한 번 더 가린다.
+ */
+function participantMaskedName(string $name): string {
+    $name = trim($name);
+    if ($name === '') return '';
+    return mb_substr($name, 0, 1) . str_repeat('*', max(1, mb_strlen($name) - 1));
+}

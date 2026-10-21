@@ -11,6 +11,7 @@ import { formatKST } from "../../lib/datetime";
 import { partyVisibility, partyTypeOf, PARTY_TYPES, PARTY_TYPE_LABELS, type Party, type PartyType } from "../../lib/data";
 import { templateFor, normalizeDetail, withGuideDefaults, compactDetailForSave, defaultNotice, type PartyDetail } from "../../lib/partyDetailTemplates";
 import PartyDetailEditor, { validateDetail, type DetailSourceParty } from "./PartyDetailEditor";
+import PartyHeroCropModal from "./PartyHeroCropModal";
 import TestUsersTools from "./TestUsersTools";
 import HeroEditor from "./HeroEditor";
 import PartyOptionsEditor from "./PartyOptionsEditor";
@@ -106,7 +107,9 @@ type PartyForm = {
   tag: string;
   maleStock: number;
   femaleStock: number;
-  imageUrl: string;
+  imageUrl: string;       // 메인이미지 — 메인페이지·파티 목록 카드
+  heroImageUrl: string;   // 대표이미지 — 상세페이지 맨 위 16:9 (PartyHeroCropModal 로 잘라 올림)
+  locationShort: string;  // 짧은 장소명 — 상세페이지 하단 바 (최대 10자, 비우면 지역 태그)
   // 참가 자격 제한 (선택). 빈 문자열은 무제한 의미.
   minAge: string;
   maxAge: string;
@@ -124,7 +127,7 @@ const EMPTY_PARTY: PartyForm = {
   partyType: "",
   title: "", description: "", dateString: "", calendarDate: "",
   location: "", target: "", price: 0, priceMale: 0, priceFemale: 0, tag: "주제별",
-  maleStock: 12, femaleStock: 12, imageUrl: "",
+  maleStock: 12, femaleStock: 12, imageUrl: "", heroImageUrl: "", locationShort: "",
   minAge: "", maxAge: "", allowedMaritalStatus: "all",
   targetGroup: "", theme: "", locationTag: "",
   optionMode: "single", optionsDraft: EMPTY_OPTIONS_DRAFT,
@@ -531,7 +534,12 @@ export default function AdminDashboard() {
   // 파티 CRUD state
   const [partyForm, setPartyForm] = useState<PartyForm>(EMPTY_PARTY);
   const [partyEditMode, setPartyEditMode] = useState<"create" | "edit" | null>(null);
-  const [uploading, setUploading] = useState(false);
+  // 이미지 업로드 중인 칸 — 메인이미지(imageUrl) / 대표이미지(heroImageUrl)
+  const [uploading, setUploading] = useState<null | "imageUrl" | "heroImageUrl">(null);
+  // 대표이미지 16:9 자르기 — 자르는 중인 파일, 마지막으로 고른 원본([변경]에서 다시 자르기)
+  const [heroCropFile, setHeroCropFile] = useState<File | null>(null);
+  const [heroSourceFile, setHeroSourceFile] = useState<File | null>(null);
+  const heroFileInputRef = useRef<HTMLInputElement>(null);
   // 상세페이지 안내 편집 — 관리자 전용 GET(/api/admin/parties.php)의 저장값(detail)을 쓴다. 공개 목록 API 에는 detail 이 없다.
   const [adminPartyRows, setAdminPartyRows] = useState<Record<string, AdminPartyRow>>({});
   const [partyDetail, setPartyDetail] = useState<PartyDetail | null>(null);
@@ -544,6 +552,7 @@ export default function AdminDashboard() {
   const resetPartyModal = () => {
     setPartyDetail(null); setDetailUsingDefault(false); setDetailTouched(false);
     setPartyModalTab("basic"); setTypeSwitchPrompt(null);
+    setHeroCropFile(null); setHeroSourceFile(null);
   };
   const updatePartyDetail = (next: PartyDetail | ((prev: PartyDetail) => PartyDetail)) => {
     setPartyDetail(prev => (typeof next === "function" ? (prev ? next(prev) : prev) : next));
@@ -628,6 +637,8 @@ export default function AdminDashboard() {
       tag: p.tag,
       maleStock: p.maleStock, femaleStock: p.femaleStock,
       imageUrl: p.imageUrl ?? "",
+      heroImageUrl: p.heroImageUrl ?? "",
+      locationShort: p.locationShort ?? "",
       minAge: p.minAge != null ? String(p.minAge) : "",
       maxAge: p.maxAge != null ? String(p.maxAge) : "",
       allowedMaritalStatus: (ams === "싱글" || ams === "돌싱") ? ams : "all",
@@ -782,8 +793,9 @@ export default function AdminDashboard() {
     }
   };
 
-  const uploadImage = async (file: File) => {
-    setUploading(true);
+  /** 파티 이미지 업로드 — 메인이미지(imageUrl) 또는 대표이미지(heroImageUrl, 16:9 로 자른 JPEG) 칸에 넣는다 */
+  const uploadImage = async (file: File, field: "imageUrl" | "heroImageUrl" = "imageUrl") => {
+    setUploading(field);
     try {
       const fd = new FormData();
       fd.append("image", file);
@@ -792,15 +804,27 @@ export default function AdminDashboard() {
       });
       const d = await res.json();
       if (d?.ok) {
-        setPartyForm(prev => ({ ...prev, imageUrl: d.url }));
+        setPartyForm(prev => ({ ...prev, [field]: d.url }));
+        setPartyFormDirty(true);
       } else {
         alert(d?.error || "업로드 실패");
       }
     } catch {
       alert("업로드 네트워크 오류");
     } finally {
-      setUploading(false);
+      setUploading(null);
     }
+  };
+
+  /** 대표이미지 — 파일을 고르면 16:9 자르기 창을 연다 */
+  const pickHeroFile = (file: File) => {
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) { alert("JPG·PNG·WebP 파일만 올릴 수 있습니다."); return; }
+    setHeroSourceFile(file);
+    setHeroCropFile(file);
+  };
+  const applyHeroCrop = (blob: Blob) => {
+    setHeroCropFile(null);
+    uploadImage(new File([blob], "hero.jpg", { type: "image/jpeg" }), "heroImageUrl");
   };
 
   // Auth gate
@@ -2247,10 +2271,10 @@ export default function AdminDashboard() {
                         )
                       ) : (
                       <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[280px_minmax(0,1fr)] lg:gap-x-8 lg:items-start">
-                        {/* lg 이상 2단 — 왼쪽: 파티 종류·대표 이미지·쿠폰 옵션 / 오른쪽: 기본 정보·참가비·정원·자격·카테고리.
+                        {/* lg 이상 2단 — 왼쪽: 파티 종류·메인이미지·대표이미지·쿠폰 옵션 / 오른쪽: 기본 정보·참가비·정원·자격·카테고리.
                              모바일·md 는 두 묶음을 풀어(contents) 예전 순서 그대로 한 줄로 보여준다(쿠폰 옵션은 order-last 로 맨 끝) */}
                         <div className="contents lg:flex lg:flex-col lg:gap-4">
-                          <h4 className="text-[13px] md:text-sm font-black text-gray-500">파티 종류 · 대표 이미지</h4>
+                          <h4 className="text-[13px] md:text-sm font-black text-gray-500">파티 종류 · 이미지</h4>
                           {/* 파티 종류 */}
                           <div>
                             <label className="block text-sm font-bold text-gray-700 mb-1.5">파티 종류 *</label>
@@ -2267,9 +2291,9 @@ export default function AdminDashboard() {
                             )}
                           </div>
 
-                          {/* 대표 이미지 */}
+                          {/* 메인이미지 — 메인페이지·파티 목록 카드 (예전 "대표 이미지", imageUrl) */}
                           <div>
-                            <label className="block text-sm font-bold text-gray-700 mb-1.5">대표 이미지</label>
+                            <label className="block text-sm font-bold text-gray-700 mb-1.5">메인이미지</label>
                             <div className="flex items-start gap-3 lg:flex-col">
                               <div className="w-28 h-20 lg:w-full lg:h-auto lg:aspect-[7/5] bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0">
                                 {partyForm.imageUrl
@@ -2277,18 +2301,60 @@ export default function AdminDashboard() {
                                   : <ImageIcon size={20} className="text-gray-500" />}
                               </div>
                               <div className="flex-1 min-w-0 lg:w-full">
-                                <input type="file" accept="image/*" aria-label="대표 이미지"
-                                  onChange={e => { const f = e.target.files?.[0]; if (f) uploadImage(f); }}
+                                <input type="file" accept="image/*" aria-label="메인이미지"
+                                  onChange={e => { const f = e.target.files?.[0]; if (f) uploadImage(f, "imageUrl"); }}
                                   className="block w-full text-xs file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-brand-black file:text-white file:font-bold file:cursor-pointer hover:file:bg-brand-point" />
-                                <p className="text-[13px] md:text-sm text-gray-500 mt-1.5">JPG/PNG/WebP, 최대 10MB. 메인페이지 카드·상세페이지 상단에 공통 노출 — 가로로 넓은 배너형 권장 (예: 1200×300)</p>
-                                {uploading && <p className="text-[13px] md:text-sm text-brand-point-ink mt-1">업로드 중...</p>}
+                                <p className="text-[13px] md:text-sm text-gray-500 mt-1.5">메인페이지·파티 목록 카드에 노출되는 이미지. 가로형 권장 (예: 1200×300)</p>
+                                <p className="text-[13px] md:text-sm text-gray-500">JPG/PNG/WebP, 최대 10MB</p>
+                                {uploading === "imageUrl" && <p className="text-[13px] md:text-sm text-brand-point-ink mt-1">업로드 중...</p>}
                                 {partyForm.imageUrl && (
-                                  <button onClick={() => setPartyForm(p => ({ ...p, imageUrl: "" }))}
+                                  <button onClick={() => { setPartyForm(p => ({ ...p, imageUrl: "" })); setPartyFormDirty(true); }}
                                     className="text-xs text-red-500 mt-1.5 underline min-h-11 md:min-h-0">이미지 제거</button>
                                 )}
                               </div>
                             </div>
                           </div>
+
+                          {/* 대표이미지 — 상세페이지 맨 위 16:9 (heroImageUrl). 파일을 고르면 16:9 자르기 창 → 1600×900 JPEG 업로드 */}
+                          <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-1.5">대표이미지</label>
+                            <div className="flex items-start gap-3 lg:flex-col">
+                              <div className="w-36 lg:w-full aspect-video bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0" data-testid="hero-image-preview">
+                                {partyForm.heroImageUrl
+                                  ? <img src={partyForm.heroImageUrl} alt="" className="w-full h-full object-cover" />
+                                  : <ImageIcon size={20} className="text-gray-500" />}
+                              </div>
+                              <div className="flex-1 min-w-0 lg:w-full">
+                                <input ref={heroFileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" aria-label="대표이미지 파일 선택"
+                                  onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; if (f) pickHeroFile(f); }} />
+                                <div className="flex flex-wrap items-center gap-2">
+                                  {partyForm.heroImageUrl ? (
+                                    <>
+                                      <button type="button" disabled={uploading === "heroImageUrl"}
+                                        onClick={() => { if (heroSourceFile) setHeroCropFile(heroSourceFile); else heroFileInputRef.current?.click(); }}
+                                        className="min-h-11 md:min-h-0 px-3 py-2 rounded-lg bg-brand-black text-white text-xs font-bold hover:bg-brand-point hover:text-black disabled:opacity-40">변경</button>
+                                      <button type="button" disabled={uploading === "heroImageUrl"}
+                                        onClick={() => { setPartyForm(p => ({ ...p, heroImageUrl: "" })); setHeroSourceFile(null); setPartyFormDirty(true); }}
+                                        className="min-h-11 md:min-h-0 px-1 text-xs text-red-500 underline disabled:opacity-40">이미지 제거</button>
+                                    </>
+                                  ) : (
+                                    <button type="button" disabled={uploading === "heroImageUrl"} onClick={() => heroFileInputRef.current?.click()}
+                                      className="min-h-11 md:min-h-0 px-3 py-2 rounded-lg bg-brand-black text-white text-xs font-bold hover:bg-brand-point hover:text-black disabled:opacity-40">파일 선택</button>
+                                  )}
+                                </div>
+                                <p className="text-[13px] md:text-sm text-gray-500 mt-1.5">상세페이지 맨 위에 16:9 비율로 노출. 1600×900 권장(최소 1280×720), JPG 권장. 왼쪽 위는 상태 배지, 오른쪽 아래는 인원 표시가 겹치니 비워 두고 중요한 장면은 가운데에. 미등록 시 메인이미지가 원본 비율로 표시돼요.</p>
+                                {uploading === "heroImageUrl" && <p className="text-[13px] md:text-sm text-brand-point-ink mt-1">업로드 중...</p>}
+                              </div>
+                            </div>
+                          </div>
+                          {heroCropFile && (
+                            <PartyHeroCropModal
+                              file={heroCropFile}
+                              onCancel={() => setHeroCropFile(null)}
+                              onApply={applyHeroCrop}
+                              onPickOther={() => heroFileInputRef.current?.click()}
+                            />
+                          )}
 
                           {/* 쿠폰 적용 불가 (매칭·솔로 공통) — 서버(결제 준비·무통장 신청·결제 완료)도 같은 값으로 쿠폰을 막는다 */}
                           <div className="pt-2 border-t border-gray-100 order-last lg:order-none">
@@ -2328,7 +2394,17 @@ export default function AdminDashboard() {
                           </div>
                           {/* 장소/대상 — lg 이상 2열 */}
                           <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-4">
-                            <FormField label="장소 *" value={partyForm.location} onChange={v => setPartyForm(p => ({ ...p, location: v }))} />
+                            <div className="space-y-4">
+                              <FormField label="장소 *" value={partyForm.location} onChange={v => setPartyForm(p => ({ ...p, location: v }))} />
+                              {/* 짧은 장소명 — 상세페이지 하단 바 (지역 필터용 locationTag 와 따로) */}
+                              <div>
+                                <label htmlFor="party-location-short" className="block text-sm font-bold text-gray-700 mb-1.5">짧은 장소명 (예: 분당, 수원)</label>
+                                <input id="party-location-short" type="text" value={partyForm.locationShort} maxLength={10}
+                                  onChange={e => setPartyForm(p => ({ ...p, locationShort: e.target.value }))}
+                                  className="w-full px-4 py-3 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none min-h-11 md:min-h-0" />
+                                <p className="mt-1.5 text-[13px] md:text-sm text-gray-500">상세페이지 하단 바에 표시돼요. 비우면 지역 태그가 표시돼요.</p>
+                              </div>
+                            </div>
                             <FormField label="대상 *" value={partyForm.target} onChange={v => setPartyForm(p => ({ ...p, target: v }))} placeholder="만 25-35세 / 남녀비율 1:1" />
                           </div>
                           <div className="pt-4 border-t border-gray-100"><h4 className="text-[13px] md:text-sm font-black text-gray-500">참가비 · 정원</h4></div>

@@ -5,8 +5,8 @@
  * GET → [{id,title,dateString,calendarDate,location,target,price,tag,
  *        maleStock,femaleStock,maleBooked,femaleBooked,
  *        minAge?,maxAge?,allowedMaritalStatus?,
- *        imageUrl?,description?,
- *        targetGroup?,theme?,locationTag?,partyType,couponDisabled,
+ *        imageUrl?,heroImageUrl?,description?,
+ *        targetGroup?,theme?,locationTag?,locationShort?,partyType,couponDisabled,
  *        sessions?:[{id,name,startTime,maleStock,femaleStock,maleBooked,femaleBooked}],
  *        options?:[{id,name,sessionIds,priceMale,priceFemale}]}]
  *   sessions·options: 참가 구성이 있는 솔로파티만 (docs/specs/party-options-solo.md). 회차별 신청 인원은 party_counts 의 sessions.
@@ -69,10 +69,12 @@ foreach ($parties as $p) {
         'maxAge'               => isset($p['maxAge'])   ? (int)$p['maxAge']   : null,
         'allowedMaritalStatus' => $p['allowedMaritalStatus'] ?? null,
         'imageUrl'             => $p['imageUrl']    ?? null,
+        'heroImageUrl'         => $p['heroImageUrl'] ?? null,   // 대표이미지 — 상세페이지 맨 위 16:9
         'description'          => $p['description'] ?? null,
         'targetGroup'          => $p['targetGroup'] ?? null,
         'theme'                => $p['theme']       ?? null,
         'locationTag'          => $p['locationTag'] ?? null,
+        'locationShort'        => $p['locationShort'] ?? null,  // 짧은 장소명 — 상세페이지 하단 바
         // 파티 종류 — 상세페이지 안내(detail)는 10초 폴링 응답을 키우지 않도록 넣지 않는다 (/api/party-detail.php 로 따로 조회)
         'partyType'            => partyTypeOf($p),
         // 쿠폰 적용 불가 — 장바구니·결제 화면이 쿠폰 입력을 막는 데 쓴다 (서버 결제 검증은 따로 함)

@@ -35,7 +35,7 @@ type SlideProps = {
 export default function HeroSlide({ slide, mode, active = true, reducedMotion = false, priority = false, firstEntry = false, interactive = true }: SlideProps) {
   const isParty = slide.type === "party";
   const ownImage = !!(slide.imagePc || slide.imageMo);
-  // 전용 이미지가 없는 파티 슬라이드는 대표 이미지를 흐린 배경 + 원본 비율로 보여주고 흰 글자 고정
+  // 전용 이미지가 없는 파티 슬라이드는 파티 메인이미지(imageUrl)를 흐린 배경 + 원본 비율로 보여주고 흰 글자 고정
   const toneMo: HeroTone = isParty && !ownImage ? "dark" : slide.toneMo;
   const tonePc: HeroTone = isParty && !ownImage ? "dark" : slide.tonePc;
   const t = (part: Parameters<typeof toneClass>[0]) => `${toneClass(part, toneMo, tonePc, mode)} ${HERO_TONE_TRANSITION}`;

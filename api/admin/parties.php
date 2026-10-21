@@ -13,12 +13,14 @@
  *   id, title, dateString, calendarDate, location, target, price, tag,
  *   maleStock, femaleStock, maleBooked, femaleBooked,
  *   minAge?, maxAge?, allowedMaritalStatus?,
- *   imageUrl?, description?, targetGroup?, theme?, locationTag?, host_name?,
+ *   imageUrl? (메인이미지), heroImageUrl? (대표이미지 16:9), description?, targetGroup?, theme?, locationTag?,
+ *   locationShort? (짧은 장소명, 최대 10자), host_name?,
  *   partyType ('matching'|'solo', create 시 필수), detail? (상세페이지 안내 — lib.php sanitizePartyDetail)
  *   couponDisabled (쿠폰 적용 불가 — true 면 이 파티 결제에 쿠폰을 쓸 수 없다. 없으면 false)
  *   sessions?·options? (솔로파티 참가 구성 — lib.php sanitizePartyOptions, docs/specs/party-options-solo.md)
  *
- * update: 요청에 없는 host_name·partyType·detail·voting_status·status·couponDisabled·sessions·options 는 기존 값을 그대로 둔다.
+ * update: 요청에 없는 host_name·partyType·detail·voting_status·status·couponDisabled·imageUrl·heroImageUrl·locationShort·sessions·options 는
+ *         기존 값을 그대로 둔다. imageUrl·heroImageUrl·locationShort 는 키가 있고 비어 있으면 null 로 저장한다(이미지 제거·장소명 지우기).
  * GET: 참가 구성이 있는 파티에는 applicants(취소되지 않은 예약 기준 항목별·회차별 신청자 수)를 덧붙인다.
  *
  * 보안:
@@ -128,14 +130,15 @@ try {
                     if ((string)($row['id'] ?? '') === (string)$p['id']) {
                         // 요청에 없는 필드는 기존 값 유지 — 관리자 폼이 보내지 않는 값(투표 상태·모임종료 표시·담당자)이
                         // 저장 때마다 초기화되지 않도록. partyType·detail 도 요청에 없으면 그대로 둔다.
-                        foreach (['host_name', 'partyType', 'detail', 'voting_status', 'status', 'couponDisabled'] as $keep) {
+                        // imageUrl·heroImageUrl·locationShort 도 요청에 키가 없으면(예전 관리자 화면) 그대로 둔다 — 키가 있고 비어 있으면 지운다(sanitizeParty)
+                        foreach (['host_name', 'partyType', 'detail', 'voting_status', 'status', 'couponDisabled', 'imageUrl', 'heroImageUrl', 'locationShort'] as $keep) {
                             if (!array_key_exists($keep, $p) && array_key_exists($keep, $row)) {
                                 $p[$keep] = $row[$keep];
                             }
                         }
                         $before = $row;
                         // 참가 구성(sessions·options)은 요청에 없으면 sanitizePartyOptions 가 기존 값을 유지한다
-                        $row = sanitizePartyOptions($p, $before, sanitizeParty($p));
+                        $row = sanitizePartyOptions($p, $before, sanitizeParty($p, true));
                         $logInfo = [
                             'id'            => $row['id'],
                             'row'           => $row,
@@ -196,7 +199,7 @@ jsonOut(['ok' => true]);
 /**
  * 관리자 입력 파티 객체 정규화 — 알려진 필드만 통과시켜 안전한 형태로 저장.
  */
-function sanitizeParty(array $p): array {
+function sanitizeParty(array $p, bool $isUpdate = false): array {
     $clean = [
         'id'                   => (string)($p['id']           ?? ''),
         'title'                => trim((string)($p['title']        ?? '')),
@@ -226,8 +229,12 @@ function sanitizeParty(array $p): array {
         $clean['allowedMaritalStatus'] = $ams;
     }
 
-    // 콘텐츠
-    if (!empty($p['imageUrl']))    $clean['imageUrl']    = (string)$p['imageUrl'];
+    // 콘텐츠 — 메인이미지(imageUrl, 메인·목록 카드)와 대표이미지(heroImageUrl, 상세페이지 맨 위 16:9).
+    //   수정(update) 때 키가 있는데 비어 있으면 null 로 저장한다 — 관리자가 [이미지 제거] 후 저장한 것을 그대로 반영. 등록은 비면 넣지 않는다.
+    foreach (['imageUrl', 'heroImageUrl'] as $k) {
+        if (!empty($p[$k]))                                $clean[$k] = (string)$p[$k];
+        elseif ($isUpdate && array_key_exists($k, $p))     $clean[$k] = null;
+    }
     if (!empty($p['description'])) $clean['description'] = (string)$p['description'];
 
     // 카테고리
@@ -239,6 +246,11 @@ function sanitizeParty(array $p): array {
 
     $lt = (string)($p['locationTag'] ?? '');
     if (in_array($lt, ['서울', '성남', '수원', '인천', '용인', '기타'], true)) $clean['locationTag'] = $lt;
+
+    // 짧은 장소명 (상세페이지 하단 바, 최대 10자) — 제어문자·HTML 꺾쇠는 지운다. 수정 때 키가 있는데 비어 있으면 null
+    $ls = mb_substr(trim((string)preg_replace('/[<>\x00-\x1F\x7F]/u', '', (string)($p['locationShort'] ?? ''))), 0, 10);
+    if ($ls !== '')                                          $clean['locationShort'] = $ls;
+    elseif ($isUpdate && array_key_exists('locationShort', $p)) $clean['locationShort'] = null;
 
     // host_name (관리자 전용 — 공개 API 응답에는 포함 안 됨)
     if (array_key_exists('host_name', $p)) {
