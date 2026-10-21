@@ -41,6 +41,7 @@ yarn-error.log*
 /api/auth/sms-config.php
 /api/auth/oauth-config.php
 /api/payments/toss-config.php
+/api/payments/toss-billing-config.php
 /api/auth/portone-config.php
 /api/integrations/autoinsta-config.php
 

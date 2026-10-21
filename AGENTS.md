@@ -141,7 +141,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## 10. 비밀 정보
 
-- 실제 설정 파일(`api/db-config.php`, `api/auth/*-config.php`, `api/payments/toss-config.php`), `.env*`, `api/data/`, `api/uploads/`, 세션 폴더는 커밋하지 않는다(`.gitignore`). 설정 항목을 바꾸면 `*.example.php` 템플릿만 고친다.
+- 실제 설정 파일(`api/db-config.php`, `api/auth/*-config.php`, `api/payments/toss-config.php`, `api/payments/toss-billing-config.php`), `.env*`, `api/data/`, `api/uploads/`, 세션 폴더는 커밋하지 않는다(`.gitignore`). 설정 항목을 바꾸면 `*.example.php` 템플릿만 고친다.
 - 비밀번호, API 키, SSH 키, 서버 주소는 코드·문서·커밋 메시지·PR 설명·대화에 적지 않는다.
 - 저장소에 이미 알려진 보안 문제가 있다(`docs/PROJECT_OVERVIEW.md` 7-3). 해당 코드를 다룰 때 실제 값을 문서나 PR에 옮겨 적지 않는다.
 
