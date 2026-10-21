@@ -46,7 +46,7 @@ const photoLabel = (t: PhotoTarget) => (t.kind === "slot" ? DETAIL_IMAGE_SLOT_LA
 /** 상세페이지 화면 순서 — 편집 블록도 이 순서로 나열한다 */
 const SCREEN_ORDER = "신청 전 꼭 확인해주세요 → 소개글 → (바로가기 탭·실시간 참가자 명단) → 사진 ③ → 진행방식 → 소요 시간 → 사진 ① → 참가 신청 방법 → 사진 ② → 사진 ④ → 필수 확인 사항 → 사진 ⑤";
 /** 사진 칸 표시 규칙 안내 (상세페이지 DetailPhotos 와 같은 규칙) */
-const PHOTO_SLOT_HINT = "1장이면 화면 전체 폭으로 크게, 여러 장이면 모바일은 옆으로 넘겨 보기 / 태블릿·PC는 2열로 표시돼요. 가로 1600px 이상, 가로형(3:2 또는 4:3) 사진을 권장해요.";
+const PHOTO_SLOT_HINT = "사진은 장수와 상관없이 화면 전체 폭으로 크게, 여러 장이면 위에서 아래로 차례로 표시돼요(자르지 않고 원본 비율). 가로 1600px 이상 사진을 권장해요.";
 
 function Counter({ value, max }: { value: string; max: number }) {
   return <span className="text-[13px] md:text-sm text-gray-500 tabular-nums">{value.length}/{max}</span>;

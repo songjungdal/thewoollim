@@ -879,8 +879,9 @@ export default function PartyClientView({ id, initialParties }: { id: string; in
                   <span className="min-w-0 flex-1 text-[13px] text-gray-700 break-keep md:text-[15px]">
                     <strong className="font-black text-brand-point-ink">사전 승인제 운영</strong>
                     {" · "}
-                    <span className="md:hidden">결제 후 프로필 확인을 거쳐 참가확정</span>
-                    <span className="hidden md:inline">결제 후 프로필 확인을 거쳐 참가가 확정됩니다.</span>
+                    {/* 솔로파티는 프로필 카드를 받지 않으므로 "운영진 확인" (2026-10-21 사용자 결정) */}
+                    <span className="md:hidden">결제 후 {partyType === "solo" ? "운영진" : "프로필"} 확인을 거쳐 참가확정</span>
+                    <span className="hidden md:inline">결제 후 {partyType === "solo" ? "운영진" : "프로필"} 확인을 거쳐 참가가 확정됩니다.</span>
                   </span>
                   <ChevronDown className={`size-4 flex-shrink-0 text-gray-400 transition-transform ${beforeApplyOpen ? "rotate-180" : ""}`} aria-hidden />
                 </button>
