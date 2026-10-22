@@ -126,7 +126,7 @@ GitHub 이 제공하는 실행기(GitHub-hosted runner)는 실행할 때마다 I
 
 - `environment: production` 을 지정한 작업(`plan`·`deploy`·`rollback-list`·`rollback`)이 **`main` 브랜치에서 실행될 때만** 이 값을 읽을 수 있습니다. `build` 작업과 다른 브랜치의 실행은 읽을 수 없습니다.
 - **같은 이름을 Repository Secrets 에 두지 않습니다.** 남아 있으면 production 환경을 지정하지 않은 작업(예: 다른 브랜치에서 수정한 워크플로)도 그 값을 읽을 수 있어 `main` 전용 제한을 우회할 수 있습니다.
-  - 서버 접속용 3개는 production 환경에만 있습니다. Repository Secrets 에는 빌드용 3개와 아래 멤버십 테스트 키 2개가 있습니다.
+  - 서버 접속용 3개는 production 환경에만 있습니다. Repository Secrets 에는 빌드용 3개가 있고, 아래 멤버십 테스트 키 2개는 처음에 Repository Secrets 에 넣었다가 production 환경으로 옮기는 중입니다(아래 참고).
 
 #### 멤버십 자동결제 키 (1회용 워크플로 전용)
 
@@ -135,8 +135,9 @@ GitHub 이 제공하는 실행기(GitHub-hosted runner)는 실행할 때마다 I
 | `TOSS_BILLING_CLIENT_KEY` | 자동결제 MID 의 API 개별 연동 클라이언트 키 (`test_ck_…`) |
 | `TOSS_BILLING_SECRET_KEY` | 같은 MID 의 시크릿 키 (`test_sk_…`) |
 
-- 등록 위치: 원칙은 production 환경 Secret 이지만, 개인 계정 저장소에서 환경 Secret 은 **저장소 소유자만** 등록할 수 있어(협업자는 Repository Secret 만 가능) 지금의 **test 키는 Repository Secrets 에 등록**했습니다(2026-10-22). 실제 돈이 오가지 않는 테스트 키라서 허용했습니다.
-  - **live 키로 바꿀 때는 반드시 production 환경 Secret 에 등록하고, Repository Secrets 의 같은 이름 2개는 삭제**합니다(위 "같은 이름을 두지 않는다" 규칙).
+- 등록 위치: **production 환경 Secret**. 개인 계정 저장소에서 환경 Secret 은 **저장소 소유자 계정만** 등록할 수 있습니다(협업자는 Repository Secret 만 가능).
+  - 2026-10-22 처음에는 협업자 계정으로 Repository Secrets 에 test 키를 넣어 실행했고, 같은 날 소유자 계정으로 production 환경에도 등록했습니다. 같은 이름이면 환경 Secret 이 우선합니다.
+  - **Repository Secrets 에 남은 같은 이름 2개는 삭제합니다**(위 "같은 이름을 두지 않는다" 규칙). live 키도 production 환경에만 등록합니다.
 - 2026-10-22 실행 완료: 서버에 설정 파일 생성(소유자 `toss-config.php` 와 같음, 640, test 모드, 암호화 키 새로 생성). 서버 밖 확인 결과 `state.php` ready=true·mode=test, `/membership/` 에 테스트 결제 안내 표시, 설정 파일 주소는 200·0바이트. 워크플로는 비활성화됨.
 - `.github/workflows/ops-membership-key.yml`("Ops - membership billing key (one-time)", `confirm=INSTALL`)이 이 값으로 서버에 `api/payments/toss-billing-config.php` 를 만듭니다. 서버 쪽 처리는 `scripts/ops/membership-key-remote.sh`.
   - 소유자는 `toss-config.php` 와 같게, 권한 640, `TOSS_BILLING_MODE=test`.
@@ -229,6 +230,18 @@ sudo mv $W/api/data ${W}-data-old-$(date +%Y%m%d)
 - 3) 에서 새 파일이 계속 `api/data/` 쪽에만 생기면 전환되지 않은 것입니다(권한, 또는 PHP 의 `open_basedir` 제한 가능성). 이때는 4) 를 하지 말고 개발 담당에게 알립니다.
 - 서버가 환경변수 `THEWOOLLIM_DATA_DIR` 을 지정하면 그 경로를 먼저 씁니다(같은 조건).
 - 옮기기 전까지는 PHP 가 `api/data/`, `api/auth/sessions/`, `api/admin/sessions/` 에 웹 접근 차단 `.htaccess` 를 만들어 둡니다(없을 때만). Apache 가 `.htaccess` 를 따를 때만 효과가 있으므로 근본 해결은 위 이전입니다.
+
+### 6-2. phpMyAdmin·IP 접속(기본 사이트) 차단 (2026-10-22)
+
+- 배경: 서버에 phpMyAdmin 패키지가 설치돼 있고(2026-02-11, 사용하지 않음), IP 주소로 접속하면 Apache 기본 사이트(`000-default.conf`·`default-ssl.conf`, 웹 루트 `/var/www/html`)가 예전 사이트 사본을 보여 주고 있었습니다. 실제 사이트(`thewoollim.com`·`www.thewoollim.com`)의 웹 루트는 `/var/www/thewoollim` 입니다.
+- 조치: 1회용 워크플로(배포와 같은 서버 접속 방식)로 Apache 설정 2개를 추가했습니다. 기존 설정 파일과 사이트 파일은 고치거나 지우지 않았습니다.
+  - `/etc/apache2/conf-available/zz-block-phpmyadmin.conf` — 모든 사이트에서 `/phpmyadmin`(대소문자 무관)을 403
+  - `/etc/apache2/conf-available/zz-deny-default-site.conf` — 웹 루트가 `/var/www/html` 인 사이트 전체를 403 (`<If>` 라서 그 폴더의 `.htaccess` 허용보다 우선)
+  - 되돌리기: `sudo a2disconf zz-block-phpmyadmin zz-deny-default-site && sudo systemctl reload apache2`
+- 결과(서버 밖에서 확인): IP 로 `/`·`/phpmyadmin/` 은 http·https 모두 403, `thewoollim.com`·`www.thewoollim.com` 의 `/` 는 200, `/phpmyadmin/` 은 403, `/api/parties.php`·`/membership/` 은 200.
+- 과거 기록 점검(접근 기록 2026-02-11 ~ 2026-10-22): `/phpmyadmin` 로그인 시도(POST)는 0건, 로그인해야 보이는 화면의 응답도 0건이었습니다. 200 응답 53건(2026-05-02 ~ 07-10)은 기본 사이트에서 나온 것으로, 49건은 같은 기록의 사이트 첫 화면 응답과 크기가 똑같았습니다(phpMyAdmin 화면이 아니라 첫 화면이 돌아간 것으로 판단). phpMyAdmin 인증 방식은 비밀번호 입력(cookie)이라 POST 없이는 로그인할 수 없습니다.
+- `/var/www/html` 사본(파일 1,144개, 2026-10-08 수정)에는 데이터·설정·SQL·백업·압축·PHP 파일이 없고, 개인정보로 보이는 값도 없었습니다(사이트 대표 전화번호 형식 1개뿐). 파일은 지우지 않았습니다.
+- 남은 선택 사항: phpMyAdmin 패키지 삭제(`apt purge phpmyadmin`), `/var/www/html` 사본 정리. 둘 다 운영 판단 후 진행합니다.
 
 ## 7. 처음 가동하는 순서
 
