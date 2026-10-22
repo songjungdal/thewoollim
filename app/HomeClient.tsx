@@ -1014,6 +1014,8 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
                     moreLinkClick={(info) => { setScheduleSelected(toYmd(info.date)); return "dayGridMonth"; }}
                     dayCellClassNames={(arg) => (toYmd(arg.date) === pcSelectedDate ? ["sch-day-selected"] : [])}
                     // 칩 — 맨 앞 종류 태그(매칭/솔로) + 시간·테마 + (마감임박 "임박" / 마감 "마감" 태그).
+                    // 끝 태그가 붙는 칩은 칸(1024px 화면에서 안쪽 약 64px)에 한 줄로 다 들어가지 않아 두 줄:
+                    // [종류] 시간 / 테마 [임박·마감]. 시간은 항상 보이고 테마만 말줄임.
                     // 배경: 모집중·마감임박 = 종류 연한 색, 마감 = 회색 + 취소선, 지난 일정 = 흰색 점선. 테두리는 마감임박만 빨강
                     eventContent={(arg) => {
                       const xp = arg.event.extendedProps as { time?: string; theme?: string; status?: ScheduleStatus | null; partyType?: PartyType };
@@ -1026,20 +1028,28 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
                         full: "bg-[#F3F4F6] border-transparent text-gray-500",
                         past: "bg-white border-dashed border-[#E5E7EB] text-[#9CA3AF]",
                       }[status];
+                      const label = xp.theme ? categoryLabel(xp.theme) : arg.event.title;
+                      const endTag = status === "soon" ? { text: "임박", tone: "bg-[#DC2626] text-white" }
+                        : status === "full" ? { text: "마감", tone: "bg-[#111111] text-white" }
+                        : null;
                       return (
                         <div
                           title={`${xp.time ? xp.time + " " : ""}${arg.event.title}`}
-                          className={`sch-chip ${partyType === "solo" ? "sch-chip-solo" : "sch-chip-match"} sch-chip-${status} w-full flex items-center gap-1 rounded-md border px-1 xl:px-1.5 py-1 text-xs font-bold leading-tight ${chipTone}`}
+                          className={`sch-chip ${partyType === "solo" ? "sch-chip-solo" : "sch-chip-match"} sch-chip-${status} w-full rounded-md border px-1 xl:px-1.5 py-1 text-xs font-bold leading-tight ${chipTone}`}
                         >
-                          <span className={`flex-shrink-0 rounded px-1 text-[10px] font-black ${scheduleTypeBadgeTone(partyType, status)}`}>
-                            {SCHEDULE_TYPE_STYLE[partyType].short}
-                          </span>
-                          <span className="min-w-0 flex-1 truncate">
-                            {xp.time && <span className="tabular-nums mr-1">{xp.time}</span>}
-                            <span className={status === "full" ? "line-through" : ""}>{xp.theme ? categoryLabel(xp.theme) : arg.event.title}</span>
-                          </span>
-                          {status === "soon" && <span className="flex-shrink-0 rounded px-1 text-[10px] font-black bg-[#DC2626] text-white">임박</span>}
-                          {status === "full" && <span className="flex-shrink-0 rounded px-1 text-[10px] font-black bg-[#111111] text-white">마감</span>}
+                          <div className="flex items-center gap-1">
+                            <span className={`flex-shrink-0 rounded px-1 text-[10px] font-black ${scheduleTypeBadgeTone(partyType, status)}`}>
+                              {SCHEDULE_TYPE_STYLE[partyType].short}
+                            </span>
+                            {xp.time && <span className="flex-shrink-0 tabular-nums">{xp.time}</span>}
+                            {!endTag && <span className="min-w-0 truncate">{label}</span>}
+                          </div>
+                          {endTag && (
+                            <div className="mt-0.5 flex items-center gap-1">
+                              <span className={`min-w-0 flex-1 truncate ${status === "full" ? "line-through" : ""}`}>{label}</span>
+                              <span className={`flex-shrink-0 rounded px-1 text-[10px] font-black ${endTag.tone}`}>{endTag.text}</span>
+                            </div>
+                          )}
                         </div>
                       );
                     }}
