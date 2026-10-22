@@ -37,6 +37,11 @@ section {
   box-shadow: 0 0 20px rgba(64, 224, 208, 0.4), inset 0 0 10px rgba(64, 224, 208, 0.2);
 }
 
+/* ─── 솔로파티 종류색 (app/HomeClient.tsx #schedule SCHEDULE_TYPE_STYLE) ─────────────
+   solo-grad: 진한 배지·점(분홍→보라, 흰 글자) / solo-grad-soft: 연한 배경(달력 칩·날짜 블록) */
+.solo-grad      { background: linear-gradient(90deg, #FF2EC4, #7B3BFF); color: #fff; }
+.solo-grad-soft { background: linear-gradient(135deg, #FFE3F6, #EDE3FF); }
+
 /* ─── 파티 신청 카드 — 솔로파티(모집 중) 사이키 테두리 효과 ───────────────────────
    app/page.tsx 카드에 .card--psyche, 신청 버튼에 .apply-btn. 카드 배경은 투명이어야 한다
    (::after 글로우가 z-index -1 이라 카드 배경이 있으면 덮임 — 배경은 배너·본문에 각각 칠함). */
