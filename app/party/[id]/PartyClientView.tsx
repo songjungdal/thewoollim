@@ -20,6 +20,7 @@ import ParticipantsRoster, { type Participant, type GenderSeats, type RosterStat
 import PartyCtaButtons, { type PartyCtaState } from "./PartyCtaButtons";
 import PartyBottomBar, { type BarFee } from "./PartyBottomBar";
 import DetailPhotos from "./DetailPhotos";
+import { canGoBackInSite } from "../../lib/navHistory";
 
 /** 오늘 날짜(한국 시간) "YYYY-MM-DD" — useSyncExternalStore 용 (날짜가 바뀌어도 다시 구독할 필요는 없음) */
 const todayKSTString = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date());
@@ -763,8 +764,18 @@ export default function PartyClientView({ id, initialParties }: { id: string; in
         >
           {/* ── 상단: 상단이미지 → 제목·소개 → 정보 패널 → 사전 승인제 한 줄 → 참가 항목 선택 → 소개글 (E-1, 가운데 한 단) ── */}
           <div className={CONTAINER}>
-            <Link href="/#apply" className="mb-3 inline-flex items-center gap-2 py-2 text-sm font-bold text-gray-500 transition-colors hover:text-brand-black md:mb-5 md:text-base">
-              <ArrowLeft size={18} /> 목록으로 돌아가기
+            {/* 이전 화면으로 — 사이트 안에서 들어왔으면 뒤로가기(메인 일정·파티 카드는 그때 화면을 되살림, app/HomeClient.tsx),
+                 바로 들어왔으면(이전 화면이 사이트 밖) 예전처럼 메인 파티 목록으로 */}
+            <Link
+              href="/#apply"
+              onClick={(e) => {
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0 || !canGoBackInSite()) return;
+                e.preventDefault();
+                router.back();
+              }}
+              className="mb-3 inline-flex items-center gap-2 py-2 text-sm font-bold text-gray-500 transition-colors hover:text-brand-black md:mb-5 md:text-base"
+            >
+              <ArrowLeft size={18} /> 이전으로 돌아가기
             </Link>
 
             {/* 상단이미지 — 관리자 "상단이미지"(heroImageUrl, 16:9) 우선. 없으면 "대표이미지"(imageUrl, 파티 카드 이미지)를 자르지 않고 원본 비율, 둘 다 없으면 공통 기본 배너(원본 비율) */}
