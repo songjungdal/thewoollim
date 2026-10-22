@@ -1,0 +1,150 @@
+# [1회용] 멤버십 자동결제 설정 파일을 서버에 넣는다 (2026-10-22)
+#
+# 실행: Actions → "Ops - membership billing key (one-time)" → Run workflow (main 에서만), confirm=INSTALL
+#   1. production 환경 Secret TOSS_BILLING_CLIENT_KEY(test_ck_…)·TOSS_BILLING_SECRET_KEY(test_sk_…) 형식 확인 (값은 출력하지 않음)
+#   2. 서버에 api/payments/toss-billing-config.php 를 만든다 — scripts/ops/membership-key-remote.sh
+#      소유자는 toss-config.php 와 같게, 권한 640, TOSS_BILLING_MODE=test.
+#      암호화 키는 파일이 없을 때만 서버에서 openssl rand -base64 32 로 만들고, 파일이 있으면 절대 바꾸지 않는다.
+#      키 값은 명령줄이 아니라 ssh 표준입력으로 넘긴다(로그·프로세스 목록에 남지 않게). Secret 값은 GitHub 이 로그에서도 가린다.
+#   3. 서버 밖(이 실행기)에서 확인 — state.php 가 ready·test 인지, 멤버십 화면에 "준비 중" 안내가 없는지, 설정 파일 주소가 아무 내용도 보여주지 않는지
+#      /membership/join/ 은 로그인해야 열리므로(비로그인은 로그인 화면으로 이동), 같은 안내 부품(MembershipNotice)과
+#      같은 state.php 의 ready 값을 쓰는 소개 페이지 /membership/ 을 실제 브라우저로 연다.
+#   4. 모두 통과하면 이 워크플로를 스스로 비활성화한다. 다시 쓰려면 Actions 화면에서 Enable workflow.
+# 서버 접속은 deploy.yml 과 같은 방식·같은 production 환경 Secret.
+
+name: Ops - membership billing key (one-time)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "서버에 멤버십 설정 파일을 만들려면 INSTALL 입력"
+        type: string
+        default: ""
+
+permissions: {}
+
+concurrency:
+  group: thewoollim-production
+  cancel-in-progress: false
+
+env:
+  WEB_ROOT: ${{ vars.DEPLOY_WEB_ROOT || '/var/www/thewoollim' }}
+  SITE_URL: ${{ vars.DEPLOY_SITE_URL || 'https://thewoollim.com' }}
+  DEPLOY_SSH_USER: ${{ vars.DEPLOY_SSH_USER || 'admin' }}
+  DEPLOY_SSH_PORT: ${{ vars.DEPLOY_SSH_PORT || '22' }}
+  DEPLOY_ACCESS_MODE: ${{ vars.DEPLOY_ACCESS_MODE || 'direct' }}
+
+jobs:
+  install:
+    name: 멤버십 설정 파일 넣기
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment:
+      name: production
+    permissions:
+      contents: read
+      id-token: write
+      actions: write   # 마지막 단계에서 이 워크플로를 비활성화
+    steps:
+      - name: 실행 조건 확인
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          [ "$GITHUB_REF" = "refs/heads/main" ] || { echo "::error::main 브랜치에서만 실행합니다."; exit 1; }
+          [ "$CONFIRM" = "INSTALL" ] || { echo "::error::confirm=INSTALL 이 필요합니다."; exit 1; }
+
+      - name: 키 형식 확인 (값은 출력하지 않음)
+        env:
+          CK: ${{ secrets.TOSS_BILLING_CLIENT_KEY }}
+          SK: ${{ secrets.TOSS_BILLING_SECRET_KEY }}
+        run: |
+          CK="${CK//[[:space:]]/}"; SK="${SK//[[:space:]]/}"
+          [ -n "$CK" ] || { echo "::error::Secret TOSS_BILLING_CLIENT_KEY 가 없습니다 (production 환경 Secret 으로 등록)"; exit 1; }
+          [ -n "$SK" ] || { echo "::error::Secret TOSS_BILLING_SECRET_KEY 가 없습니다 (production 환경 Secret 으로 등록)"; exit 1; }
+          [[ "$CK" =~ ^test_ck_[A-Za-z0-9_-]+$ ]] || { echo "::error::TOSS_BILLING_CLIENT_KEY 가 test_ck_… 형식이 아닙니다 (결제위젯 키 test_gck_… 나 live 키는 쓸 수 없음)"; exit 1; }
+          [[ "$SK" =~ ^test_sk_[A-Za-z0-9_-]+$ ]] || { echo "::error::TOSS_BILLING_SECRET_KEY 가 test_sk_… 형식이 아닙니다 (결제위젯 키 test_gsk_… 나 live 키는 쓸 수 없음)"; exit 1; }
+          echo "클라이언트 키 test_ck_… / 시크릿 키 test_sk_… 형식 확인"
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: AWS 자격증명 (보안그룹 임시 허용 모드)
+        if: env.DEPLOY_ACCESS_MODE == 'aws-sg-temporary'
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: 보안그룹 임시 허용
+        if: env.DEPLOY_ACCESS_MODE == 'aws-sg-temporary'
+        env:
+          AWS_SECURITY_GROUP_ID: ${{ vars.AWS_SECURITY_GROUP_ID }}
+        run: bash scripts/deploy/aws-sg.sh open
+
+      - name: SSH 설정
+        env:
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}
+          DEPLOY_SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+        run: bash scripts/deploy/ssh-setup.sh
+
+      - name: 서버에 설정 파일 만들기
+        env:
+          CK: ${{ secrets.TOSS_BILLING_CLIENT_KEY }}
+          SK: ${{ secrets.TOSS_BILLING_SECRET_KEY }}
+        run: |
+          set -euo pipefail
+          REMOTE="$(ssh thewoollim-prod 'mktemp /tmp/membership-key-XXXXXXXX.sh')"
+          ssh thewoollim-prod "cat > '$REMOTE'" < scripts/ops/membership-key-remote.sh
+          # 키는 표준입력으로만 넘긴다 (printf 는 셸 내장 명령이라 프로세스 목록에도 나오지 않음)
+          printf '%s\n%s\n' "$CK" "$SK" | ssh thewoollim-prod "bash '$REMOTE' install '$WEB_ROOT'; rc=\$?; rm -f '$REMOTE'; exit \$rc"
+
+      - name: 서버 밖에서 확인
+        run: |
+          set -uo pipefail
+          ok=1
+          state="$(curl -s -m 20 "$SITE_URL/api/membership/state.php?t=$(date +%s)")"
+          ready="$(jq -r '.ready // "없음"' <<<"$state" 2>/dev/null || echo "응답 오류")"
+          mode="$(jq -r '.mode // "없음"' <<<"$state" 2>/dev/null || echo "응답 오류")"
+          echo "state.php → ready=$ready, mode=$mode"
+          [ "$ready" = "true" ] && [ "$mode" = "test" ] || { echo "::error::state.php 가 ready=true, mode=test 가 아닙니다"; ok=0; }
+
+          r="$(curl -s -o "$RUNNER_TEMP/cfg" -m 20 -w '%{http_code} %{size_download}' "$SITE_URL/api/payments/toss-billing-config.php")"
+          echo "toss-billing-config.php 주소 → 상태 ${r% *}, 내용 ${r#* }바이트 (0 이거나 403·404 여야 함)"
+          [ "${r#* }" = "0" ] || case "${r% *}" in 403|404) ;; *) echo "::error::설정 파일 주소가 내용을 돌려줍니다"; ok=0 ;; esac
+          rm -f "$RUNNER_TEMP/cfg"
+
+          # 실제 브라우저(실행기에 설치된 Chrome)로 화면 문구 확인 — 화면 내용은 출력하지 않는다
+          # /membership/join/ 은 로그인이 필요해 같은 안내 부품·같은 ready 값을 쓰는 /membership/ 을 연다
+          CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          if [ -z "$CHROME" ]; then
+            echo "::warning::실행기에 Chrome 이 없어 화면 문구 확인을 건너뜁니다"
+          else
+            "$CHROME" --headless=new --no-sandbox --disable-gpu --virtual-time-budget=20000 --dump-dom "$SITE_URL/membership/" > "$RUNNER_TEMP/join.html" 2>/dev/null || true
+            if grep -q '멤버십 결제는 준비 중입니다' "$RUNNER_TEMP/join.html"; then
+              echo "::error::/membership/ 에 아직 \"준비 중\" 안내가 보입니다"; ok=0
+            elif grep -q '테스트 결제 — 실제로 청구되지 않습니다' "$RUNNER_TEMP/join.html"; then
+              echo "/membership/ → \"준비 중\" 안내 없음, \"테스트 결제 — 실제로 청구되지 않습니다\" 안내 표시"
+            else
+              echo "::error::/membership/ 화면에서 안내 문구를 찾지 못했습니다 (페이지 로딩 실패 가능)"; ok=0
+            fi
+            rm -f "$RUNNER_TEMP/join.html"
+          fi
+          [ "$ok" = "1" ] || exit 1
+
+      - name: 이 워크플로 비활성화
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl -fsS -X PUT -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/ops-membership-key.yml/disable"
+          echo "워크플로를 비활성화했습니다 (다시 쓰려면 Actions 화면에서 Enable workflow)"
+
+      - name: 보안그룹 임시 허용 제거
+        if: always() && env.DEPLOY_ACCESS_MODE == 'aws-sg-temporary'
+        env:
+          AWS_SECURITY_GROUP_ID: ${{ vars.AWS_SECURITY_GROUP_ID }}
+        run: bash scripts/deploy/aws-sg.sh close
