@@ -20,6 +20,7 @@ import { PARTICIPANTS, FAQS, partyStockStatus, withLiveCounts, partyVisibility, 
 import { useAuth } from "./context/AuthContext";
 import { useParties, PARTIES_NOT_LOADED } from "./lib/useParties";
 import { daysUntil } from "./lib/refund";
+import { cameBackHere } from "./lib/navHistory";
 
 /* ── #schedule(파티 일정) 섹션 전용 — 일정 상태별 표시 스타일 ──────────────
  * 우선순위: 지난 일정 > 마감 > 마감임박 > 모집중 (계산은 컴포넌트의 scheduleStatus 참고) */
@@ -34,9 +35,9 @@ const SCHEDULE_STATUS_STYLE: Record<ScheduleStatus, { label: string; tone: strin
 };
 /* 파티 종류색 — solid: 진한 배지·점 / soft: 연한 배경(달력 칩·날짜 블록) / ink: 연한 배경 위 글자.
  * 솔로파티 그라데이션(solo-grad, solo-grad-soft)은 app/globals.css */
-const SCHEDULE_TYPE_STYLE: Record<PartyType, { label: string; short: string; solid: string; soft: string; ink: string }> = {
-  matching: { label: PARTY_TYPE_LABELS.matching, short: "매칭", solid: "bg-[#40E0D0] text-[#003B37]", soft: "bg-[#E6FAF8]",   ink: "text-[#00756F]" },
-  solo:     { label: PARTY_TYPE_LABELS.solo,     short: "솔로", solid: "solo-grad",                  soft: "solo-grad-soft", ink: "text-[#9D1C8A]" },
+const SCHEDULE_TYPE_STYLE: Record<PartyType, { label: string; solid: string; soft: string; ink: string }> = {
+  matching: { label: PARTY_TYPE_LABELS.matching, solid: "bg-[#40E0D0] text-[#003B37]", soft: "bg-[#E6FAF8]",   ink: "text-[#00756F]" },
+  solo:     { label: PARTY_TYPE_LABELS.solo,     solid: "solo-grad",                  soft: "solo-grad-soft", ink: "text-[#9D1C8A]" },
 };
 /** 파티 종류 배지 — 모집중·마감임박은 진하게, 마감은 연하게, 지난 일정은 회색 (상태 계산 전에는 모집중처럼) */
 const scheduleTypeBadgeTone = (partyType: PartyType, status: ScheduleStatus | null | undefined) => {
@@ -77,6 +78,8 @@ const withWebpGallery = <T extends { image_path: string }>(item: T): T =>
 /** Date → 로컬 기준 "YYYY-MM-DD" */
 const toYmd = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+/** 파티 상세로 갈 때 저장하는 메인 화면 상태 (sessionStorage) — 뒤로 돌아오면 되살린다 (HomeClient saveHomeReturn) */
+const HOME_RETURN_KEY = "woollim_home_return";
 /** "YYYY-MM-DD" → "10.17 토" */
 const scheduleShortLabel = (ymd: string) => {
   const d = new Date(ymd + "T00:00:00");
@@ -295,8 +298,13 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
     return () => mq.removeEventListener("change", update);
   }, []);
 
-  // 필터(종류·대상·테마·지역) 변경 시 더보기 상태 초기화 → 새 결과는 항상 접힌 채 처음부터 노출
+  // 필터(종류·대상·테마·지역) 변경 시 더보기 상태 초기화 → 새 결과는 항상 접힌 채 처음부터 노출.
+  // 단, 뒤로 돌아와 필터를 되살린 직후 한 번은 건너뛴다(되살린 더보기 상태 유지 — restoredFiltersRef)
+  const restoredFiltersRef = useRef<string | null>(null);
   useEffect(() => {
+    const restored = restoredFiltersRef.current;
+    restoredFiltersRef.current = null;
+    if (restored !== null && restored === JSON.stringify([selections, typeTab])) return;
     setApplyMoreOpen(false);
   }, [selections, typeTab]);
 
@@ -306,6 +314,88 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
     setMobileYear(d.getFullYear());
     setMobileMonth(d.getMonth() + 1);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* ── 파티 상세 → [이전으로 돌아가기]·뒤로가기 시 메인 화면 되살리기 ──────────────
+   * 일정(달력·리스트)이나 파티 카드에서 상세로 갈 때 그때 상태를 sessionStorage 에 저장(saveHomeReturn)하고,
+   * 메인이 다시 열릴 때 꺼내 지운다. 뒤로가기로 돌아온 경우(cameBackHere)에만 되살린다 — 로고 등 링크로 오면 처음 화면.
+   * 스크롤은 섹션(#schedule·#apply) 위치 기준으로 저장해, 위쪽 내용(후기·현장스케치)이 늦게 불러와져 높이가 바뀌어도 같은 자리. */
+  const calendarRef = useRef<FullCalendar>(null);
+  type HomeReturn = {
+    anchor: "schedule" | "apply";
+    offset: number;                       // 섹션 맨 위에서 화면 맨 위까지 거리(px)
+    calendarDate: string | null;          // PC 달력에서 보던 달 (YYYY-MM-DD)
+    scheduleSelected: string | null;
+    mobileYear: number;
+    mobileMonth: number;
+    mobilePicked: string | null;
+    mobileListMode: "day" | "month" | null;
+    scheduleMoreOpen: boolean;
+    applyMoreOpen: boolean;
+    selections: Record<CategoryAxis, string | null>;
+    typeTab: "all" | PartyType;
+  };
+  const saveHomeReturn = (anchor: HomeReturn["anchor"]) => {
+    const el = document.getElementById(anchor);
+    const snap: HomeReturn = {
+      anchor,
+      offset: el ? -el.getBoundingClientRect().top : 0,
+      calendarDate: calendarRef.current ? toYmd(calendarRef.current.getApi().getDate()) : null,
+      scheduleSelected, mobileYear, mobileMonth, mobilePicked, mobileListMode, scheduleMoreOpen,
+      applyMoreOpen, selections, typeTab,
+    };
+    try { sessionStorage.setItem(HOME_RETURN_KEY, JSON.stringify(snap)); } catch { /* 저장 실패 시 되살리기만 생략 */ }
+  };
+  /** 일정(달력 칩·PC 패널·모바일 카드)에서 파티 상세로 */
+  const openScheduleParty = (id: string) => {
+    saveHomeReturn("schedule");
+    router.push(`/party/${id}`);
+  };
+  // 꺼낸 상태 — ref 에 두어 개발 모드(Strict Mode)에서 effect 가 두 번 실행돼도 같은 값으로 되살린다
+  const homeReturnRef = useRef<HomeReturn | null | undefined>(undefined);
+  useEffect(() => {
+    if (homeReturnRef.current === undefined) {
+      let saved: HomeReturn | null = null;
+      try {
+        saved = JSON.parse(sessionStorage.getItem(HOME_RETURN_KEY) || "null") as HomeReturn | null;
+        sessionStorage.removeItem(HOME_RETURN_KEY);
+      } catch { /* 못 읽으면 되살리지 않음 */ }
+      homeReturnRef.current = saved && cameBackHere() ? saved : null;
+    }
+    const snap = homeReturnRef.current;
+    if (!snap) return;
+
+    // 일정 섹션 — 보던 달·고른 날짜·모바일 리스트 상태 (위 모바일 연/월 초기화보다 뒤에 실행되어 덮어쓴다)
+    if (snap.calendarDate) calendarRef.current?.getApi().gotoDate(snap.calendarDate);
+    setScheduleSelected(snap.scheduleSelected);
+    if (snap.mobileYear) { setMobileYear(snap.mobileYear); setMobileMonth(snap.mobileMonth); }
+    setMobilePicked(snap.mobilePicked);
+    setMobileListMode(snap.mobileListMode);
+    setScheduleMoreOpen(snap.scheduleMoreOpen);
+    // 신청 섹션 — 필터·더보기
+    restoredFiltersRef.current = JSON.stringify([snap.selections, snap.typeTab]);
+    setSelections(snap.selections);
+    setTypeTab(snap.typeTab);
+    setApplyMoreOpen(snap.applyMoreOpen);
+
+    // 스크롤 — 섹션 위치 + 저장한 거리. 2초 동안 높이가 바뀌면 다시 맞추고, 사용자가 스크롤·터치·키 입력을 하면 멈춘다
+    const { anchor, offset } = snap;
+    const scrollToSaved = () => {
+      const el = document.getElementById(anchor);
+      if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY + offset, behavior: "instant" });
+    };
+    const USER_EVENTS = ["wheel", "touchstart", "keydown", "mousedown"] as const;
+    const ro = new ResizeObserver(scrollToSaved);
+    const timers: number[] = [];
+    const stop = () => {
+      ro.disconnect();
+      timers.forEach(t => window.clearTimeout(t));
+      USER_EVENTS.forEach(ev => window.removeEventListener(ev, stop));
+    };
+    ro.observe(document.body);
+    USER_EVENTS.forEach(ev => window.addEventListener(ev, stop, { passive: true }));
+    timers.push(window.setTimeout(scrollToSaved, 0), window.setTimeout(scrollToSaved, 300), window.setTimeout(stop, 2000));
+    return stop;
+  }, []);
 
   const sortedParties = useMemo(() => {
     // 선택된 모든 축을 동시에 만족(AND)하는 파티만
@@ -467,7 +557,7 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
       <button
         key={event.id}
         type="button"
-        onClick={() => router.push(`/party/${event.id}`)}
+        onClick={() => openScheduleParty(event.id)}
         className={`w-full text-left rounded-2xl p-4 flex items-center gap-4 transition-all shadow-sm active:scale-[0.98] cursor-pointer ${SCHEDULE_CARD_TONE[status ?? "open"]}`}
       >
         <div className={`flex-shrink-0 w-14 rounded-xl py-2 text-center ${isClosed ? "bg-[#F3F4F6] text-[#9CA3AF]" : typeStyle.soft}`}>
@@ -667,6 +757,7 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
                          motion.div 가 transform 을 쓰므로 안쪽 요소에 준다 */}
                     <Link
                       href={`/party/${card.id}`}
+                      onClick={() => saveHomeReturn("apply")}
                       className={`party-card group h-full flex flex-col rounded-2xl md:rounded-[20px] border border-[#E6E8EC] shadow-[0_2px_8px_rgba(0,0,0,0.04)] md:hover:-translate-y-1 md:hover:shadow-[0_10px_24px_rgba(0,0,0,0.08)] md:focus-visible:-translate-y-1 md:focus-visible:shadow-[0_10px_24px_rgba(0,0,0,0.08)] ${
                         isEnded ? "" : "hover:border-brand-point focus-visible:border-brand-point"
                       } ${psyche ? "card--psyche" : ""}`}
@@ -987,6 +1078,7 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
                     .fc-daygrid-event-dot { display: none !important; }
                   `}} />
                   <FullCalendar
+                    ref={calendarRef}
                     plugins={[dayGridPlugin, interactionPlugin]}
                     initialView="dayGridMonth"
                     // 초기 노출 월 = 접속한 사용자의 현재 날짜. initialDate 생략 시 FullCalendar 가
@@ -994,7 +1086,7 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
                     locale="ko"
                     buttonText={{ today: 'TODAY' }}
                     events={CALENDAR_EVENTS}
-                    eventClick={(info) => router.push(`/party/${info.event.id}`)}
+                    eventClick={(info) => openScheduleParty(info.event.id)}
                     height="auto"
                     headerToolbar={{
                       left: 'prev,next',
@@ -1014,27 +1106,27 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
                     // 팝오버를 열기 때문에 현재 보기(dayGridMonth)를 반환 → 같은 달 그대로 유지.
                     moreLinkClick={(info) => { setScheduleSelected(toYmd(info.date)); return "dayGridMonth"; }}
                     dayCellClassNames={(arg) => (toYmd(arg.date) === pcSelectedDate ? ["sch-day-selected"] : [])}
-                    // 칩 — 종류 태그(매칭/솔로) + 시간. 칸이 좁아 테마·"임박"/"마감" 글자 태그는 넣지 않는다
-                    // (시간이 없는 일정만 시간 자리에 테마). 상태는 색으로만 구분:
-                    // 모집중 = 종류 연한 색, 마감임박 = 종류 연한 색 + 빨간 테두리, 마감 = 회색, 지난 일정 = 흰색 점선
+                    // 칩 — 종류 태그(매칭파티/솔로파티) + 시간(보통 굵기·회색). 칸이 좁아 테마·"임박"/"마감" 글자 태그는 넣지 않는다
+                    // (시간이 없는 일정만 시간 자리에 테마). 태그와 시간이 한 줄에 안 들어가면(1024px 화면 등) 시간이 다음 줄로.
+                    // 상태는 색으로만 구분: 모집중 = 종류 연한 색, 마감임박 = 종류 연한 색 + 빨간 테두리, 마감 = 회색, 지난 일정 = 흰색 점선
                     eventContent={(arg) => {
                       const xp = arg.event.extendedProps as { time?: string; theme?: string; status?: ScheduleStatus | null; partyType?: PartyType };
                       const status = xp.status ?? "open";
                       const partyType = xp.partyType ?? "matching";
                       const soft = SCHEDULE_TYPE_STYLE[partyType].soft;
                       const chipTone = {
-                        open: `${soft} border-transparent text-brand-black`,
-                        soon: `${soft} border-[#F87171] text-brand-black`,
-                        full: "bg-[#F3F4F6] border-transparent text-gray-500",
+                        open: `${soft} border-transparent text-gray-600`,
+                        soon: `${soft} border-[#F87171] text-gray-600`,
+                        full: "bg-[#F3F4F6] border-transparent text-gray-400",
                         past: "bg-white border-dashed border-[#E5E7EB] text-[#9CA3AF]",
                       }[status];
                       return (
                         <div
                           title={`${xp.time ? xp.time + " " : ""}${arg.event.title}`}
-                          className={`sch-chip ${partyType === "solo" ? "sch-chip-solo" : "sch-chip-match"} sch-chip-${status} w-full flex items-center overflow-hidden rounded-md border px-1 py-1 text-xs font-bold leading-tight ${chipTone}`}
+                          className={`sch-chip ${partyType === "solo" ? "sch-chip-solo" : "sch-chip-match"} sch-chip-${status} w-full flex flex-wrap items-center gap-y-0.5 overflow-hidden rounded-md border px-1 py-1 text-xs font-medium leading-tight ${chipTone}`}
                         >
-                          <span className={`flex-shrink-0 mr-1 rounded px-0.5 text-[10px] font-black ${scheduleTypeBadgeTone(partyType, status)}`}>
-                            {SCHEDULE_TYPE_STYLE[partyType].short}
+                          <span className={`flex-shrink-0 mr-1 rounded px-0.5 text-[10px] font-black whitespace-nowrap ${scheduleTypeBadgeTone(partyType, status)}`}>
+                            {SCHEDULE_TYPE_STYLE[partyType].label}
                           </span>
                           {xp.time ? (
                             <span className="flex-shrink-0 tabular-nums">{xp.time}</span>
@@ -1071,7 +1163,7 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
                         <li key={event.id}>
                           <button
                             type="button"
-                            onClick={() => router.push(`/party/${event.id}`)}
+                            onClick={() => openScheduleParty(event.id)}
                             className={`group w-full text-left rounded-2xl p-4 flex items-center gap-3 transition-all ${SCHEDULE_CARD_TONE[status ?? "open"]} ${
                               status === "full" || isPast ? "" : "hover:shadow-md"
                             }`}
