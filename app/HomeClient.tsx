@@ -1013,10 +1013,9 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
                     // 팝오버를 열기 때문에 현재 보기(dayGridMonth)를 반환 → 같은 달 그대로 유지.
                     moreLinkClick={(info) => { setScheduleSelected(toYmd(info.date)); return "dayGridMonth"; }}
                     dayCellClassNames={(arg) => (toYmd(arg.date) === pcSelectedDate ? ["sch-day-selected"] : [])}
-                    // 칩 — 맨 앞 종류 태그(매칭/솔로) + 시간·테마 + (마감임박 "임박" / 마감 "마감" 태그).
-                    // 끝 태그가 붙는 칩은 칸(1024px 화면에서 안쪽 약 64px)에 한 줄로 다 들어가지 않아 두 줄:
-                    // [종류] 시간 / 테마 [임박·마감]. 시간은 항상 보이고 테마만 말줄임.
-                    // 배경: 모집중·마감임박 = 종류 연한 색, 마감 = 회색 + 취소선, 지난 일정 = 흰색 점선. 테두리는 마감임박만 빨강
+                    // 칩 — 종류 태그(매칭/솔로) + 시간 + (마감임박 "임박" / 마감 "마감" 태그). 칸이 좁아 테마는 넣지 않는다
+                    // (시간이 없는 일정만 시간 자리에 테마). 끝 태그는 한 줄에 안 들어가면(1024px 화면 등) 다음 줄로 내려간다.
+                    // 배경: 모집중·마감임박 = 종류 연한 색, 마감 = 회색, 지난 일정 = 흰색 점선. 테두리는 마감임박만 빨강
                     eventContent={(arg) => {
                       const xp = arg.event.extendedProps as { time?: string; theme?: string; status?: ScheduleStatus | null; partyType?: PartyType };
                       const status = xp.status ?? "open";
@@ -1028,27 +1027,27 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
                         full: "bg-[#F3F4F6] border-transparent text-gray-500",
                         past: "bg-white border-dashed border-[#E5E7EB] text-[#9CA3AF]",
                       }[status];
-                      const label = xp.theme ? categoryLabel(xp.theme) : arg.event.title;
                       const endTag = status === "soon" ? { text: "임박", tone: "bg-[#DC2626] text-white" }
                         : status === "full" ? { text: "마감", tone: "bg-[#111111] text-white" }
                         : null;
                       return (
                         <div
                           title={`${xp.time ? xp.time + " " : ""}${arg.event.title}`}
-                          className={`sch-chip ${partyType === "solo" ? "sch-chip-solo" : "sch-chip-match"} sch-chip-${status} w-full rounded-md border px-1 xl:px-1.5 py-1 text-xs font-bold leading-tight ${chipTone}`}
+                          className={`sch-chip ${partyType === "solo" ? "sch-chip-solo" : "sch-chip-match"} sch-chip-${status} w-full flex flex-wrap items-center gap-y-0.5 rounded-md border px-1 py-1 text-xs font-bold leading-tight ${chipTone}`}
                         >
-                          <div className="flex items-center gap-1">
-                            <span className={`flex-shrink-0 rounded px-1 text-[10px] font-black ${scheduleTypeBadgeTone(partyType, status)}`}>
-                              {SCHEDULE_TYPE_STYLE[partyType].short}
-                            </span>
-                            {xp.time && <span className="flex-shrink-0 tabular-nums">{xp.time}</span>}
-                            {!endTag && <span className="min-w-0 truncate">{label}</span>}
-                          </div>
+                          <span className={`flex-shrink-0 mr-1 rounded px-0.5 text-[10px] font-black ${scheduleTypeBadgeTone(partyType, status)}`}>
+                            {SCHEDULE_TYPE_STYLE[partyType].short}
+                          </span>
+                          {xp.time ? (
+                            <span className="flex-shrink-0 tabular-nums">{xp.time}</span>
+                          ) : (
+                            <span className={`min-w-0 flex-1 truncate ${status === "full" ? "line-through" : ""}`}>{xp.theme ? categoryLabel(xp.theme) : arg.event.title}</span>
+                          )}
+                          {/* 끝 태그 — 바깥 span 의 왼쪽 여백까지 한 덩어리로 줄바꿈되게 해서, 좁은 칸에서는 시간 대신 태그만 다음 줄로 */}
                           {endTag && (
-                            <div className="mt-0.5 flex items-center gap-1">
-                              <span className={`min-w-0 flex-1 truncate ${status === "full" ? "line-through" : ""}`}>{label}</span>
-                              <span className={`flex-shrink-0 rounded px-1 text-[10px] font-black ${endTag.tone}`}>{endTag.text}</span>
-                            </div>
+                            <span className="flex-shrink-0 ml-auto pl-0.5">
+                              <span className={`block rounded px-0.5 text-[10px] font-black ${endTag.tone}`}>{endTag.text}</span>
+                            </span>
                           )}
                         </div>
                       );
