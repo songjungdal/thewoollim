@@ -25,7 +25,7 @@ if (!adminIsLoggedIn()) {
     exit;
 }
 
-$dataDir = __DIR__ . '/../data';
+$dataDir = dataDir();
 
 function loadBookings(string $email): array {
     global $dataDir;

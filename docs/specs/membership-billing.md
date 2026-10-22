@@ -103,7 +103,7 @@
 ## 구현 메모 (명세와 다르게 정한 점)
 
 - **키 위치**: 환경변수·AWS Secrets Manager 대신 서버의 `api/payments/toss-billing-config.php` 파일에 둔다(사용자 결정, 2026-10-22). 항목 이름은 명세의 환경변수 이름과 같게 했고, 빌링키 암호화 키 `TOSS_BILLING_ENC_KEY` 를 더했다. 값이 비었거나 형식이 틀리면(test 모드에 live 키, gck 키, 일반 결제 키와 같은 값 등) "준비 중"으로 보이고 결제를 시작하지 않는다.
-- **데이터 저장**: DB 테이블 대신 기존 예약처럼 `api/data/` 의 JSON 파일에 둔다(사용자 결정). memberships·membership_payments 를 한 파일(`api/data/membership/memberships-<해시>.json`)에 함께 두고 파일 잠금 안에서만 읽고 쓴다. 명세 항목 외에 `auth_key_hash`, `pending_order_id`, `billing_anchor_day`, `updated_at`, `fail_code`·`fail_message`(멤버십), `billing_key_deleted` 를 둔다.
+- **데이터 저장**: DB 테이블 대신 기존 예약처럼 JSON 파일에 둔다(사용자 결정). memberships·membership_payments 를 한 파일(`membership/memberships-<해시>.json`)에 함께 두고 파일 잠금 안에서만 읽고 쓴다. 2026-10-22 부터 이 파일은 **웹 루트 밖 데이터 폴더에만** 저장하고(`.htaccess` 에 기대지 않음, 사용자 요청), 그 폴더가 없으면 "준비 중"이다. 명세 항목 외에 `auth_key_hash`, `pending_order_id`, `billing_anchor_day`, `updated_at`, `fail_code`·`fail_message`(멤버십), `billing_key_deleted` 를 둔다.
 - **첫 결제 실패**: 빌링키를 삭제하고 멤버십 상태를 `canceled` 로 둔다(명세 상태값 안에서 처리).
 - **결제 결과를 모를 때**(통신 끊김·5xx): 멤버십을 `pending` 으로 두고, 다시 확인하면 같은 주문번호로 토스 "orderId 로 결제 조회"를 먼저 한 뒤 없을 때만 같은 주문번호로 다시 결제한다. 결제 요청에는 주문번호를 `Idempotency-Key` 로 보낸다.
 - **마이페이지 멤버십 영역**은 멤버십 기록이 있는 회원에게만 보인다(아직 공개하지 않는 상품이라 다른 회원에게 노출하지 않기 위해).

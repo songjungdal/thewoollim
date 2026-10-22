@@ -9,6 +9,7 @@
  */
 
 declare(strict_types=1);
+require_once __DIR__ . '/../lib.php';   // dataDir()
 
 ini_set('session.save_path',  __DIR__ . '/sessions');
 ini_set('session.use_strict_mode', '1');
@@ -66,7 +67,7 @@ function logAdminActivity(
     $before = null,
     $after  = null
 ): void {
-    $file = __DIR__ . '/../data/admin_activity.json';
+    $file = dataDir() . '/admin_activity.json';
     $row = [
         'id'           => 0,                    // 저장 시 부여
         'created_at'   => date('Y-m-d H:i:s'),

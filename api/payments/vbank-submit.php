@@ -41,7 +41,7 @@ $optionIdsIn   = is_array($body['optionIds'] ?? null) ? $body['optionIds'] : [];
 $couponCode    = strtoupper(trim((string)($body['couponCode']    ?? '')));
 $couponPartyId = trim((string)        ($body['couponPartyId'] ?? ''));
 
-$dataDir = __DIR__ . '/../data';
+$dataDir = dataDir();
 
 // ── 1) 회원 정보 (성별) ───────────────────────────────────────────────
 try {

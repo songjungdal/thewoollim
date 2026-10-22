@@ -33,7 +33,7 @@ requireUser($email);
 
 if ($bid === '') jsonFail('예약 정보가 없습니다.');
 
-$dataDir = __DIR__ . '/../data';
+$dataDir = dataDir();
 $bf = $dataDir . '/bookings_' . md5(strtolower(trim($email))) . '.json';
 if (!file_exists($bf)) jsonFail('예약을 찾을 수 없습니다.', 404);
 

@@ -70,7 +70,7 @@ try {
     $user = $stmt->fetch();
 } catch (Throwable $e) {
     @file_put_contents(
-        dirname(__DIR__) . '/data/_admin_login_db_error.log',
+        dataDir() . '/_admin_login_db_error.log',
         sprintf("[%s] %s\n", date('c'), $e->getMessage()),
         FILE_APPEND
     );
@@ -90,7 +90,7 @@ if (!$pwOk) {
     $_SESSION['_loginGate'] = $gate;
 
     @file_put_contents(
-        dirname(__DIR__) . '/data/_admin_login_fail.log',
+        dataDir() . '/_admin_login_fail.log',
         sprintf("[%s] FAIL id=%s ip=%s\n",
             date('c'), $id, $_SERVER['REMOTE_ADDR'] ?? '-'),
         FILE_APPEND
@@ -116,7 +116,7 @@ $_SESSION['loggedInAt'] = $now;
 unset($_SESSION['_loginGate']);
 
 @file_put_contents(
-    dirname(__DIR__) . '/data/_admin_login_success.log',
+    dataDir() . '/_admin_login_success.log',
     sprintf("[%s] OK id=%s userId=%d ip=%s\n",
         date('c'), $id, $user['id'], $_SERVER['REMOTE_ADDR'] ?? '-'),
     FILE_APPEND

@@ -94,7 +94,7 @@ function autoCancelAndFail(string $reason, string $cancelReason, string $logTag,
 if ($paymentKey === '' || $orderId === '' || $amount <= 0) redirectFail('잘못된 결제 응답');
 if (!preg_match('/^[A-Za-z0-9_\-]+$/', $orderId))           redirectFail('주문 식별자 오류');
 
-$dataDir     = __DIR__ . '/../data';
+$dataDir     = dataDir();
 $pendingFile = $dataDir . '/pending/' . $orderId . '.json';
 if (!file_exists($pendingFile)) redirectFail('주문을 찾을 수 없습니다');
 $pending = json_decode((string)file_get_contents($pendingFile), true);
