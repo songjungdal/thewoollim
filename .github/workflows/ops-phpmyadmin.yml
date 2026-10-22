@@ -1,9 +1,11 @@
-# [1회용] phpMyAdmin 외부 접근 점검·차단 (2026-10-22)
+# [1회용] phpMyAdmin 외부 접근 점검·차단 + IP 로 열리는 기본 사이트 점검·차단 (2026-10-22)
 #
 # 실행: Actions → "Ops - phpMyAdmin check/block (one-time)" → Run workflow (main 에서만)
-#   step=check  읽기만 — 서버 밖(이 실행기)에서 서버 공인 IP·thewoollim.com 으로 /phpmyadmin/ 과 기본 사이트 상태 확인 + 서버 설정 점검
-#   step=block  (confirm=BLOCK) Apache 에 /phpmyadmin 차단 설정 추가(모든 사이트) → 다시 바깥에서 확인
+#   step=check  읽기만 — 서버 밖(이 실행기)에서 상태 코드 확인 + 서버 설정 요약
+#   step=audit  읽기만 — 접근 로그의 /phpmyadmin 과거 기록(개수·날짜만), 기본 사이트(/var/www/html) 파일 점검(이름·개수만), 사이트별 웹 루트
+#   step=block  (confirm=BLOCK) Apache 설정 2개 추가 — /phpmyadmin 전부 403, 기본 사이트(/var/www/html) 전부 403 → 바깥에서 다시 확인
 # 서버 접속은 deploy.yml 과 같은 방식·같은 production 환경 Secret. 공인 IP 는 받자마자 로그에서 가린다.
+# 공개 저장소라 실행 로그는 누구나 볼 수 있다: IP·개인정보 값·관리자 폴더 실제 이름은 출력하지 않는다.
 # 작업이 끝나면 이 파일은 삭제한다(1회용).
 
 name: Ops - phpMyAdmin check/block (one-time)
@@ -14,10 +16,10 @@ on:
       step:
         description: "단계"
         type: choice
-        options: [check, block]
+        options: [check, audit, block]
         default: check
       confirm:
-        description: "block 은 BLOCK 입력 (check 는 비워 둠)"
+        description: "block 은 BLOCK 입력 (check·audit 는 비워 둠)"
         type: string
         default: ""
 
@@ -32,6 +34,25 @@ env:
   DEPLOY_SSH_USER: ${{ vars.DEPLOY_SSH_USER || 'admin' }}
   DEPLOY_SSH_PORT: ${{ vars.DEPLOY_SSH_PORT || '22' }}
   DEPLOY_ACCESS_MODE: ${{ vars.DEPLOY_ACCESS_MODE || 'direct' }}
+  # 바깥에서 확인하는 표 (변경 전·후에 같은 내용으로 실행)
+  PROBE: |
+    IP="$(cat "$RUNNER_TEMP/server_ip")"
+    code() { curl -s -o /dev/null -m 15 -k -w '%{http_code}' "$1"; }
+    loc()  { curl -s -o /dev/null -m 15 -k -w '%{redirect_url}' "$1" | sed "s#$IP#<서버IP>#g"; }
+    printf '| %-34s | %-4s | %s\n' "주소" "상태" "이동"
+    for h in "$IP" "$SITE_HOST" "www.$SITE_HOST"; do
+      for s in http https; do
+        for p in / /phpmyadmin/; do
+          u="$s://$h$p"; label="${u/$IP/<서버IP>}"
+          printf '| %-34s | %-4s | %s\n' "$label" "$(code "$u")" "$(loc "$u")"
+        done
+      done
+    done
+    printf '| %-34s | %-4s |\n' "https://$SITE_HOST/api/parties.php" "$(code "https://$SITE_HOST/api/parties.php")"
+    printf '| %-34s | %-4s |\n' "https://$SITE_HOST/membership/" "$(code "https://$SITE_HOST/membership/")"
+    if getent hosts "www.$SITE_HOST" >/dev/null; then
+      [ "$(getent hosts "www.$SITE_HOST" | awk '{print $1}' | head -1)" = "$IP" ] && echo "www.$SITE_HOST: 이 서버 IP 로 연결됨" || echo "www.$SITE_HOST: 다른 IP 로 연결됨"
+    else echo "www.$SITE_HOST: DNS 에 없음"; fi
 
 jobs:
   run:
@@ -51,7 +72,7 @@ jobs:
         run: |
           [ "$GITHUB_REF" = "refs/heads/main" ] || { echo "::error::main 브랜치에서만 실행합니다."; exit 1; }
           case "$STEP" in
-            check) ;;
+            check|audit) ;;
             block) [ "$CONFIRM" = "BLOCK" ] || { echo "::error::block 은 confirm=BLOCK 이 필요합니다."; exit 1; } ;;
             *) echo "::error::알 수 없는 단계"; exit 1 ;;
           esac
@@ -91,29 +112,14 @@ jobs:
 
       - name: 서버 밖에서 확인 (변경 전)
         run: bash -c "$PROBE"
-        env:
-          PROBE: |
-            IP="$(cat "$RUNNER_TEMP/server_ip")"
-            code() { curl -s -o /dev/null -m 15 -k -w '%{http_code}' "$@"; }
-            echo "== /phpmyadmin/ (실행기 → 서버) =="
-            printf '%-36s %s\n' "http://<서버IP>/phpmyadmin/"  "$(code "http://$IP/phpmyadmin/")"
-            printf '%-36s %s\n' "https://<서버IP>/phpmyadmin/" "$(code "https://$IP/phpmyadmin/")"
-            printf '%-36s %s\n' "http://$SITE_HOST/phpmyadmin/"  "$(code "http://$SITE_HOST/phpmyadmin/")"
-            printf '%-36s %s\n' "https://$SITE_HOST/phpmyadmin/" "$(code "https://$SITE_HOST/phpmyadmin/")"
-            echo
-            echo "== 기본 사이트 (IP 로 접속) =="
-            for u in "http://$IP/" "https://$IP/"; do
-              label="${u/$IP/<서버IP>}"
-              c="$(curl -s -o "$RUNNER_TEMP/body" -m 15 -k -w '%{http_code} %{size_download}바이트 이동:%{redirect_url}' "$u")"
-              t="$(grep -oiE '<title>[^<]*</title>' "$RUNNER_TEMP/body" | head -1 | sed -E 's/<\/?title>//gi')"
-              s="$(curl -s -I -m 15 -k "$u" | grep -i '^server:' | tr -d '\r')"
-              echo "$label → $c  제목:[${t:-없음}]  ${s}"
-            done
-            rm -f "$RUNNER_TEMP/body"
 
       - name: 서버 설정 점검
         if: inputs.step == 'check'
         run: ssh thewoollim-prod "bash -s -- check" < scripts/ops/phpmyadmin-remote.sh
+
+      - name: 과거 기록·기본 사이트 파일 점검
+        if: inputs.step == 'audit'
+        run: ssh thewoollim-prod "bash -s -- audit" < scripts/ops/phpmyadmin-remote.sh
 
       - name: 차단 적용
         if: inputs.step == 'block'
@@ -121,15 +127,7 @@ jobs:
 
       - name: 서버 밖에서 다시 확인 (변경 후)
         if: inputs.step == 'block'
-        run: |
-          IP="$(cat "$RUNNER_TEMP/server_ip")"
-          code() { curl -s -o /dev/null -m 15 -k -w '%{http_code}' "$@"; }
-          printf '%-36s %s\n' "http://<서버IP>/phpmyadmin/"  "$(code "http://$IP/phpmyadmin/")"
-          printf '%-36s %s\n' "https://<서버IP>/phpmyadmin/" "$(code "https://$IP/phpmyadmin/")"
-          printf '%-36s %s\n' "http://$SITE_HOST/phpmyadmin/"  "$(code "http://$SITE_HOST/phpmyadmin/")"
-          printf '%-36s %s\n' "https://$SITE_HOST/phpmyadmin/" "$(code "https://$SITE_HOST/phpmyadmin/")"
-          printf '%-36s %s\n' "https://$SITE_HOST/"            "$(code "https://$SITE_HOST/")"
-          printf '%-36s %s\n' "https://$SITE_HOST/api/parties.php" "$(code "https://$SITE_HOST/api/parties.php")"
+        run: bash -c "$PROBE"
 
       - name: 보안그룹 임시 허용 제거
         if: always() && env.DEPLOY_ACCESS_MODE == 'aws-sg-temporary'
