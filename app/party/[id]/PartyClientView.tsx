@@ -570,7 +570,7 @@ export default function PartyClientView({ id, initialParties }: { id: string; in
   // 사진 ① 참가 신청 방법 위
   pushPhotos("beforeApply");
 
-  // 참가 신청 방법 (D-8) — 위에서 아래로 세로 카드. 단계가 없으면 숨김
+  // 참가 신청 방법 (D-8) — 위에서 아래로 세로 카드. 단계가 없으면 숨김 (참고 상자는 카드 안 설명과 같은 폭 — 640px 제한 없앰, 2026-10-22)
   if (applyView && applyView.steps.length > 0) {
     blocks.push({
       key: "apply", kind: "section", node: (
@@ -587,7 +587,7 @@ export default function PartyClientView({ id, initialParties }: { id: string; in
                   <h3 className="mt-0.5 text-[15px] font-bold leading-snug text-brand-black md:text-[17px]">{item.title}</h3>
                   <p className="mt-1.5 text-[14px] leading-[1.65] text-gray-600 whitespace-pre-line break-keep md:text-[15px]">{item.desc}</p>
                   {item.note && (
-                    <p className="mt-3 max-w-[640px] rounded-lg bg-white px-3.5 py-2.5 text-[13px] leading-relaxed text-gray-600 whitespace-pre-line break-keep md:text-[14px]">
+                    <p className="mt-3 rounded-lg bg-white px-3.5 py-2.5 text-[13px] leading-relaxed text-gray-600 whitespace-pre-line break-keep md:text-[14px]">
                       {item.note}
                     </p>
                   )}
