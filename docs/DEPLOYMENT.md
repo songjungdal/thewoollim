@@ -126,15 +126,18 @@ GitHub 이 제공하는 실행기(GitHub-hosted runner)는 실행할 때마다 I
 
 - `environment: production` 을 지정한 작업(`plan`·`deploy`·`rollback-list`·`rollback`)이 **`main` 브랜치에서 실행될 때만** 이 값을 읽을 수 있습니다. `build` 작업과 다른 브랜치의 실행은 읽을 수 없습니다.
 - **같은 이름을 Repository Secrets 에 두지 않습니다.** 남아 있으면 production 환경을 지정하지 않은 작업(예: 다른 브랜치에서 수정한 워크플로)도 그 값을 읽을 수 있어 `main` 전용 제한을 우회할 수 있습니다.
-  - 현재 Repository Secrets 에는 빌드용 3개만 있고, 서버 접속용 3개는 production 환경에만 있습니다.
+  - 서버 접속용 3개는 production 환경에만 있습니다. Repository Secrets 에는 빌드용 3개와 아래 멤버십 테스트 키 2개가 있습니다.
 
-#### 멤버십 자동결제 키 (production 환경 Secret, 1회용 워크플로 전용)
+#### 멤버십 자동결제 키 (1회용 워크플로 전용)
 
 | 이름 | 내용 |
 |---|---|
 | `TOSS_BILLING_CLIENT_KEY` | 자동결제 MID 의 API 개별 연동 클라이언트 키 (`test_ck_…`) |
 | `TOSS_BILLING_SECRET_KEY` | 같은 MID 의 시크릿 키 (`test_sk_…`) |
 
+- 등록 위치: 원칙은 production 환경 Secret 이지만, 개인 계정 저장소에서 환경 Secret 은 **저장소 소유자만** 등록할 수 있어(협업자는 Repository Secret 만 가능) 지금의 **test 키는 Repository Secrets 에 등록**했습니다(2026-10-22). 실제 돈이 오가지 않는 테스트 키라서 허용했습니다.
+  - **live 키로 바꿀 때는 반드시 production 환경 Secret 에 등록하고, Repository Secrets 의 같은 이름 2개는 삭제**합니다(위 "같은 이름을 두지 않는다" 규칙).
+- 2026-10-22 실행 완료: 서버에 설정 파일 생성(소유자 `toss-config.php` 와 같음, 640, test 모드, 암호화 키 새로 생성). 서버 밖 확인 결과 `state.php` ready=true·mode=test, `/membership/` 에 테스트 결제 안내 표시, 설정 파일 주소는 200·0바이트. 워크플로는 비활성화됨.
 - `.github/workflows/ops-membership-key.yml`("Ops - membership billing key (one-time)", `confirm=INSTALL`)이 이 값으로 서버에 `api/payments/toss-billing-config.php` 를 만듭니다. 서버 쪽 처리는 `scripts/ops/membership-key-remote.sh`.
   - 소유자는 `toss-config.php` 와 같게, 권한 640, `TOSS_BILLING_MODE=test`.
   - 빌링키 암호화 키 `TOSS_BILLING_ENC_KEY` 는 파일이 없을 때만 서버에서 `openssl rand -base64 32` 로 만듭니다. GitHub 에는 저장하지 않습니다. 파일이 이미 있으면 그 안의 암호화 키를 그대로 두고 클라이언트·시크릿 키만 바꿉니다(읽을 수 없으면 아무것도 고치지 않고 멈춤).
