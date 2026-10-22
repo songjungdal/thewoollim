@@ -967,10 +967,11 @@ function privateDataDir(): ?string {
         dirname(webRootDir()) . '/' . basename(webRootDir()) . '-data',
     ]);
     foreach ($candidates as $c) {
-        $real = realpath($c);
-        if ($real === false || !is_dir($real) || !is_writable($real)) continue;
+        // @: open_basedir 로 웹 루트 밖 접근이 막힌 서버에서 경고가 API 응답(JSON)에 섞이지 않게
+        $real = @realpath($c);
+        if ($real === false || !@is_dir($real) || !@is_writable($real)) continue;
         if ($root !== false && ($real === $root || str_starts_with($real . '/', $root . '/'))) continue;  // 웹 루트 안이면 쓰지 않음
-        if (!is_file($real . '/parties.json')) {
+        if (!@is_file($real . '/parties.json')) {
             error_log('[dataDir] 웹 루트 밖 폴더에 parties.json 이 없어 사용하지 않음: ' . $real);
             continue;
         }
