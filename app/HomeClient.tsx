@@ -25,14 +25,43 @@ import { daysUntil } from "./lib/refund";
  * 우선순위: 지난 일정 > 마감 > 마감임박 > 모집중 (계산은 컴포넌트의 scheduleStatus 참고) */
 type ScheduleStatus = "open" | "soon" | "full" | "past";
 const SCHEDULE_STATUS_ORDER: ScheduleStatus[] = ["open", "soon", "full", "past"];
-const SCHEDULE_STATUS_STYLE: Record<ScheduleStatus, { label: string; tone: string; dot: string }> = {
-  open: { label: "모집중",    tone: "bg-[#40E0D0]/15 text-brand-point-ink",             dot: "bg-brand-point" },
-  soon: { label: "마감임박",  tone: "bg-amber-50 text-amber-800",                       dot: "bg-amber-500" },
-  full: { label: "마감",      tone: "bg-gray-200 text-gray-600",                        dot: "bg-gray-500" },
-  past: { label: "지난 일정", tone: "bg-gray-50 text-gray-400 border border-gray-200",  dot: "bg-gray-300" },
+/* 상태색 — 초록 = 모집중, 빨강 = 마감임박, 검정 = 마감, 점선 회색 = 지난 일정 */
+const SCHEDULE_STATUS_STYLE: Record<ScheduleStatus, { label: string; tone: string }> = {
+  open: { label: "모집중",    tone: "bg-[#DCFCE7] text-[#166534]" },
+  soon: { label: "마감임박",  tone: "bg-[#DC2626] text-white" },
+  full: { label: "마감",      tone: "bg-[#111111] text-white" },
+  past: { label: "지난 일정", tone: "bg-white text-[#6B7280] border border-dashed border-[#D1D5DB]" },
 };
-/** 일정 카드·패널의 파티 종류 배지 — 지난 일정은 다른 표시처럼 흐리게 */
-const scheduleTypeBadgeTone = (isPast: boolean) => (isPast ? "bg-gray-200 text-gray-500" : "bg-gray-900 text-white");
+/* 파티 종류색 — solid: 진한 배지·점 / soft: 연한 배경(달력 칩·날짜 블록) / ink: 연한 배경 위 글자.
+ * 솔로파티 그라데이션(solo-grad, solo-grad-soft)은 app/globals.css */
+const SCHEDULE_TYPE_STYLE: Record<PartyType, { label: string; short: string; solid: string; soft: string; ink: string }> = {
+  matching: { label: PARTY_TYPE_LABELS.matching, short: "매칭", solid: "bg-[#40E0D0] text-[#003B37]", soft: "bg-[#E6FAF8]",   ink: "text-[#00756F]" },
+  solo:     { label: PARTY_TYPE_LABELS.solo,     short: "솔로", solid: "solo-grad",                  soft: "solo-grad-soft", ink: "text-[#9D1C8A]" },
+};
+/** 파티 종류 배지 — 모집중·마감임박은 진하게, 마감은 연하게, 지난 일정은 회색 (상태 계산 전에는 모집중처럼) */
+const scheduleTypeBadgeTone = (partyType: PartyType, status: ScheduleStatus | null | undefined) => {
+  const t = SCHEDULE_TYPE_STYLE[partyType];
+  if (status === "past") return "bg-[#F3F4F6] text-[#9CA3AF]";
+  if (status === "full") return `${t.soft} ${t.ink}`;
+  return t.solid;
+};
+/** 모바일 작은 달력의 날짜 아래 점 — 모집중·마감임박은 종류색(임박은 빨간 테두리), 마감은 검정, 지난 일정은 점선 회색처럼 흰 점 */
+const scheduleDotTone = (partyType: PartyType, status: ScheduleStatus | null | undefined) => {
+  if (status === "past") return "bg-white border-[1.5px] border-[#D1D5DB]";
+  if (status === "full") return "bg-[#111111]";
+  const solid = SCHEDULE_TYPE_STYLE[partyType].solid;
+  return status === "soon" ? `${solid} ring-[1.5px] ring-[#EF4444]` : solid;
+};
+/** 일정 카드(모바일 리스트·PC 패널) 테두리·배경 — 청록 hover 강조는 모집중·마감임박만 */
+const SCHEDULE_CARD_TONE: Record<ScheduleStatus, string> = {
+  open: "bg-white border border-gray-200 hover:border-brand-point",
+  soon: "bg-white border-[1.5px] border-[#FCA5A5] hover:border-brand-point",
+  full: "bg-[#F9FAFB] border border-gray-200 hover:bg-gray-100",
+  past: "bg-[#F9FAFB] border border-dashed border-[#D1D5DB] hover:bg-gray-100",
+};
+/** "남 N · 여 N 남음" 글자색 — 기본색(모집중)은 카드마다 달라 null */
+const scheduleRemainTone = (status: ScheduleStatus | null | undefined) =>
+  status === "soon" ? "text-[#DC2626]" : status === "full" || status === "past" ? "text-[#9CA3AF]" : null;
 const SCHEDULE_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 /** 참가자 마키 — 카드 1장이 지나가는 시간(초). 한 바퀴 = 카드 수 × 이 값이라 인원이 늘어도 흐르는 속도가 같다 */
 const PARTICIPANT_SEC_PER_CARD = 2;
@@ -330,8 +359,8 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
     return map;
   }, [PARTIES, partyCounts, now]);
 
-  // 일정 섹션(모바일 리스트 + 데스크탑 캘린더) — 행사 일시 경과한 이벤트에 'fc-event-ended' 클래스
-  // 부여해 연한 회색 톤으로 표시. 다른 카테고리 탭/필터·데이터 쿼리에는 무영향.
+  // 일정 섹션(모바일 리스트 + 데스크탑 캘린더) — 행사 일시 경과한 이벤트에 'fc-event-ended' 클래스 부여.
+  // 칩 색은 eventContent 가 상태(extendedProps.status)로 정한다. 다른 카테고리 탭/필터·데이터 쿼리에는 무영향.
   const CALENDAR_EVENTS = useMemo(() => PARTIES.map(p => {
     const past = now ? partyVisibility(p, now) !== "active" : false;
     const m = (p.dateString ?? "").match(/(\d{1,2}):(\d{2})/);
@@ -343,7 +372,7 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
       id: p.id,
       title: p.title,
       start,
-      // 솔로파티는 fc-event-solo 클래스 + 칩 안 "솔로" 표시로 구분 (색은 상태 범례 그대로 — 지난 일정 표시가 우선)
+      // 솔로파티는 fc-event-solo 클래스. 칩 안에는 종류(매칭/솔로) 표시가 항상 붙는다 (eventContent)
       classNames: [...(past ? ["fc-event-ended"] : []), ...(partyTypeOf(p) === "solo" ? ["fc-event-solo"] : [])],
       extendedProps: {
         location: p.location, target: p.target, price: p.price,
@@ -421,13 +450,15 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
     else mobileMonthGroups.push([ymd, [e]]);
   });
 
-  // #schedule 모바일 카드 — 기존 디자인 유지 + 오른쪽 위 상태·대상(싱글/돌싱) 배지 + "남 N · 여 N 남음" 한 줄.
-  // 지난 일정은 연한 회색, 누르면 기존처럼 /party/{id} 로 이동.
+  // #schedule 모바일 카드 — 날짜 블록 + 제목 위 배지 줄(종류·상태·대상) + "남 N · 여 N 남음" 한 줄.
+  // 색은 상태별(SCHEDULE_CARD_TONE 등), 누르면 기존처럼 /party/{id} 로 이동.
   const renderScheduleCard = (event: ScheduleEvent) => {
     const party = PARTIES.find(p => p.id === event.id);
     const xp = event.extendedProps;
     const status = xp.status;
     const isPast = status === "past";
+    const isClosed = status === "full" || isPast;   // 마감·지난 일정 — 날짜 블록을 회색으로
+    const typeStyle = SCHEDULE_TYPE_STYLE[xp.partyType];
     const dateObj = new Date(event.start.substring(0, 10) + "T00:00:00");
     const month = dateObj.getMonth() + 1;
     const day = dateObj.getDate();
@@ -437,43 +468,35 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
         key={event.id}
         type="button"
         onClick={() => router.push(`/party/${event.id}`)}
-        className={`w-full text-left rounded-2xl p-4 flex items-center gap-4 transition-all shadow-sm active:scale-[0.98] cursor-pointer ${
-          isPast
-            ? "bg-gray-50 border border-gray-200 hover:bg-gray-100"
-            : "bg-gray-50 border border-gray-100 hover:border-brand-point hover:bg-white"
-        }`}
+        className={`w-full text-left rounded-2xl p-4 flex items-center gap-4 transition-all shadow-sm active:scale-[0.98] cursor-pointer ${SCHEDULE_CARD_TONE[status ?? "open"]}`}
       >
-        <div className={`flex-shrink-0 w-14 rounded-xl py-2 text-center ${isPast ? "bg-gray-100" : "bg-[#40E0D0]/15"}`}>
-          <div className={`text-xs font-bold ${isPast ? "text-gray-400" : "text-brand-point-ink"}`}>{month}월</div>
-          <div className={`text-2xl font-black leading-none ${isPast ? "text-gray-400" : "text-brand-black"}`}>{day}</div>
-          <div className={`text-xs font-semibold ${isPast ? "text-gray-400" : "text-gray-500"}`}>{dayName}요일</div>
+        <div className={`flex-shrink-0 w-14 rounded-xl py-2 text-center ${isClosed ? "bg-[#F3F4F6] text-[#9CA3AF]" : typeStyle.soft}`}>
+          <div className={`text-xs font-bold ${isClosed ? "" : typeStyle.ink}`}>{month}월</div>
+          <div className={`text-2xl font-black leading-none ${isClosed ? "" : "text-brand-black"}`}>{day}</div>
+          <div className={`text-xs font-semibold ${isClosed ? "" : typeStyle.ink}`}>{dayName}요일</div>
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2 mb-1">
-            <div className={`font-bold text-[15px] leading-snug min-w-0 ${isPast ? "text-gray-400" : "text-brand-black"} ${status === "full" ? "line-through" : ""}`}>
-              <span className={`inline-block align-middle mr-1.5 -mt-0.5 text-xs font-black px-1.5 py-0.5 rounded-full no-underline ${scheduleTypeBadgeTone(isPast)}`}>
-                {PARTY_TYPE_LABELS[xp.partyType]}
+          <div className="flex flex-wrap items-center gap-1 mb-1.5">
+            <span className={`text-xs font-black px-1.5 py-0.5 rounded-md whitespace-nowrap ${scheduleTypeBadgeTone(xp.partyType, status)}`}>
+              {typeStyle.label}
+            </span>
+            {status && (
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${SCHEDULE_STATUS_STYLE[status].tone}`}>
+                {SCHEDULE_STATUS_STYLE[status].label}
               </span>
-              {event.title}
-            </div>
-            {(status || xp.targetGroup) && (
-              <div className="flex-shrink-0 flex flex-col items-end gap-1">
-                {status && (
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${SCHEDULE_STATUS_STYLE[status].tone}`}>
-                    {SCHEDULE_STATUS_STYLE[status].label}
-                  </span>
-                )}
-                {xp.targetGroup && (
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap bg-gray-100 ${isPast ? "text-gray-400" : "text-gray-600"}`}>
-                    {xp.targetGroup}
-                  </span>
-                )}
-              </div>
             )}
+            {xp.targetGroup && (
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap bg-gray-100 ${isPast ? "text-gray-400" : "text-gray-600"}`}>
+                {xp.targetGroup}
+              </span>
+            )}
+          </div>
+          <div className={`font-bold text-[15px] leading-snug mb-1 ${isPast ? "text-gray-400" : "text-brand-black"} ${status === "full" ? "line-through" : ""}`}>
+            {event.title}
           </div>
           <div className={`text-sm ${isPast ? "text-gray-400" : "text-gray-500"}`}>{party?.dateString}</div>
           <div className={`text-xs mt-0.5 truncate ${isPast ? "text-gray-400" : "text-gray-500"}`}>{party?.location} · {party?.target}</div>
-          <div className={`text-xs mt-1 font-bold break-keep ${isPast ? "text-gray-400" : "text-gray-600"}`}>{xp.hasOptions ? `${xp.remainingLabel} 남음` : `남 ${xp.maleRemaining} · 여 ${xp.femaleRemaining} 남음`}</div>
+          <div className={`text-xs mt-1 font-bold break-keep ${scheduleRemainTone(status) ?? "text-gray-600"}`}>{xp.hasOptions ? `${xp.remainingLabel} 남음` : `남 ${xp.maleRemaining} · 여 ${xp.femaleRemaining} 남음`}</div>
         </div>
         <ArrowRight size={16} className={`flex-shrink-0 ${isPast ? "text-gray-400" : "text-gray-500"}`} />
       </button>
@@ -664,7 +687,7 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
                         {/* 우상단 — D-day(모집 중일 때만) → 대상(싱글/돌싱)·모집 마감 / 종료 시 [모집종료] 하나 */}
                         <div className="absolute top-2.5 right-2.5 md:top-3.5 md:right-3.5 z-10 flex items-center justify-end gap-1.5">
                           {isEnded ? (
-                            <span className={`${badgeCls} bg-[#FDE2E4] text-[#C81E33]`}>모집종료</span>
+                            <span className={`${badgeCls} bg-white text-[#6B7280] border border-dashed border-[#D1D5DB]`}>모집종료</span>
                           ) : (
                             <>
                               {dDay && <span className={`${badgeCls} bg-white text-[#D61F45] tabular-nums`}>{dDay}</span>}
@@ -773,14 +796,24 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
             <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="text-center mb-8 md:mb-12">
               <h2 className="text-4xl md:text-6xl font-bold mb-4 md:mb-6 tracking-tight">파티 일정</h2>
               <p className="text-base md:text-lg text-gray-500 max-w-2xl mx-auto">신청 가능한 파티 일정을 확인하세요.</p>
-              {/* 상태 범례 (한 줄) */}
-              <ul aria-label="일정 상태 안내" className="mt-5 md:mt-6 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 md:gap-x-5 text-[13px] md:text-sm font-bold text-gray-600">
-                {SCHEDULE_STATUS_ORDER.map(s => (
-                  <li key={s} className="inline-flex items-center gap-1.5">
-                    <span aria-hidden="true" className={`w-3 h-3 rounded-[4px] ring-1 ring-black/5 ${SCHEDULE_STATUS_STYLE[s].tone}`} />
-                    {SCHEDULE_STATUS_STYLE[s].label}
-                  </li>
-                ))}
+              {/* 범례 — 파티 종류(네모 배지) | 모집 상태(알약 배지). 모바일은 두 줄, md 이상은 한 줄 + 세로 구분선 */}
+              <ul aria-label="일정 상태 안내" className="mt-5 md:mt-6 flex flex-col md:flex-row items-center justify-center gap-2 md:gap-0">
+                <li className="flex flex-wrap items-center justify-center gap-1.5">
+                  <span className="text-xs text-gray-400 mr-0.5">파티 종류</span>
+                  {PARTY_TYPES.map(t => (
+                    <span key={t} className={`text-xs font-black px-2 py-0.5 rounded-md whitespace-nowrap ${SCHEDULE_TYPE_STYLE[t].solid}`}>
+                      {SCHEDULE_TYPE_STYLE[t].label}
+                    </span>
+                  ))}
+                </li>
+                <li className="flex flex-wrap items-center justify-center gap-1.5 md:ml-4 md:pl-4 md:border-l md:border-gray-200">
+                  <span className="text-xs text-gray-400 mr-0.5">모집 상태</span>
+                  {SCHEDULE_STATUS_ORDER.map(s => (
+                    <span key={s} className={`text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${SCHEDULE_STATUS_STYLE[s].tone}`}>
+                      {SCHEDULE_STATUS_STYLE[s].label}
+                    </span>
+                  ))}
+                </li>
               </ul>
             </motion.div>
 
@@ -810,7 +843,7 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
                 </button>
               </div>
 
-              {/* 작은 달력 — 일정 있는 날짜 아래 상태 색 점(최대 3개, 4개 이상이면 +) */}
+              {/* 작은 달력 — 일정 있는 날짜 아래 종류·상태 점(최대 3개, 4개 이상이면 +, scheduleDotTone) */}
               {mobileYear > 0 && (
                 <div className="mb-5 rounded-2xl border border-gray-100 bg-white p-2 shadow-sm">
                   <div className="grid grid-cols-7">
@@ -836,15 +869,15 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
                           className="h-12 flex flex-col items-center justify-start gap-0.5 pt-1 rounded-xl active:bg-gray-100 transition-colors"
                         >
                           <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm ${
-                            isSelected ? "bg-brand-black text-white font-black"
-                              : isToday ? "text-brand-point-ink font-black"
+                            isSelected ? "bg-brand-point text-[#003B37] font-black"
+                              : isToday ? "bg-[#E9FBF9] text-brand-point-ink font-black"
                               : "text-gray-800 font-bold"
                           }`}>
                             {day}
                           </span>
-                          <span aria-hidden="true" className="h-2.5 flex items-center gap-0.5">
+                          <span aria-hidden="true" className="h-2.5 flex items-center gap-1">
                             {dayEvents.slice(0, 3).map(e => (
-                              <span key={e.id} className={`w-1.5 h-1.5 rounded-full ${SCHEDULE_STATUS_STYLE[e.extendedProps.status ?? "open"].dot}`} />
+                              <span key={e.id} className={`w-1.5 h-1.5 rounded-full ${scheduleDotTone(e.extendedProps.partyType, e.extendedProps.status)}`} />
                             ))}
                             {dayEvents.length > 3 && <span className="text-xs leading-none font-black text-gray-500">+</span>}
                           </span>
@@ -943,8 +976,11 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
                     .fc-col-header-cell { padding: 12px 0 !important; background-color: #fafafa; }
                     .fc-col-header-cell-cushion { color: #666; font-weight: 700; font-size: 0.9rem; }
                     .fc-daygrid-more-link { font-weight: 800; color: #00807A !important; font-size: 0.8rem; margin-top: 2px; padding-left: 4px; }
-                    /* 지난 일정 — 연한 회색 (예전 분홍 톤 대체) */
-                    .fc-event.fc-event-ended .sch-chip { background-color: #f9fafb; color: #99a1af; border: 1px solid #e5e7eb; }
+                    /* 오늘 칸 — 연한 청록 배경 + 진한 청록 날짜. 오늘 칸 안의 매칭 칩(모집중·마감임박)은 배경에 묻히지 않게 흰색
+                       (마감·지난 칩은 eventContent 의 상태별 색 그대로) */
+                    .fc .fc-daygrid-day.fc-day-today { background-color: #E9FBF9 !important; }
+                    .fc .fc-day-today .fc-daygrid-day-number { color: #00756F; font-weight: 900; }
+                    .fc .fc-day-today .sch-chip-match:is(.sch-chip-open, .sch-chip-soon) { background: #FFFFFF; }
                     /* 선택한 날짜 — 검정 2px 테두리 */
                     .fc .sch-day-selected .fc-daygrid-day-frame { box-shadow: inset 0 0 0 2px #000; border-radius: 4px; }
                     .fc-daygrid-event-dot { display: none !important; }
@@ -977,19 +1013,33 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
                     // 팝오버를 열기 때문에 현재 보기(dayGridMonth)를 반환 → 같은 달 그대로 유지.
                     moreLinkClick={(info) => { setScheduleSelected(toYmd(info.date)); return "dayGridMonth"; }}
                     dayCellClassNames={(arg) => (toYmd(arg.date) === pcSelectedDate ? ["sch-day-selected"] : [])}
+                    // 칩 — 맨 앞 종류 태그(매칭/솔로) + 시간·테마 + (마감임박 "임박" / 마감 "마감" 태그).
+                    // 배경: 모집중·마감임박 = 종류 연한 색, 마감 = 회색 + 취소선, 지난 일정 = 흰색 점선. 테두리는 마감임박만 빨강
                     eventContent={(arg) => {
                       const xp = arg.event.extendedProps as { time?: string; theme?: string; status?: ScheduleStatus | null; partyType?: PartyType };
-                      const tone = SCHEDULE_STATUS_STYLE[xp.status ?? "open"].tone;
+                      const status = xp.status ?? "open";
+                      const partyType = xp.partyType ?? "matching";
+                      const soft = SCHEDULE_TYPE_STYLE[partyType].soft;
+                      const chipTone = {
+                        open: `${soft} border-transparent text-brand-black`,
+                        soon: `${soft} border-[#F87171] text-brand-black`,
+                        full: "bg-[#F3F4F6] border-transparent text-gray-500",
+                        past: "bg-white border-dashed border-[#E5E7EB] text-[#9CA3AF]",
+                      }[status];
                       return (
                         <div
                           title={`${xp.time ? xp.time + " " : ""}${arg.event.title}`}
-                          className={`sch-chip w-full truncate rounded-md px-1 xl:px-1.5 py-1 text-xs font-bold leading-tight ${tone} ${xp.status === "full" ? "line-through" : ""}`}
+                          className={`sch-chip ${partyType === "solo" ? "sch-chip-solo" : "sch-chip-match"} sch-chip-${status} w-full flex items-center gap-1 rounded-md border px-1 xl:px-1.5 py-1 text-xs font-bold leading-tight ${chipTone}`}
                         >
-                          {xp.partyType === "solo" && (
-                            <span className={`mr-1 rounded px-1 ${scheduleTypeBadgeTone(xp.status === "past")}`}>솔로</span>
-                          )}
-                          {xp.time && <span className="tabular-nums mr-1">{xp.time}</span>}
-                          {xp.theme ? categoryLabel(xp.theme) : arg.event.title}
+                          <span className={`flex-shrink-0 rounded px-1 text-[10px] font-black ${scheduleTypeBadgeTone(partyType, status)}`}>
+                            {SCHEDULE_TYPE_STYLE[partyType].short}
+                          </span>
+                          <span className="min-w-0 flex-1 truncate">
+                            {xp.time && <span className="tabular-nums mr-1">{xp.time}</span>}
+                            <span className={status === "full" ? "line-through" : ""}>{xp.theme ? categoryLabel(xp.theme) : arg.event.title}</span>
+                          </span>
+                          {status === "soon" && <span className="flex-shrink-0 rounded px-1 text-[10px] font-black bg-[#DC2626] text-white">임박</span>}
+                          {status === "full" && <span className="flex-shrink-0 rounded px-1 text-[10px] font-black bg-[#111111] text-white">마감</span>}
                         </div>
                       );
                     }}
@@ -1021,14 +1071,14 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
                           <button
                             type="button"
                             onClick={() => router.push(`/party/${event.id}`)}
-                            className={`group w-full text-left rounded-2xl p-4 flex items-center gap-3 border transition-all ${
-                              isPast ? "bg-gray-50 border-gray-200 hover:bg-gray-100" : "bg-white border-gray-200 hover:border-brand-point hover:shadow-md"
+                            className={`group w-full text-left rounded-2xl p-4 flex items-center gap-3 transition-all ${SCHEDULE_CARD_TONE[status ?? "open"]} ${
+                              status === "full" || isPast ? "" : "hover:shadow-md"
                             }`}
                           >
                             <div className="flex-1 min-w-0">
                               <div className="flex flex-wrap items-center gap-1.5 mb-2">
-                                <span className={`text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${scheduleTypeBadgeTone(isPast)}`}>
-                                  {PARTY_TYPE_LABELS[xp.partyType]}
+                                <span className={`text-xs font-black px-2 py-0.5 rounded-md whitespace-nowrap ${scheduleTypeBadgeTone(xp.partyType, status)}`}>
+                                  {SCHEDULE_TYPE_STYLE[xp.partyType].label}
                                 </span>
                                 {status && (
                                   <span className={`text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${SCHEDULE_STATUS_STYLE[status].tone}`}>
@@ -1048,7 +1098,7 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
                               <div className={`text-sm mt-1 truncate ${isPast ? "text-gray-400" : "text-gray-500"}`}>
                                 {xp.location} · {xp.target}
                               </div>
-                              <div className={`text-sm mt-1 font-bold ${isPast ? "text-gray-400" : "text-gray-700"}`}>
+                              <div className={`text-sm mt-1 font-bold ${scheduleRemainTone(status) ?? "text-gray-700"}`}>
                                 {xp.hasOptions ? `${xp.remainingLabel} 남음` : `남 ${xp.maleRemaining}석 · 여 ${xp.femaleRemaining}석 남음`}
                               </div>
                             </div>
