@@ -134,13 +134,22 @@ const EMPTY_PARTY: PartyForm = {
   couponDisabled: false,
 };
 
+/** 비고 한 줄 — 과거에 함께 참가확정 완료됐던 파티의 날짜와, 그 파티에서 만났던(이번 파티 이성 신청자 중) 사람 이름 */
+type BookingRemark = { date: string; names: string[] };
+
+/** 이름 뒤 조사 "과/와" — 마지막 글자에 받침이 있으면 "과" (한글이 아니면 "와") */
+function withJosa(name: string): string {
+  const code = name.charCodeAt(name.length - 1) - 0xac00;
+  return name + (code >= 0 && code <= 11171 && code % 28 !== 0 ? "과" : "와");
+}
+
 function BookingTable({ label, toneClass, rows, party, remarks, onApprove, onCancel, onConfirmVBank, onFullRefund, showOption = false }: {
   showOption?: boolean;   // 참가 구성이 있는 솔로파티 — 신청자 줄마다 항목 이름 열
   label: string;
   toneClass: string;
   rows: BookingRow[];
   party: { title: string; price: number } | undefined;
-  remarks: Record<string, string[]>;
+  remarks: Record<string, BookingRemark[]>;
   onApprove: (email: string, bookingId: string) => void;
   onCancel: (email: string, bookingId: string) => void;
   onConfirmVBank: (email: string, bookingId: string, defaultAmount: number) => void;
@@ -219,7 +228,20 @@ function BookingTable({ label, toneClass, rows, party, remarks, onApprove, onCan
                   ) : (
                     <td className="px-3 py-2.5 md:py-3 font-mono text-xs md:text-sm text-gray-700 max-w-[240px] md:max-w-[200px] truncate" title={b.userEmail || ""}>{b.userEmail || "-"}</td>
                   )}
-                  <td className="px-3 py-2.5 md:py-3 text-xs md:text-sm text-gray-700 font-medium whitespace-pre-line md:whitespace-nowrap md:max-w-[200px] md:truncate" title={isCancelled ? undefined : remarks[b.id]?.join("\n")}>{isCancelled ? "-" : (remarks[b.id]?.join("\n") || "-")}</td>
+                  {/* 비고 — 과거 파티에서 만났던 사람 이름과 그 파티 날짜. 칸 폭 안에서 줄바꿈해 잘리지 않게 다 보여준다 */}
+                  <td className="px-3 py-2.5 md:py-3 text-xs md:text-sm text-gray-700 font-medium whitespace-normal align-top min-w-[220px] max-w-[300px]">
+                    {isCancelled || !remarks[b.id]?.length ? "-" : (
+                      <ul className="space-y-1.5" data-testid="booking-remarks">
+                        {remarks[b.id].map((r, i) => (
+                          <li key={i} className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 leading-snug break-keep">
+                            <span className="font-black text-amber-900">{r.names.slice(0, -1).map(n => `${n}, `).join("")}{withJosa(r.names[r.names.length - 1])}</span>
+                            <span className="text-amber-900"> 만난 적 있음</span>
+                            <span className="block mt-0.5 text-[11px] md:text-xs font-bold text-amber-800/80 tabular-nums">{r.date}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </td>
                   {/* 맨 오른쪽 [취소·환불] 컬럼 — 3가지 분기 (내용은 예전 맨 앞 [취소] 칸 그대로, 위치만 이동):
                        1) 회원탈퇴: userStatus === 'withdrawn' (booking 은 completed 상태로 보존됨)
                        2) 취소완료: booking status === 'cancelled'
@@ -368,7 +390,8 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [bookings, setBookings] = useState<BookingRow[]>([]);
 
-  // 비고: 같은 파티에 신청한 이성 신청자와 과거 파티(신청 결제일 이전)에서 함께 참가확정 완료됐던 파티 날짜·시간
+  // 비고: 같은 파티에 신청한 이성 신청자와 과거 파티(신청 결제일 이전)에서 함께 참가확정 완료됐던 파티 날짜·시간과
+  // 그때 만났던 사람(이번 파티 이성 신청자) 이름. 판단 기준은 예전과 같고, 이름만 함께 담는다 (2026-10-22)
   // 상태 필터와 무관하게 전체 예약으로 계산한다 (필터로 상대 신청자가 빠져도 기록이 누락되지 않도록)
   const remarksByBookingId = useMemo(() => {
     const DONE = new Set(["confirmed", "completed"]);
@@ -392,7 +415,7 @@ export default function AdminDashboard() {
       .filter((x): x is { party: Party; startMs: number } => x.startMs !== null)
       .sort((a, b) => a.startMs - b.startMs);
     const isMF = (g: string) => g === "남성" || g === "여성";
-    const result: Record<string, string[]> = {};
+    const result: Record<string, BookingRemark[]> = {};
     for (const b of bookings) {
       if (b.status === "cancelled" || !isMF(b.userGender)) continue;
       const createdMs = new Date(b.createdAt).getTime();
@@ -400,11 +423,12 @@ export default function AdminDashboard() {
       const counterparts = (activeByParty.get(b.partyId) ?? [])
         .filter(o => isMF(o.userGender) && o.userGender !== b.userGender && o.userEmail !== b.userEmail);
       if (counterparts.length === 0) continue;
-      const lines: string[] = [];
+      const lines: BookingRemark[] = [];
       for (const { party, startMs } of pastParties) {
         if (startMs >= createdMs) break;
         if (!doneKeys.has(`${party.id}|${b.userEmail}`)) continue;
-        if (counterparts.some(o => doneKeys.has(`${party.id}|${o.userEmail}`))) lines.push(party.dateString);
+        const met = counterparts.filter(o => doneKeys.has(`${party.id}|${o.userEmail}`));
+        if (met.length > 0) lines.push({ date: party.dateString, names: [...new Set(met.map(o => o.userName || o.userEmail))] });
       }
       if (lines.length > 0) result[b.id] = lines;
     }
