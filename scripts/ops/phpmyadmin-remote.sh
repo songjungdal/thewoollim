@@ -66,6 +66,7 @@ audit)
     elif S test -e "$f"; then echo "  $f: 있음 (수정일 $(S stat -c %y "$f" | cut -d' ' -f1))"
     else echo "  $f: 없음"; fi
   done
+  echo "  phpMyAdmin 인증 방식(auth_type 값만): $(S sh -c 'cat /etc/phpmyadmin/config.inc.php /etc/phpmyadmin/conf.d/*.php 2>/dev/null' | grep -E "auth_type" | grep -vE '^\s*(//|#|\*)' | sed -nE "s/.*auth_type'\]\s*=\s*'([a-z]+)'.*/\1/p" | sort -u | tr '\n' ' ')"
   echo "  apache2.conf 안 phpmyadmin 관련 줄 번호: $(S grep -niE 'phpmyadmin' /etc/apache2/apache2.conf | cut -d: -f1 | tr '\n' ' ')"
   echo "  패키지 설치·변경 기록(dpkg.log, 남아 있는 것만):"
   S sh -c 'zcat -f /var/log/dpkg.log* 2>/dev/null' | grep -E ' (install|upgrade|remove|purge) phpmyadmin[: ]' | awk '{print "    " $1 " " $3 " " $4 " " $6}' | sort | head -10
@@ -87,7 +88,7 @@ audit)
       sub rng { my ($a,$b)=@_; defined $a ? day($a)." ~ ".day($b) : "-" }
       my (%st,%ipall,$n,$lmin,$lmax);
       my (%g);   # 그룹별 {n,min,max,ip{}}
-      my (%month200,%size200,%path200,%file200,%vh200,%poststat,%postip,%authip);
+      my (%month200,%size200,%path200,%file200,%vh200,%poststat,%postip,%authip,%root,%rmin,%rmax,%pma200);
       my $AUTH = qr{[?&](route=/(server|database|table|sql|import|export|navigation|db_|preferences)|db=|table=|server=\d)|/(db_[a-z_]+|tbl_[a-z_]+|server_[a-z_]+|sql|import|export|navigation)\.php}i;
       sub add { my ($k,$e,$ip)=@_; $g{$k}{n}++; $g{$k}{ip}{$ip}=1; if (defined $e) { $g{$k}{min}=$e if !defined $g{$k}{min}||$e<$g{$k}{min}; $g{$k}{max}=$e if !defined $g{$k}{max}||$e>$g{$k}{max}; } }
       my @rows;
@@ -101,6 +102,7 @@ audit)
           else { next; }
           my $e=ep($dt);
           if (defined $e) { $lmin=$e if !defined $lmin||$e<$lmin; $lmax=$e if !defined $lmax||$e>$lmax; }
+          if ($s eq "200" && $p=~m{^/(index\.html)?(\?|$)}) { $root{$bn}{$b}++; if (defined $e) { $rmin{$bn}=$e if !defined $rmin{$bn}||$e<$rmin{$bn}; $rmax{$bn}=$e if !defined $rmax{$bn}||$e>$rmax{$bn}; } }
           next unless $p=~m{^/phpmyadmin}i;
           $n++; $st{$s}++; $ipall{$ip}=1;
           push @rows, [$e,$ip,$m,$p,$s];
@@ -110,6 +112,7 @@ audit)
             $size200{$b eq "-" ? 0 : $b}++;
             (my $q=lc $p)=~s/\?.*//; $path200{$q}++;
             $file200{$bn}++;
+            $pma200{$bn}{$b eq "-" ? 0 : $b}++;
             $vh200{ $vh eq "" ? "(가상호스트 표시 없음)" : ($vh=~/thewoollim\.com$/i ? $vh : "기본 사이트") }++;
           }
           if ($m eq "POST") { add("post",$e,$ip); $poststat{$s}++; $postip{$ip}=1; }
@@ -137,6 +140,12 @@ audit)
         my @sz = sort { $size200{$b} <=> $size200{$a} || $a <=> $b } keys %size200;
         print "  200 응답 크기(바이트, 많은 순 5개): ", join(", ", map {"$_ x$size200{$_}"} @sz[0..($#sz<4?$#sz:4)]), "\n";
         my @pp = sort { $path200{$b} <=> $path200{$a} || $a cmp $b } keys %path200;
+        # 같은 로그에서 첫 화면(/) 200 응답과 크기가 똑같은지 — 같으면 phpMyAdmin 이 아니라 사이트 첫 화면이 돌아간 것
+        my ($same,$tot)=(0,0);
+        for my $f (keys %pma200) { for my $z (keys %{$pma200{$f}}) { $tot+=$pma200{$f}{$z}; $same+=$pma200{$f}{$z} if $root{$f} && $root{$f}{$z}; } }
+        printf "  200 응답 중 같은 로그의 첫 화면(/) 200 응답과 크기가 똑같은 것: %d / %d건\n", $same, $tot;
+        for my $f (sort keys %pma200) { next unless $root{$f}; my @rz = sort { $root{$f}{$b} <=> $root{$f}{$a} } keys %{$root{$f}};
+          printf "  참고 — %s 의 첫 화면(/) 200 응답: %d건, 기간 %s, 많은 크기 5개 %s\n", $f, eval { my $t=0; $t+=$_ for values %{$root{$f}}; $t }, rng($rmin{$f},$rmax{$f}), join(", ", map {"$_ x$root{$f}{$_}"} @rz[0..($#rz<4?$#rz:4)]); }
         print "  200 응답 경로(물음표 뒤 제외, 많은 순 8개): ", join(", ", map {"$_ x$path200{$_}"} @pp[0..($#pp<7?$#pp:7)]), "\n";
       }
     ' $LOGS
