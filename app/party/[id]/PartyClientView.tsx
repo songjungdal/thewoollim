@@ -618,7 +618,7 @@ export default function PartyClientView({ id, initialParties }: { id: string; in
             <p className={`mt-2 ${BODY_TEXT} text-gray-500`}>{shownDetail.timeline.intro}</p>
           )}
           {timelineNumbered ? (
-            // 세로 타임라인 — 청록 원형 번호를 세로선으로 잇는다. 단계별 소요시간(step.time)은 보여 주지 않는다(데이터는 그대로)
+            // 세로 타임라인 — 청록 원형 번호를 세로선으로 잇는다. 설명·참고 문구는 필수 확인 사항처럼 본문 전체 폭(640px 제한 없앰, 2026-10-22). 단계별 소요시간(step.time)은 보여 주지 않는다(데이터는 그대로)
             <ol className="mt-6 md:mt-8">
               {steps.map((item, idx) => {
                 const no = String(idx + 1).padStart(2, "0");
@@ -633,9 +633,9 @@ export default function PartyClientView({ id, initialParties }: { id: string; in
                     <div className="min-w-0 flex-1 md:pt-1 lg:pt-1.5">
                       <p className="text-[11px] font-black tracking-[0.2em] text-brand-point-ink md:text-xs">STEP {no}</p>
                       <h3 className="mt-1 text-[16px] font-bold leading-snug text-brand-black md:text-[18px] lg:text-[19px]">{item.title}</h3>
-                      <p className={`mt-1.5 max-w-[640px] ${BODY_TEXT} text-gray-600 whitespace-pre-line break-keep`}>{item.desc}</p>
+                      <p className={`mt-1.5 ${BODY_TEXT} text-gray-600 whitespace-pre-line break-keep`}>{item.desc}</p>
                       {item.note && (
-                        <p className="mt-3 max-w-[640px] rounded-lg bg-brand-point/10 px-3.5 py-2.5 text-[13px] leading-relaxed text-gray-700 whitespace-pre-line break-keep md:text-[14px]">
+                        <p className="mt-3 rounded-lg bg-brand-point/10 px-3.5 py-2.5 text-[13px] leading-relaxed text-gray-700 whitespace-pre-line break-keep md:text-[14px]">
                           {item.note}
                         </p>
                       )}
