@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, useMemo, Fragment } from "react";
 import { useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Users, Ticket, Tag, Building2, LogOut, ShieldCheck, CheckCircle2, Clock, AlertTriangle, Calendar, Plus, Pencil, Trash2, ImageIcon, X, FileText, Search, StickyNote, Save, ChevronDown, CreditCard, RotateCcw, Star, GalleryHorizontal, Menu } from "lucide-react";
 import { useParties, broadcastPartiesUpdated } from "../../lib/useParties";
@@ -143,6 +144,100 @@ function withJosa(name: string): string {
   return name + (code >= 0 && code <= 11171 && code % 28 !== 0 ? "과" : "와");
 }
 
+/** 비고 한 칸 — 과거 파티마다 "OOO, OOO와 만난 적 있음" + 그 파티 날짜·시간 */
+function RemarkList({ items }: { items: BookingRemark[] }) {
+  return (
+    <ul className="space-y-1.5" data-testid="booking-remarks">
+      {items.map((r, i) => (
+        <li key={i} className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 leading-snug break-keep">
+          <span className="font-black text-amber-900">{r.names.slice(0, -1).map(n => `${n}, `).join("")}{withJosa(r.names[r.names.length - 1])}</span>
+          <span className="text-amber-900"> 만난 적 있음</span>
+          <span className="block mt-0.5 text-[11px] md:text-xs font-bold text-amber-800/80 tabular-nums">{r.date}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * 비고 버튼 — "과거 파티 이력 있음 · N건". 누르면 버튼 바로 아래(공간이 없으면 위)에 작은 창으로 만났던 사람·날짜를 보여 준다.
+ * 칸 폭·줄 높이가 늘어나지 않게 표 밖(body)에 그린다. 바깥 클릭·Esc·스크롤·창 크기 변경 시 닫힌다.
+ */
+function RemarksButton({ userName, items }: { userName: string; items: BookingRemark[] }) {
+  const [pos, setPos] = useState<{ left: number; top?: number; bottom?: number; maxH: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+  const open = pos !== null;
+  const WIDTH = 300, GAP = 6, MARGIN = 8;
+  const openPopover = () => {
+    const r = btnRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const left = Math.max(MARGIN, Math.min(r.left, window.innerWidth - WIDTH - MARGIN));
+    const below = window.innerHeight - r.bottom - GAP - MARGIN;
+    const above = r.top - GAP - MARGIN;
+    setPos(below >= 200 || below >= above
+      ? { left, top: r.bottom + GAP, maxH: Math.max(120, below) }
+      : { left, bottom: window.innerHeight - r.top + GAP, maxH: Math.max(120, above) });
+  };
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setPos(null);
+    const inside = (t: EventTarget | null) => t instanceof Node && (!!popRef.current?.contains(t) || !!btnRef.current?.contains(t));
+    const onDown = (e: MouseEvent | TouchEvent) => { if (!inside(e.target)) close(); };
+    // Esc 는 이 작은 창만 닫는다 — 신청자 명단 패널도 Esc 로 닫히므로(window keydown) 여기서 전파를 멈춘다
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); close(); } };
+    const onScroll = (e: Event) => { if (!(e.target instanceof Node && popRef.current?.contains(e.target))) close(); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("touchstart", onDown, { passive: true });
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", close);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("touchstart", onDown);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [open]);
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={() => (open ? setPos(null) : openPopover())}
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-black text-amber-900 transition-colors hover:bg-amber-100 min-h-11 md:min-h-0"
+        data-testid="booking-remarks-button"
+      >
+        <Clock size={12} aria-hidden />과거 파티 이력 있음
+        <span className="font-bold text-amber-800/80">· {items.length}건</span>
+        <ChevronDown size={12} aria-hidden className={`transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && pos && createPortal(
+        <div
+          ref={popRef}
+          role="dialog"
+          aria-label={`${userName} 과거 파티 이력`}
+          style={{ position: "fixed", left: pos.left, top: pos.top, bottom: pos.bottom, width: WIDTH, maxHeight: pos.maxH }}
+          className="z-[300] overflow-y-auto rounded-xl border border-amber-200 bg-white p-3 text-xs md:text-sm text-gray-700 font-medium whitespace-normal shadow-xl"
+          data-testid="booking-remarks-popover"
+        >
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="text-xs md:text-sm font-black text-gray-800">{userName}님 과거 파티 이력</p>
+            <button type="button" onClick={() => setPos(null)} aria-label="닫기" className="-m-1 p-1 text-gray-500 hover:text-brand-black">
+              <X size={14} />
+            </button>
+          </div>
+          <RemarkList items={items} />
+        </div>,
+        document.body,
+      )}
+    </>
+  );
+}
+
 function BookingTable({ label, toneClass, rows, party, remarks, onApprove, onCancel, onConfirmVBank, onFullRefund, showOption = false }: {
   showOption?: boolean;   // 참가 구성이 있는 솔로파티 — 신청자 줄마다 항목 이름 열
   label: string;
@@ -228,19 +323,9 @@ function BookingTable({ label, toneClass, rows, party, remarks, onApprove, onCan
                   ) : (
                     <td className="px-3 py-2.5 md:py-3 font-mono text-xs md:text-sm text-gray-700 max-w-[240px] md:max-w-[200px] truncate" title={b.userEmail || ""}>{b.userEmail || "-"}</td>
                   )}
-                  {/* 비고 — 과거 파티에서 만났던 사람 이름과 그 파티 날짜. 칸 폭 안에서 줄바꿈해 잘리지 않게 다 보여준다 */}
-                  <td className="px-3 py-2.5 md:py-3 text-xs md:text-sm text-gray-700 font-medium whitespace-normal align-top min-w-[220px] max-w-[300px]">
-                    {isCancelled || !remarks[b.id]?.length ? "-" : (
-                      <ul className="space-y-1.5" data-testid="booking-remarks">
-                        {remarks[b.id].map((r, i) => (
-                          <li key={i} className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 leading-snug break-keep">
-                            <span className="font-black text-amber-900">{r.names.slice(0, -1).map(n => `${n}, `).join("")}{withJosa(r.names[r.names.length - 1])}</span>
-                            <span className="text-amber-900"> 만난 적 있음</span>
-                            <span className="block mt-0.5 text-[11px] md:text-xs font-bold text-amber-800/80 tabular-nums">{r.date}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
+                  {/* 비고 — 과거 파티 이력이 있으면 버튼만 (누르면 작은 창에 만났던 사람·날짜). 칸 폭·줄 높이는 한 줄 그대로 */}
+                  <td className="px-3 py-2.5 md:py-3 text-xs md:text-sm text-gray-700 font-medium">
+                    {isCancelled || !remarks[b.id]?.length ? "-" : <RemarksButton userName={b.userName} items={remarks[b.id]} />}
                   </td>
                   {/* 맨 오른쪽 [취소·환불] 컬럼 — 3가지 분기 (내용은 예전 맨 앞 [취소] 칸 그대로, 위치만 이동):
                        1) 회원탈퇴: userStatus === 'withdrawn' (booking 은 completed 상태로 보존됨)
