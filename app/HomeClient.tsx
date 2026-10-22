@@ -25,7 +25,6 @@ import { cameBackHere } from "./lib/navHistory";
 /* ── #schedule(파티 일정) 섹션 전용 — 일정 상태별 표시 스타일 ──────────────
  * 우선순위: 지난 일정 > 마감 > 마감임박 > 모집중 (계산은 컴포넌트의 scheduleStatus 참고) */
 type ScheduleStatus = "open" | "soon" | "full" | "past";
-const SCHEDULE_STATUS_ORDER: ScheduleStatus[] = ["open", "soon", "full", "past"];
 /* 상태색 — 초록 = 모집중, 빨강 = 마감임박, 검정 = 마감, 점선 회색 = 지난 일정 */
 const SCHEDULE_STATUS_STYLE: Record<ScheduleStatus, { label: string; tone: string }> = {
   open: { label: "모집중",    tone: "bg-[#DCFCE7] text-[#166534]" },
@@ -887,26 +886,6 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
             <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="text-center mb-8 md:mb-12">
               <h2 className="text-4xl md:text-6xl font-bold mb-4 md:mb-6 tracking-tight">파티 일정</h2>
               <p className="text-base md:text-lg text-gray-500 max-w-2xl mx-auto">신청 가능한 파티 일정을 확인하세요.</p>
-              {/* 범례 — 파티 종류(네모 배지) | 모집 상태(알약 배지). 모바일은 두 줄, md 이상은 한 줄 + 세로 구분선.
-                   묶음 이름("파티 종류"·"모집 상태")은 배지만 봐도 알 수 있어 화면에서는 숨기고 화면 낭독기에만 읽힌다 */}
-              <ul aria-label="일정 상태 안내" className="mt-5 md:mt-6 flex flex-col md:flex-row items-center justify-center gap-2 md:gap-0">
-                <li className="flex flex-wrap items-center justify-center gap-1.5">
-                  <span className="sr-only">파티 종류</span>
-                  {PARTY_TYPES.map(t => (
-                    <span key={t} className={`text-xs font-black px-2 py-0.5 rounded-md whitespace-nowrap ${SCHEDULE_TYPE_STYLE[t].solid}`}>
-                      {SCHEDULE_TYPE_STYLE[t].label}
-                    </span>
-                  ))}
-                </li>
-                <li className="flex flex-wrap items-center justify-center gap-1.5 md:ml-4 md:pl-4 md:border-l md:border-gray-200">
-                  <span className="sr-only">모집 상태</span>
-                  {SCHEDULE_STATUS_ORDER.map(s => (
-                    <span key={s} className={`text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${SCHEDULE_STATUS_STYLE[s].tone}`}>
-                      {SCHEDULE_STATUS_STYLE[s].label}
-                    </span>
-                  ))}
-                </li>
-              </ul>
             </motion.div>
 
             {/* Mobile: 연/월 내비게이션 + 작은 달력 + 날짜별 리스트 */}
