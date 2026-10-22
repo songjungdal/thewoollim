@@ -4,10 +4,10 @@
  *
  *  - 설정: api/payments/toss-billing-config.php (서버에만 있음, 템플릿 toss-billing-config.example.php).
  *    일반 결제 키(api/payments/toss-config.php)와 분리한다. 값이 없거나 형식이 틀리면 ready=false("준비 중").
- *  - 저장: api/data/membership/memberships-<암호화 키에서 만든 이름>.json 한 파일에
- *    { customers: {userId: customerKey}, memberships: [...], payments: [...] } 를 둔다.
+ *  - 저장: 웹 루트 밖 데이터 폴더(api/lib.php privateDataDir)의 membership/memberships-<암호화 키에서 만든 이름>.json
+ *    한 파일에 { customers: {userId: customerKey}, memberships: [...], payments: [...] } 를 둔다.
+ *    웹 루트 밖 폴더가 준비되지 않았으면 ready=false("준비 중") — 웹 루트 안(api/data)에는 저장하지 않는다(.htaccess 에 기대지 않음).
  *    모든 읽기·쓰기는 membershipWithStore() 의 flock 안에서 한다 → 동시 요청에도 중복 발급·중복 결제가 없다.
- *    폴더에는 웹 접근 차단 .htaccess 를 만들고, 파일 이름은 암호화 키 없이는 알 수 없게 한다.
  *  - 빌링키는 AES-256-GCM 으로 암호화해 저장한다. 시크릿 키·빌링키는 응답·로그에 남기지 않는다.
  *  - 이번 단계(1-A)는 첫 결제까지만. 정기결제 스케줄러·재시도·카드 변경·혜택 연동은 없다.
  */
@@ -65,6 +65,8 @@ function membershipConfig(): array {
     }
 
     if (!function_exists('openssl_encrypt')) { $out['reason'] = 'openssl_missing'; return $cfg = $out; }
+    // 빌링키가 들어가는 파일이라 웹 루트 밖 폴더가 있을 때만 연다
+    if (privateDataDir() === null) { $out['reason'] = 'private_data_dir_missing'; return $cfg = $out; }
 
     $out['ready']     = true;
     $out['clientKey'] = $client;
@@ -93,14 +95,12 @@ function membershipDecrypt(string $enc, string $key): ?string {
 
 // ─── 저장 파일 ────────────────────────────────────────────────────
 
+/** 멤버십 저장 폴더 — 웹 루트 밖 데이터 폴더 안에만 (없으면 예외. membershipConfig() 가 먼저 ready=false 로 막는다) */
 function membershipDir(): string {
-    $dir = dataDir() . '/membership';
+    $base = privateDataDir();
+    if ($base === null) throw new RuntimeException('private data dir missing');
+    $dir = $base . '/membership';
     if (!is_dir($dir)) @mkdir($dir, 0770, true);
-    // 웹으로 직접 열리지 않게 (Apache 2.4 / 2.2 모두). 서버가 .htaccess 를 무시해도 파일 이름은 추측할 수 없다.
-    $ht = $dir . '/.htaccess';
-    if (!is_file($ht)) {
-        @file_put_contents($ht, "Options -Indexes\n<IfModule mod_authz_core.c>\n  Require all denied\n</IfModule>\n<IfModule !mod_authz_core.c>\n  Order allow,deny\n  Deny from all\n</IfModule>\n");
-    }
     return $dir;
 }
 
@@ -146,7 +146,11 @@ function membershipWithStore(array $cfg, callable $fn): void {
 
 /** 운영 확인용 로그 — 빌링키·키·카드번호는 남기지 않는다 */
 function membershipLog(string $line): void {
-    @file_put_contents(membershipDir() . '/_membership.log', sprintf("[%s] %s\n", date('c'), $line), FILE_APPEND);
+    try {
+        @file_put_contents(membershipDir() . '/_membership.log', sprintf("[%s] %s\n", date('c'), $line), FILE_APPEND);
+    } catch (Throwable $e) {
+        error_log('[membership] ' . $line);
+    }
 }
 
 // ─── 회원 · 날짜 ──────────────────────────────────────────────────

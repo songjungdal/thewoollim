@@ -71,7 +71,7 @@ rsync 필터의 `P`(삭제 금지)와 `-`(전송 제외)를 함께 적용합니�
 | 구분 | 서버 경로 (웹 루트 기준) |
 |---|---|
 | 비밀 설정 | `api/db-config.php`, `api/auth/sms-config.php`, `api/auth/oauth-config.php`, `api/auth/portone-config.php`, `api/payments/toss-config.php`, 그 밖의 `*-config.php`(멤버십 자동결제 `api/payments/toss-billing-config.php` 포함) |
-| 운영 데이터 | `api/data/` |
+| 운영 데이터 | `api/data/` (웹 루트 밖 `../thewoollim-data/` 로 옮긴 뒤에는 배포가 그 폴더를 아예 건드리지 않음 — 6-1) |
 | 세션 | `api/auth/sessions/`, `api/admin/sessions/` (그 밖의 `sessions/` 포함) |
 | 업로드 | `uploads/`, `api/uploads/` |
 | 서버 설정 | `.htaccess` (웹 루트) |
@@ -174,6 +174,43 @@ GitHub 이 제공하는 실행기(GitHub-hosted runner)는 실행할 때마다 I
    - IAM → 자격 증명 공급자에 GitHub OIDC(`token.actions.githubusercontent.com`) 추가
    - IAM 역할 생성: 신뢰 조건을 이 저장소(`repo:songjungdal/thewoollim:*`)로 제한, 권한은 해당 보안그룹 하나에 대한 `ec2:AuthorizeSecurityGroupIngress`, `ec2:RevokeSecurityGroupIngress` 만
    - 보안그룹의 기존 22번 허용 규칙은 담당자 IP 등 필요한 것만 남김
+
+### 6-1. 운영 데이터 폴더를 웹 루트 밖으로 옮기기 (2026-10-22)
+
+`api/data/` 는 웹 루트 안이라 서버 설정에 따라 브라우저로 그대로 열립니다(2026-10-22 `/api/data/parties.json` 이 200 으로 열리는 것을 확인). 코드(`api/lib.php` `dataDir()`)는 **웹 루트와 같은 층의 `<웹 루트 이름>-data` 폴더**(지금 기준 `/var/www/thewoollim-data`)가 아래 조건을 만족하면 자동으로 그 폴더를 씁니다. 조건을 만족하지 않으면 예전처럼 `api/data/` 를 씁니다.
+
+- 실제 폴더이고 PHP(웹 서버 계정)가 쓸 수 있다
+- 웹 루트 안이 아니다
+- `parties.json` 이 들어 있다 (빈 폴더로 바뀌어 예약이 사라져 보이는 사고 방지)
+
+멤버십(자동결제) 데이터는 이 폴더에만 저장합니다. 폴더가 없으면 멤버십은 "준비 중"으로 막힙니다.
+
+옮기는 순서 (서버에서 담당자가 직접, 손님이 적은 시간에):
+
+```bash
+W=/var/www/thewoollim                 # 웹 루트
+sudo stat -c '%U:%G %a' $W/api/data   # 지금 소유자·권한 확인 (아래에서 그대로 따라 함)
+
+# 1) 임시 이름으로 복사하고 권한을 맞춘 뒤, 이름을 바꾸는 순간 사이트가 새 폴더로 넘어간다
+sudo rsync -a --exclude=.htaccess $W/api/data/ ${W}-data.tmp/
+sudo chown -R --reference=$W/api/data ${W}-data.tmp
+sudo chmod --reference=$W/api/data ${W}-data.tmp
+sudo mv ${W}-data.tmp ${W}-data
+
+# 2) 복사와 전환 사이 몇 초 동안 예전 폴더에 쓰인 내용을 한 번 더 옮긴다 (새 폴더 쪽이 더 새 파일이면 건드리지 않음)
+sudo rsync -a --update --exclude=.htaccess $W/api/data/ ${W}-data/
+sudo chown -R --reference=$W/api/data ${W}-data
+
+# 3) 확인 — 사이트를 몇 번 열고 로그인해 본 뒤, 새 폴더에 방금 쓰인 파일이 있는지
+sudo ls -lt ${W}-data | head
+
+# 4) 예전 폴더를 웹 루트 밖으로 치운다 (지우지 않고 보관)
+sudo mv $W/api/data ${W}-data-old-$(date +%Y%m%d)
+```
+
+- 3) 에서 새 파일이 계속 `api/data/` 쪽에만 생기면 전환되지 않은 것입니다(권한, 또는 PHP 의 `open_basedir` 제한 가능성). 이때는 4) 를 하지 말고 개발 담당에게 알립니다.
+- 서버가 환경변수 `THEWOOLLIM_DATA_DIR` 을 지정하면 그 경로를 먼저 씁니다(같은 조건).
+- 옮기기 전까지는 PHP 가 `api/data/`, `api/auth/sessions/`, `api/admin/sessions/` 에 웹 접근 차단 `.htaccess` 를 만들어 둡니다(없을 때만). Apache 가 `.htaccess` 를 따를 때만 효과가 있으므로 근본 해결은 위 이전입니다.
 
 ## 7. 처음 가동하는 순서
 

@@ -21,7 +21,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 | 서비스 | thewoollim.com. 오프라인 파티 신청·결제·운영 사이트. 파티 종류는 매칭파티(1:1 로테이션 소개팅)와 솔로파티 두 가지다. 솔로파티 규칙은 `docs/specs/party-*.md` 명세서에 있다 |
 | 화면 | Next.js 16 App Router + React 19 + Tailwind CSS 4 + TypeScript. `next.config.ts`의 `output: "export"`로 **정적 HTML(`out/`)** 을 만든다 |
 | 서버 | `api/` 아래 PHP 파일. 브라우저가 `/api/*.php`를 직접 호출한다 |
-| 데이터 | 회원·후기·현장스케치·관리자 메모·매칭 투표는 MySQL/MariaDB(PDO, `api/db.php`). 파티·예약·장바구니·쿠폰·메인이미지 설정·관리자 활동 기록은 서버의 `api/data/*.json` 파일 |
+| 데이터 | 회원·후기·현장스케치·관리자 메모·매칭 투표는 MySQL/MariaDB(PDO, `api/db.php`). 파티·예약·장바구니·쿠폰·메인이미지 설정·관리자 활동 기록·멤버십은 서버의 JSON 파일. 위치는 `api/lib.php` `dataDir()`가 정한다(웹 루트 밖 `<웹 루트>-data/`, 옮기기 전에는 `api/data/`. `docs/DEPLOYMENT.md` 6-1) |
 | 외부 연동 | 토스페이먼츠(결제), 포트원 V2 + 다날(본인인증), 알리고(SMS), 카카오·네이버·구글 로그인(현재 화면에서 숨김) |
 | 운영 | AWS EC2. 배포는 GitHub Actions 수동 워크플로로만 한다(13장) |
 
@@ -75,7 +75,8 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 - 새 파일은 기존 파일처럼 `declare(strict_types=1);`로 시작하고 `api/lib.php`의 헬퍼(`jsonBody`, `jsonOut`, `jsonFail` 등)를 쓴다.
 - DB는 `api/db.php`의 `getDB()`(PDO, prepared statement)로만 접근한다. 연결 직후 DB 시간대가 KST로 고정된다.
-- `api/data/*.json`을 고칠 때는 반드시 `withFileLock()`으로 읽고 쓴다. 동시 결제·신청에서 데이터가 깨지는 것을 막기 위해서다.
+- 운영 데이터 경로는 반드시 `dataDir()`로 얻는다. `__DIR__ . '/../data'`처럼 직접 쓰지 않는다(데이터 폴더는 웹 루트 밖으로 옮겨진다).
+- 데이터 JSON 파일을 고칠 때는 반드시 `withFileLock()`으로 읽고 쓴다. 동시 결제·신청에서 데이터가 깨지는 것을 막기 위해서다.
 - 회원 세션은 `api/auth/_session.php`, 관리자 세션은 `api/admin/_session.php`를 쓴다. 관리자 API는 관리자 세션 검사를 빠뜨리지 않는다.
 - 결제 금액·정원·쿠폰·환불 금액은 **서버가 최종 판단**한다. 화면에서 보낸 값을 그대로 믿지 않는다.
 - `api/cron/*.php`는 서버 타이머로만 실행하는 CLI 스크립트다. HTTP로 열리게 만들지 않는다.

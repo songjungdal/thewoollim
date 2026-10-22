@@ -19,7 +19,7 @@ if (!adminIsLoggedIn()) {
     exit;
 }
 
-$dir   = __DIR__ . '/../data';
+$dir   = dataDir();
 $today = date('Y-m-d');
 
 // 시스템/결제 실패 계열 로그 파일 (각 라인은 "[ISO8601] ..." 형식 → 오늘 날짜 prefix 매칭)

@@ -938,15 +938,76 @@ function releaseCouponUsage(string $code, string $email): void {
 }
 
 // ─── 데이터 디렉토리 경로 ──────────────────────────────────────────
+//   운영 데이터(예약·장바구니·쿠폰·로그 등)는 웹 루트 밖 폴더에 둔다 — 브라우저로 직접 열리지 않게.
+//   1) 웹 루트 밖 폴더(privateDataDir)가 준비돼 있으면 그곳
+//   2) 아니면 예전 위치 api/data (옮기기 전 호환). 이때는 웹 접근 차단 .htaccess 를 만들어 둔다
+//      (Apache 가 .htaccess 를 따를 때만 효과 — 옮기는 것이 근본 해결).
+//   모든 PHP 는 데이터 경로를 이 함수로만 얻는다 (__DIR__ . '/../data' 직접 사용 금지).
+
+/** 웹 루트 (= api/ 의 상위 폴더) */
+function webRootDir(): string {
+    return dirname(__DIR__);
+}
+
+/**
+ * 웹 루트 밖 데이터 폴더. 조건을 모두 만족할 때만 경로를, 아니면 null.
+ *  - 위치: 환경변수 THEWOOLLIM_DATA_DIR(서버가 지정한 경우) 또는 웹 루트와 같은 층의 "<웹 루트 이름>-data"
+ *    (예: 웹 루트가 /var/www/thewoollim 이면 /var/www/thewoollim-data)
+ *  - 실제 폴더이고, PHP 가 쓸 수 있고, 웹 루트 안이 아니어야 한다
+ *  - parties.json 이 있어야 한다 — 기존 데이터를 옮기기 전에 빈 폴더로 바뀌어 예약이 사라져 보이는 사고 방지
+ */
+function privateDataDir(): ?string {
+    static $resolved = false, $dir = null;
+    if ($resolved) return $dir;
+    $resolved = true;
+    $root = realpath(webRootDir());
+    $env  = getenv('THEWOOLLIM_DATA_DIR');
+    $candidates = array_filter([
+        is_string($env) && $env !== '' ? $env : null,
+        dirname(webRootDir()) . '/' . basename(webRootDir()) . '-data',
+    ]);
+    foreach ($candidates as $c) {
+        $real = realpath($c);
+        if ($real === false || !is_dir($real) || !is_writable($real)) continue;
+        if ($root !== false && ($real === $root || str_starts_with($real . '/', $root . '/'))) continue;  // 웹 루트 안이면 쓰지 않음
+        if (!is_file($real . '/parties.json')) {
+            error_log('[dataDir] 웹 루트 밖 폴더에 parties.json 이 없어 사용하지 않음: ' . $real);
+            continue;
+        }
+        return $dir = $real;
+    }
+    return null;
+}
+
+/** 폴더에 웹 접근 차단 .htaccess 가 없으면 만든다 (있으면 건드리지 않음) */
+function denyWebAccess(string $dir): void {
+    $ht = $dir . '/.htaccess';
+    if (!is_dir($dir) || is_file($ht) || !is_writable($dir)) return;
+    @file_put_contents($ht, "# 운영 데이터·세션 — 웹으로 직접 열지 않는다 (api/lib.php denyWebAccess)\n"
+        . "Options -Indexes\n<IfModule mod_authz_core.c>\n  Require all denied\n</IfModule>\n"
+        . "<IfModule !mod_authz_core.c>\n  Order allow,deny\n  Deny from all\n</IfModule>\n");
+}
+
 function dataDir(): string {
-    // /var/www/thewoollim/api/<this>.php → /var/www/thewoollim/api/data
-    // /var/www/thewoollim/api/admin/<x>.php 에서 호출 시도 자동 보정
+    static $dir = null;
+    if ($dir !== null) return $dir;
+
+    // 세션 폴더도 웹 루트 안에 있으므로 차단 파일을 둔다
+    denyWebAccess(__DIR__ . '/auth/sessions');
+    denyWebAccess(__DIR__ . '/admin/sessions');
+
+    $private = privateDataDir();
+    if ($private !== null) return $dir = $private;
+
+    // 예전 위치 — /var/www/thewoollim/api/data
     $candidates = [
         __DIR__ . '/data',
         dirname(__DIR__) . '/data',
     ];
+    $dir = $candidates[0];
     foreach ($candidates as $p) {
-        if (is_dir($p)) return $p;
+        if (is_dir($p)) { $dir = $p; break; }
     }
-    return $candidates[0];
+    denyWebAccess($dir);
+    return $dir;
 }
