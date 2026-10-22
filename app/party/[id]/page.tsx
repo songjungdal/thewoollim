@@ -38,11 +38,13 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       noindex: true,
     });
   }
+  // 공유 썸네일 — 상단이미지(16:9, 상세페이지 맨 위) 우선, 없으면 대표이미지(파티 카드), 둘 다 없으면 사이트 기본 이미지 (2026-10-22)
+  const shareImage = party.heroImageUrl || party.imageUrl;
   return pageMetadata({
     title: partyTitle(party),
     description: partyDescription(party),
     path: `/party/${id}/`,
-    image: party.imageUrl ? { url: party.imageUrl, alt: party.title } : undefined,
+    image: shareImage ? { url: shareImage, alt: party.title } : undefined,
   });
 }
 
