@@ -1053,7 +1053,9 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
                     .fc .fc-day-today .fc-daygrid-day-number { color: #00756F; font-weight: 900; }
                     .fc .fc-day-today .sch-chip-match:is(.sch-chip-open, .sch-chip-soon) { background: #FFFFFF; }
                     /* 선택한 날짜 — 검정 2px 테두리 */
-                    .fc .sch-day-selected .fc-daygrid-day-frame { box-shadow: inset 0 0 0 2px #000; border-radius: 4px; }
+                    /* (칸 안쪽 상자가 아니라 칸 전체에 그린다 — 안쪽 상자는 최소 높이(120px)라, 같은 줄의 다른 날짜에 일정이 많아 줄이 높아지면 테두리가 칸보다 짧아짐) */
+                    .fc .fc-daygrid-day.sch-day-selected { position: relative; }
+                    .fc .fc-daygrid-day.sch-day-selected::after { content: ""; position: absolute; inset: 0; box-shadow: inset 0 0 0 2px #000; border-radius: 4px; pointer-events: none; z-index: 5; }
                     .fc-daygrid-event-dot { display: none !important; }
                   `}} />
                   <FullCalendar
