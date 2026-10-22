@@ -88,7 +88,8 @@ export const PARTY_GUIDES: Record<PartyType, PartyGuide> = {
       { text: "[확정 대기 중]", strong: true },
       { text: " 상태가 되며, 운영진이 성비와 참가 조건을 확인한 뒤 " },
       { text: "[참가 확정]", strong: true },
-      { text: " 문자를 보내드립니다. 별도의 프로필 카드 작성은 필요 없습니다." },
+      // 마지막 문장 — 2026-10-22 사용자 요청으로 "별도의 프로필 카드 작성은 필요 없습니다." 에서 변경
+      { text: " 문자를 보내드립니다. 참가 확정 및 안내 문자는 확정 시점에 맞춰 순차적으로 발송됩니다." },
     ],
     steps: [
       {
