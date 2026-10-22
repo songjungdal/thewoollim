@@ -1085,8 +1085,9 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
                     // 팝오버를 열기 때문에 현재 보기(dayGridMonth)를 반환 → 같은 달 그대로 유지.
                     moreLinkClick={(info) => { setScheduleSelected(toYmd(info.date)); return "dayGridMonth"; }}
                     dayCellClassNames={(arg) => (toYmd(arg.date) === pcSelectedDate ? ["sch-day-selected"] : [])}
-                    // 칩 — 종류 태그(매칭파티/솔로파티) + 시간(보통 굵기·회색). 칸이 좁아 테마·"임박"/"마감" 글자 태그는 넣지 않는다
-                    // (시간이 없는 일정만 시간 자리에 테마). 태그와 시간이 한 줄에 안 들어가면(1024px 화면 등) 시간이 다음 줄로.
+                    // 칩 — 종류 태그(매칭파티/솔로파티, 시간과 같은 12px 굵게) + 시간(보통 굵기·회색). 칸이 좁아 테마·"임박"/"마감" 글자 태그는 넣지 않는다
+                    // (시간이 없는 일정만 시간 자리에 테마). 여백(칩·태그 3px)은 1263px(윈도우 150% 배율) 화면에서도 한 줄에 들어가게 맞춘 값.
+                    // 그보다 좁으면(1024px 화면·태블릿) 시간이 다음 줄로.
                     // 상태는 색으로만 구분: 모집중 = 종류 연한 색, 마감임박 = 종류 연한 색 + 빨간 테두리, 마감 = 회색, 지난 일정 = 흰색 점선
                     eventContent={(arg) => {
                       const xp = arg.event.extendedProps as { time?: string; theme?: string; status?: ScheduleStatus | null; partyType?: PartyType };
@@ -1102,9 +1103,9 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
                       return (
                         <div
                           title={`${xp.time ? xp.time + " " : ""}${arg.event.title}`}
-                          className={`sch-chip ${partyType === "solo" ? "sch-chip-solo" : "sch-chip-match"} sch-chip-${status} w-full flex flex-wrap items-center gap-y-0.5 overflow-hidden rounded-md border px-1 py-1 text-xs font-medium leading-tight ${chipTone}`}
+                          className={`sch-chip ${partyType === "solo" ? "sch-chip-solo" : "sch-chip-match"} sch-chip-${status} w-full flex flex-wrap items-center gap-y-0.5 overflow-hidden rounded-md border px-[3px] py-1 text-xs font-medium leading-tight ${chipTone}`}
                         >
-                          <span className={`flex-shrink-0 mr-1 rounded px-0.5 text-[10px] font-black whitespace-nowrap ${scheduleTypeBadgeTone(partyType, status)}`}>
+                          <span className={`flex-shrink-0 mr-[3px] rounded px-[3px] py-px text-xs font-bold tracking-tight whitespace-nowrap ${scheduleTypeBadgeTone(partyType, status)}`}>
                             {SCHEDULE_TYPE_STYLE[partyType].label}
                           </span>
                           {xp.time ? (
