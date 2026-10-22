@@ -280,7 +280,7 @@ export type FaqItem = {
   id: string;
   q: string;
   lead: string;
-  body: string;                                        // 빈 문자열이면 표시하지 않음
+  body: string;                                        // 빈 문자열이면 표시하지 않음. "\n" 줄바꿈은 그대로 보인다
   steps?: { label: string; desc: string }[];           // 단계 카드 (마지막 단계 강조)
   refund?: { when: string; pct: string; value: number }[]; // 환불 비율 막대 (value = 막대 너비 %)
   chips?: string[];                                    // 체크 칩
@@ -324,6 +324,12 @@ export const FAQS: FaqItem[] = [
     lead: "장바구니 페이지에서 쿠폰 코드를 입력하면 바로 적용돼요.",
     body: "",
     chips: ["파티당 1매 사용", "다른 쿠폰과 중복 적용 불가"],
+  },
+  {
+    id: "rematch",
+    q: "이전 파티에서 만난 참가자와 겹치지 않게 조율해 주나요?",
+    lead: "네, 걱정하지 않으셔도 됩니다.",
+    body: "어울림은 참가자분들의 편안하고 설레는 만남을 위해 ‘재회 방지 사전 안내 시스템’을 운영하고 있습니다.\n\n신청하신 파티에 기존에 마주쳤던 참가자가 포함되어 있을 경우, 파티 확정 전 개별적으로 미리 안내해 드립니다. 원치 않으실 경우 다른 일정으로의 변경 또는 100% 전액 취소를 도와드리고 있으니 부담 없이 안심하고 신청해 주셔도 좋습니다.",
   },
   {
     id: "partnership",

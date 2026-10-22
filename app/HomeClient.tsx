@@ -1173,7 +1173,7 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
                             <div className="bg-brand-lightgray rounded-2xl p-5 md:p-6">
                               <p className="font-bold text-black text-[15px] md:text-base leading-relaxed break-keep">{faq.lead}</p>
                               {faq.body && (
-                                <p className="mt-2 text-sm md:text-[15px] text-gray-600 leading-relaxed break-keep">{faq.body}</p>
+                                <p className="mt-2 text-sm md:text-[15px] text-gray-600 leading-relaxed break-keep whitespace-pre-line">{faq.body}</p>
                               )}
 
                               {faq.steps && (
