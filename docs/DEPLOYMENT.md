@@ -208,6 +208,7 @@ sudo ls -lt ${W}-data | head
 sudo mv $W/api/data ${W}-data-old-$(date +%Y%m%d)
 ```
 
+- SSH 를 쓰기 어려우면 같은 순서를 1회용 워크플로 `.github/workflows/ops-data-migrate.yml`(Actions → "Ops - data dir migration (one-time)", main 전용, 배포와 같은 서버 접속 방식)로 실행합니다. 단계를 나눠 `check`(읽기만) → `migrate`(confirm=`MIGRATE`, 백업 tar.gz → 복사 → 전환 → PHP 가 새 폴더를 쓰는지 확인, 아니면 새 폴더를 비켜 두고 멈춤) → `finalize`(confirm=`FINALIZE`, 옛 폴더 이동·상태 코드 확인) 순서입니다. 서버 쪽 동작은 `scripts/ops/data-migrate-remote.sh`. 작업이 끝나면 워크플로는 지웁니다.
 - 3) 에서 새 파일이 계속 `api/data/` 쪽에만 생기면 전환되지 않은 것입니다(권한, 또는 PHP 의 `open_basedir` 제한 가능성). 이때는 4) 를 하지 말고 개발 담당에게 알립니다.
 - 서버가 환경변수 `THEWOOLLIM_DATA_DIR` 을 지정하면 그 경로를 먼저 씁니다(같은 조건).
 - 옮기기 전까지는 PHP 가 `api/data/`, `api/auth/sessions/`, `api/admin/sessions/` 에 웹 접근 차단 `.htaccess` 를 만들어 둡니다(없을 때만). Apache 가 `.htaccess` 를 따를 때만 효과가 있으므로 근본 해결은 위 이전입니다.
