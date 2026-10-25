@@ -16,7 +16,7 @@ import GalleryGrid from "./components/gallery/GalleryGrid";
 import GalleryAllSheet from "./components/gallery/GalleryAllSheet";
 import GalleryLightbox from "./components/gallery/GalleryLightbox";
 import type { GalleryItem } from "./components/gallery/types";
-import { PARTICIPANTS, FAQS, partyStockStatus, withLiveCounts, partyVisibility, categoryLabel, partyTypeOf, PARTY_TYPES, PARTY_TYPE_LABELS, type Party, type PartyType, type AllowedMaritalStatus } from "./lib/data";
+import { PARTICIPANTS, FAQS, partyStockStatus, withLiveCounts, partyVisibility, categoryLabel, partyTypeOf, PARTY_TYPES, type Party, type PartyType, type AllowedMaritalStatus } from "./lib/data";
 import { useAuth } from "./context/AuthContext";
 import { useParties, PARTIES_NOT_LOADED } from "./lib/useParties";
 import { daysUntil } from "./lib/refund";
@@ -32,11 +32,12 @@ const SCHEDULE_STATUS_STYLE: Record<ScheduleStatus, { label: string; tone: strin
   full: { label: "마감",      tone: "bg-[#111111] text-white" },
   past: { label: "지난 일정", tone: "bg-white text-[#6B7280] border border-dashed border-[#D1D5DB]" },
 };
-/* 파티 종류색 — solid: 진한 배지·점 / soft: 연한 배경(달력 칩·날짜 블록) / ink: 연한 배경 위 글자.
+/* 파티 종류색 — label: 이 섹션의 종류 이름(2026-10-25, 매칭파티 → 소개팅 / 솔로파티 → 파티) /
+ * solid: 진한 배지·점 / soft: 연한 배경(달력 칩·날짜 블록) / ink: 연한 배경 위 글자.
  * 솔로파티 그라데이션(solo-grad, solo-grad-soft)은 app/globals.css */
 const SCHEDULE_TYPE_STYLE: Record<PartyType, { label: string; solid: string; soft: string; ink: string }> = {
-  matching: { label: PARTY_TYPE_LABELS.matching, solid: "bg-[#40E0D0] text-[#003B37]", soft: "bg-[#E6FAF8]",   ink: "text-[#00756F]" },
-  solo:     { label: PARTY_TYPE_LABELS.solo,     solid: "solo-grad",                  soft: "solo-grad-soft", ink: "text-[#9D1C8A]" },
+  matching: { label: "소개팅", solid: "bg-[#40E0D0] text-[#003B37]", soft: "bg-[#E6FAF8]",   ink: "text-[#00756F]" },
+  solo:     { label: "파티",   solid: "solo-grad",                  soft: "solo-grad-soft", ink: "text-[#9D1C8A]" },
 };
 /** 파티 종류 배지 — 모집중·마감임박은 진하게, 마감은 연하게, 지난 일정은 회색 (상태 계산 전에는 모집중처럼) */
 const scheduleTypeBadgeTone = (partyType: PartyType, status: ScheduleStatus | null | undefined) => {
