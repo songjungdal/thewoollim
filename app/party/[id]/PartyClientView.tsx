@@ -789,7 +789,8 @@ export default function PartyClientView({ id, initialParties }: { id: string; in
                 <img src={detailItem.imageUrl || DEFAULT_IMAGE} alt={detailItem.title} onLoad={jumpToPendingHash} className="block h-auto w-full max-w-full" data-testid="party-main-image" />
               )}
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-              {/* 상태 배지 — 우선순위: 행사일 경과(모집종료) > 정원 만석(모집마감) > 모집중 (기존 로직 그대로) */}
+              {/* 상태 배지 — 우선순위: 행사일 경과(모집종료) > 정원 만석(모집마감) > 모집중 (기존 로직 그대로).
+                   파티 종류 배지(매칭파티/솔로파티)는 2026-10-25 사용자 요청으로 뺐다 */}
               {(() => {
                 const status: "ended" | "full" | "open" =
                   isExpired ? "ended" : stock.allFull ? "full" : "open";
@@ -802,10 +803,6 @@ export default function PartyClientView({ id, initialParties }: { id: string; in
                   <div className="absolute left-3 top-3 z-10 flex items-center gap-1.5 md:left-4 md:top-4 md:gap-2">
                     <div className={`rounded-full px-3 py-1 text-xs font-bold shadow-xl md:px-4 md:py-1.5 md:text-sm ${badge.cls}`}>
                       {badge.label}
-                    </div>
-                    {/* 파티 종류 배지 */}
-                    <div className="rounded-full bg-gray-900 px-3 py-1 text-xs font-bold text-white shadow-xl md:px-4 md:py-1.5 md:text-sm">
-                      {typeLabel}
                     </div>
                   </div>
                 );
