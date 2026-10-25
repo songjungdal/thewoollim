@@ -4,13 +4,13 @@ import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ShoppingBag, LogOut, User, Trash2, CheckSquare, Square, CreditCard, Pencil, AlertTriangle, X, Ticket, TicketX, Clock, CheckCircle2, Check, KeyRound, ChevronDown } from "lucide-react";
+import { ShoppingBag, LogOut, User, Trash2, CheckSquare, Square, CreditCard, Pencil, AlertTriangle, X, Ticket, TicketX, Clock, CheckCircle2, Check, KeyRound, ChevronDown, CalendarCheck } from "lucide-react";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useAuth, calcCouponDiscount, type BookingStatus } from "../context/AuthContext";
 import MembershipSection from "./MembershipSection";
 import { useParties, PARTIES_NOT_LOADED } from "../lib/useParties";
-import { partyStockStatus, linePriceFor, partyHasOptions, partyOptionById, dateOnly, VBANK_INFO, COUPON_DISABLED_MESSAGE } from "../lib/data";
+import { partyStockStatus, linePriceFor, partyHasOptions, partyOptionById, dateOnly, partyVisibility, VBANK_INFO, COUPON_DISABLED_MESSAGE } from "../lib/data";
 
 // 관리자 페이지의 신청자 상태 배지 규격과 동일한 색상 조합 사용 (admin8888/dashboard STATUS_LABEL)
 const STATUS_DISPLAY: Record<BookingStatus, { label: string; tone: string; stripe: string; icon: typeof Clock; sub?: string }> = {
@@ -77,6 +77,9 @@ const STATUS_DISPLAY: Record<BookingStatus, { label: string; tone: string; strip
     icon:   X,
   },
 };
+
+// 참가확정 예약의 행사 일시가 지났을 때 카드 안내 문구 (표시만 — 상태값은 그대로 confirmed)
+const PARTY_ENDED_SUB = "어울림과 함께한 시간은 즐거우셨나요? 소중한 후기를 남겨주시면 다음 참여 시 혜택을 드립니다.";
 
 export default function MyPage() {
   const { mounted, isLoggedIn, userEmail, userRole, logout, verifySession, cart, removeFromCart, profile, deleteAccount, bookings, appliedCoupon, applyCoupon, clearCoupon, partyCounts, refreshCart, refreshBookings } = useAuth();
@@ -418,16 +421,29 @@ export default function MyPage() {
                             const party = PARTIES.find(p => p.id === b.partyId);
                             const meta  = STATUS_DISPLAY[b.status] ?? STATUS_DISPLAY.paid_pending_profile;
                             const Icon  = meta.icon;
+                            // 참가확정 + 행사 일시 지남(메인과 같은 partyVisibility 기준) — 표시만 바꾼다.
+                            // 상태값·분류는 그대로이며, 투표 종료로 completed 가 되면 '지난 예약'으로 옮겨진다.
+                            const partyEnded = b.status === "confirmed" && !!party?.calendarDate && partyVisibility(party) !== "active";
                             return (
                               <div key={b.id} className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
                                 {/* 상태 색 띠 */}
                                 <div className={`h-1.5 ${meta.stripe}`} />
                                 <div className="p-4 lg:p-6 lg:flex lg:items-end lg:justify-between lg:gap-6">
                                   <div className="flex-1 min-w-0">
-                                    <span className={`inline-flex items-center gap-1.5 text-[13px] lg:text-sm font-black px-3 py-1 rounded-full ${meta.tone}`}>
-                                      <Icon size={14} /> {meta.label}
-                                    </span>
-                                    {meta.sub && (
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <span className={`inline-flex items-center gap-1.5 text-[13px] lg:text-sm font-black px-3 py-1 rounded-full ${meta.tone}`}>
+                                        <Icon size={14} /> {meta.label}
+                                      </span>
+                                      {/* 파티종료 — 누를 수 없는 표시용 배지 */}
+                                      {partyEnded && (
+                                        <span className="inline-flex items-center gap-1.5 text-[13px] lg:text-sm font-black px-3 py-1 rounded-full bg-brand-black text-white" data-testid="booking-party-ended">
+                                          <CalendarCheck size={14} /> 파티종료
+                                        </span>
+                                      )}
+                                    </div>
+                                    {partyEnded ? (
+                                      <p className="mt-2 text-[13px] lg:text-sm text-brand-point-ink font-bold break-keep">{PARTY_ENDED_SUB}</p>
+                                    ) : meta.sub && (
                                       <p className="mt-2 text-[13px] lg:text-sm text-gray-600 font-medium break-keep">{meta.sub}</p>
                                     )}
                                     <h3 className="mt-3 text-[17px] lg:text-xl font-black leading-snug text-brand-black break-keep">
