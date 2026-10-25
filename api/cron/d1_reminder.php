@@ -129,23 +129,20 @@ foreach ($users as $u) {
             }
 
             $party = $targetParties[$partyId];
-            $typeLabel = partyTypeLabel($party);   // 매칭파티 / 솔로파티 (글자 수 같아 단문·장문 구분 영향 없음)
             $title = (string)($party['title']    ?? '');
             $loc   = (string)($party['location'] ?? '');
             $dt    = _d1SplitDate((string)($party['dateString'] ?? ''));
             $pdate = $dt['date'] !== '' ? $dt['date'] : '추후 안내';
             $ptime = $dt['time'] !== '' ? $dt['time'] : '추후 안내';
-            // 참가 구성 예약 — 항목 이름 한 줄, 시간은 처음 참석하는 회차 기준 (항목 예약이 아니면 기존 문구 그대로)
-            $optLine = !empty($b['optionName']) ? '참가: ' . (string)$b['optionName'] . "\n" : '';
+            // 참가 구성 예약 — 시간은 처음 참석하는 회차 기준 (항목 예약이 아니면 파티 시각 그대로)
             if (bookingFirstSessionTime($b, $party) !== '') $ptime = bookingFirstSessionTime($b, $party);
 
             $msg =
-                "{$name}님, 내일은 설레는 만남이 있는 {$typeLabel} 날입니다!\n\n" .
+                "[어울림] 파티 하루 전 안내\n" .
+                "{$name}님, 내일은 설레는 만남이 있는 날입니다!\n" .
                 "{$title}\n" .
-                $optLine .
-                "일시: {$pdate}\n" .
-                "시간: {$ptime}\n" .
-                "장소: {$loc}\n\n" .
+                "{$pdate} {$ptime}\n" .
+                "{$loc}\n\n" .
                 "현장 본인 확인을 위해 신분증을 반드시 지참해 주시고, 늦지 않게 10분 전까지 도착해 주세요.";
 
             // 90 byte 초과 → LMS 자동 분기 (한글 LMS 안전 처리)
@@ -160,7 +157,7 @@ foreach ($users as $u) {
                 'msg_type'    => $msgType,
                 'testmode_yn' => 'N',
             ];
-            if ($msgType === 'LMS') $params['title'] = "[어울림] {$typeLabel} D-Day 안내";
+            if ($msgType === 'LMS') $params['title'] = '[어울림] 파티 하루 전 안내';
 
             $ch = curl_init('https://apis.aligo.in/send/');
             curl_setopt_array($ch, [
