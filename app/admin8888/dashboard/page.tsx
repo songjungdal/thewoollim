@@ -9,7 +9,7 @@ import { useParties, broadcastPartiesUpdated } from "../../lib/useParties";
 import { formatPhoneKR } from "../../lib/phone";
 import { calculateRefund, refundRateLabel } from "../../lib/refund";
 import { formatKST } from "../../lib/datetime";
-import { partyVisibility, partyTypeOf, PARTY_TYPES, PARTY_TYPE_LABELS, PARTY_TYPE_ADMIN_LABELS, THEMES, LEGACY_THEMES, categoryLabel, type Party, type PartyType, type Theme } from "../../lib/data";
+import { partyVisibility, partyTypeOf, PARTY_TYPES, PARTY_TYPE_ADMIN_LABELS, THEMES, LEGACY_THEMES, categoryLabel, type Party, type PartyType, type Theme } from "../../lib/data";
 import { templateFor, normalizeDetail, withGuideDefaults, compactDetailForSave, defaultNotice, type PartyDetail } from "../../lib/partyDetailTemplates";
 import PartyDetailEditor, { validateDetail, type DetailSourceParty } from "./PartyDetailEditor";
 import PartyHeroCropModal from "./PartyHeroCropModal";
@@ -383,7 +383,7 @@ function BookingTable({ label, toneClass, rows, party, remarks, onApprove, onCan
 function PartyTypeBadge({ type }: { type: PartyType }) {
   return (
     <span className={`inline-block text-xs font-black px-2 py-0.5 rounded-full whitespace-nowrap ${type === "solo" ? "bg-gray-900 text-white" : "bg-brand-point/20 text-brand-black"}`}>
-      {PARTY_TYPE_LABELS[type]}
+      {PARTY_TYPE_ADMIN_LABELS[type]}
     </span>
   );
 }
@@ -2174,7 +2174,7 @@ export default function AdminDashboard() {
                     className="w-full md:w-auto px-3 py-2.5 rounded-lg border border-gray-200 text-base md:text-sm font-bold bg-white text-brand-black focus:ring-2 focus:ring-brand-point outline-none min-h-11 md:min-h-0 md:h-10"
                   >
                     <option value="all">전체</option>
-                    {PARTY_TYPES.map(t => <option key={t} value={t}>{PARTY_TYPE_LABELS[t]}</option>)}
+                    {PARTY_TYPES.map(t => <option key={t} value={t}>{PARTY_TYPE_ADMIN_LABELS[t]}</option>)}
                   </select>
                   <select
                     value={partyMonthFilter}
@@ -2258,7 +2258,7 @@ export default function AdminDashboard() {
                       <tr><td colSpan={10} className="text-center text-gray-500 py-8">
                         {PARTIES.length === 0
                           ? "등록된 파티 없음"
-                          : `${labelMonth(partyMonthFilter)}${partyTypeFilter !== "all" ? ` · ${PARTY_TYPE_LABELS[partyTypeFilter]}` : ""}에 등록된 파티 없음`}
+                          : `${labelMonth(partyMonthFilter)}${partyTypeFilter !== "all" ? ` · ${PARTY_TYPE_ADMIN_LABELS[partyTypeFilter]}` : ""}에 등록된 파티 없음`}
                       </td></tr>
                     )}
                   </tbody>
@@ -2323,7 +2323,7 @@ export default function AdminDashboard() {
                   <p className="bg-white rounded-2xl border border-gray-200 text-center text-sm text-gray-500 py-8">
                     {PARTIES.length === 0
                       ? "등록된 파티 없음"
-                      : `${labelMonth(partyMonthFilter)}${partyTypeFilter !== "all" ? ` · ${PARTY_TYPE_LABELS[partyTypeFilter]}` : ""}에 등록된 파티 없음`}
+                      : `${labelMonth(partyMonthFilter)}${partyTypeFilter !== "all" ? ` · ${PARTY_TYPE_ADMIN_LABELS[partyTypeFilter]}` : ""}에 등록된 파티 없음`}
                   </p>
                 )}
               </div>
