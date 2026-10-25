@@ -468,11 +468,12 @@ export default function PartyClientView({ id, initialParties }: { id: string; in
       ? { kind: "empty" }
       : { kind: "open", total: totalApplied, cap: maleSeats.cap + femaleSeats.cap, remaining: maleSeats.remaining + femaleSeats.remaining };
 
-  // 대상별 안내 (싱글/돌싱) — 필수 확인 사항 맨 끝 항목으로. 미지정·all 이면 없음 (노출 조건은 기존 그대로)
+  // 대상별 안내 (싱글/돌싱) — 필수 확인 사항 맨 끝 항목으로. 미지정·all 이면 없음.
+  //   싱글 전용 경고는 신청 제한(checkEligibility)과 같게 혼인여부 "싱글"일 때만 — 대상별 "싱글"만으로는 띄우지 않는다 (2026-10-25)
   const targetVariant: "single" | "divorced" | null = (() => {
     const tg = detailItem.targetGroup;
     const ams = detailItem.allowedMaritalStatus;
-    return tg === "싱글" || ams === "싱글" ? "single" : tg === "돌싱" || ams === "돌싱" ? "divorced" : null;
+    return ams === "싱글" ? "single" : tg === "돌싱" || ams === "돌싱" ? "divorced" : null;
   })();
 
   // 이미지 오른쪽 아래 인원 표시 — 누르면 실시간 참가자 명단으로 (C-1)
