@@ -32,19 +32,19 @@ export type EligibilityResult = {
 /**
  * 회원이 해당 파티에 신청 가능한지 검증.
  *  - minAge/maxAge: 미설정 시 무제한
- *  - 혼인여부 차단 규칙은 '싱글' 전용 파티에만 적용:
- *    · allowedMaritalStatus="싱글" 또는 targetGroup="싱글" → 돌싱 회원 차단
- *    · 그 외(ams="돌싱"/all/null, tg="돌싱"/null) → 차단 없음 (싱글·돌싱 모두 가능)
- *  - "돌싱" 파티는 마케팅 분류일 뿐 자격 차단 규칙 없음 — 싱글 회원도 자유롭게 신청 가능
+ *  - 혼인여부 차단 규칙은 파티 혼인여부(allowedMaritalStatus)만 따른다 (2026-10-25, docs/specs/party-request-tabs.md):
+ *    · "싱글"(싱글 전용) → 돌싱 회원 차단
+ *    · "돌싱"(싱글도 허용) / "all"(누구나) / 없음 → 차단 없음 (싱글·돌싱 모두 가능)
+ *  - 대상별 분류(targetGroup)는 신청 제한에 쓰지 않는다 — 대상별이 "싱글"이어도 혼인여부가 돌싱·누구나면 돌싱 회원 신청 가능
  */
 export function checkEligibility(
-  party: Pick<Party, "minAge" | "maxAge" | "allowedMaritalStatus" | "targetGroup">,
+  party: Pick<Party, "minAge" | "maxAge" | "allowedMaritalStatus">,
   user: { birthDate?: string; maritalStatus?: string } | null,
 ): EligibilityResult {
   if (!user) return { ok: false, reason: "missingProfile", message: "프로필 정보가 필요합니다." };
 
   const ageRequired   = party.minAge != null || party.maxAge != null;
-  const singlesOnly   = party.allowedMaritalStatus === "싱글" || party.targetGroup === "싱글";
+  const singlesOnly   = party.allowedMaritalStatus === "싱글";
 
   // 연령 검증
   if (ageRequired) {
@@ -74,13 +74,13 @@ export function checkEligibility(
 }
 
 /** 자격 라벨 (UI 노출용 짧은 요약) */
-export function eligibilitySummary(p: Pick<Party, "minAge" | "maxAge" | "allowedMaritalStatus" | "targetGroup">): string {
+export function eligibilitySummary(p: Pick<Party, "minAge" | "maxAge" | "allowedMaritalStatus">): string {
   const parts: string[] = [];
   if (p.minAge != null && p.maxAge != null) parts.push(`만 ${p.minAge}~${p.maxAge}세`);
   else if (p.minAge != null)                parts.push(`만 ${p.minAge}세 이상`);
   else if (p.maxAge != null)                parts.push(`만 ${p.maxAge}세 이하`);
   // '싱글 전용' 만 명시 — '돌싱' 파티는 모두 허용이므로 라벨 노출 안 함
-  if (p.allowedMaritalStatus === "싱글" || p.targetGroup === "싱글") {
+  if (p.allowedMaritalStatus === "싱글") {
     parts.push("싱글 전용");
   }
   return parts.join(" · ");

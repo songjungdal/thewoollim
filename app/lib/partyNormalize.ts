@@ -1,5 +1,5 @@
 import { normalizeSessions, normalizeOptions } from "./partyOptions";
-import { TARGET_GROUPS, THEMES, LOCATION_TAGS, partyTypeOf, type Party, type TargetGroup, type Theme, type LocationTag } from "./data";
+import { TARGET_GROUPS, THEMES, LEGACY_THEMES, LOCATION_TAGS, partyTypeOf, type Party, type TargetGroup, type Theme, type LocationTag } from "./data";
 
 /**
  * /api/parties.php 응답 한 건 → Party.
@@ -35,7 +35,7 @@ export function normalizeParty(p: Record<string, unknown>): Party {
     allowedMaritalStatus: (ams === "싱글" || ams === "돌싱") ? ams : "all",
     // 카테고리 (화이트리스트 매칭 — 잘못된 값은 undefined로 폴백)
     targetGroup: TARGET_GROUPS.includes(p.targetGroup as TargetGroup) ? (p.targetGroup as TargetGroup) : undefined,
-    theme:       THEMES.includes(p.theme as Theme)                   ? (p.theme       as Theme)       : undefined,
+    theme:       [...THEMES, ...LEGACY_THEMES].includes(p.theme as Theme) ? (p.theme as Theme) : undefined,   // 예전 값도 지우지 않고 읽는다
     locationTag: LOCATION_TAGS.includes(p.locationTag as LocationTag) ? (p.locationTag as LocationTag) : undefined,
     // 파티 종류 (없거나 잘못된 값은 matching)
     partyType:   partyTypeOf({ partyType: typeof p.partyType === "string" ? p.partyType : undefined }),

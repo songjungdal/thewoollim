@@ -6,10 +6,13 @@ export type AllowedMaritalStatus = "all" | "싱글" | "돌싱";
 
 /** 메인 페이지 카테고리 분류값 */
 export const TARGET_GROUPS = ["싱글", "돌싱"] as const;
-export const THEMES        = ["티타임", "와인파티", "사케파티", "쿠킹클래스"] as const;
+/** 테마 — 관리자 폼에서 고를 수 있는 값 (docs/specs/party-request-tabs.md, 서버 api/admin/parties.php 와 같은 목록) */
+export const THEMES        = ["로테이션소개팅", "와인파티", "솔로파티"] as const;
+/** 예전 테마 값 — 새로 고를 수는 없지만, 이미 저장된 파티의 값은 지우지 않고 그대로 읽는다 */
+export const LEGACY_THEMES = ["티타임", "사케파티", "쿠킹클래스"] as const;
 export const LOCATION_TAGS = ["서울", "성남", "수원", "인천", "용인", "기타"] as const;
 export type TargetGroup  = typeof TARGET_GROUPS[number];
-export type Theme        = typeof THEMES[number];
+export type Theme        = typeof THEMES[number] | typeof LEGACY_THEMES[number];
 export type LocationTag  = typeof LOCATION_TAGS[number];
 
 /**
@@ -64,9 +67,9 @@ export type Party = {
   heroImageUrl?: string; // 상단이미지 — 상세페이지 맨 위 16:9 (관리자가 16:9로 잘라 올림). 없으면 상세는 대표이미지를 원본 비율로
   description?: string;  // 파티 소개/내용 (multiline 가능)
   locationShort?: string; // 짧은 장소명(최대 10자) — 상세페이지 하단 바. 없으면 locationTag
-  // 메인 페이지 필터 카테고리 (선택 — 누락 시 해당 필터에서 제외, "전체" 탭에서만 노출)
-  targetGroup?: TargetGroup;   // 대상별: 싱글 / 돌싱
-  theme?: Theme;               // 테마별: 티타임 / 와인파티 / 사케파티 / 쿠킹클래스
+  // 분류 (선택) — 메인 "파티 일정" 섹션 태그·대상별 안내에 쓴다. 메인 "파티 신청"은 종류(partyType) 탭으로만 나눈다
+  targetGroup?: TargetGroup;   // 대상별: 싱글 / 돌싱 (없음 = 관리자 화면의 "누구나")
+  theme?: Theme;               // 테마별: 로테이션소개팅 / 와인파티 / 솔로파티 (+ 예전 값 LEGACY_THEMES)
   locationTag?: LocationTag;   // 지역별: 서울 / 성남 / 수원 / 인천 / 용인 / 기타
   partyType?: PartyType;       // 파티 종류 — 없으면 매칭파티 (partyTypeOf 로 읽는다)
   couponDisabled?: boolean;    // 쿠폰 적용 불가 (매칭·솔로 공통) — 없으면 쿠폰 사용 가능
