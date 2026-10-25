@@ -32,6 +32,7 @@ type AdminUser = {
 type BookingRow = {
   id: string; partyId: string; status: string; createdAt: string; total?: number;
   paymentMethod?: string | null; // 'vbank' = 무통장 입금 (v7.0)
+  couponCode?: string | null;    // 이 예약에 적용된 쿠폰 코드 (쿠폰을 안 썼으면 null/없음)
   userEmail: string; userName: string; userGender: string; userPhone: string;
   userMbti?: string; userJob?: string; userBirthDate?: string;
   userStatus?: string;       // 'active' | 'withdrawn' — 회원 탈퇴 여부
@@ -261,14 +262,14 @@ function BookingTable({ label, toneClass, rows, party, remarks, onApprove, onCan
         <table className="w-full text-xs md:text-sm whitespace-nowrap">
           <thead className="bg-gray-50 text-gray-500 font-bold md:sticky md:top-0 md:z-10">
             <tr>
-              {["이름", ...(showOption ? ["항목"] : []), "연락처", "생년월일", "직업", "결제금액", "상태", "관리", "결제일", "이메일", "비고", "취소·환불"].map(h => (
+              {["이름", ...(showOption ? ["항목"] : []), "연락처", "생년월일", "직업", "결제금액", "상태", "관리", "쿠폰사용", "결제일", "이메일", "비고", "취소·환불"].map(h => (
                 <th key={h} className={`text-left px-3 py-2.5 md:py-3 first:pl-5 md:first:pl-7 ${h === "결제금액" ? "md:text-right" : ""} ${h === "이름" ? "md:sticky md:left-0 md:z-20 md:bg-gray-50" : ""} ${h === "취소·환불" ? "md:border-l md:border-gray-200" : ""}`}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
-              <tr><td colSpan={showOption ? 12 : 11} className="text-center text-gray-500 py-6 text-xs">신청자 없음</td></tr>
+              <tr><td colSpan={showOption ? 13 : 12}className="text-center text-gray-500 py-6 text-xs">신청자 없음</td></tr>
             )}
             {rows.map(b => {
               const isCancelled = b.status === "cancelled";
@@ -315,6 +316,8 @@ function BookingTable({ label, toneClass, rows, party, remarks, onApprove, onCan
                       </button>
                     )}
                   </td>
+                  {/* 쿠폰사용 — 결제 때 이 예약에 적용된 쿠폰 코드. 쓰지 않았으면 빈칸 */}
+                  <td className={`px-3 py-2.5 md:py-3 font-mono font-bold ${isCancelled ? "line-through" : "text-gray-800"}`}>{b.couponCode || ""}</td>
                   <td className="px-3 py-2.5 md:py-3 text-gray-500 md:tabular-nums">{b.createdAt?.slice(0, 10)}</td>
                   {/* v3.6: MBTI 컬럼만 이메일(로그인 아이디)로 교체. 길이 대응 — font-mono + text-xs (md:text-sm) + max-w + truncate.
                        탈퇴 회원은 시스템 익명화로 이메일이 매우 길어지므로 노출 생략 ("—"). */}
