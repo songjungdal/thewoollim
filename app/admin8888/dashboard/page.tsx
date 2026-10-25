@@ -9,7 +9,7 @@ import { useParties, broadcastPartiesUpdated } from "../../lib/useParties";
 import { formatPhoneKR } from "../../lib/phone";
 import { calculateRefund, refundRateLabel } from "../../lib/refund";
 import { formatKST } from "../../lib/datetime";
-import { partyVisibility, partyTypeOf, PARTY_TYPES, PARTY_TYPE_LABELS, THEMES, LEGACY_THEMES, categoryLabel, type Party, type PartyType, type Theme } from "../../lib/data";
+import { partyVisibility, partyTypeOf, PARTY_TYPES, PARTY_TYPE_LABELS, PARTY_TYPE_ADMIN_LABELS, THEMES, LEGACY_THEMES, categoryLabel, type Party, type PartyType, type Theme } from "../../lib/data";
 import { templateFor, normalizeDetail, withGuideDefaults, compactDetailForSave, defaultNotice, type PartyDetail } from "../../lib/partyDetailTemplates";
 import PartyDetailEditor, { validateDetail, type DetailSourceParty } from "./PartyDetailEditor";
 import PartyHeroCropModal from "./PartyHeroCropModal";
@@ -676,7 +676,7 @@ export default function AdminDashboard() {
     const prevType = partyForm.partyType;
     if (prevType === t) return;
     if (t === "matching" && partyHasOptionApplicants()) {
-      alert("신청자가 있는 참가 구성은 지울 수 없어 매칭파티로 바꿀 수 없습니다.");
+      alert("신청자가 있는 참가 구성은 지울 수 없어 로테이션소개팅으로 바꿀 수 없습니다.");
       return;
     }
     if (partyEditMode === "edit" && partyForm.id && prevType) {
@@ -2391,12 +2391,12 @@ export default function AdminDashboard() {
                               {PARTY_TYPES.map(t => (
                                 <button key={t} type="button" onClick={() => selectPartyType(t)} aria-pressed={partyForm.partyType === t}
                                   className={`w-full py-4 rounded-xl border-2 text-base md:text-lg font-black transition-all ${partyForm.partyType === t ? "border-brand-black bg-brand-black text-white" : "border-gray-200 text-gray-500 hover:border-gray-300"} min-h-11 md:min-h-0`}>
-                                  {PARTY_TYPE_LABELS[t]}
+                                  {PARTY_TYPE_ADMIN_LABELS[t]}
                                 </button>
                               ))}
                             </div>
                             {partyForm.partyType === "solo" && (
-                              <p className="text-[13px] md:text-sm font-bold text-gray-600 mt-2">솔로파티는 매칭 투표가 없습니다.</p>
+                              <p className="text-[13px] md:text-sm font-bold text-gray-600 mt-2">‘파티’는 매칭 투표가 없습니다.</p>
                             )}
                           </div>
 
@@ -2718,7 +2718,7 @@ export default function AdminDashboard() {
                     <div className="fixed inset-0 z-[210] bg-black/40 flex items-center justify-center p-0 md:p-4" role="dialog" aria-modal="true">
                       <div className="bg-white rounded-none md:rounded-2xl shadow-2xl w-full h-[100dvh] md:h-auto max-w-none md:max-w-sm p-5 md:p-6 flex flex-col justify-center">
                         <p className="font-black text-base md:text-lg text-brand-black break-keep">
-                          상세페이지 안내를 {PARTY_TYPE_LABELS[typeSwitchPrompt]} 기본 내용으로 바꿀까요?
+                          상세페이지 안내를 {PARTY_TYPE_ADMIN_LABELS[typeSwitchPrompt]} 기본 내용으로 바꿀까요?
                         </p>
                         <div className="grid grid-cols-2 gap-2 md:flex md:justify-end mt-5">
                           <button type="button" onClick={() => setTypeSwitchPrompt(null)}

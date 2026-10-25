@@ -30,6 +30,8 @@ export const categoryLabel = (value: string): string => CATEGORY_LABELS[value] ?
 export const PARTY_TYPES = ["matching", "solo"] as const;
 export type PartyType = typeof PARTY_TYPES[number];
 export const PARTY_TYPE_LABELS: Record<PartyType, string> = { matching: "매칭파티", solo: "솔로파티" };
+/** 관리자 파티 등록·수정 창(기본 정보·상세페이지 안내 탭)에서 쓰는 종류 이름 — 저장값은 그대로 (docs/specs/party-request-tabs.md D) */
+export const PARTY_TYPE_ADMIN_LABELS: Record<PartyType, string> = { matching: "로테이션소개팅", solo: "파티" };
 export const partyTypeOf = (party: { partyType?: string | null }): PartyType =>
   (PARTY_TYPES as readonly string[]).includes(party.partyType ?? "") ? (party.partyType as PartyType) : "matching";
 

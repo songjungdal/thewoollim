@@ -10,7 +10,7 @@
  */
 import { useState } from "react";
 import { ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Trash2, Plus, ImageIcon, RotateCcw, Download, RefreshCw } from "lucide-react";
-import { PARTY_TYPE_LABELS, type PartyType } from "../../lib/data";
+import { PARTY_TYPE_ADMIN_LABELS, type PartyType } from "../../lib/data";
 import {
   DETAIL_IMAGE_SLOT_LABELS, DETAIL_LIMITS, DEFAULT_ABOUT_TITLE, DEFAULT_APPLY_TITLE, DEFAULT_NOTICE_TITLE, DEFAULT_TIMELINE_TITLE,
   templateFor, cloneDetail, withGuideDefaults, defaultApply, defaultNotice, defaultBeforeApply, DEFAULT_BEFORE_APPLY_TITLE,
@@ -88,7 +88,7 @@ export default function PartyDetailEditor({ value, onChange, partyType, hasSessi
     onChange(src.detail ? withGuideDefaults(cloneDetail(src.detail), src.partyType, hasSessions) : templateFor(src.partyType, hasSessions));
   };
   const resetToTemplate = () => {
-    if (!confirm(`상세페이지 안내를 ${PARTY_TYPE_LABELS[partyType]} 기본 내용으로 되돌릴까요?\n(지금 입력한 내용은 사라집니다.)`)) return;
+    if (!confirm(`상세페이지 안내를 ${PARTY_TYPE_ADMIN_LABELS[partyType]} 기본 내용으로 되돌릴까요?\n(지금 입력한 내용은 사라집니다.)`)) return;
     onChange(templateFor(partyType, hasSessions));
   };
 
@@ -250,7 +250,7 @@ export default function PartyDetailEditor({ value, onChange, partyType, hasSessi
             className={`${inputCls} sm:flex-1 min-w-0`}>
             <option value="">다른 파티 선택…</option>
             {sources.filter(s => s.id !== currentId).map(s => (
-              <option key={s.id} value={s.id}>#{s.id} {s.title} · {PARTY_TYPE_LABELS[s.partyType]} · {s.dateString}</option>
+              <option key={s.id} value={s.id}>#{s.id} {s.title} · {PARTY_TYPE_ADMIN_LABELS[s.partyType]} · {s.dateString}</option>
             ))}
           </select>
           <button type="button" onClick={loadFromParty} className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-sm font-bold bg-brand-black text-white hover:bg-brand-point hover:text-black whitespace-nowrap min-h-11 md:min-h-0">
@@ -258,7 +258,7 @@ export default function PartyDetailEditor({ value, onChange, partyType, hasSessi
           </button>
         </div>
         <button type="button" onClick={resetToTemplate} className="inline-flex items-center gap-1.5 text-xs md:text-sm font-bold text-gray-600 underline min-h-11 md:min-h-0">
-          <RotateCcw size={13} />기본 내용으로 되돌리기 ({PARTY_TYPE_LABELS[partyType]})
+          <RotateCcw size={13} />기본 내용으로 되돌리기 ({PARTY_TYPE_ADMIN_LABELS[partyType]})
         </button>
         <p className="text-[13px] md:text-sm text-gray-500 leading-relaxed">
           사진은 JPG·PNG·WebP, 10MB 이하. 썸네일의 [교체]로 같은 자리의 사진만 바꿀 수 있습니다(대체 텍스트 유지).
@@ -273,7 +273,7 @@ export default function PartyDetailEditor({ value, onChange, partyType, hasSessi
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <p className="text-sm font-black text-gray-700">신청 전 꼭 확인해주세요 <span className="text-gray-500 font-medium">· 상세페이지에서는 &quot;사전 승인제 운영&quot; 한 줄로 접혀 있고, 펼치면 아래 제목·본문이 보입니다. 본문을 비우면 숨겨집니다</span></p>
           <button type="button" className={smallBtn}
-            onClick={() => { if (confirm(`신청 전 꼭 확인해주세요를 ${PARTY_TYPE_LABELS[partyType]} 기본 문구로 되돌릴까요?`)) set(d => { d.beforeApply = defaultBeforeApply(partyType); }); }}>
+            onClick={() => { if (confirm(`신청 전 꼭 확인해주세요를 ${PARTY_TYPE_ADMIN_LABELS[partyType]} 기본 문구로 되돌릴까요?`)) set(d => { d.beforeApply = defaultBeforeApply(partyType); }); }}>
             <RotateCcw size={12} />기본 문구로 되돌리기
           </button>
         </div>
@@ -339,7 +339,7 @@ export default function PartyDetailEditor({ value, onChange, partyType, hasSessi
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <p className="text-sm font-black text-gray-700">참가 신청 방법 <span className="text-gray-500 font-medium">· 단계가 없으면 상세페이지에서 이 영역이 숨겨집니다</span></p>
           <button type="button" className={smallBtn}
-            onClick={() => { if (confirm(`참가 신청 방법을 ${PARTY_TYPE_LABELS[partyType]} 기본 문구로 되돌릴까요?`)) set(d => { d.apply = defaultApply(partyType); }); }}>
+            onClick={() => { if (confirm(`참가 신청 방법을 ${PARTY_TYPE_ADMIN_LABELS[partyType]} 기본 문구로 되돌릴까요?`)) set(d => { d.apply = defaultApply(partyType); }); }}>
             <RotateCcw size={12} />기본 문구로 되돌리기
           </button>
         </div>
@@ -472,7 +472,7 @@ export default function PartyDetailEditor({ value, onChange, partyType, hasSessi
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <p className="text-sm font-black text-gray-700">필수 확인 사항 <span className="text-gray-500 font-medium">· 항목이 없으면 상세페이지에서 이 영역이 숨겨집니다</span></p>
           <button type="button" className={smallBtn}
-            onClick={() => { if (confirm(`필수 확인 사항을 ${PARTY_TYPE_LABELS[partyType]} 기본 문구로 되돌릴까요?`)) set(d => { d.notice = defaultNotice(partyType, hasSessions); }); }}>
+            onClick={() => { if (confirm(`필수 확인 사항을 ${PARTY_TYPE_ADMIN_LABELS[partyType]} 기본 문구로 되돌릴까요?`)) set(d => { d.notice = defaultNotice(partyType, hasSessions); }); }}>
             <RotateCcw size={12} />기본 문구로 되돌리기
           </button>
         </div>
