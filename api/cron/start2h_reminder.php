@@ -148,42 +148,34 @@ foreach ($users as $u) {
             }
 
             $party = $targets[$partyId]['party'];
-            $title = (string)($party['title']    ?? '');
             $loc   = (string)($party['location'] ?? '');
             $dt    = _s2hSplitDate((string)($party['dateString'] ?? ''));
             $pdate = $dt['date'] !== '' ? $dt['date'] : '추후 안내';
             $ptime = $dt['time'] !== '' ? $dt['time'] : '추후 안내';
             if ($firstTime !== '') $ptime = $firstTime;
-            $optLine = !empty($b['optionName']) ? '참가: ' . (string)$b['optionName'] . "\n" : '';
 
             $isSolo = partyTypeOf($party) === 'solo';
             if ($isSolo) {
-                // 솔로파티 문구 (docs/specs/party-box-sms.md 2-2) — 입장 시각 = 시작 시각 10분 전
-                $entry = preg_match('/^(\d{1,2}):(\d{2})$/', $ptime, $tm)
-                    ? sprintf('%02d:%02d', intdiv(((int)$tm[1] * 60 + (int)$tm[2] - 10 + 1440) % 1440, 60), ((int)$tm[1] * 60 + (int)$tm[2] - 10 + 1440) % 60)
-                    : '';
-                $entryLine = $entry !== '' ? "- {$entry}부터 입장 가능합니다.\n" : "- 시작 10분 전부터 입장 가능합니다.\n";
+                // 솔로파티 문구 (2026-10-25 사용자 요청 문구, docs/PROJECT_OVERVIEW.md 4-8)
                 $msg =
                     "[어울림] 파티 시작 2시간 전 최종 안내\n" .
                     "안녕하세요, {$name}님!\n" .
-                    "2시간 뒤 {$title}이 시작됩니다. 즐거운 파티를 위해 아래 안내사항을 꼭 확인해 주세요.\n" .
-                    $optLine .
+                    "2시간 뒤 파티가 시작됩니다. 즐거운 파티를 위해 아래 안내사항을 꼭 확인해 주세요.\n" .
                     "{$pdate} {$ptime}\n" .
-                    "{$loc}\n\n" .
+                    "{$loc}\n" .
                     "[참석 전 필수 체크사항]\n" .
-                    $entryLine .
-                    "- 늦게 도착하셔도 입장은 가능하지만, 파티가 이미 진행 중이니 가급적 시작 시각 전에 도착해 주세요.\n" .
+                    "- 시작 10분 전부터 입장 가능합니다.\n" .
+                    "- 늦으시더라도 입장은 도와드리지만, 시작 시간 전 여유 있게 도착해 주시길 바랍니다.\n" .
                     "- 입장 시 신분증으로 본인·성인 확인을 합니다. 신분증을 꼭 챙겨 주세요.\n" .
-                    "- 술과 함께하는 파티이니 차량은 두고 대중교통을 이용해 주세요.\n" .
-                    "즐거운 파티로 기다리고 있겠습니다. 오시는 길 조심히 오세요!";
+                    "- 파티 장소 주변 주차 공간이 협소하오니 가급적 대중교통 이용을 부탁드립니다.\n" .
+                    "즐거운 파티가 되도록 준비하고 기다리고 있겠습니다. 오시는 길 조심히 오세요!";
             } else {
             $msg =
                 "[어울림] 파티 시작 2시간 전 최종 안내\n" .
                 "안녕하세요, {$name}님!\n" .
-                "2시간 뒤 {$title}이 시작됩니다. 원활하고 편안한 진행을 위해 아래 안내사항을 꼭 확인해 주세요.\n" .
-                $optLine .
+                "2시간 뒤 파티가 시작됩니다. 원활하고 편안한 진행을 위해 아래 안내사항을 꼭 확인해 주세요.\n" .
                 "{$pdate} {$ptime}\n" .
-                "{$loc}\n\n" .
+                "{$loc}\n" .
                 "[참석 전 필수 체크사항]\n" .
                 "- 시작 20분 전부터 라운지 입장이 가능합니다. 일찍 도착하셔서 차 한잔하시며 분위기에 미리 적응해 보세요.\n" .
                 "- 파티 시작 10분 이후부터는 입장이 절대 불가능합니다. 여유 있게 10분 전까지 도착해주세요.\n" .
@@ -202,7 +194,7 @@ foreach ($users as $u) {
                 'msg_type'    => $msgType,
                 'testmode_yn' => 'N',
             ];
-            if ($msgType === 'LMS') $params['title'] = $isSolo ? '[어울림] 솔로파티 시작 2시간 전 안내' : '[어울림] 파티 시작 2시간 전 최종 안내';
+            if ($msgType === 'LMS') $params['title'] = '[어울림] 파티 시작 2시간 전 최종 안내';
 
             $ch = curl_init('https://apis.aligo.in/send/');
             curl_setopt_array($ch, [
