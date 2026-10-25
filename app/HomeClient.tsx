@@ -16,7 +16,7 @@ import GalleryGrid from "./components/gallery/GalleryGrid";
 import GalleryAllSheet from "./components/gallery/GalleryAllSheet";
 import GalleryLightbox from "./components/gallery/GalleryLightbox";
 import type { GalleryItem } from "./components/gallery/types";
-import { PARTICIPANTS, FAQS, partyStockStatus, withLiveCounts, partyVisibility, categoryLabel, partyTypeOf, PARTY_TYPES, PARTY_TYPE_LABELS, type Party, type PartyType } from "./lib/data";
+import { PARTICIPANTS, FAQS, partyStockStatus, withLiveCounts, partyVisibility, categoryLabel, partyTypeOf, PARTY_TYPES, PARTY_TYPE_LABELS, type Party, type PartyType, type AllowedMaritalStatus } from "./lib/data";
 import { useAuth } from "./context/AuthContext";
 import { useParties, PARTIES_NOT_LOADED } from "./lib/useParties";
 import { daysUntil } from "./lib/refund";
@@ -63,6 +63,18 @@ const SCHEDULE_CARD_TONE: Record<ScheduleStatus, string> = {
 const scheduleRemainTone = (status: ScheduleStatus | null | undefined) =>
   status === "soon" ? "text-[#DC2626]" : status === "full" || status === "past" ? "text-[#9CA3AF]" : null;
 const SCHEDULE_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+/* ── #apply(파티 신청) 섹션 — 종류별 탭과 카드 대상 배지 (docs/specs/party-request-tabs.md) ── */
+/** 탭 — 처음은 로테이션 소개팅(매칭파티). 대상·테마·지역으로는 거르지 않는다 */
+const APPLY_TABS: { type: PartyType; label: string }[] = [
+  { type: "matching", label: "로테이션 소개팅" },
+  { type: "solo",     label: "파티" },
+];
+/** 카드 좌측 상단 대상 배지 — 파티 혼인여부(allowedMaritalStatus) 기준, 값이 없으면 누구나 */
+const APPLY_TARGET_BADGE: Record<AllowedMaritalStatus, { label: string; tone: string }> = {
+  "싱글": { label: "싱글",   tone: "bg-[#3EE0C5] text-[#0B3B34]" },
+  "돌싱": { label: "돌싱",   tone: "bg-[#8b5cf6] text-white" },
+  all:    { label: "누구나", tone: "bg-[#708090] text-white" },
+};
 /** 참가자 마키 — 카드 1장이 지나가는 시간(초). 한 바퀴 = 카드 수 × 이 값이라 인원이 늘어도 흐르는 속도가 같다 */
 const PARTICIPANT_SEC_PER_CARD = 2;
 /** 참가자 카드 키워드 칩 — 한 줄에 놓을 개수 */
@@ -187,69 +199,21 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
     [liveMembers]
   );
 
-  // 4축 필터 [종류 / 대상 / 테마 / 지역] — 축마다 값을 하나씩 골라 겹쳐(AND) 거른다.
-  //   openAxis = 세부 옵션 줄이 열린 축(1개 또는 null), selections = 대상·테마·지역 선택값(없으면 null).
-  //   종류 축의 선택값은 아래 typeTab(?type= 주소 연동)을 그대로 쓴다.
-  type Axis = "type" | "targetGroup" | "theme" | "locationTag";
-  type CategoryAxis = Exclude<Axis, "type">;
-  const AXES: { key: Axis; label: string }[] = [
-    { key: "type", label: "종류" }, { key: "targetGroup", label: "대상" },
-    { key: "theme", label: "테마" }, { key: "locationTag", label: "지역" },
-  ];
-  const CATEGORY_AXES: CategoryAxis[] = ["targetGroup", "theme", "locationTag"];
-  const AXIS_OPTIONS: Record<Axis, readonly string[]> = {
-    type: PARTY_TYPES,
-    targetGroup: ["싱글", "돌싱"],
-    theme: ["티타임", "와인파티", "사케파티", "쿠킹클래스"],
-    // '기타' 는 필터 버튼에서 노출 제외 — 기존 '기타' 파티는 전체보기에 그대로 노출됨
-    // 표시 순서만: 인천 ↔ 용인 교체 (DB 값/매칭 로직 무영향)
-    locationTag: ["서울", "성남", "수원", "용인", "인천"],
-  };
-  // 화면 표시 라벨 — 종류는 매칭파티/솔로파티, 나머지는 categoryLabel (테마 "쿠킹클래스" → "세션")
-  const optionLabel = (axis: Axis, value: string) =>
-    axis === "type" ? PARTY_TYPE_LABELS[value as PartyType] : categoryLabel(value);
-  const [openAxis, setOpenAxis] = useState<Axis | null>(null);
-  // 지금 열린 축 — 닫히는 애니메이션(0.22초) 동안 화면에 남은 옵션 줄의 클릭을 걸러내는 데 쓴다 (pickOption)
-  const openAxisRef = useRef<Axis | null>(null);
-  useEffect(() => { openAxisRef.current = openAxis; }, [openAxis]);
-  const [selections, setSelections] = useState<Record<CategoryAxis, string | null>>({ targetGroup: null, theme: null, locationTag: null });
-
-  // 종류 축 선택값 — /?type=solo#apply 로 들어오면 솔로파티가 선택된 채 열리고, 바꾸면 주소만 바꾼다(history.replaceState).
-  const [typeTab, setTypeTab] = useState<"all" | PartyType>("all");
+  // 탭 [로테이션 소개팅 / 파티] = 파티 종류(매칭파티 / 솔로파티). 처음은 로테이션 소개팅.
+  //   /?type=solo#apply 로 들어오면 "파티" 탭이 선택된 채 열리고, 바꾸면 주소만 바꾼다(history.replaceState, 로테이션 소개팅은 ?type= 없음).
+  const [typeTab, setTypeTab] = useState<PartyType>("matching");
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get("type");
     if (t && (PARTY_TYPES as readonly string[]).includes(t)) setTypeTab(t as PartyType);
   }, []);
-  const pickType = (t: "all" | PartyType) => {
+  const pickType = (t: PartyType) => {
     setTypeTab(t);
     try {
       const url = new URL(window.location.href);
-      if (t === "all") url.searchParams.delete("type"); else url.searchParams.set("type", t);
+      if (t === "matching") url.searchParams.delete("type"); else url.searchParams.set("type", t);
       window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
     } catch { /* 주소 갱신 실패는 무시 */ }
   };
-
-  const selectedOf = (axis: Axis): string | null =>
-    axis === "type" ? (typeTab === "all" ? null : typeTab) : selections[axis];
-  // 축 버튼 = 그 축의 옵션 줄 열기/닫기 (다른 축 선택값은 유지)
-  const toggleAxis = (axis: Axis) => setOpenAxis(cur => (cur === axis ? null : axis));
-  // 옵션 클릭 = 그 축 값 선택(null = "전체", 선택 해제) + 옵션 줄 닫기
-  const pickOption = (axis: Axis, value: string | null) => {
-    // 닫히는 중인(사라지는) 옵션 줄은 반응하지 않는다 — 지금 열린 축의 줄만 선택 가능
-    if (openAxisRef.current !== axis) return;
-    if (axis === "type") pickType((value as PartyType | null) ?? "all");
-    else setSelections(s => ({ ...s, [axis]: value }));
-    setOpenAxis(null);
-  };
-  const resetFilters = () => {
-    setSelections({ targetGroup: null, theme: null, locationTag: null });
-    pickType("all");
-    setOpenAxis(null);
-  };
-  const selectedLabels = AXES.flatMap(({ key }) => {
-    const v = selectedOf(key);
-    return v ? [optionLabel(key, v)] : [];
-  });
 
   // SSR/CSR 시간대 차이로 인한 hydration mismatch 방지 — now 는 mount 후에만 세팅,
   // 1분마다 갱신해 행사 종료 시점에 카드 UI 가 자연스럽게 전환되게 함
@@ -297,15 +261,15 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
     return () => mq.removeEventListener("change", update);
   }, []);
 
-  // 필터(종류·대상·테마·지역) 변경 시 더보기 상태 초기화 → 새 결과는 항상 접힌 채 처음부터 노출.
-  // 단, 뒤로 돌아와 필터를 되살린 직후 한 번은 건너뛴다(되살린 더보기 상태 유지 — restoredFiltersRef)
-  const restoredFiltersRef = useRef<string | null>(null);
+  // 탭 변경 시 더보기 상태 초기화 → 새 결과는 항상 접힌 채 처음부터 노출.
+  // 단, 뒤로 돌아와 탭을 되살린 직후 한 번은 건너뛴다(되살린 더보기 상태 유지 — restoredTabRef)
+  const restoredTabRef = useRef<PartyType | null>(null);
   useEffect(() => {
-    const restored = restoredFiltersRef.current;
-    restoredFiltersRef.current = null;
-    if (restored !== null && restored === JSON.stringify([selections, typeTab])) return;
+    const restored = restoredTabRef.current;
+    restoredTabRef.current = null;
+    if (restored !== null && restored === typeTab) return;
     setApplyMoreOpen(false);
-  }, [selections, typeTab]);
+  }, [typeTab]);
 
   // 모바일 일정 섹션 — 마운트 1회, 현재 날짜 기준 연/월 초기화
   useEffect(() => {
@@ -330,8 +294,7 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
     mobileListMode: "day" | "month" | null;
     scheduleMoreOpen: boolean;
     applyMoreOpen: boolean;
-    selections: Record<CategoryAxis, string | null>;
-    typeTab: "all" | PartyType;
+    typeTab: PartyType;                   // 예전에 저장된 값("all" 등)은 되살릴 때 로테이션 소개팅으로
   };
   const saveHomeReturn = (anchor: HomeReturn["anchor"]) => {
     const el = document.getElementById(anchor);
@@ -340,7 +303,7 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
       offset: el ? -el.getBoundingClientRect().top : 0,
       calendarDate: calendarRef.current ? toYmd(calendarRef.current.getApi().getDate()) : null,
       scheduleSelected, mobileYear, mobileMonth, mobilePicked, mobileListMode, scheduleMoreOpen,
-      applyMoreOpen, selections, typeTab,
+      applyMoreOpen, typeTab,
     };
     try { sessionStorage.setItem(HOME_RETURN_KEY, JSON.stringify(snap)); } catch { /* 저장 실패 시 되살리기만 생략 */ }
   };
@@ -370,10 +333,10 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
     setMobilePicked(snap.mobilePicked);
     setMobileListMode(snap.mobileListMode);
     setScheduleMoreOpen(snap.scheduleMoreOpen);
-    // 신청 섹션 — 필터·더보기
-    restoredFiltersRef.current = JSON.stringify([snap.selections, snap.typeTab]);
-    setSelections(snap.selections);
-    setTypeTab(snap.typeTab);
+    // 신청 섹션 — 탭·더보기
+    const tab: PartyType = (PARTY_TYPES as readonly string[]).includes(snap.typeTab) ? snap.typeTab : "matching";
+    restoredTabRef.current = tab;
+    setTypeTab(tab);
     setApplyMoreOpen(snap.applyMoreOpen);
 
     // 스크롤 — 섹션 위치 + 저장한 거리. 2초 동안 높이가 바뀌면 다시 맞추고, 사용자가 스크롤·터치·키 입력을 하면 멈춘다
@@ -397,11 +360,8 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
   }, []);
 
   const sortedParties = useMemo(() => {
-    // 선택된 모든 축을 동시에 만족(AND)하는 파티만
-    const filtered = [...PARTIES].filter(p => {
-      if (typeTab !== "all" && partyTypeOf(p) !== typeTab) return false;
-      return CATEGORY_AXES.every(ax => !selections[ax] || p[ax] === selections[ax]);
-    });
+    // 고른 탭의 종류(매칭파티 / 솔로파티)인 파티만
+    const filtered = PARTIES.filter(p => partyTypeOf(p) === typeTab);
 
     // mount 전(SSR/초기 hydration) — 시간 의존 필터/정렬 생략, 기존 동작 유지
     // (빌드 시점에 지난 파티는 뒤로 — 마운트 뒤 active 우선 정렬과 같은 순서)
@@ -421,7 +381,7 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
         return a.calendarDate.localeCompare(b.calendarDate);     // 그룹 내부는 기존 날짜 오름차순 유지
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selections, typeTab, PARTIES, now, endedAtBuildSet]);
+  }, [typeTab, PARTIES, now, endedAtBuildSet]);
 
   // 신청 섹션 렌더용 slice — 위 sortedParties(필터/정렬 완료)를 가로채 노출 개수만 제한
   const applyLimit = isDesktop ? APPLY_LIMIT_DESKTOP : APPLY_LIMIT_MOBILE;
@@ -613,105 +573,36 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
             <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp} className="text-center mb-10 md:mb-16">
               <h2 className="text-4xl md:text-6xl font-bold mb-4 md:mb-6 tracking-tight">파티 신청</h2>
               <p className="text-sm md:text-lg text-gray-500 max-w-2xl mx-auto leading-relaxed break-keep px-2">
-                돌싱부터 싱글까지, 원하는 테마와 지역을 선택하여 새로운 연결을 시작해보세요.
+                원하는 모임을 골라 새로운 연결을 시작해보세요.
               </p>
             </motion.div>
 
-            {/* v8.0 — 카테고리 필터 + 카드 그리드 영역을 mounted 게이트 + opacity 트랜지션으로 감싸서
+            {/* v8.0 — 탭 + 카드 그리드 영역을 mounted 게이트 + opacity 트랜지션으로 감싸서
                 seed → live 데이터 swap 깜빡임 방지. 컨테이너 레이아웃은 유지되어 layout shift 없음. */}
             <div className={`transition-opacity duration-500 ease-out ${contentReady ? "opacity-100" : "opacity-0"}`}>
 
-            {/* 4축 필터 [종류 / 대상 / 테마 / 지역] — 축 버튼 = 옵션 줄 열기/닫기, 옵션 = 그 축 값 선택(AND)
-                모바일은 4칸 그리드 한 줄(320px 에서도 "솔로파티 ▾"가 한 줄), md 이상은 가운데 정렬 */}
+            {/* 탭 [로테이션 소개팅 / 파티] — 둥근 버튼. 선택 = 검정 배경·흰 글씨, 나머지 = 흰 배경·회색 테두리 */}
             <div className="mb-10 md:mb-16 border-b border-gray-100 pb-6 md:pb-8">
-              <div className="grid grid-cols-4 gap-1.5 md:flex md:justify-center md:gap-3">
-                {AXES.map(({ key, label }) => {
-                  const isOpen = openAxis === key;
-                  const sel = selectedOf(key);
-                  const text = sel ? optionLabel(key, sel) : label;
+              <div className="flex justify-center gap-2 md:gap-3">
+                {APPLY_TABS.map(({ type, label }) => {
+                  const selected = typeTab === type;
                   return (
                     <button
-                      key={key}
+                      key={type}
                       type="button"
-                      onClick={() => toggleAxis(key)}
-                      aria-expanded={isOpen}
-                      aria-controls="apply-filter-options"
-                      aria-label={sel ? `${label}: ${text}` : label}
-                      className={`py-2 px-1 md:px-7 md:py-3 text-[12px] min-[360px]:text-[13px] md:text-lg font-black rounded-full transition-all whitespace-nowrap truncate ${
-                        isOpen
-                          ? "bg-brand-point text-black shadow-md border-2 border-brand-point"
-                          : sel
-                            ? "bg-white text-brand-black border-2 border-brand-point"
-                            : "bg-gray-50 text-gray-500 hover:bg-gray-100 border border-gray-200"
+                      onClick={() => pickType(type)}
+                      aria-pressed={selected}
+                      className={`inline-flex items-center h-11 md:h-12 px-5 md:px-8 text-[15px] md:text-lg font-bold rounded-full border transition-colors whitespace-nowrap ${
+                        selected
+                          ? "bg-[#111] text-white border-[#111]"
+                          : "bg-white text-gray-600 border-gray-300 hover:border-gray-400 hover:text-brand-black"
                       }`}
                     >
-                      {text} <span aria-hidden="true">{isOpen ? "▴" : "▾"}</span>
+                      {label}
                     </button>
                   );
                 })}
               </div>
-
-              {/* 세부 옵션 줄 (열린 축이 있을 때만) — 맨 앞 "전체" = 그 축 선택 해제. 고르면 줄이 닫힌다 */}
-              <AnimatePresence initial={false}>
-                {openAxis && (
-                  <motion.div
-                    key={openAxis}
-                    id="apply-filter-options"
-                    initial={{ opacity: 0, height: 0, y: -6 }}
-                    animate={{ opacity: 1, height: "auto", y: 0 }}
-                    exit={{ opacity: 0, height: 0, y: -6 }}
-                    transition={{ duration: 0.22, ease: "easeOut" }}
-                    className="overflow-hidden"
-                  >
-                    <div className="flex justify-center flex-wrap gap-2 md:gap-2.5 mt-5 md:mt-6">
-                      <button
-                        type="button"
-                        onClick={() => pickOption(openAxis, null)}
-                        className={`px-3.5 md:px-5 py-1.5 md:py-2 text-xs md:text-sm font-bold rounded-full transition-all ${
-                          !selectedOf(openAxis)
-                            ? "bg-brand-point/10 text-brand-point-ink border border-brand-point/30"
-                            : "bg-white text-gray-500 hover:bg-gray-50 border border-gray-200"
-                        }`}
-                      >
-                        전체
-                      </button>
-                      {AXIS_OPTIONS[openAxis].map(opt => {
-                        const isSelected = selectedOf(openAxis) === opt;
-                        return (
-                          <button
-                            key={opt}
-                            type="button"
-                            onClick={() => pickOption(openAxis, opt)}
-                            className={`px-3.5 md:px-5 py-1.5 md:py-2 text-xs md:text-sm font-bold rounded-full transition-all ${
-                              isSelected
-                                ? "bg-brand-point text-black shadow-md"
-                                : "bg-white text-gray-500 hover:bg-gray-50 border border-gray-200"
-                            }`}
-                          >
-                            {optionLabel(openAxis, opt)}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* 요약 줄 — 선택이 있을 때만: "솔로파티 · 싱글 · 와인파티 · N건  초기화" */}
-              {selectedLabels.length > 0 && (
-                <div className="flex flex-wrap justify-center items-baseline gap-x-2 gap-y-1 mt-4 text-xs md:text-sm text-gray-500 font-medium">
-                  <span>
-                    <span className="text-brand-point-ink font-bold">{selectedLabels.join(" · ")}</span> · {sortedParties.length}건
-                  </span>
-                  <button
-                    type="button"
-                    onClick={resetFilters}
-                    className="py-3 -my-3 px-1 text-gray-500 font-bold underline underline-offset-2 hover:text-brand-black"
-                  >
-                    초기화
-                  </button>
-                </div>
-              )}
             </div>
 
             {!partiesLoaded ? (
@@ -721,8 +612,8 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
               </div>
             ) : sortedParties.length === 0 ? (
               <div className="bg-white border border-gray-100 rounded-2xl md:rounded-3xl p-10 md:p-16 text-center">
-                <p className="text-gray-500 font-bold text-sm md:text-base">선택한 조건에 맞는 파티가 없습니다.</p>
-                <p className="text-xs md:text-sm text-gray-500 mt-2">다른 카테고리를 선택하거나 조건을 초기화해주세요.</p>
+                <p className="text-gray-500 font-bold text-sm md:text-base">지금 신청할 수 있는 일정이 없습니다.</p>
+                <p className="text-xs md:text-sm text-gray-500 mt-2">새 일정이 열리면 이곳에 안내해 드릴게요.</p>
               </div>
             ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-8">
@@ -741,6 +632,7 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
                   const dDay = days === null || days < 0 ? null : days === 0 ? "D-DAY" : `D-${days}`;
                   const psyche = recruiting && partyTypeOf(card) === "solo";
                   const badgeCls = "text-[11px] md:text-xs font-bold leading-none px-2.5 py-1.5 md:px-[11px] md:py-[7px] rounded-full whitespace-nowrap";
+                  const targetBadge = APPLY_TARGET_BADGE[card.allowedMaritalStatus ?? "all"];
                   return (
                   <motion.div
                     key={card.id}
@@ -770,19 +662,17 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
                         />
                         {/* 배지 대비용 오버레이 */}
                         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.25)_0%,rgba(0,0,0,0)_45%,rgba(0,0,0,0.2)_100%)]" />
-                        {/* 좌상단 — 파티 종류 */}
-                        <span className="absolute top-2.5 left-2.5 md:top-3.5 md:left-3.5 z-10 bg-[rgba(17,17,17,0.85)] text-white text-[11px] md:text-xs font-bold leading-none px-2.5 py-1.5 md:px-[11px] md:py-[7px] rounded-full whitespace-nowrap">
-                          {PARTY_TYPE_LABELS[partyTypeOf(card)]}
+                        {/* 좌상단 — 대상(파티 혼인여부: 싱글 / 돌싱 / 누구나), 모든 카드 */}
+                        <span className={`absolute top-2.5 left-2.5 md:top-3.5 md:left-3.5 z-10 ${badgeCls} ${targetBadge.tone}`}>
+                          {targetBadge.label}
                         </span>
-                        {/* 우상단 — D-day(모집 중일 때만) → 대상(싱글/돌싱)·모집 마감 / 종료 시 [모집종료] 하나 */}
+                        {/* 우상단 — D-day(모집 중일 때만)·모집 마감 / 종료 시 [모집종료] 하나 */}
                         <div className="absolute top-2.5 right-2.5 md:top-3.5 md:right-3.5 z-10 flex items-center justify-end gap-1.5">
                           {isEnded ? (
                             <span className={`${badgeCls} bg-white text-[#6B7280] border border-dashed border-[#D1D5DB]`}>모집종료</span>
                           ) : (
                             <>
                               {dDay && <span className={`${badgeCls} bg-white text-[#D61F45] tabular-nums`}>{dDay}</span>}
-                              {card.targetGroup === "싱글" && <span className={`${badgeCls} bg-[#3EE0C5] text-[#0B3B34]`}>싱글</span>}
-                              {card.targetGroup === "돌싱" && <span className={`${badgeCls} bg-[#b4a7d6] text-black`}>돌싱</span>}
                               {stock.allFull && <span className={`${badgeCls} bg-gray-900 text-white`}>모집 마감</span>}
                             </>
                           )}
@@ -837,7 +727,7 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
             </div>
             )}
 
-            {/* v9.2 — [더보기] 버튼: 필터된 개수가 제한치(PC 12 / 모바일 10) 초과 + 아직 안 펼쳤을 때만 노출 */}
+            {/* v9.2 — [더보기] 버튼: 고른 탭의 파티 수가 제한치(PC 12 / 모바일 10) 초과 + 아직 안 펼쳤을 때만 노출 */}
             {showApplyMore && (
               <div className="mt-8 md:mt-12 flex justify-center">
                 <button
