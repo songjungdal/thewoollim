@@ -241,8 +241,10 @@ function sanitizeParty(array $p, bool $isUpdate = false): array {
     $tg = (string)($p['targetGroup'] ?? '');
     if (in_array($tg, ['싱글', '돌싱'], true)) $clean['targetGroup'] = $tg;
 
+    // 테마 — 새 선택지 3개(화면 app/lib/data.ts THEMES) + 예전 값 3개(LEGACY_THEMES). 예전 값은 관리자 화면에서 새로 고를 수 없고,
+    //   이미 그 값이 저장된 파티를 그대로 저장할 때 지워지지 않게 받는다 (docs/specs/party-request-tabs.md)
     $th = (string)($p['theme'] ?? '');
-    if (in_array($th, ['티타임', '와인파티', '사케파티', '쿠킹클래스'], true)) $clean['theme'] = $th;
+    if (in_array($th, ['로테이션소개팅', '와인파티', '솔로파티', '티타임', '사케파티', '쿠킹클래스'], true)) $clean['theme'] = $th;
 
     $lt = (string)($p['locationTag'] ?? '');
     if (in_array($lt, ['서울', '성남', '수원', '인천', '용인', '기타'], true)) $clean['locationTag'] = $lt;

@@ -9,7 +9,7 @@ import { useParties, broadcastPartiesUpdated } from "../../lib/useParties";
 import { formatPhoneKR } from "../../lib/phone";
 import { calculateRefund, refundRateLabel } from "../../lib/refund";
 import { formatKST } from "../../lib/datetime";
-import { partyVisibility, partyTypeOf, PARTY_TYPES, PARTY_TYPE_LABELS, type Party, type PartyType } from "../../lib/data";
+import { partyVisibility, partyTypeOf, PARTY_TYPES, PARTY_TYPE_LABELS, THEMES, LEGACY_THEMES, categoryLabel, type Party, type PartyType, type Theme } from "../../lib/data";
 import { templateFor, normalizeDetail, withGuideDefaults, compactDetailForSave, defaultNotice, type PartyDetail } from "../../lib/partyDetailTemplates";
 import PartyDetailEditor, { validateDetail, type DetailSourceParty } from "./PartyDetailEditor";
 import PartyHeroCropModal from "./PartyHeroCropModal";
@@ -115,9 +115,9 @@ type PartyForm = {
   minAge: string;
   maxAge: string;
   allowedMaritalStatus: "all" | "싱글" | "돌싱";
-  // 메인 페이지 카테고리 (선택). 빈 문자열은 미지정.
+  // 메인 페이지 카테고리 (선택). 빈 문자열은 미지정(대상별은 화면에 "누구나").
   targetGroup: "" | "싱글" | "돌싱";
-  theme: "" | "티타임" | "와인파티" | "사케파티" | "쿠킹클래스";
+  theme: "" | Theme;   // 예전 값(LEGACY_THEMES)은 이미 저장된 파티만 — 새로 고를 수 없다
   locationTag: "" | "서울" | "성남" | "수원" | "인천" | "용인" | "기타";
   // 솔로파티 참가 구성 (명세 docs/specs/party-options-solo.md 7-1) — "options" 면 남/여 참가비·정원 대신 회차·항목을 쓴다
   optionMode: "single" | "options";
@@ -752,7 +752,7 @@ export default function AdminDashboard() {
       maxAge: p.maxAge != null ? String(p.maxAge) : "",
       allowedMaritalStatus: (ams === "싱글" || ams === "돌싱") ? ams : "all",
       targetGroup: (tg === "싱글" || tg === "돌싱") ? tg : "",
-      theme: (th === "티타임" || th === "와인파티" || th === "사케파티" || th === "쿠킹클래스") ? th : "",
+      theme: th && ([...THEMES, ...LEGACY_THEMES] as readonly string[]).includes(th) ? th : "",
       locationTag: (lt === "서울" || lt === "성남" || lt === "수원" || lt === "인천" || lt === "용인" || lt === "기타") ? lt : "",
       partyType: type,
       optionMode: row?.options?.length ? "options" : "single",
@@ -2628,9 +2628,10 @@ export default function AdminDashboard() {
                                   className="w-full px-4 py-3 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none min-h-11 md:min-h-0"
                                   aria-label="혼인여부 제한"
                                 >
-                                  <option value="all">무관 (모두 허용)</option>
+                                  {/* 순서·문구만 바꿈, 저장값(싱글/돌싱/all)은 그대로 (docs/specs/party-request-tabs.md) */}
                                   <option value="싱글">싱글 전용 (돌싱 차단)</option>
-                                  <option value="돌싱">돌싱 환영 (싱글도 허용)</option>
+                                  <option value="돌싱">돌싱 (싱글도 허용)</option>
+                                  <option value="all">누구나 (모두 허용)</option>
                                 </select>
                               </div>
                             </div>
@@ -2643,7 +2644,7 @@ export default function AdminDashboard() {
                           <div className="pt-4 border-t border-gray-100"><h4 className="text-[13px] md:text-sm font-black text-gray-500">옵션</h4></div>
                           <div>
                             <p className="text-sm font-black text-gray-700 mb-3">
-                              메인 페이지 카테고리 <span className="text-gray-500 font-medium">· 비워두면 해당 필터에서 제외</span>
+                              메인 페이지 카테고리 <span className="text-gray-500 font-medium">· 메인 화면 파티 일정에 태그로 표시 (미지정·누구나는 표시 안 함)</span>
                             </p>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
                               <div>
@@ -2654,7 +2655,8 @@ export default function AdminDashboard() {
                                   className="w-full px-4 py-3 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none min-h-11 md:min-h-0"
                                   aria-label="대상별 카테고리"
                                 >
-                                  <option value="">미지정</option>
+                                  {/* "누구나" = 미지정(빈 값) — 저장값은 그대로 */}
+                                  <option value="">누구나</option>
                                   <option value="싱글">싱글</option>
                                   <option value="돌싱">돌싱</option>
                                 </select>
@@ -2668,11 +2670,11 @@ export default function AdminDashboard() {
                                   aria-label="테마별 카테고리"
                                 >
                                   <option value="">미지정</option>
-                                  <option value="티타임">티타임</option>
-                                  <option value="와인파티">와인파티</option>
-                                  <option value="사케파티">사케파티</option>
-                                  {/* value 는 DB/필터 값 유지, 표시 라벨만 '세션' (v6.7) */}
-                                  <option value="쿠킹클래스">세션</option>
+                                  {THEMES.map(t => <option key={t} value={t}>{t}</option>)}
+                                  {/* 예전 값(티타임·사케파티·쿠킹클래스)은 그 값이 저장된 파티를 열었을 때만 — 그대로 저장하면 유지된다 */}
+                                  {(LEGACY_THEMES as readonly string[]).includes(partyForm.theme) && (
+                                    <option value={partyForm.theme}>{categoryLabel(partyForm.theme)} (이전 분류)</option>
+                                  )}
                                 </select>
                               </div>
                               <div>
