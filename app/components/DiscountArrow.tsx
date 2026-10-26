@@ -4,12 +4,12 @@
  * 바로 뒤에 할인가·DiscountBadge 를 붙여 쓴다.
  *   size "panel": 상세 정보 패널·장바구니(쿠폰 없음)·관리자 미리보기 / "small": 장바구니(쿠폰 적용)
  *   (PC 하단 바는 2026-10-26 사용자 요청으로 할인가만 보여 주므로 쓰지 않는다)
- * 768px 미만에서는 정가 앞 ₩를 생략한다 — 360px 에서 할인가·배지까지 한 줄에 넣기 위해.
+ * 768px 미만에서는 정가 앞 ₩를 작게(글자의 77%) — 360px 에서 할인가·배지까지 한 줄에 넣기 위해.
  */
 type DiscountArrowSize = "panel" | "small";
 
 const TEXT_CLS: Record<DiscountArrowSize, string> = {
-  panel: "text-[13px] pr-[24px] md:text-[14px] md:pr-[26px]",
+  panel: "text-[13px] pr-[22px] md:text-[14px] md:pr-[26px]",
   small: "text-[12px] pr-[20px] md:text-[13px] md:pr-[22px]",
 };
 
@@ -20,7 +20,7 @@ export default function DiscountArrow({ price, size = "panel" }: {
   return (
     <span className="relative inline-flex items-center" data-testid="discount-arrow">
       <span className={`whitespace-nowrap font-semibold tabular-nums text-[#9ca3af] ${TEXT_CLS[size]}`}>
-        <span className="sr-only">정가 </span><span className="max-md:hidden">₩</span>{price.toLocaleString()}
+        <span className="sr-only">정가 </span><span className="max-md:text-[0.77em]">₩</span>{price.toLocaleString()}
       </span>
       <span
         aria-hidden
