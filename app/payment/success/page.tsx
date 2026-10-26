@@ -17,12 +17,16 @@ function PaymentSuccessContent() {
   const { mounted, isLoggedIn, profile, userEmail, refreshBookings, bookings } = useAuth();
   const PARTIES = useParties();
   const [checkingProfile, setCheckingProfile] = useState(false);
+  // 서버 예약 목록을 한 번 받아 왔는지 — 결제 내역의 파티별 금액(예약에 저장된 결제 금액)을 기다리는 데 쓴다
+  const [bookingsSynced, setBookingsSynced] = useState(false);
 
   // 결제 직후 booking이 backend에서 'pending_approval' 자동 전환되었을 가능성 →
   // 진입 시점에 1회 강제 동기화하여 마이페이지 상태가 즉시 정확하게 보이도록 보장.
   useEffect(() => {
     if (!mounted || !isLoggedIn) return;
-    refreshBookings();
+    let alive = true;
+    refreshBookings().finally(() => { if (alive) setBookingsSynced(true); });
+    return () => { alive = false; };
   }, [mounted, isLoggedIn, refreshBookings]);
 
   const ids   = (searchParams.get("ids") || "").split(",").filter(Boolean);
@@ -165,15 +169,24 @@ function PaymentSuccessContent() {
               <p className="text-xs md:text-sm font-bold text-gray-500 mb-3 tracking-wider">결제 내역</p>
               <div className="space-y-2.5">
                 {parties.map(p => {
-                  // 솔로파티 참가 구성 — 이 파티의 예약(취소 제외)에서 항목 이름과 결제 금액을 쓴다
-                  const ob = bookings.find(b => b.partyId === p.id && b.status !== "cancelled" && b.optionName);
+                  // 이번 결제의 예약 — 이 파티의 취소·환불되지 않은 예약 중 가장 최근 것(한 파티는 취소 전까지 한 번만 신청 가능).
+                  //   금액은 예약에 저장된 실제 결제 금액(성별 가격·할인율·쿠폰 반영). 참가 구성 예약은 항목 이름도 쓴다.
+                  const ob = bookings
+                    .filter(b => b.partyId === p.id && b.status !== "cancelled" && b.status !== "refund_completed")
+                    .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""))[0];
+                  // 예약을 아직 못 받았으면 — 파티 1건 주문은 위쪽 결제 금액과 같고, 여러 건은 받아 올 때까지 자리만 표시
+                  const amount = ob?.total != null && ob.total > 0 ? ob.total : parties.length === 1 && total > 0 ? total : null;
                   return (
                     <div key={p.id} className="flex justify-between items-center gap-4">
                       <span className="font-bold text-sm md:text-base truncate">
                         {p.title}
-                        {ob && <span className="ml-1.5 text-xs md:text-sm font-black text-brand-point-ink" data-testid="option-name">{ob.optionName}</span>}
+                        {ob?.optionName && <span className="ml-1.5 text-xs md:text-sm font-black text-brand-point-ink" data-testid="option-name">{ob.optionName}</span>}
                       </span>
-                      <span className="font-black text-sm md:text-base text-brand-point-ink whitespace-nowrap">₩{(ob?.total ?? p.price).toLocaleString()}</span>
+                      {amount !== null ? (
+                        <span className="font-black text-sm md:text-base text-brand-point-ink whitespace-nowrap" data-testid="paid-line-amount">₩{amount.toLocaleString()}</span>
+                      ) : !bookingsSynced ? (
+                        <span className="h-4 w-16 flex-shrink-0 rounded bg-gray-100 animate-pulse md:h-5" aria-hidden />
+                      ) : null}
                     </div>
                   );
                 })}
