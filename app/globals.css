@@ -22,6 +22,12 @@
   --color-female-bg: #FFF0F6;
   --color-female-seat: #FFF7FA;
   --color-female-line: #FBDCE9;
+  /* 할인 표시 — 할인가 글자·할인 배지(discount), 정가 화살표 선 시작색(-light), 관리자 미리보기 상자 배경(-bg)·테두리(-line).
+     docs/specs/party-discount-rate.md. 경고·마감용 danger 와 따로 둔다 */
+  --color-discount: #E11D2E;
+  --color-discount-light: #F7A9B0;
+  --color-discount-bg: #FFF6F7;
+  --color-discount-line: #FFE0E3;
   --radius-3xl: 1.5rem;
 }
 

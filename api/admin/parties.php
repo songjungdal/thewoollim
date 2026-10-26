@@ -17,9 +17,10 @@
  *   locationShort? (짧은 장소명, 최대 10자), host_name?,
  *   partyType ('matching'|'solo', create 시 필수), detail? (상세페이지 안내 — lib.php sanitizePartyDetail)
  *   couponDisabled (쿠폰 적용 불가 — true 면 이 파티 결제에 쿠폰을 쓸 수 없다. 없으면 false)
+ *   discountRate (할인율 0~90 정수, 그 밖의 값은 0 — 결제 금액은 lib.php priceForGender 가 할인가로 계산. docs/specs/party-discount-rate.md)
  *   sessions?·options? (솔로파티 참가 구성 — lib.php sanitizePartyOptions, docs/specs/party-options-solo.md)
  *
- * update: 요청에 없는 host_name·partyType·detail·voting_status·status·couponDisabled·imageUrl·heroImageUrl·locationShort·sessions·options 는
+ * update: 요청에 없는 host_name·partyType·detail·voting_status·status·couponDisabled·discountRate·imageUrl·heroImageUrl·locationShort·sessions·options 는
  *         기존 값을 그대로 둔다. imageUrl·heroImageUrl·locationShort 는 키가 있고 비어 있으면 null 로 저장한다(이미지 제거·장소명 지우기).
  * GET: 참가 구성이 있는 파티에는 applicants(취소되지 않은 예약 기준 항목별·회차별 신청자 수)를 덧붙인다.
  *
@@ -131,7 +132,7 @@ try {
                         // 요청에 없는 필드는 기존 값 유지 — 관리자 폼이 보내지 않는 값(투표 상태·모임종료 표시·담당자)이
                         // 저장 때마다 초기화되지 않도록. partyType·detail 도 요청에 없으면 그대로 둔다.
                         // imageUrl·heroImageUrl·locationShort 도 요청에 키가 없으면(예전 관리자 화면) 그대로 둔다 — 키가 있고 비어 있으면 지운다(sanitizeParty)
-                        foreach (['host_name', 'partyType', 'detail', 'voting_status', 'status', 'couponDisabled', 'imageUrl', 'heroImageUrl', 'locationShort'] as $keep) {
+                        foreach (['host_name', 'partyType', 'detail', 'voting_status', 'status', 'couponDisabled', 'discountRate', 'imageUrl', 'heroImageUrl', 'locationShort'] as $keep) {
                             if (!array_key_exists($keep, $p) && array_key_exists($keep, $row)) {
                                 $p[$keep] = $row[$keep];
                             }
@@ -281,6 +282,9 @@ function sanitizeParty(array $p, bool $isUpdate = false): array {
 
     // 쿠폰 적용 불가 (매칭·솔로 공통) — 값이 없거나 false 면 false (기존 파티는 지금처럼 쿠폰 사용 가능)
     $clean['couponDisabled'] = filter_var($p['couponDisabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+    // 할인율 (단일 가격 파티) — 0~90 정수만, 그 밖의 값은 0 (docs/specs/party-discount-rate.md 1장)
+    $clean['discountRate'] = partyDiscountRate($p);
 
     // 상세페이지 안내 — 있으면 검증 후 저장 (입력 제한 위반 시 RuntimeException → 저장 거절)
     if (array_key_exists('detail', $p) && $p['detail'] !== null) {

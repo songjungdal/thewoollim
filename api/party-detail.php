@@ -2,7 +2,7 @@
 /**
  * 파티 상세페이지 안내 조회 (공개).
  *
- * GET ?id=N → { ok: true, partyType: 'matching'|'solo', detail: {...} | null }   (detail.about: 소개글 — docs/specs/party-solo-guide.md 7장)
+ * GET ?id=N → { ok: true, partyType: 'matching'|'solo', discountRate: 0~90, detail: {...} | null }   (detail.about: 소개글 — docs/specs/party-solo-guide.md 7장)
  *   - detail 이 없으면 null — 화면은 종류별 기본 내용(app/lib/partyDetailTemplates.ts)으로 그린다.
  *   - 목록 API(/api/parties.php)는 10초마다 다시 불러오므로 detail 을 넣지 않고 이 API 로 따로 조회한다.
  *   - 파티가 없으면 404 { ok: false }.
@@ -25,9 +25,10 @@ $parties = json_decode((string)@file_get_contents(dataDir() . '/parties.json'), 
 foreach ((array)$parties as $p) {
     if (is_array($p) && (string)($p['id'] ?? '') === $id) {
         jsonOut([
-            'ok'        => true,
-            'partyType' => partyTypeOf($p),
-            'detail'    => is_array($p['detail'] ?? null) ? $p['detail'] : null,
+            'ok'           => true,
+            'partyType'    => partyTypeOf($p),
+            'discountRate' => partyDiscountRate($p),   // 할인율 (0 = 할인 없음) — 가격은 목록 API(parties.php)에 있다
+            'detail'       => is_array($p['detail'] ?? null) ? $p['detail'] : null,
         ]);
     }
 }

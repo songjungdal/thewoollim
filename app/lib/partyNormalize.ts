@@ -40,9 +40,16 @@ export function normalizeParty(p: Record<string, unknown>): Party {
     // 파티 종류 (없거나 잘못된 값은 matching)
     partyType:   partyTypeOf({ partyType: typeof p.partyType === "string" ? p.partyType : undefined }),
     couponDisabled: p.couponDisabled === true,
+    // 할인율 — 0~90 정수(또는 숫자 1~2자리 문자열)만, 그 밖의 값은 0 = 할인 없음 (서버 api/lib.php partyDiscountRate 와 같은 규칙)
+    discountRate: normalizeDiscountRate(p.discountRate),
     // 솔로파티 참가 구성 — 회차·항목이 모두 있을 때만 (없으면 기존 파티와 똑같이 동작)
     ...(sessions.length > 0 && options.length > 0 ? { sessions, options } : {}),
   };
+}
+
+function normalizeDiscountRate(v: unknown): number {
+  const n = typeof v === "number" ? v : typeof v === "string" && /^\d{1,2}$/.test(v) ? Number(v) : 0;
+  return Number.isInteger(n) && n >= 0 && n <= 90 ? n : 0;
 }
 
 /** 응답 배열 → Party 목록 (id 가 없는 항목은 버린다) */

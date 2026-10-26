@@ -7,10 +7,12 @@ import Link from "next/link";
 import { ShoppingBag, LogOut, User, Trash2, CheckSquare, Square, CreditCard, Pencil, AlertTriangle, X, Ticket, TicketX, Clock, CheckCircle2, Check, KeyRound, ChevronDown, CalendarCheck } from "lucide-react";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import DiscountArrow from "../components/DiscountArrow";
+import DiscountBadge from "../components/DiscountBadge";
 import { useAuth, calcCouponDiscount, type BookingStatus } from "../context/AuthContext";
 import MembershipSection from "./MembershipSection";
 import { useParties, PARTIES_NOT_LOADED } from "../lib/useParties";
-import { partyStockStatus, linePriceFor, partyHasOptions, partyOptionById, dateOnly, partyVisibility, VBANK_INFO, COUPON_DISABLED_MESSAGE } from "../lib/data";
+import { partyStockStatus, linePriceFor, basePriceForGender, partyHasDiscount, partyHasOptions, partyOptionById, dateOnly, partyVisibility, VBANK_INFO, COUPON_DISABLED_MESSAGE } from "../lib/data";
 
 // 관리자 페이지의 신청자 상태 배지 규격과 동일한 색상 조합 사용 (admin8888/dashboard STATUS_LABEL)
 const STATUS_DISPLAY: Record<BookingStatus, { label: string; tone: string; stripe: string; icon: typeof Clock; sub?: string }> = {
@@ -285,6 +287,11 @@ export default function MyPage() {
   const selectedOriginalTotal = selectedParties.reduce((sum, p) => sum + unitPrice(p) * qtyOf(p.id), 0);
   const selectedTotal         = selectedParties.reduce((sum, p) => sum + computeRowPrice(p.id, unitPrice(p) * qtyOf(p.id)), 0);
   const selectedDiscount      = selectedOriginalTotal - selectedTotal;
+  // 파티 할인 (docs/specs/party-discount-rate.md 8장) — 정가 합에서 할인가 합(selectedOriginalTotal)을 뺀 금액.
+  //   할인 파티는 basePriceForGender(정가), 그 밖의 파티(참가 구성 파티 포함)는 위 단가 그대로
+  const basePrice = (p: typeof PARTIES[number]) => partyHasDiscount(p) ? basePriceForGender(p, profile?.gender) : unitPrice(p);
+  const selectedBaseTotal     = selectedParties.reduce((sum, p) => sum + basePrice(p) * qtyOf(p.id), 0);
+  const selectedPartyDiscount = selectedBaseTotal - selectedOriginalTotal;
   const cartOriginalTotal     = cartParties.reduce((sum, p) => sum + unitPrice(p) * qtyOf(p.id), 0);
   const cartTotal             = cartParties.reduce((sum, p) => sum + computeRowPrice(p.id, unitPrice(p) * qtyOf(p.id)), 0);
 
@@ -657,13 +664,33 @@ export default function MyPage() {
 
                           {/* 금액 — 회원 성별 기반 단가 (priceMale/Female 우선) */}
                           {(() => {
-                            const lineTotal = unitPrice(party); // quantity 항상 1
+                            const lineTotal = unitPrice(party); // quantity 항상 1 · 할인 파티는 할인가
                             const lineFinal = computeRowPrice(party.id, lineTotal);
+                            // 할인 파티 — 정가 화살표 + 할인가 + 배지 (쿠폰이 붙으면 윗줄로 작게, 아랫줄에 쿠폰 적용 금액)
+                            const rate = partyHasDiscount(party) ? (party.discountRate ?? 0) : 0;
                             return (
                               <div className="flex items-baseline justify-between gap-3 lg:block lg:flex-shrink-0">
-                                <span className="lg:hidden text-xs font-bold text-gray-500">결제 금액</span>
+                                <span className={`lg:hidden text-xs font-bold text-gray-500 ${rate > 0 ? "whitespace-nowrap" : ""}`}>결제 금액</span>
                                 <div className="flex flex-col items-end leading-tight gap-0.5">
-                                  {couponHere ? (
+                                  {rate > 0 && couponHere ? (
+                                    <>
+                                      <span className="flex flex-wrap items-center justify-end gap-1.5" data-testid="cart-discount-price">
+                                        <DiscountArrow price={basePriceForGender(party, profile?.gender)} size="small" />
+                                        <span className="whitespace-nowrap text-[13px] font-extrabold tabular-nums text-discount lg:text-[14px]">₩{lineTotal.toLocaleString()}</span>
+                                        <DiscountBadge rate={rate} />
+                                      </span>
+                                      <span className="flex items-baseline gap-1.5">
+                                        <span className="text-[11px] font-extrabold text-brand-point-ink">쿠폰 적용</span>
+                                        <span className="font-black text-xl lg:text-2xl text-brand-point-ink whitespace-nowrap tabular-nums">₩{lineFinal.toLocaleString()}</span>
+                                      </span>
+                                    </>
+                                  ) : rate > 0 ? (
+                                    <span className="flex flex-wrap items-center justify-end gap-x-1.5 gap-y-1" data-testid="cart-discount-price">
+                                      <DiscountArrow price={basePriceForGender(party, profile?.gender)} />
+                                      <span className="font-black text-xl lg:text-2xl text-discount whitespace-nowrap tabular-nums">₩{lineTotal.toLocaleString()}</span>
+                                      <DiscountBadge rate={rate} />
+                                    </span>
+                                  ) : couponHere ? (
                                     <>
                                       <s className="text-gray-500 text-xs lg:text-sm font-medium tabular-nums">₩{lineTotal.toLocaleString()}</s>
                                       <span className="font-black text-xl lg:text-2xl text-brand-point-ink whitespace-nowrap tabular-nums">₩{lineFinal.toLocaleString()}</span>
@@ -748,19 +775,27 @@ export default function MyPage() {
 
                   {/* 결제 요약 — 영수증 형태 */}
                   <div className="bg-white rounded-2xl p-5 lg:p-6 border border-gray-200">
-                    {selectedDiscount > 0 && (
+                    {(selectedPartyDiscount > 0 || selectedDiscount > 0) && (
                       <dl className="space-y-1.5 text-sm lg:text-base">
                         <div className="flex justify-between items-center gap-3 text-gray-500 font-medium">
                           <dt>상품 금액</dt>
-                          <dd className="tabular-nums">₩{selectedOriginalTotal.toLocaleString()}</dd>
+                          <dd className="tabular-nums">₩{selectedBaseTotal.toLocaleString()}</dd>
                         </div>
-                        <div className="flex justify-between items-center gap-3 text-brand-point-ink font-bold">
-                          <dt>쿠폰 할인 ({appliedCoupon?.code})</dt>
-                          <dd className="tabular-nums">- ₩{selectedDiscount.toLocaleString()}</dd>
-                        </div>
+                        {selectedPartyDiscount > 0 && (
+                          <div className="flex justify-between items-center gap-3 text-discount font-bold">
+                            <dt>파티 할인</dt>
+                            <dd className="tabular-nums">- ₩{selectedPartyDiscount.toLocaleString()}</dd>
+                          </div>
+                        )}
+                        {selectedDiscount > 0 && (
+                          <div className="flex justify-between items-center gap-3 text-brand-point-ink font-bold">
+                            <dt>쿠폰 할인 ({appliedCoupon?.code})</dt>
+                            <dd className="tabular-nums">- ₩{selectedDiscount.toLocaleString()}</dd>
+                          </div>
+                        )}
                       </dl>
                     )}
-                    <div className={`flex justify-between items-center gap-3 mb-5 ${selectedDiscount > 0 ? "mt-3 pt-3 border-t border-dashed border-gray-300" : ""}`}>
+                    <div className={`flex justify-between items-center gap-3 mb-5 ${selectedPartyDiscount > 0 || selectedDiscount > 0 ? "mt-3 pt-3 border-t border-dashed border-gray-300" : ""}`}>
                       <span className="font-black text-base lg:text-lg break-keep">
                         {allSelected ? "전체 결제금액" : "선택 결제금액"}{" "}
                         <span className="text-brand-point-ink">({selectedParties.length}건)</span>
