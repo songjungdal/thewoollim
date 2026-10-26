@@ -87,6 +87,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 | 규칙 | 화면 | 서버 |
 |---|---|---|
 | 성별별 참가비·참가 항목 가격 | `app/lib/data.ts`(`priceForGender`, `linePriceFor`) | `api/lib.php`(`priceForGender`, `resolvePartyOption`), `api/payments/pending.php`·`success.php`·`vbank-submit.php` |
+| 파티 할인율(할인가 = 천원 미만 내림, 0~90 정수만) | `app/lib/data.ts`(`discountedPrice`, `priceForGender`), `app/lib/partyNormalize.ts` | `api/lib.php`(`discountedPrice`, `partyDiscountRate`, `priceForGender`) — 결제 금액 할인은 `priceForGender` 한 곳에서만 (`docs/specs/party-discount-rate.md`) |
 | 남은 자리·마감 판정 | `app/lib/data.ts`(`partyStockStatus`) | `api/lib.php`(`partyRemainingSeats`) |
 | 파티 종류(매칭파티·솔로파티) | `app/lib/data.ts`(`PARTY_TYPES`, `partyTypeOf`) | `api/lib.php`(`partyTypeOf`, `partyTypeLabel`) |
 | 솔로파티 참가 구성(회차·항목) 제한 | `app/lib/partyOptions.ts` | `api/lib.php`(`sanitizePartyOptions`) |

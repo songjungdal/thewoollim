@@ -75,6 +75,7 @@ export type Party = {
   locationTag?: LocationTag;   // 지역별: 서울 / 성남 / 수원 / 인천 / 용인 / 기타
   partyType?: PartyType;       // 파티 종류 — 없으면 매칭파티 (partyTypeOf 로 읽는다)
   couponDisabled?: boolean;    // 쿠폰 적용 불가 (매칭·솔로 공통) — 없으면 쿠폰 사용 가능
+  discountRate?: number;       // 할인율 0~90 (없거나 0 = 할인 없음). 참가 구성 파티에는 쓰지 않는다 (docs/specs/party-discount-rate.md)
   // 솔로파티 참가 구성 (docs/specs/party-options-solo.md) — 있으면 남은 자리·마감은 회차 기준(partyStockStatus)
   sessions?: PartySession[];   // 회차 (maleBooked/femaleBooked = 회차별 신청 인원)
   options?: PartyOption[];     // 참가 항목 (항목 가격·포함 회차)
@@ -84,13 +85,41 @@ export type Party = {
 // 파티 데이터는 빌드 시점(lib/buildParties.ts)과 화면이 열린 뒤(lib/useParties.ts) 모두 /api/parties.php 에서 받는다.
 
 /**
- * 회원 성별 기준 파티 참가비 — priceMale / priceFemale 우선, 미설정 시 price 폴백.
- * 사용처: 카트 합계, /checkout 결제 금액, pending.php 와 동일 규칙으로 클라/서버가 일치해야 함.
+ * 할인가 — 천원 미만 내림 (69,000원 20% → 55,000원). 할인율이 1~90 정수가 아니면 가격 그대로.
+ * 서버 api/lib.php discountedPrice 와 같은 규칙.
  */
-export function priceForGender(party: Pick<Party, "price" | "priceMale" | "priceFemale">, gender?: string | null): number {
+export function discountedPrice(price: number, rate?: number): number {
+  if (!isDiscountRate(rate)) return price;
+  return Math.floor(price * (100 - rate) / 100000) * 1000;
+}
+
+/** 할인율로 쓸 수 있는 값인지 (1~90 정수) */
+function isDiscountRate(rate?: number): rate is number {
+  return rate !== undefined && Number.isInteger(rate) && rate >= 1 && rate <= 90;
+}
+
+/**
+ * 할인 적용 전 성별 참가비 (정가) — priceMale / priceFemale 우선, 미설정 시 price 폴백.
+ * 화면 표시(정가 + 화살표) 전용. 결제 금액 계산에는 priceForGender 를 쓴다.
+ */
+export function basePriceForGender(party: Pick<Party, "price" | "priceMale" | "priceFemale">, gender?: string | null): number {
   if (gender === "남성" && party.priceMale && party.priceMale > 0) return party.priceMale;
   if (gender === "여성" && party.priceFemale && party.priceFemale > 0) return party.priceFemale;
   return party.price; // 폴백
+}
+
+/**
+ * 회원 성별 기준 파티 참가비 — 정가(basePriceForGender)에 할인율을 적용한 금액.
+ * 사용처: 카트 합계, /checkout 결제 금액, pending.php 와 동일 규칙으로 클라/서버가 일치해야 함 (서버 api/lib.php priceForGender).
+ * 참가 구성 파티는 linePriceFor 가 항목 가격을 쓰므로 여기로 오지 않는다.
+ */
+export function priceForGender(party: Pick<Party, "price" | "priceMale" | "priceFemale" | "discountRate">, gender?: string | null): number {
+  return discountedPrice(basePriceForGender(party, gender), party.discountRate);
+}
+
+/** 할인 표시를 할 파티인지 — 할인율 1 이상이고 참가 구성 파티가 아닐 때 */
+export function partyHasDiscount(party: Pick<Party, "discountRate" | "sessions" | "options">): boolean {
+  return isDiscountRate(party.discountRate) && !partyHasOptions(party);
 }
 
 /** 참가 구성이 있는 파티인지 (회차·항목이 모두 있어야 함) */

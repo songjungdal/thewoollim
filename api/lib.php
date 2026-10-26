@@ -204,6 +204,8 @@ function withFileLock(string $path, callable $callback) {
 //   클라이언트(priceForGender) 와 동일 규칙 — 결제 금액 검증 일치.
 //   참가 항목(options)이 있는 솔로파티는 고른 항목의 남/여 가격. 항목이 없거나 잘못된 optionId 면 null
 //   → 호출한 쪽에서 결제를 거절한다 (docs/specs/party-options-solo.md 6장).
+//   그 밖의 파티는 성별 가격에 할인율(discountRate)을 적용한 금액 — 결제 금액의 할인은 이 함수 한 곳에서만 한다
+//   (docs/specs/party-discount-rate.md). 참가 항목 가격에는 할인율을 쓰지 않는다.
 function priceForGender(array $party, string $gender, ?string $optionId = null): ?int {
     if (partyHasOptions($party)) {
         $opt = partyOptionById($party, (string)$optionId);
@@ -212,9 +214,26 @@ function priceForGender(array $party, string $gender, ?string $optionId = null):
     }
     $male   = (int)($party['priceMale']   ?? 0);
     $female = (int)($party['priceFemale'] ?? 0);
-    if ($gender === '남성' && $male   > 0) return $male;
-    if ($gender === '여성' && $female > 0) return $female;
-    return (int)($party['price'] ?? 0);
+    if ($gender === '남성' && $male > 0)       $base = $male;
+    elseif ($gender === '여성' && $female > 0) $base = $female;
+    else                                       $base = (int)($party['price'] ?? 0);
+    return discountedPrice($base, partyDiscountRate($party));
+}
+
+// ─── 파티 할인율 ──────────────────────────────────────────────────
+//   parties.json 의 discountRate — 0~90 정수만 쓰고 그 밖의 값(없음 포함)은 0 (할인 없음).
+//   공개 목록 API(parties.php)도 이 값을 내려 화면(app/lib/data.ts discountedPrice)이 같은 금액을 계산한다.
+function partyDiscountRate(array $party): int {
+    $v = $party['discountRate'] ?? 0;
+    $r = is_int($v) ? $v : (is_string($v) && preg_match('/^\d{1,2}$/', $v) ? (int)$v : 0);
+    return ($r >= 0 && $r <= 90) ? $r : 0;
+}
+
+// 할인가 — 천원 미만 내림 (69,000원 20% → 55,000원). 할인율이 1~90 정수가 아니면 가격 그대로.
+//   화면 app/lib/data.ts discountedPrice 와 같은 규칙.
+function discountedPrice(int $price, $rate): int {
+    if (!is_int($rate) || $rate < 1 || $rate > 90) return $price;
+    return intdiv($price * (100 - $rate), 100000) * 1000;
 }
 
 // ─── 파티별 성별 정원 ──────────────────────────────────────────────

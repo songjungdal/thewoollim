@@ -2,11 +2,16 @@
 
 import type { ReactNode } from "react";
 import { CalendarDays, MapPin } from "lucide-react";
+import DiscountArrow from "../../components/DiscountArrow";
+import { discountedPrice } from "../../lib/data";
 
-/** PC 하단 바 가운데 참가비 — 남/여 분리 / 단일 가격 / 참가 구성 파티(가장 낮은 가격부터) */
+/**
+ * PC 하단 바 가운데 참가비 — 남/여 분리 / 단일 가격 / 참가 구성 파티(가장 낮은 가격부터).
+ * split·single 의 가격은 정가. discountRate 가 1 이상이면 정가 화살표 + 할인가 (docs/specs/party-discount-rate.md 6장)
+ */
 export type BarFee =
-  | { kind: "split"; male: number; female: number }
-  | { kind: "single"; price: number }
+  | { kind: "split"; male: number; female: number; discountRate?: number }
+  | { kind: "single"; price: number; discountRate?: number }
   | { kind: "from"; price: number };
 
 const won = (n: number) => `₩${n.toLocaleString()}`;
@@ -24,6 +29,7 @@ export default function PartyBottomBar({ title, when, place, fee, children }: {
   fee: BarFee;
   children: ReactNode;   // PartyCtaButtons
 }) {
+  const rate = fee.kind === "from" ? 0 : (fee.discountRate ?? 0);
   return (
     <div
       className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_rgba(0,0,0,0.06)]"
@@ -51,9 +57,32 @@ export default function PartyBottomBar({ title, when, place, fee, children }: {
         </div>
         {/* PC — 가운데 참가비 (양옆 1px 구분선) */}
         <div className="hidden h-[52px] flex-shrink-0 flex-col justify-center border-x border-gray-200 px-5 lg:flex">
-          <span className="text-[12px] font-medium text-gray-500">참가비</span>
+          <span className="flex items-center gap-1.5 text-[12px] font-medium text-gray-500">
+            참가비
+            {rate > 0 && (
+              <span className="inline-flex items-baseline gap-[3px] whitespace-nowrap rounded-full bg-discount px-1.5 py-0.5 leading-none text-white" data-testid="bar-discount-badge">
+                <span className="text-[11px] font-black">{rate}%</span>
+                <span className="text-[10px] font-bold">할인</span>
+              </span>
+            )}
+          </span>
           <span className="flex items-baseline gap-1.5 whitespace-nowrap">
-            {fee.kind === "split" ? (
+            {rate > 0 && fee.kind !== "from" ? (
+              // 할인 — 남 [69,000→] ₩55,000 · 여 [49,000→] ₩39,000 / 단일 [69,000→] ₩55,000
+              <span className="flex items-center gap-1.5 whitespace-nowrap">
+                {(fee.kind === "split"
+                  ? [["남", "text-male", fee.male], ["여", "text-female", fee.female]] as const
+                  : [["", "", fee.price]] as const
+                ).map(([g, cls, amt], i) => (
+                  <span key={g || "single"} className="contents">
+                    {i > 0 && <span className="text-gray-300">·</span>}
+                    {g && <span className={`text-[12px] font-bold ${cls}`}>{g}</span>}
+                    <DiscountArrow price={amt} size="bar" won={false} />
+                    <span className="text-[20px] font-black tracking-[-0.3px] tabular-nums text-discount">{won(discountedPrice(amt, rate))}</span>
+                  </span>
+                ))}
+              </span>
+            ) : fee.kind === "split" ? (
               <>
                 <span className="text-[12px] font-bold text-male">남</span>
                 <span className="text-[20px] font-black tracking-[-0.3px] tabular-nums">{won(fee.male)}</span>

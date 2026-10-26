@@ -1,4 +1,4 @@
-import { dateOnly, partyHasOptions, partyStockStatus, partyTypeOf, PARTY_TYPE_LABELS, type Party } from "./data";
+import { dateOnly, partyHasOptions, partyStockStatus, partyTypeOf, priceForGender, PARTY_TYPE_LABELS, type Party } from "./data";
 import { optionsMinPrice } from "./partyOptions";
 import { absoluteUrl, SITE_ORIGIN, SITE_NAME } from "./seo";
 
@@ -9,11 +9,11 @@ import { absoluteUrl, SITE_ORIGIN, SITE_NAME } from "./seo";
 
 const won = (n: number) => `${n.toLocaleString("ko-KR")}원`;
 
-/** 화면 상세와 같은 기준의 참가비 문구 — "남성 50,000원 · 여성 40,000원" / 참가 구성 파티는 "30,000원부터" */
+/** 화면 상세와 같은 기준의 참가비 문구 — "남성 50,000원 · 여성 40,000원" / 참가 구성 파티는 "30,000원부터". 할인율이 있으면 할인가 */
 export function partyPriceText(p: Party): string {
   if (partyHasOptions(p) && p.options) return `${won(optionsMinPrice(p.options))}부터`;
-  const male = p.priceMale && p.priceMale > 0 ? p.priceMale : p.price;
-  const female = p.priceFemale && p.priceFemale > 0 ? p.priceFemale : p.price;
+  const male = priceForGender(p, "남성");
+  const female = priceForGender(p, "여성");
   return male === female ? won(male) : `남성 ${won(male)} · 여성 ${won(female)}`;
 }
 
@@ -88,8 +88,9 @@ export function partyEventJsonLd(p: Party, now: Date = new Date()) {
         { name: `${o.name} (여성)`, price: o.priceFemale, availability: availability(o.femaleClosed) },
       ])
     : [
-        { name: "남성 참가", price: p.priceMale && p.priceMale > 0 ? p.priceMale : p.price, availability: availability(stock.maleFull) },
-        { name: "여성 참가", price: p.priceFemale && p.priceFemale > 0 ? p.priceFemale : p.price, availability: availability(stock.femaleFull) },
+        // 할인율이 있으면 할인가 (화면·결제 금액과 같은 priceForGender)
+        { name: "남성 참가", price: priceForGender(p, "남성"), availability: availability(stock.maleFull) },
+        { name: "여성 참가", price: priceForGender(p, "여성"), availability: availability(stock.femaleFull) },
       ];
 
   const image = p.imageUrl

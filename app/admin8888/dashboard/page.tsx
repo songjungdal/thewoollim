@@ -9,13 +9,15 @@ import { useParties, broadcastPartiesUpdated } from "../../lib/useParties";
 import { formatPhoneKR } from "../../lib/phone";
 import { calculateRefund, refundRateLabel } from "../../lib/refund";
 import { formatKST } from "../../lib/datetime";
-import { partyVisibility, partyTypeOf, PARTY_TYPES, PARTY_TYPE_ADMIN_LABELS, THEMES, LEGACY_THEMES, categoryLabel, type Party, type PartyType, type Theme } from "../../lib/data";
+import { partyVisibility, partyTypeOf, basePriceForGender, discountedPrice, partyHasDiscount, PARTY_TYPES, PARTY_TYPE_ADMIN_LABELS, THEMES, LEGACY_THEMES, categoryLabel, type Party, type PartyType, type Theme } from "../../lib/data";
 import { templateFor, normalizeDetail, withGuideDefaults, compactDetailForSave, defaultNotice, type PartyDetail } from "../../lib/partyDetailTemplates";
 import PartyDetailEditor, { validateDetail, type DetailSourceParty } from "./PartyDetailEditor";
 import PartyHeroCropModal from "./PartyHeroCropModal";
 import TestUsersTools from "./TestUsersTools";
 import HeroEditor from "./HeroEditor";
 import PartyOptionsEditor from "./PartyOptionsEditor";
+import DiscountArrow from "../../components/DiscountArrow";
+import DiscountBadge from "../../components/DiscountBadge";
 import {
   EMPTY_OPTIONS_DRAFT, draftFromParty, draftToPayload, validateOptionsDraft, duplicateOptionSessions, optionsMinPrice, normalizeSessions, normalizeOptions,
   type OptionsDraft, type OptionApplicants, type PartySession, type PartyOption,
@@ -124,6 +126,7 @@ type PartyForm = {
   optionMode: "single" | "options";
   optionsDraft: OptionsDraft;
   couponDisabled: boolean; // 쿠폰 적용 불가 (매칭·솔로 공통) — 체크하면 이 파티 결제에 쿠폰을 쓸 수 없다
+  discountRate: string;    // 할인율 (%) — 단일 가격 모드만. 빈 문자열 = 0 (할인 없음), 1~90 정수 (docs/specs/party-discount-rate.md 9장)
 };
 const EMPTY_PARTY: PartyForm = {
   partyType: "",
@@ -134,7 +137,14 @@ const EMPTY_PARTY: PartyForm = {
   targetGroup: "", theme: "", locationTag: "",
   optionMode: "single", optionsDraft: EMPTY_OPTIONS_DRAFT,
   couponDisabled: false,
+  discountRate: "",
 };
+
+/** 할인율 입력값 → 저장할 정수 (0~90 정수가 아니면 0 = 할인 없음, 서버 sanitizeParty 와 같은 규칙) */
+function formDiscountRate(v: string): number {
+  const n = Number(v);
+  return Number.isInteger(n) && n >= 0 && n <= 90 ? n : 0;
+}
 
 /** 비고 한 줄 — 과거에 함께 참가확정 완료됐던 파티의 날짜와, 그 파티에서 만났던(이번 파티 이성 신청자 중) 사람 이름 */
 type BookingRemark = { date: string; names: string[] };
@@ -430,6 +440,7 @@ type AdminPartyRow = {
   options: PartyOption[];
   applicants: OptionApplicants | null;
   couponDisabled: boolean;
+  discountRate: number;   // 할인율 0~90 (0 = 할인 없음)
 };
 
 /** 관리자 GET 응답 → 파티별 AdminPartyRow */
@@ -437,7 +448,7 @@ function buildAdminPartyRows(items: unknown[]): Record<string, AdminPartyRow> {
   const out: Record<string, AdminPartyRow> = {};
   for (const it of items) {
     if (!it || typeof it !== "object") continue;
-    const r = it as { id?: unknown; partyType?: string; detail?: unknown; sessions?: unknown; options?: unknown; applicants?: unknown; couponDisabled?: unknown };
+    const r = it as { id?: unknown; partyType?: string; detail?: unknown; sessions?: unknown; options?: unknown; applicants?: unknown; couponDisabled?: unknown; discountRate?: unknown };
     if (r.id == null) continue;
     const type = partyTypeOf(r);
     const options = type === "solo" ? normalizeOptions(r.options) : [];
@@ -447,6 +458,7 @@ function buildAdminPartyRows(items: unknown[]): Record<string, AdminPartyRow> {
       partyType: type, detail: normalizeDetail(r.detail), sessions, options,
       applicants: ap ? { options: ap.options ?? {}, sessions: ap.sessions ?? {} } : null,
       couponDisabled: r.couponDisabled === true,
+      discountRate: typeof r.discountRate === "number" ? formDiscountRate(String(r.discountRate)) : 0,
     };
   }
   return out;
@@ -761,6 +773,7 @@ export default function AdminDashboard() {
       optionMode: row?.options?.length ? "options" : "single",
       optionsDraft: row?.options?.length ? draftFromParty(row.sessions, row.options) : EMPTY_OPTIONS_DRAFT,
       couponDisabled: row?.couponDisabled ?? !!p.couponDisabled,
+      discountRate: (row?.discountRate ?? p.discountRate ?? 0) > 0 ? String(row?.discountRate ?? p.discountRate) : "",
     });
     resetPartyModal();
     // 저장된 안내에 참가 신청 방법·필수 확인 사항이 없으면 기본 문구로 채워 보여준다 (저장 때 기본 문구와 같으면 다시 빠진다)
@@ -874,13 +887,25 @@ export default function AdminDashboard() {
   };
 
   /** 저장 요청 — 참가 구성 사용이면 sessions·options 를 보내고, 구성을 끄면(단일 가격) 빈 목록으로 지운다 */
+  // 파티 목록 참가비 칸 — 할인율 (관리자 GET 값 우선, 참가 구성 파티는 0)과 "남 ₩55,000 / 여 ₩39,000" 문구 (rate 0 = 정가)
+  const listDiscountRate = (p: Party): number => {
+    const rate = adminPartyRows[p.id]?.discountRate ?? p.discountRate ?? 0;
+    return !adminPartyRows[p.id]?.options?.length && partyHasDiscount({ ...p, discountRate: rate }) ? rate : 0;
+  };
+  const listPriceText = (p: Party, rate: number): string => {
+    const amt = (g: "남성" | "여성") => `₩${discountedPrice(basePriceForGender(p, g), rate).toLocaleString()}`;
+    return p.priceMale || p.priceFemale ? `남 ${amt("남성")} / 여 ${amt("여성")}` : `₩${discountedPrice(p.price, rate).toLocaleString()}`;
+  };
+
   const partySavePayload = (f: PartyForm, detail: PartyDetail, useOptions: boolean) => {
-    const { optionMode: _mode, optionsDraft, ...rest } = f;
+    const { optionMode: _mode, optionsDraft, discountRate: rateInput, ...rest } = f;
     void _mode;
+    // 할인율은 단일 가격 모드만 — 참가 구성 모드로 저장하면 0 (숨겨진 할인율이 남지 않게)
+    const discountRate = useOptions ? 0 : formDiscountRate(rateInput);
     const hadOptions = !!(f.id && adminPartyRows[f.id]?.options?.length);
-    if (useOptions) return { ...rest, detail, ...draftToPayload(optionsDraft) };
-    if (f.partyType === "solo" && hadOptions) return { ...rest, detail, sessions: [], options: [] };
-    return { ...rest, detail };
+    if (useOptions) return { ...rest, discountRate, detail, ...draftToPayload(optionsDraft) };
+    if (f.partyType === "solo" && hadOptions) return { ...rest, discountRate, detail, sessions: [], options: [] };
+    return { ...rest, discountRate, detail };
   };
 
   const deleteParty = async (id: string) => {
@@ -2237,8 +2262,20 @@ export default function AdminDashboard() {
                               <td className="px-3 py-3 text-right tabular-nums text-gray-600">{ar.sessions.map(s => `${s.name} ${s.maleStock}/${s.femaleStock}명`).join(" · ")}</td>
                             </>);
                           }
+                          // 할인 파티 — [배지] 할인가(빨강), 아래 줄 정가 취소선 (docs/specs/party-discount-rate.md 10장)
+                          const rate = listDiscountRate(p);
                           return (<>
-                            <td className="px-3 py-3 text-right tabular-nums font-black text-brand-point-ink">₩{p.price.toLocaleString()}</td>
+                            {rate > 0 ? (
+                              <td className="px-3 py-3 text-right" data-testid="admin-discount-price">
+                                <div className="inline-flex items-center gap-1.5">
+                                  <DiscountBadge rate={rate} />
+                                  <span className="font-black text-discount tabular-nums">{listPriceText(p, rate)}</span>
+                                </div>
+                                <div className="text-[12px] text-[#9ca3af] line-through tabular-nums">{listPriceText(p, 0)}</div>
+                              </td>
+                            ) : (
+                              <td className="px-3 py-3 text-right tabular-nums font-black text-brand-point-ink">₩{p.price.toLocaleString()}</td>
+                            )}
                             <td className="px-3 py-3 text-right tabular-nums text-gray-600">{p.maleStock}명 / {p.femaleStock}명</td>
                           </>);
                         })()}
@@ -2300,11 +2337,22 @@ export default function AdminDashboard() {
                           <dd className="text-gray-700 break-keep">{ar.sessions.map(s => `${s.name} ${s.maleStock}/${s.femaleStock}명`).join(" · ")}</dd>
                         </>) : (<>
                           <dt className="text-gray-500">참가비</dt>
-                          <dd className="font-black text-brand-point-ink tabular-nums">
-                            {p.priceMale || p.priceFemale
-                              ? `남 ₩${(p.priceMale ?? p.price).toLocaleString()} / 여 ₩${(p.priceFemale ?? p.price).toLocaleString()}`
-                              : `₩${p.price.toLocaleString()}`}
-                          </dd>
+                          {listDiscountRate(p) > 0 ? (
+                            // 할인 파티 — 할인가(빨강) + 배지, 아래 줄 정가 취소선
+                            <dd className="min-w-0 tabular-nums" data-testid="admin-discount-price">
+                              <span className="inline-flex flex-wrap items-center gap-1.5">
+                                <span className="font-black text-discount">{listPriceText(p, listDiscountRate(p))}</span>
+                                <DiscountBadge rate={listDiscountRate(p)} />
+                              </span>
+                              <span className="block text-[12px] text-[#9ca3af] line-through">{listPriceText(p, 0)}</span>
+                            </dd>
+                          ) : (
+                            <dd className="font-black text-brand-point-ink tabular-nums">
+                              {p.priceMale || p.priceFemale
+                                ? `남 ₩${(p.priceMale ?? p.price).toLocaleString()} / 여 ₩${(p.priceFemale ?? p.price).toLocaleString()}`
+                                : `₩${p.price.toLocaleString()}`}
+                            </dd>
+                          )}
                           <dt className="text-gray-500">정원</dt>
                           <dd className="text-gray-700">남 {p.maleStock}명 / 여 {p.femaleStock}명</dd>
                         </>)}
@@ -2542,10 +2590,11 @@ export default function AdminDashboard() {
                               applicants={partyForm.id ? adminPartyRows[partyForm.id]?.applicants ?? null : null}
                             />
                           ) : (<>
-                          {/* 남·여 참가비 + 남·여 정원 — lg 이상 한 줄 4칸 */}
-                          <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-4">
+                          {/* 남·여 참가비 + 남·여 정원 — lg 이상 윗줄 4칸, 아랫줄 [할인율 | 미리보기(2칸) | 정원 안내].
+                               lg 미만: 참가비 → 할인율 → 미리보기 → 정원 (docs/specs/party-discount-rate.md 9장) */}
+                          <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-4 lg:gap-4">
                             {/* 참가비 — 성별별 분리 입력 */}
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-2 gap-4 lg:col-span-2 lg:col-start-1 lg:row-start-1">
                               <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-1.5">남성 참가비 (원) *</label>
                                 <input
@@ -2574,8 +2623,51 @@ export default function AdminDashboard() {
                                 />
                               </div>
                             </div>
+                            {/* 할인율 — 0 또는 비우면 할인 없음. 결제 금액도 할인가 (서버 api/lib.php priceForGender) */}
+                            <div className="lg:col-start-1 lg:row-start-2">
+                              <label htmlFor="party-discount-rate" className="block text-sm font-bold text-gray-700 mb-1.5">할인율 (%)</label>
+                              <div className="relative w-[140px] lg:w-full">
+                                <input
+                                  id="party-discount-rate"
+                                  type="number" min={0} max={90} step={1} inputMode="numeric" placeholder="0"
+                                  value={partyForm.discountRate}
+                                  onChange={e => {
+                                    // 숫자만, 최대 90 — 소수·음수는 입력되지 않는다
+                                    const raw = e.target.value.replace(/\D/g, "").slice(0, 2);
+                                    setPartyForm(p => ({ ...p, discountRate: raw === "" ? "" : String(Math.min(90, parseInt(raw, 10))) }));
+                                  }}
+                                  className={`w-full pl-4 pr-9 py-3 rounded-lg border text-base md:text-sm font-medium bg-white focus:ring-2 outline-none min-h-11 md:min-h-0 ${
+                                    formDiscountRate(partyForm.discountRate) > 0 ? "border-discount focus:ring-discount/25" : "border-gray-200 focus:ring-brand-point"}`}
+                                />
+                                <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-gray-500" aria-hidden>%</span>
+                              </div>
+                              <p className="mt-1.5 text-[13px] md:text-sm text-gray-500">0 또는 비우면 할인 없음 · 1~90 정수</p>
+                            </div>
+                            {/* 할인 미리보기 — 상세페이지와 같은 정가 화살표 + 할인가 + 배지 (입력하면 바로 갱신) */}
+                            {formDiscountRate(partyForm.discountRate) > 0 && (() => {
+                              const rate = formDiscountRate(partyForm.discountRate);
+                              return (
+                                <div className="lg:col-span-2 lg:col-start-2 lg:row-start-2" data-testid="discount-preview">
+                                  <p className="text-sm font-bold text-gray-700 mb-1.5">상세페이지 표시</p>
+                                  <div className="flex flex-col gap-1.5 rounded-[10px] border border-discount-line bg-discount-bg px-3 py-2.5">
+                                    {([["남성", "text-male"], ["여성", "text-female"]] as const).map(([g, cls]) => {
+                                      const base = basePriceForGender(partyForm, g);
+                                      return (
+                                        <div key={g} className="flex items-center gap-1.5">
+                                          <span className={`w-7 flex-shrink-0 text-[12px] font-bold ${cls}`}>{g}</span>
+                                          <DiscountArrow price={base} />
+                                          <span className="whitespace-nowrap text-[16px] font-black tabular-nums text-discount">₩{discountedPrice(base, rate).toLocaleString()}</span>
+                                          <DiscountBadge rate={rate} />
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                  <p className="mt-1.5 text-[13px] md:text-sm text-gray-500">백원 단위 내림. 결제도 이 금액으로 진행됩니다.</p>
+                                </div>
+                              );
+                            })()}
                             {/* 정원 */}
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-2 gap-4 lg:col-span-2 lg:col-start-3 lg:row-start-1">
                               <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-1.5">남성 정원 *</label>
                                 <input type="number" min={0} max={100} value={partyForm.maleStock} onChange={e => {
@@ -2594,8 +2686,9 @@ export default function AdminDashboard() {
                                   }}
                                   className="w-full px-4 py-3 rounded-lg border border-gray-200 text-base md:text-sm font-medium bg-white focus:ring-2 focus:ring-brand-point outline-none min-h-11 md:min-h-0" aria-label="여성 정원" />
                               </div>
-                              <p className="col-span-2 -mt-2 text-[13px] md:text-sm text-gray-500">입력한 정원이 결제 마감 기준이 됩니다.</p>
+                              <p className="col-span-2 -mt-2 text-[13px] md:text-sm text-gray-500 lg:hidden">입력한 정원이 결제 마감 기준이 됩니다.</p>
                             </div>
+                            <p className="hidden lg:block lg:col-start-4 lg:row-start-2 text-sm text-gray-500">입력한 정원이 결제 마감 기준이 됩니다.</p>
                           </div>
                           </>)}
 

@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useSyncExternalStore, type ReactNode } from "react";
+import { Fragment, useState, useEffect, useRef, useCallback, useSyncExternalStore, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, ShoppingBag, X, Users as UsersIcon, CalendarDays, MapPin, UserRound, ChevronDown, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
-import { partyStockStatus, withLiveCounts, dateOnly, partyHasOptions, partyTypeOf, PARTY_TYPE_LABELS, type Party, type PartyType } from "../../lib/data";
+import DiscountArrow from "../../components/DiscountArrow";
+import DiscountBadge from "../../components/DiscountBadge";
+import { partyStockStatus, withLiveCounts, dateOnly, partyHasOptions, partyHasDiscount, discountedPrice, partyTypeOf, PARTY_TYPE_LABELS, type Party, type PartyType } from "../../lib/data";
 import PartyOptionPicker, { optionClosedFor } from "./PartyOptionPicker";
 import { PARTY_GUIDES, visibleNotices, markupToGuideText } from "../../lib/partyGuides";
 import { templateFor, normalizeDetail, timelineTitleOf, DEFAULT_ABOUT_TITLE, DEFAULT_APPLY_TITLE, DEFAULT_NOTICE_TITLE, DEFAULT_BEFORE_APPLY_TITLE, type PartyDetail, type DetailImageSlot } from "../../lib/partyDetailTemplates";
@@ -433,6 +435,9 @@ export default function PartyClientView({ id, initialParties }: { id: string; in
   const hasSplit = (!!pm && pm > 0) || (!!pf && pf > 0);
   const maleAmt   = pm && pm > 0 ? pm : detailItem.price;
   const femaleAmt = pf && pf > 0 ? pf : detailItem.price;
+  // 할인율 (docs/specs/party-discount-rate.md 5장) — 1 이상이고 참가 구성 파티가 아닐 때만 정가 화살표 + 할인가 + 배지.
+  //   위 maleAmt·femaleAmt·price 는 정가(basePriceForGender 와 같은 값), 할인가는 결제 금액(priceForGender)과 같은 규칙
+  const discountRate = partyHasDiscount(detailItem) ? (detailItem.discountRate ?? 0) : 0;
 
   // 하단 바 — 일시 "10월 17일(토) 15:00"(참가 구성 파티는 첫 회차 시작), 장소 = 짧은 장소명 → 지역 태그("기타" 제외) → 생략
   const barTime = (() => {
@@ -445,7 +450,7 @@ export default function PartyClientView({ id, initialParties }: { id: string; in
     || (detailItem.locationTag && detailItem.locationTag !== "기타" ? detailItem.locationTag : "");
   const barFee: BarFee = stock.hasOptions && detailItem.options
     ? { kind: "from", price: optionsMinPrice(detailItem.options) }
-    : hasSplit ? { kind: "split", male: maleAmt, female: femaleAmt } : { kind: "single", price: detailItem.price };
+    : hasSplit ? { kind: "split", male: maleAmt, female: femaleAmt, discountRate } : { kind: "single", price: detailItem.price, discountRate };
 
   // 성별 자리 현황 — 머리 카드·명단 상태 문구. 참가 구성 파티는 회차 자리를 모두 더한다(1부+2부 신청은 두 자리)
   const seatsOf = (g: "male" | "female"): GenderSeats => {
@@ -533,6 +538,8 @@ export default function PartyClientView({ id, initialParties }: { id: string; in
   const plainValue = "block truncate text-[14px] font-bold tracking-[-0.2px] text-brand-black max-[359px]:text-[13px] md:text-[16px] md:tracking-normal";
   const dateValue = "block truncate text-[16px] font-black tracking-[-0.3px] text-brand-black max-[359px]:text-[15px] md:text-[19px] lg:text-[20px]";
   const amountCls = "text-[18px] font-black tracking-[-0.3px] tabular-nums max-[359px]:text-[16px] md:text-[22px] lg:text-[24px]";
+  // 할인가 — 모바일 18px(360px 미만 16px), md 이상 22px(lg 도 22px)
+  const discountAmtCls = "whitespace-nowrap text-[18px] font-black leading-none tracking-[-0.3px] tabular-nums text-discount max-[359px]:text-[16px] md:text-[22px]";
   const iconCls = "size-3.5 md:size-4";
 
   // 진행방식 "소요 시간" — 행 이름의 "8 : 8" 이 이 파티 정원(남:여)과 같으면 "이번 파티"
@@ -853,6 +860,39 @@ export default function PartyClientView({ id, initialParties }: { id: string; in
                     </li>
                   ))}
                 </ul>
+              ) : discountRate > 0 && hasSplit ? (
+                // 할인 — 모바일: [성별 | 정가→ | 할인가 | 배지] 남·여 한 줄씩 / md 이상: [남성 묶음] │ [여성 묶음]
+                <>
+                  {/* 360px 미만 — 배지는 숨기고 [성별 | 정가→ | 할인가] 만 (배지까지 넣으면 패널 밖으로 나감) */}
+                  <div className="grid grid-cols-[28px_auto_auto_auto] items-center justify-start gap-x-[6px] gap-y-[5px] max-[359px]:grid-cols-[28px_auto_auto] md:hidden" data-testid="discount-price-mobile">
+                    {([["남성", "text-male", maleAmt], ["여성", "text-female", femaleAmt]] as const).map(([g, cls, amt]) => (
+                      <Fragment key={g}>
+                        <span className={`text-[12px] font-bold ${cls}`}>{g}</span>
+                        <DiscountArrow price={amt} />
+                        <span className={discountAmtCls}>₩{discountedPrice(amt, discountRate).toLocaleString()}</span>
+                        <DiscountBadge rate={discountRate} className="max-[359px]:hidden" />
+                      </Fragment>
+                    ))}
+                  </div>
+                  {/* 세로 구분선(1px × 26px)은 여성 묶음 왼쪽 간격 가운데에 그린다 — 폭이 좁아 여성 묶음이 다음 줄로 내려가면
+                       구분선이 상자 왼쪽 밖으로 나가 overflow-hidden 에 가려진다 (윗줄 끝에 구분선만 남지 않게) */}
+                  <div className="hidden flex-wrap items-center gap-x-4 gap-y-1 overflow-hidden py-0.5 md:flex" data-testid="discount-price">
+                    {([["남성", "text-male", maleAmt], ["여성", "text-female", femaleAmt]] as const).map(([g, cls, amt], i) => (
+                      <span key={g} className={`inline-flex items-center gap-[7px] ${i > 0 ? "relative before:absolute before:left-[-8.5px] before:top-1/2 before:h-[26px] before:w-px before:-translate-y-1/2 before:bg-gray-200" : ""}`}>
+                        <span className={`text-[13px] font-bold ${cls}`}>{g}</span>
+                        <DiscountArrow price={amt} />
+                        <span className={discountAmtCls}>₩{discountedPrice(amt, discountRate).toLocaleString()}</span>
+                        <DiscountBadge rate={discountRate} />
+                      </span>
+                    ))}
+                  </div>
+                </>
+              ) : discountRate > 0 ? (
+                <span className="flex flex-wrap items-center gap-x-[6px] gap-y-1 md:gap-x-[7px]" data-testid="discount-price">
+                  <DiscountArrow price={detailItem.price} />
+                  <span className={discountAmtCls}>₩{discountedPrice(detailItem.price, discountRate).toLocaleString()}</span>
+                  <DiscountBadge rate={discountRate} />
+                </span>
               ) : hasSplit ? (
                 <span className="flex flex-nowrap items-baseline gap-x-1.5 gap-y-0.5 md:flex-wrap md:gap-x-2">
                   <span className="inline-flex items-baseline gap-1 whitespace-nowrap">
