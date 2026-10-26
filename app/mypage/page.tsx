@@ -639,14 +639,16 @@ export default function MyPage() {
                             {partyHasOptions(party) && !partyOptionById(party, cartOptionOf(party.id)) && (
                               <span className="block mt-1 text-xs lg:text-sm font-bold text-danger break-keep">참가 항목을 다시 선택해주세요 (상세에서 항목을 골라 담기)</span>
                             )}
-                            <dl className="mt-2.5 grid gap-1 lg:grid-cols-2 text-sm lg:text-base">
+                            {/* 일시 · 장소 — 장소는 늘 한 줄 (2026-10-26 사용자 요청). 일시 옆에 다 들어가면 같은 줄, 아니면 장소가 다음 줄로
+                                 내려가 줄 전체 폭을 쓰고, 그래도 길면(좁은 폰) "…" — 전체 주소는 마우스를 올리면 보인다 */}
+                            <dl className="mt-2.5 flex flex-wrap gap-x-8 gap-y-1 text-sm lg:text-base">
                               <div className="flex gap-2 min-w-0">
                                 <dt className="w-8 flex-shrink-0 pt-0.5 text-xs text-gray-500">일시</dt>
-                                <dd className="min-w-0 font-medium text-gray-700 break-keep">{party.dateString}</dd>
+                                <dd className="min-w-0 font-medium text-gray-700 break-keep lg:whitespace-nowrap">{party.dateString}</dd>
                               </div>
                               <div className="flex gap-2 min-w-0">
                                 <dt className="w-8 flex-shrink-0 pt-0.5 text-xs text-gray-500">장소</dt>
-                                <dd className="min-w-0 font-medium text-gray-700 break-keep">{party.location}</dd>
+                                <dd className="min-w-0 truncate font-medium text-gray-700" title={party.location}>{party.location}</dd>
                               </div>
                             </dl>
                           </Link>
@@ -685,7 +687,7 @@ export default function MyPage() {
                                       </span>
                                     </>
                                   ) : rate > 0 ? (
-                                    <span className="flex flex-wrap items-center justify-end gap-x-1.5 gap-y-1" data-testid="cart-discount-price">
+                                    <span className="flex flex-wrap items-center justify-end gap-x-1 gap-y-1" data-testid="cart-discount-price">
                                       <DiscountArrow price={basePriceForGender(party, profile?.gender)} />
                                       <span className="font-black text-xl lg:text-2xl text-discount whitespace-nowrap tabular-nums">₩{lineTotal.toLocaleString()}</span>
                                       <DiscountBadge rate={rate} />

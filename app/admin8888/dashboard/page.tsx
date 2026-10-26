@@ -2653,7 +2653,7 @@ export default function AdminDashboard() {
                                     {([["남성", "text-male"], ["여성", "text-female"]] as const).map(([g, cls]) => {
                                       const base = basePriceForGender(partyForm, g);
                                       return (
-                                        <div key={g} className="flex items-center gap-1.5">
+                                        <div key={g} className="flex flex-wrap items-center gap-1.5">
                                           <span className={`w-7 flex-shrink-0 text-[12px] font-bold ${cls}`}>{g}</span>
                                           <DiscountArrow price={base} />
                                           <span className="whitespace-nowrap text-[16px] font-black tabular-nums text-discount">₩{discountedPrice(base, rate).toLocaleString()}</span>
