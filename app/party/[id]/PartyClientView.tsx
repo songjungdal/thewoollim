@@ -9,6 +9,7 @@ import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import DiscountArrow from "../../components/DiscountArrow";
 import DiscountBadge from "../../components/DiscountBadge";
+import FitWidth from "../../components/FitWidth";
 import { partyStockStatus, withLiveCounts, dateOnly, partyHasOptions, partyHasDiscount, discountedPrice, partyTypeOf, PARTY_TYPE_LABELS, type Party, type PartyType } from "../../lib/data";
 import PartyOptionPicker, { optionClosedFor } from "./PartyOptionPicker";
 import { PARTY_GUIDES, visibleNotices, markupToGuideText } from "../../lib/partyGuides";
@@ -863,20 +864,20 @@ export default function PartyClientView({ id, initialParties }: { id: string; in
               ) : discountRate > 0 && hasSplit ? (
                 // 할인 — 모바일: [성별 | 정가→ | 할인가 | 배지] 남·여 한 줄씩 / md 이상: [남성 묶음] │ [여성 묶음]
                 <>
-                  {/* 모바일 배지는 남·여 두 줄 오른쪽에 하나만(할인율이 같으므로). 폭이 모자라면(긴 금액·좁은 폰) 금액 아래 줄로
-                       내려가 패널 밖으로 나가지 않는다 (2026-10-26 사용자 요청 — 정가 앞 ₩ 를 작게 다시 넣으면서) */}
-                  <div className="flex flex-wrap items-center gap-x-[5px] gap-y-[5px] md:hidden" data-testid="discount-price-mobile">
-                    <div className="grid grid-cols-[auto_auto_auto] items-center justify-start gap-x-[5px] gap-y-[5px]">
+                  {/* 모바일 — 남·여 줄마다 배지(2026-10-26 사용자 요청). 줄바꿈하지 않고, 패널이 좁으면(320px 폰·10만 원 이상 금액)
+                       FitWidth 가 줄 전체를 조금 작게 줄여 패널 안에 넣는다. 360px·69,000원은 원래 크기 그대로 들어간다 */}
+                  <FitWidth className="md:hidden" testId="discount-price-mobile">
+                    <div className="grid grid-cols-[auto_auto_auto_auto] items-center justify-start gap-x-[5px] gap-y-[5px]">
                       {([["남성", "text-male", maleAmt], ["여성", "text-female", femaleAmt]] as const).map(([g, cls, amt]) => (
                         <Fragment key={g}>
                           <span className={`text-[12px] font-bold ${cls}`}>{g}</span>
                           <DiscountArrow price={amt} />
                           <span className={discountAmtCls}>₩{discountedPrice(amt, discountRate).toLocaleString()}</span>
+                          <DiscountBadge rate={discountRate} />
                         </Fragment>
                       ))}
                     </div>
-                    <DiscountBadge rate={discountRate} />
-                  </div>
+                  </FitWidth>
                   {/* 세로 구분선(1px × 26px)은 여성 묶음 왼쪽 간격 가운데에 그린다 — 폭이 좁아 여성 묶음이 다음 줄로 내려가면
                        구분선이 상자 왼쪽 밖으로 나가 overflow-hidden 에 가려진다 (윗줄 끝에 구분선만 남지 않게) */}
                   <div className="hidden flex-wrap items-center gap-x-4 gap-y-1 overflow-hidden py-0.5 md:flex" data-testid="discount-price">
