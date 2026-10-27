@@ -91,7 +91,7 @@ const LEGACY_TIMELINE_TITLE = "Party Timeline";
 const DEFAULT_TIMELINE_INTRO  = "편안한 분위기 속에서, 자연스럽게 이어지는 인연의 시작";
 const DEFAULT_DURATIONS_TITLE = "인원별 소요 시간 안내";
 
-/** 매칭파티 기본 내용 — 지금 상세페이지에 고정된 문구·사진·순서를 그대로 옮긴 것 */
+/** 매칭파티 기본 내용 — 예전 상세페이지에 고정된 문구·순서를 그대로 옮긴 것 (사진은 2026-10-27 교체) */
 export const MATCHING_TEMPLATE: PartyDetail = {
   timeline: {
     title: DEFAULT_TIMELINE_TITLE,
@@ -131,17 +131,20 @@ export const MATCHING_TEMPLATE: PartyDetail = {
       { label: "10 : 10 파티", total: "약 3시간" },
     ],
   },
+  // 사진 — 운영 76번 파티 안내 사진과 같은 파일 (2026-10-27). 서버 업로드 파일은 지우지 않는다(docs/specs/party-type-solo.md C-4)
   images: {
-    beforeApply:    [{ url: "/images/party_apply_guide_head.png", alt: "참가 신청 안내" }],
-    afterApply:     [{ url: "/images/page_a01.webp", alt: "참가 신청 방법 안내" }],
-    beforeTimeline: [
-      { url: "/images/party_our_experience.webp", alt: "OUR EXPERIENCE" },
-      { url: "/images/page_a02.webp", alt: "Party Timeline 안내" },
-      { url: "/images/page_a03.webp", alt: "Party Timeline 안내" },
+    beforeApply:    [{ url: "/uploads/parties/p_d5c39fbd04bd_1793016309.jpg", alt: "어울림 소개" }],
+    afterApply:     [{ url: "/uploads/parties/p_4d24b1a211bd_1793077706.jpg", alt: "어울림 파티 공간 안내" }],
+    beforeTimeline: [],
+    beforeNotice:   [
+      { url: "/uploads/parties/p_246efd79d4b2_1793077795.jpg", alt: "프로필 카드" },
+      { url: "/uploads/parties/p_c4ea8d72df1d_1793077795.jpg", alt: "파티 현장 사진" },
+      { url: "/uploads/parties/p_13ea6b28fa4c_1793077795.jpg", alt: "파티 현장 사진" },
+      { url: "/uploads/parties/p_55fcef7f09fc_1793077795.jpg", alt: "파티 현장 사진" },
     ],
-    beforeNotice:   [{ url: "/images/page_a04.webp", alt: "필수 확인 사항 안내" }],
     afterNotice:    [
-      { url: "/images/page_a05.webp", alt: "필수 확인 사항 안내" },
+      { url: "/uploads/parties/p_07798961ee00_1793077782.jpg", alt: "참가자 후기 안내" },
+      { url: "/uploads/parties/p_db3daa512456_1793077782.jpg", alt: "어울림 SNS 안내" },
       { url: "/images/party_required_notice_bottom.png", alt: "필수 확인 사항 안내" },
     ],
   },
