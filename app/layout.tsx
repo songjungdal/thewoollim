@@ -20,9 +20,9 @@ export const metadata: Metadata = {
     siteName: "어울림",
     images: [
       {
-        url: "/images/og-main.jpg",
-        width: 1024,
-        height: 559,
+        url: "/images/og-main-v2.jpg",
+        width: 860,
+        height: 502,
         alt: "어울림 — 세상을 울리는 새로운 연결",
       },
     ],
@@ -33,7 +33,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "어울림 | 세상을 울리는 새로운 연결",
     description: "진정성 있는 오프라인 매칭과 네트워킹의 시작.",
-    images: ["/images/og-main.jpg"],
+    images: ["/images/og-main-v2.jpg"],
   },
 };
 

@@ -10,9 +10,9 @@ export const SITE_ORIGIN = "https://thewoollim.com";
 export const SITE_NAME = "어울림";
 
 const OG_IMAGE = {
-  url: "/images/og-main.jpg",
-  width: 1024,
-  height: 559,
+  url: "/images/og-main-v2.jpg",
+  width: 860,
+  height: 502,
   alt: "어울림 — 세상을 울리는 새로운 연결",
 };
 
