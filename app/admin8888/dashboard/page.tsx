@@ -484,6 +484,7 @@ export default function AdminDashboard() {
   const [opsHideToday, setOpsHideToday] = useState(false);
   const [opsNow, setOpsNow] = useState("");
   const [opsErrorCount, setOpsErrorCount] = useState(0);
+  const [opsErrorAcking, setOpsErrorAcking] = useState(false);
   const [opsSmsRemainLms, setOpsSmsRemainLms] = useState<number | null>(null);
   const PARTIES = useParties();
 
@@ -1259,6 +1260,27 @@ export default function AdminDashboard() {
       .then(r => r.json()).then(j => { if (j?.ok) setOpsSmsRemainLms(Number(j.lms) || 0); }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authChecked]);
+
+  // 시스템 에러 [확인] — 지금까지의 에러를 확인 처리(서버에 저장돼 다른 PC·관리자에도 반영). 이후 새로 생긴 에러만 다시 센다
+  const ackOpsErrors = async () => {
+    if (opsErrorAcking) return;
+    if (!confirm(`시스템 에러 ${opsErrorCount}건을 확인 처리할까요?\n확인 뒤에는 새로 생기는 에러만 표시됩니다.`)) return;
+    setOpsErrorAcking(true);
+    try {
+      const res = await fetch("/api/admin/error-count.php", {
+        method: "POST", credentials: "include", cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "ack" }),
+      });
+      const d = await res.json();
+      if (d?.ok) setOpsErrorCount(Number(d.count) || 0);
+      else alert("확인 처리 중 오류가 발생했습니다." + (d?.error ? `\n(${d.error})` : ""));
+    } catch {
+      alert("확인 처리 중 오류가 발생했습니다.");
+    } finally {
+      setOpsErrorAcking(false);
+    }
+  };
 
   const closeOpsPopup = () => {
     if (opsHideToday) { try { localStorage.setItem("hide_admin_popup", opsTodayKey()); } catch {} }
@@ -3934,7 +3956,12 @@ export default function AdminDashboard() {
                     <ul className="space-y-1 pl-1">
                       <li>• 취소 요청 : <Num v={cancelReq} />건</li>
                       <li>• 신규 업무 메모 : <Num v={newMemos} />건</li>
-                      <li>• 시스템 에러 : <Num v={opsErrorCount} />건 {opsErrorCount === 0 && <span className="text-emerald-600 font-bold">(정상)</span>}</li>
+                      <li>• 시스템 에러 : <Num v={opsErrorCount} />건 {opsErrorCount === 0 ? <span className="text-emerald-600 font-bold">(정상)</span> : (
+                        <button type="button" onClick={ackOpsErrors} disabled={opsErrorAcking}
+                          className="ml-1 align-middle bg-brand-black text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-brand-point hover:text-black transition-all disabled:opacity-50 min-h-11 md:min-h-0">
+                          {opsErrorAcking ? "처리 중…" : "확인"}
+                        </button>
+                      )}</li>
                     </ul>
                     {/* 알림 문자 잔여 발송 가능 건수 — 충전 타이밍 놓쳐 문자 미발송되는 것 방지용 참고 정보 (조회 전용) */}
                     <p className="text-[13px] md:text-xs text-gray-500 font-medium mt-1.5 pl-1">
