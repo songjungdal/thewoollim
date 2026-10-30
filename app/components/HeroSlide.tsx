@@ -105,8 +105,6 @@ export default function HeroSlide({ slide, mode, active = true, reducedMotion = 
   // 브랜드 제목·소개글 — 의도한 두 줄을 PC에서는 줄마다 한 줄로 고정 (모바일은 기존 <br /> 줄바꿈)
   const line = pick(mode, "", "block whitespace-nowrap", "md:block md:whitespace-nowrap");
   const lineBreak = pick(mode, "", "hidden", "md:hidden");
-  // PC 제목 글꼴 — 윈도우에서도 맥과 같은 글자 폭(globals.css --font-hero). 모바일은 기존 글꼴 그대로
-  const titleFont = pick(mode, "", "font-hero", "md:font-hero");
   const btnSize = pick(mode,
     "w-full h-12 text-[15px]",
     "px-10 py-[18.72px] text-[18px] whitespace-nowrap",
@@ -124,7 +122,7 @@ export default function HeroSlide({ slide, mode, active = true, reducedMotion = 
   if (slide.type === "brand") {
     content = (
       <div className={`${block} ${t("shadow")}`}>
-        <h1 className={`font-black tracking-tighter break-keep ${titleFont} ${pick(mode,
+        <h1 className={`font-black tracking-tighter break-keep ${pick(mode,
           "text-[1.75rem] leading-[1.25] mb-2",
           "text-[72px] leading-[1.15] mb-[28.8px]",
           "text-[1.75rem] leading-[1.25] mb-2 md:text-[clamp(2.5rem,5vw,5rem)] md:leading-[1.15] md:mb-[clamp(16px,2vw,32px)]")} ${t("title")}`}>
@@ -156,7 +154,7 @@ export default function HeroSlide({ slide, mode, active = true, reducedMotion = 
           {badge.text}
         </span>
         {/* PC 파티명은 폭 10em(≈ 화면 왼쪽 절반) 안에서 줄바꿈 — 긴 이름이 오른쪽 인물을 덮지 않도록 */}
-        <h2 className={`font-black tracking-tight break-keep line-clamp-2 ${titleFont} ${pick(mode,
+        <h2 className={`font-black tracking-tight break-keep line-clamp-2 ${pick(mode,
           "text-[1.6rem] leading-[1.25] mb-2",
           "text-[63.36px] leading-[1.15] mb-6 max-w-[10em]",
           "text-[1.6rem] leading-[1.25] mb-2 md:text-[clamp(2.25rem,4.4vw,4.25rem)] md:leading-[1.15] md:mb-6 md:max-w-[10em]")} ${t("title")}`}>
