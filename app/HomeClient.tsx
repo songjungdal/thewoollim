@@ -1213,11 +1213,12 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
                                 <ul className="mt-4 bg-white rounded-xl p-4 md:p-5 space-y-3">
                                   {faq.refund.map(r => (
                                     <li key={r.when} className="flex items-center gap-2.5 md:gap-3">
-                                      <span className="w-[116px] shrink-0 text-[13px] md:text-sm font-medium text-gray-700 break-keep">{r.when}</span>
+                                      {/* 기간·비율 칸은 한 줄 고정 — 글자 폭이 넓은 윈도우 글꼴이면 칸이 그만큼만 넓어진다(맥은 기존 폭 그대로) */}
+                                      <span className="min-w-[116px] shrink-0 whitespace-nowrap text-[13px] md:text-sm font-medium text-gray-700">{r.when}</span>
                                       <span aria-hidden="true" className="flex-1 h-2 rounded-full bg-gray-100 overflow-hidden">
                                         <span className="block h-full rounded-full bg-brand-point" style={{ width: `${r.value}%` }} />
                                       </span>
-                                      <span className={`w-[60px] shrink-0 text-right text-[13px] md:text-sm font-bold ${r.value === 0 ? "text-red-700" : "text-black"}`}>{r.pct}</span>
+                                      <span className={`min-w-[60px] shrink-0 whitespace-nowrap text-right text-[13px] md:text-sm font-bold ${r.value === 0 ? "text-red-700" : "text-black"}`}>{r.pct}</span>
                                     </li>
                                   ))}
                                 </ul>
