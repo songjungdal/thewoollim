@@ -29,10 +29,10 @@
   --color-discount-bg: #FFF6F7;
   --color-discount-line: #FFE0E3;
   --radius-3xl: 1.5rem;
-  /* 메인 히어로 제목(PC) 글꼴 — 맥·아이폰은 지금처럼 기기 글꼴(애플 기본 한글 글꼴), 그 밖의 기기(윈도우 등)는 Pretendard.
-     윈도우 기본 한글 글꼴(맑은 고딕)은 글자 폭이 약 15% 넓어 파티명이 폭 10em 을 넘겨 두 줄이 되던 것을 맞춘다.
-     Pretendard 는 app/layout.tsx 의 CDN 링크로 불러온다. 링크가 실패하면 기존 글꼴(system-ui)로 그린다 */
-  --font-hero: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard Variable", system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  /* 화면 전체 글꼴(font-sans) — 맥·아이폰은 기기 글꼴(애플 기본 한글 글꼴) 그대로, 그 밖의 기기(윈도우·안드로이드 등)는 Pretendard.
+     윈도우 맑은 고딕은 글자 폭이 약 10~15%, 안드로이드 기본 한글 글꼴은 약 4~10% 넓어 맥 기준으로 맞춘 줄이 넘어가던 것을 맞춘다.
+     Pretendard 는 app/layout.tsx 의 CDN 링크(필요한 글자 조각만 받는 방식)로 불러온다. 링크가 실패하면 기기 글꼴(system-ui)로 그린다 */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard Variable", system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 }
 
 html {

@@ -57,7 +57,10 @@ export default function RootLayout({
     <html lang="ko" className={`font-sans`} data-scroll-behavior="smooth">
       <head>
         <meta name="format-detection" content="telephone=no" />
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+        {/* Pretendard — 애플 기기가 아닐 때의 화면 전체 글꼴(globals.css --font-sans). 화면에 나온 글자의 조각만 받는다(파일 하나 약 2MB 대신 페이지당 약 450KB).
+            글꼴 파일은 CORS 로 받으므로 미리 연결도 crossOrigin 으로 연다 */}
+        <link rel="preconnect" href="https://cdn.jsdelivr.net" crossOrigin="anonymous" />
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
         <script src="https://js.tosspayments.com/v2/standard" defer></script>
         <script src="https://cdn.portone.io/v2/browser-sdk.js" defer></script>
       </head>
