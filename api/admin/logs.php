@@ -9,7 +9,8 @@
  *
  * AdminLogRow:
  *   { id, created_at, admin_id, ip, action, target_type, target_id,
- *     summary, before_value, after_value, user_agent }
+ *     summary, before_value, after_value, user_agent, detail? }
+ *   detail: 파티 삭제·예약 취소·환불 기록에만 있는 상세 정보 { "한글 항목": "값" } (admin/_log_detail.php)
  *
  * 필터:
  *  - from / to : created_at 범위 (포함, 'YYYY-MM-DD' 입력)

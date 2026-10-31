@@ -58,6 +58,8 @@ function adminRequire(): void {
  * @param string $summary     한글 한 줄 요약
  * @param mixed  $before      변경 전 값 (선택, JSON-encodable)
  * @param mixed  $after       변경 후 값 (선택, JSON-encodable)
+ * @param ?array $detail      상세 정보 (선택, ['한글 항목' => '값'] 순서대로) — 로그 관리 탭 [상세 보기]에 표로 보인다.
+ *                            파티 삭제·예약 취소·환불이 _log_detail.php 로 만들어 넘긴다. 비어 있으면 저장하지 않는다.
  */
 function logAdminActivity(
     string $action,
@@ -65,7 +67,8 @@ function logAdminActivity(
     string $targetId,
     string $summary,
     $before = null,
-    $after  = null
+    $after  = null,
+    ?array $detail = null
 ): void {
     $file = dataDir() . '/admin_activity.json';
     $row = [
@@ -81,6 +84,7 @@ function logAdminActivity(
         'before_value' => $before,
         'after_value'  => $after,
     ];
+    if ($detail) $row['detail'] = $detail;
 
     $fp = @fopen($file, 'c+');
     if (!$fp) return;
