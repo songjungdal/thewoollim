@@ -156,6 +156,13 @@ try {
             case 'delete': {
                 $id = (string)($body['id'] ?? '');
                 if ($id === '') throw new RuntimeException('id required');
+                // 활동 로그 상세용 — 지우기 직전 파티 값을 남겨 둔다 (삭제 처리에는 쓰지 않는다)
+                foreach ($parties as $p) {
+                    if (is_array($p) && (string)($p['id'] ?? '') === $id) {
+                        $logInfo = ['id' => $id, 'row' => $p, 'detailChanged' => false];
+                        break;
+                    }
+                }
                 $parties = array_values(array_filter($parties, fn($p) => (string)($p['id'] ?? '') !== $id));
                 return $parties;
             }
@@ -180,7 +187,7 @@ $pType   = $logInfo['row'] ? '[' . partyTypeLabel($logInfo['row']) . '] ' : '';
 $summary = match ($action) {
     'create' => "파티 생성 — {$pType}#{$pid} {$pTitle}",
     'update' => "파티 수정 — {$pType}#{$pid} {$pTitle}",
-    'delete' => "파티 삭제 — #{$pid}",
+    'delete' => "파티 삭제 — {$pType}#{$pid} {$pTitle}",
     default  => "파티 {$action}"
 };
 // 기록에는 detail 전체 대신 개수만 남긴다 (변경·등록된 경우에만).
@@ -192,8 +199,16 @@ if (is_array($afterValue)) {
             . partyDetailCounts($logInfo['row']['detail']) . ')';
     }
 }
+// 삭제는 지운 파티의 값(변경 전)과 상세 정보(일시·장소·참가비·정원·신청 인원·예약 현황 등)를 함께 남긴다.
+$beforeValue = null;
+$logDetail   = null;
+if ($action === 'delete' && is_array($logInfo['row'])) {
+    require_once __DIR__ . '/_log_detail.php';
+    $beforeValue = adminLogPartySnapshot($logInfo['row']);
+    $logDetail   = adminLogPartyDetail($logInfo['row']);
+}
 logAdminActivity($action === 'delete' ? 'delete' : ($action === 'create' ? 'create' : 'update'),
-    'party', $pid, $summary, null, $afterValue);
+    'party', $pid, $summary, $beforeValue, $afterValue, $logDetail);
 
 jsonOut(['ok' => true]);
 

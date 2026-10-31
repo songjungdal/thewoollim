@@ -94,6 +94,8 @@ type AdminLogRow = {
   before_value: unknown;
   after_value: unknown;
   user_agent: string;
+  /** 상세 정보 — 파티 삭제·예약 취소·환불 기록에만 있다 ({ "한글 항목": "값" }, api/admin/_log_detail.php) */
+  detail?: Record<string, string> | null;
 };
 
 type PartyForm = {
@@ -3456,16 +3458,19 @@ export default function AdminDashboard() {
                         view: { label: "조회", tone: "bg-gray-100 text-gray-600" },
                       };
                       const meta = actionMeta[row.action] ?? { label: row.action, tone: "bg-gray-100 text-gray-600" };
+                      const detailEntries = row.detail && typeof row.detail === "object" ? Object.entries(row.detail) : [];
+                      const hasChange = !!(row.before_value || row.after_value);
+                      const hasDetail = hasChange || detailEntries.length > 0;
                       return (
                         <Fragment key={row.id}>
                           {/* 상세가 있는 행은 행 전체가 [상세 보기/닫기] — 토글 핸들러는 예전 버튼의 것 그대로, 버튼 클릭도 여기로 전달됨 */}
                           <tr
-                            onClick={(row.before_value || row.after_value) ? () => setLogExpanded(prev => {
+                            onClick={hasDetail ? () => setLogExpanded(prev => {
                               const next = new Set(prev);
                               if (next.has(row.id)) next.delete(row.id); else next.add(row.id);
                               return next;
                             }) : undefined}
-                            className={`flex flex-col md:table-row rounded-2xl border border-gray-200 p-4 md:p-0 md:rounded-none md:border-0 md:border-t md:border-gray-100 ${(row.before_value || row.after_value) ? "md:cursor-pointer" : ""} ${isHighlight ? "bg-red-50/40 hover:bg-red-50" : "bg-white md:bg-transparent hover:bg-gray-50 md:even:bg-gray-50/50 md:hover:bg-brand-point/5"}`}>
+                            className={`flex flex-col md:table-row rounded-2xl border border-gray-200 p-4 md:p-0 md:rounded-none md:border-0 md:border-t md:border-gray-100 ${hasDetail ? "md:cursor-pointer" : ""} ${isHighlight ? "bg-red-50/40 hover:bg-red-50" : "bg-white md:bg-transparent hover:bg-gray-50 md:even:bg-gray-50/50 md:hover:bg-brand-point/5"}`}>
                             <td className="order-3 flex justify-between gap-3 py-0.5 text-[13px] md:text-xs md:table-cell md:px-3 md:py-3 md:first:pl-5 text-gray-600 tabular-nums"><span className="md:hidden text-gray-500 font-medium flex-shrink-0">일시</span>{formatKST(row.created_at)}</td>
                             <td className="order-4 flex justify-between gap-3 py-0.5 text-[13px] md:text-xs md:table-cell md:px-3 md:py-3 font-bold"><span className="md:hidden text-gray-500 font-medium flex-shrink-0">관리자</span>{row.admin_id || "-"}</td>
                             <td className="order-5 flex justify-between gap-3 py-0.5 text-[13px] md:text-xs md:table-cell md:px-3 md:py-3 text-gray-500 tabular-nums"><span className="md:hidden text-gray-500 font-medium flex-shrink-0">IP</span>{row.ip || "-"}</td>
@@ -3482,7 +3487,7 @@ export default function AdminDashboard() {
                               {row.summary || "-"}
                             </td>
                             <td className="order-7 pt-2 md:pt-0 md:table-cell md:px-3 md:py-3">
-                              {(row.before_value || row.after_value) ? (
+                              {hasDetail ? (
                                 <button type="button" aria-expanded={expanded}
                                   className="w-full md:w-auto rounded-lg md:rounded-none border border-gray-200 md:border-0 text-sm md:text-xs font-bold text-brand-point-ink md:underline min-h-11 md:min-h-0">
                                   {expanded ? "상세 닫기" : "상세 보기"}
@@ -3493,20 +3498,36 @@ export default function AdminDashboard() {
                           {expanded && (
                             <tr className="block md:table-row -mt-1 md:mt-0 rounded-2xl md:rounded-none border border-gray-200 md:border-0 md:border-t md:border-gray-100 bg-gray-50 md:bg-gray-50/60">
                               <td colSpan={7} className="block md:table-cell p-4 md:px-5 md:py-4 text-xs">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                  <div>
-                                    <p className="font-black text-gray-500 mb-1">변경 전</p>
-                                    <pre className="bg-white border border-gray-200 rounded-lg p-3 overflow-auto max-h-60 whitespace-pre-wrap break-words text-xs text-gray-700">
-                                      {row.before_value ? JSON.stringify(row.before_value, null, 2) : "(없음)"}
-                                    </pre>
+                                {/* 상세 정보 — 파티 삭제·예약 취소·환불 기록: 파티·회원·결제·처리 결과를 "항목: 값"으로 */}
+                                {detailEntries.length > 0 && (
+                                  <div className={hasChange ? "mb-3" : ""}>
+                                    <p className="font-black text-gray-500 mb-1">상세 정보</p>
+                                    <dl className="bg-white border border-gray-200 rounded-lg p-3 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1.5 text-[13px] md:text-xs">
+                                      {detailEntries.map(([label, value]) => (
+                                        <Fragment key={label}>
+                                          <dt className="font-bold text-gray-500">{label}</dt>
+                                          <dd className="text-gray-800 whitespace-normal break-words min-w-0">{String(value)}</dd>
+                                        </Fragment>
+                                      ))}
+                                    </dl>
                                   </div>
-                                  <div>
-                                    <p className="font-black text-gray-500 mb-1">변경 후</p>
-                                    <pre className="bg-white border border-gray-200 rounded-lg p-3 overflow-auto max-h-60 whitespace-pre-wrap break-words text-xs text-gray-700">
-                                      {row.after_value ? JSON.stringify(row.after_value, null, 2) : "(없음)"}
-                                    </pre>
+                                )}
+                                {hasChange && (
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div>
+                                      <p className="font-black text-gray-500 mb-1">변경 전</p>
+                                      <pre className="bg-white border border-gray-200 rounded-lg p-3 overflow-auto max-h-60 whitespace-pre-wrap break-words text-xs text-gray-700">
+                                        {row.before_value ? JSON.stringify(row.before_value, null, 2) : "(없음)"}
+                                      </pre>
+                                    </div>
+                                    <div>
+                                      <p className="font-black text-gray-500 mb-1">변경 후</p>
+                                      <pre className="bg-white border border-gray-200 rounded-lg p-3 overflow-auto max-h-60 whitespace-pre-wrap break-words text-xs text-gray-700">
+                                        {row.after_value ? JSON.stringify(row.after_value, null, 2) : "(없음)"}
+                                      </pre>
+                                    </div>
                                   </div>
-                                </div>
+                                )}
                                 {row.user_agent && (
                                   <p className="text-xs text-gray-500 mt-2 truncate" title={row.user_agent}>UA: {row.user_agent}</p>
                                 )}
@@ -3521,7 +3542,7 @@ export default function AdminDashboard() {
               </div>
               <p className="text-[13px] md:text-sm text-gray-500 mt-3">
                 <Search size={11} className="inline mr-1" />
-                삭제 / 로그인 실패는 붉은색으로 강조됩니다. 조회 항목은 최대 300건까지, 전체 건수는 헤더에 표시됩니다.
+                삭제 / 로그인 실패는 붉은색으로 강조됩니다. 파티 삭제·예약 취소·환불은 [상세 보기]에서 파티·회원·결제·처리 결과를 볼 수 있습니다. 조회 항목은 최대 300건까지, 전체 건수는 헤더에 표시됩니다.
               </p>
             </section>
           )}

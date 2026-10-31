@@ -319,11 +319,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             date('c'), $email, $bid, $isVbank ? 'vbank' : 'card', $refundAmount
         ), FILE_APPEND);
 
+        // 활동 로그 상세 — 회원·파티·결제 정보와 처리 결과 (_log_detail.php, 기록용으로 읽기만)
+        require_once __DIR__ . '/_log_detail.php';
+        $logDetail = adminLogBookingDetail($email, $target, [
+            '환불 금액' => number_format($refundAmount) . '원'
+                . ($paidAmount > 0 ? ' (결제 금액 ' . number_format($paidAmount) . '원의 ' . (int)round($refundAmount / $paidAmount * 100) . '%)' : ''),
+            '환불 방식' => $isVbank ? '무통장 — 관리자가 직접 송금' : ($refundAmount > 0 ? '카드 결제 취소(토스)' : '환불 0원 — 카드 결제 취소 없음'),
+            '신청 인원' => '변동 없음 — [예약 / 신청 현황]의 [취소]로 따로 처리',
+            '쿠폰 복원' => adminLogCouponResult($target),
+        ]);
         logAdminActivity(
             'update', 'booking', $bid,
-            "취소요청 승인(환불) — 회원 {$email}, 방식 " . ($isVbank ? '무통장' : '카드') . ", 환불 {$refundAmount}원",
+            "취소요청 승인(환불) — 회원 " . ($logDetail['회원'] ?? $email) . ", 파티 " . ($logDetail['파티'] ?? '#' . ($target['partyId'] ?? '?'))
+                . ", 방식 " . ($isVbank ? '무통장' : '카드') . ", 환불 {$refundAmount}원",
             ['status' => 'cancel_requested'],
-            ['status' => 'refund_completed']
+            ['status' => 'refund_completed'],
+            $logDetail
         );
 
         echo json_encode(['ok' => true, 'refundAmount' => $refundAmount, 'method' => $isVbank ? 'vbank' : 'card']);
@@ -488,11 +499,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             error_log('[admin/bookings cancel_full_refund sms] ' . $e->getMessage());
         }
 
+        // 활동 로그 상세 — 회원·파티·결제 정보와 처리 결과 (_log_detail.php, 기록용으로 읽기만)
+        require_once __DIR__ . '/_log_detail.php';
+        $logDetail = adminLogBookingDetail($email, $beforeBooking, [
+            '환불 금액' => number_format($paidAmount) . '원 (결제 금액 100%)',
+            '환불 방식' => $paidAmount > 0 ? '카드 결제 취소(토스)' : '결제 금액 0원 — 카드 결제 취소 없음',
+            '신청 인원' => adminLogCountResult($beforeBooking, $partyId !== '' && $wasCounted),
+            '쿠폰 복원' => adminLogCouponResult($beforeBooking),
+        ]);
         logAdminActivity(
             'update', 'booking', $bid,
-            "예약 100% 환불 취소 — 회원 {$email}, 파티 #{$partyId}, 성별 {$gender}, 환불 {$paidAmount}원",
+            "예약 100% 환불 취소 — 회원 " . ($logDetail['회원'] ?? $email) . ", 파티 " . ($logDetail['파티'] ?? "#{$partyId}")
+                . ", 성별 {$gender}, 환불 {$paidAmount}원",
             ['status' => $beforeBooking['status'] ?? ''],
-            ['status' => 'cancelled']
+            ['status' => 'cancelled'],
+            $logDetail
         );
 
         echo json_encode(['ok' => true, 'partyId' => $partyId, 'gender' => $gender, 'refundAmount' => $paidAmount]);
@@ -559,11 +580,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         error_log('[admin/bookings cancel sms] ' . $e->getMessage());
     }
 
+    // 활동 로그 상세 — 회원·파티·결제 정보와 처리 결과 (_log_detail.php, 기록용으로 읽기만)
+    require_once __DIR__ . '/_log_detail.php';
+    $logBooking = is_array($beforeBooking) ? $beforeBooking : [];
+    $logDetail  = adminLogBookingDetail($email, $logBooking, [
+        '환불' => ($logBooking['status'] ?? '') === 'refund_completed'
+            ? '이미 환불 완료된 예약 — 추가 환불 없음'
+            : '자동 환불 없음 (카드 결제 취소·무통장 송금은 따로 처리)',
+        '신청 인원' => adminLogCountResult($logBooking, $partyId !== '' && $wasCounted),
+        '쿠폰 복원' => adminLogCouponResult($logBooking),
+    ]);
     logAdminActivity(
         'update', 'booking', $bid,
-        "예약 강제 취소 — 회원 {$email}, 파티 #{$partyId}, 성별 {$gender}",
+        "예약 강제 취소 — 회원 " . ($logDetail['회원'] ?? $email) . ", 파티 " . ($logDetail['파티'] ?? "#{$partyId}") . ", 성별 {$gender}",
         ['status' => $beforeBooking['status'] ?? ''],
-        ['status' => 'cancelled']
+        ['status' => 'cancelled'],
+        $logDetail
     );
 
     echo json_encode(['ok' => true, 'partyId' => $partyId, 'gender' => $gender]);
