@@ -139,7 +139,7 @@ GitHub 이 제공하는 실행기(GitHub-hosted runner)는 실행할 때마다 I
   - 2026-10-22 처음에는 협업자 계정으로 Repository Secrets 에 test 키를 넣어 실행했고, 같은 날 소유자 계정으로 production 환경에도 등록했습니다. 같은 이름이면 환경 Secret 이 우선합니다.
   - **Repository Secrets 에 남은 같은 이름 2개는 삭제합니다**(위 "같은 이름을 두지 않는다" 규칙). live 키도 production 환경에만 등록합니다.
 - 2026-10-22 실행 완료: 서버에 설정 파일 생성(소유자 `toss-config.php` 와 같음, 640, test 모드, 암호화 키 새로 생성). 서버 밖 확인 결과 `state.php` ready=true·mode=test, `/membership/` 에 테스트 결제 안내 표시, 설정 파일 주소는 200·0바이트. 워크플로는 비활성화됨.
-- `.github/workflows/ops-membership-key.yml`("Ops - membership billing key (one-time)", `confirm=INSTALL`)이 이 값으로 서버에 `api/payments/toss-billing-config.php` 를 만듭니다. 서버 쪽 처리는 `scripts/ops/membership-key-remote.sh`.
+- `.github/workflows/ops-membership-key-install.yml`("Ops - membership billing key (one-time)", `confirm=INSTALL`)이 이 값으로 서버에 `api/payments/toss-billing-config.php` 를 만듭니다. 서버 쪽 처리는 `scripts/ops/membership-key-remote.sh`.
   - 소유자는 `toss-config.php` 와 같게, 권한 640, `TOSS_BILLING_MODE=test`.
   - 빌링키 암호화 키 `TOSS_BILLING_ENC_KEY` 는 파일이 없을 때만 서버에서 `openssl rand -base64 32` 로 만듭니다. GitHub 에는 저장하지 않습니다. 파일이 이미 있으면 그 안의 암호화 키를 그대로 두고 클라이언트·시크릿 키만 바꿉니다(읽을 수 없으면 아무것도 고치지 않고 멈춤).
   - 키 값은 ssh 표준입력으로만 넘기고 로그에 출력하지 않습니다.

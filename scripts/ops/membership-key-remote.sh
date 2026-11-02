@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# [서버에서 실행 — .github/workflows/ops-membership-key.yml 이 ssh 로 넘겨 실행] 1회용
+# [서버에서 실행 — .github/workflows/ops-membership-key-install.yml 이 ssh 로 넘겨 실행] 1회용
 # 멤버십 자동결제 설정 파일(api/payments/toss-billing-config.php) 만들기
 #
 # 사용: bash <이 파일> install <웹 루트>
@@ -64,7 +64,7 @@ S tee "$TMP" >/dev/null <<EOF
 <?php
 /**
  * 어울림 멤버십 자동결제(빌링) 설정 — 서버 전용, 저장소에 올리지 않는다.
- * 만든 방법: .github/workflows/ops-membership-key.yml (1회용). 항목 설명은 toss-billing-config.example.php
+ * 만든 방법: .github/workflows/ops-membership-key-install.yml (1회용). 항목 설명은 toss-billing-config.example.php
  * TOSS_BILLING_ENC_KEY 는 바꾸지 않는다. 바꾸면 이미 저장된 빌링키를 풀 수 없다.
  */
 return [
