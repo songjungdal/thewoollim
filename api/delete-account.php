@@ -100,6 +100,10 @@ try {
         @rename($oldFile, $newFile);
     }
 
+    // ── 사진 심사·직업 인증 파일과 기록 즉시 삭제 (보관 기간: 탈퇴 시까지, docs/specs/photo-job-verification.md 3-5)
+    require_once __DIR__ . '/verification/_lib.php';
+    verifyDeleteUser($userId);
+
     // ── 후기게시판에 작성했던 글도 탈퇴와 동시에 삭제 (best-effort — 실패해도 탈퇴 자체는 계속 진행)
     try {
         $pdo->prepare("DELETE FROM reviews WHERE user_id = ?")->execute([$userId]);

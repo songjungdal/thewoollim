@@ -1,6 +1,6 @@
 "use client";
 
-import { Mars, Venus } from "lucide-react";
+import { BadgeCheck, Mars, Venus } from "lucide-react";
 
 export type Participant = {
   id: string;
@@ -10,6 +10,7 @@ export type Participant = {
   job: string;
   status?: "confirmed" | "pending_approval" | "completed" | "paid_pending_profile" | string;
   optionName?: string;   // 솔로파티 참가 구성 — 신청한 항목 이름
+  jobVerified?: boolean; // 직업 인증 회원 (매칭파티만, docs/specs/photo-job-verification.md 2-4)
 };
 
 /** 성별 자리 현황 — 머리 카드(n/정원·진행바·잔여석)에만 쓴다 */
@@ -117,7 +118,17 @@ function GenderColumn({ gender, list, seats, hideProfile }: {
                 </span>
               )}
             </div>
-            {meta && <p className="mt-1 truncate text-[12px] text-gray-500">{meta}</p>}
+            {meta && (
+              <p className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5 text-[12px] text-gray-500">
+                <span className="min-w-0 truncate">{meta}</span>
+                {/* 직업 인증 배지 — 직업 옆. 솔로파티(hideProfile)는 직업을 보여 주지 않으므로 배지도 없다 */}
+                {!hideProfile && p.jobVerified && p.job && (
+                  <span className="inline-flex flex-shrink-0 items-center gap-0.5 whitespace-nowrap rounded-full bg-brand-point/15 px-1.5 py-0.5 text-xs font-black text-brand-point-ink" data-testid="job-verified-badge">
+                    <BadgeCheck size={12} aria-hidden /> 직업 인증
+                  </span>
+                )}
+              </p>
+            )}
           </div>
         );
       })}

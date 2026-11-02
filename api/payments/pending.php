@@ -48,6 +48,11 @@ try {
     error_log('[payments/pending] ' . $e->getMessage()); jsonFail('서버 오류', 500);
 }
 
+// ── 사진 심사 — 관리자 스위치가 켜져 있으면 승인 사진이 있는 회원만 결제 (테스트 회원 통과, docs/specs/photo-job-verification.md 3-1)
+require_once __DIR__ . '/../verification/_lib.php';
+$photoBlock = verifyPaymentBlock((int)currentUserId(), (string)$u['email']);
+if ($photoBlock !== null) jsonFail($photoBlock[1], $photoBlock[2], ['code' => $photoBlock[0]]);
+
 // parties.json
 $dir = dataDir();
 $parties = json_decode((string)file_get_contents($dir . '/parties.json'), true);

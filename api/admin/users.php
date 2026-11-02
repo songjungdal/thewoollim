@@ -84,6 +84,9 @@ if ($method === 'POST') {
         @unlink($dir . '/bookings_' . $hash . '.json');
         @unlink($dir . '/cart_'     . $hash . '.json');
         @unlink($dir . '/profile_'  . $hash . '.json');
+        // 사진 심사·직업 인증 파일과 기록 삭제 (보관 기간: 탈퇴 시까지, docs/specs/photo-job-verification.md 3-5)
+        require_once __DIR__ . '/../verification/_lib.php';
+        verifyDeleteUser($userId);
 
         @file_put_contents(
             $dir . '/_admin_user_deletions.log',

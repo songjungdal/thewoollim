@@ -11,6 +11,7 @@ import DiscountArrow from "../components/DiscountArrow";
 import DiscountBadge from "../components/DiscountBadge";
 import { useAuth, calcCouponDiscount, type BookingStatus } from "../context/AuthContext";
 import MembershipSection from "./MembershipSection";
+import VerificationSection from "./VerificationSection";
 import { useParties, PARTIES_NOT_LOADED } from "../lib/useParties";
 import { partyStockStatus, linePriceFor, basePriceForGender, partyHasDiscount, partyHasOptions, partyOptionById, dateOnly, partyVisibility, VBANK_INFO, COUPON_DISABLED_MESSAGE } from "../lib/data";
 
@@ -402,6 +403,9 @@ export default function MyPage() {
 
             {/* 섹션 이동 여백 — 모바일: 헤더 72px + 고정 탭 70px 아래, lg: 헤더 96px 아래.
                 globals.css 의 section { scroll-margin-top: 5rem } 보다 우선하도록 ! 사용 */}
+            {/* 인증 관리 — 사진 심사·직업 인증 상태 (docs/specs/photo-job-verification.md 2-3) */}
+            <VerificationSection />
+
             {/* 멤버십 — 멤버십 기록이 있는 회원에게만 보인다 */}
             <MembershipSection />
 

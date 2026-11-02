@@ -5,6 +5,7 @@
  * 실행: 서버 systemd 타이머(d1-reminder.timer) 전용 CLI 스크립트. 실결제 계정에 실제 SMS 비용이
  * 발생하는 배치라 공개 HTTP 엔드포인트로 노출하지 않고 CLI 실행만 허용함.
  *   OnCalendar=*-*-* 09:00:00  (매일 09:00 UTC = 18:00 KST)
+ *   문자 발송 전에 사진 심사 파일 정리(verifyCleanup — 반려·대체 사진 30일 뒤 삭제)도 함께 한다 (매일 도는 배치라 여기에 붙임)
  *
  * 흐름:
  *  1) '내일'(Asia/Seoul 기준) calendarDate 와 일치하는 파티 전부 조회
@@ -33,6 +34,15 @@ require_once __DIR__ . '/../lib.php';
 require_once __DIR__ . '/../db.php';
 
 $dataDir = dataDir();
+
+// 사진 심사 — 반려·대체된 사진 30일 뒤 삭제, 처리된 직업 서류 삭제 (매일 한 번 도는 이 배치에 붙인다.
+// 문자 발송보다 먼저 하고, 실패해도 문자 발송은 계속. docs/specs/photo-job-verification.md 3-5)
+try {
+    require_once __DIR__ . '/../verification/_lib.php';
+    verifyCleanup();
+} catch (Throwable $e) {
+    error_log('[d1_reminder] verification cleanup: ' . $e->getMessage());
+}
 
 function _d1Log(string $status, string $detail): void {
     global $dataDir;

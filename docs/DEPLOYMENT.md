@@ -70,7 +70,7 @@ rsync 필터의 `P`(삭제 금지)와 `-`(전송 제외)를 함께 적용합니�
 
 | 구분 | 서버 경로 (웹 루트 기준) |
 |---|---|
-| 비밀 설정 | `api/db-config.php`, `api/auth/sms-config.php`, `api/auth/oauth-config.php`, `api/auth/portone-config.php`, `api/payments/toss-config.php`, 그 밖의 `*-config.php`(멤버십 자동결제 `api/payments/toss-billing-config.php` 포함) |
+| 비밀 설정 | `api/db-config.php`, `api/auth/sms-config.php`, `api/auth/oauth-config.php`, `api/auth/portone-config.php`, `api/payments/toss-config.php`, 그 밖의 `*-config.php`(멤버십 자동결제 `api/payments/toss-billing-config.php`, 국세청 진위확인 `api/verification/nts-config.php` 포함) |
 | 운영 데이터 | `api/data/` (웹 루트 밖 `../thewoollim-data/` 로 옮긴 뒤에는 배포가 그 폴더를 아예 건드리지 않음 — 6-1) |
 | 세션 | `api/auth/sessions/`, `api/admin/sessions/` (그 밖의 `sessions/` 포함) |
 | 업로드 | `uploads/`, `api/uploads/` |
@@ -202,6 +202,7 @@ GitHub 이 제공하는 실행기(GitHub-hosted runner)는 실행할 때마다 I
 - `parties.json` 이 들어 있다 (빈 폴더로 바뀌어 예약이 사라져 보이는 사고 방지)
 
 멤버십(자동결제) 데이터는 이 폴더에만 저장합니다. 폴더가 없으면 멤버십은 "준비 중"으로 막힙니다.
+사진 심사·직업 인증의 기록과 사진도 이 폴더의 `verification/` 에만 저장합니다(배포 대상 밖이라 배포가 덮어쓰거나 지우지 않음). 폴더가 없거나 서버 PHP 에 이미지 처리 기능(GD·Imagick)이 없으면 업로드를 받지 않고 관리자 [사진 심사 필수]도 켜지지 않습니다.
 
 옮기는 순서 (서버에서 담당자가 직접, 손님이 적은 시간에):
 
