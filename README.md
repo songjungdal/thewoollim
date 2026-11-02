@@ -14,7 +14,7 @@
 브라우저 ──▶ 정적 화면 (Next.js 빌드 결과 out/)
    │
    └────▶ /api/*.php (PHP) ──▶ MySQL/MariaDB  : 회원, 후기, 현장스케치, 관리자 메모, 매칭 투표
-                          ├──▶ 데이터 JSON     : 파티, 예약, 장바구니, 쿠폰, 메인이미지 설정, 멤버십
+                          ├──▶ 데이터 JSON     : 파티, 예약, 장바구니, 쿠폰, 메인이미지 설정, 멤버십, 사진 심사·직업 인증
                           │                     (서버의 웹 루트 밖 폴더, 옮기기 전에는 api/data/)
                           └──▶ 토스페이먼츠 · 포트원(다날) · 알리고 SMS
 ```
@@ -66,6 +66,7 @@ npm run build        # 정적 빌드 → out/
 | `api/auth/portone-config.example.php` | `api/auth/portone-config.php` | 포트원 본인인증 |
 | `api/payments/toss-config.example.php` | `api/payments/toss-config.php` | 토스 결제 |
 | `api/payments/toss-billing-config.example.php` | `api/payments/toss-billing-config.php` | 토스 자동결제(멤버십) 키·빌링키 암호화 키 |
+| `api/verification/nts-config.example.php` | `api/verification/nts-config.php` | 국세청 사업자등록정보 진위확인 인증키(직업 인증 참고용, 없으면 수동 심사) |
 
 ## 협업 방식
 

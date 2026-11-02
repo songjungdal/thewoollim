@@ -38,6 +38,10 @@ export default function PrivacyPage() {
                 <div className="space-y-3 md:space-y-4 text-gray-800">
                   <p>사이트는 회원가입 및 원활한 서비스 제공을 위해 아래와 같은 개인정보를 수집합니다.</p>
                   <p className="font-bold underline decoration-brand-point/30">수집항목: 이름, 로그인ID, 비밀번호, 휴대전화번호, 이메일, 닉네임, 서비스 이용 기록, 접속 로그, 쿠키, 접속 IP 정보 등</p>
+                  <ul className="list-disc pl-5 md:pl-6 space-y-2">
+                    <li><span className="font-bold">파티 신청 시:</span> 얼굴 사진 2장</li>
+                    <li><span className="font-bold">직업 인증 신청 시(선택):</span> 직업 증빙 서류 이미지, 사업자등록번호·개업일자</li>
+                  </ul>
                 </div>
               </section>
 
@@ -48,6 +52,7 @@ export default function PrivacyPage() {
                   <ul className="list-disc pl-5 md:pl-6 space-y-3 md:space-y-4">
                     <li><span className="font-bold">서비스 제공:</span> 매칭파티·솔로파티 등 파티 예약, 콘텐츠 제공, 본인 인증 등</li>
                     <li><span className="font-bold">회원 관리:</span> 회원제 서비스 이용에 따른 본인확인, 불량회원의 부정 이용 방지와 비인가 사용 방지, 가입 의사 확인, 불만 처리 등 민원 처리</li>
+                    <li><span className="font-bold">사진 심사·직업 인증:</span> 파티 참가자 사전 심사 및 현장 본인 확인, 직업 인증 표시 (사진은 운영진만 확인하며 다른 참가자에게 공개하지 않고, 자동 얼굴 인식 등 기술적 처리를 하지 않습니다)</li>
                     <li><span className="font-bold">마케팅 및 광고에 활용:</span> 신규 서비스 개발 및 맞춤 서비스 제공, 이벤트 및 광고성 정보 전달 및 참여 기회 제공</li>
                   </ul>
                 </div>
@@ -61,6 +66,12 @@ export default function PrivacyPage() {
                     <li><span className="font-bold">계약 또는 청약철회 등에 관한 기록:</span> 5년</li>
                     <li><span className="font-bold">소비자의 불만 또는 분쟁처리에 관한 기록:</span> 3년</li>
                     <li><span className="font-bold">방문에 관한 기록:</span> 3개월</li>
+                  </ul>
+                  <p>사진 심사·직업 인증 정보는 아래 기간 동안 보관합니다.</p>
+                  <ul className="list-disc pl-5 md:pl-6 space-y-3 md:space-y-4">
+                    <li><span className="font-bold">얼굴 사진:</span> 회원 탈퇴 시까지 (반려·교체된 사진은 30일 후 삭제)</li>
+                    <li><span className="font-bold">직업 증빙 서류 이미지:</span> 확인 즉시 삭제</li>
+                    <li><span className="font-bold">직업 인증 결과(구분·표시 직업·일시):</span> 회원 탈퇴 시까지</li>
                   </ul>
                 </div>
               </section>
@@ -98,7 +109,7 @@ export default function PrivacyPage() {
 
               <section className="bg-gray-50 p-5 md:p-8 rounded-xl md:rounded-2xl border border-gray-100">
                 <h2 className="text-lg md:text-xl font-bold text-black mb-3 md:mb-4">부칙</h2>
-                <p className="text-gray-700">본 방침은 2026년 10월 9일부터 시행합니다. (이전 방침: 사이트 개설일부터 시행)</p>
+                <p className="text-gray-700">본 방침은 2026년 11월 2일부터 시행합니다. (이전 방침: 2026년 10월 9일부터 시행)</p>
               </section>
             </div>
           </div>

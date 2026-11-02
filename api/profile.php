@@ -122,6 +122,30 @@ if ($method === 'POST') {
         jsonFail('저장 중 오류', 500);
     }
 
+    // 직업 인증 — 승인 때의 직업 글자와 달라지면 배지를 숨기고 "재인증 필요"로 바꾼다 (docs/specs/photo-job-verification.md 2-4)
+    try {
+        require_once __DIR__ . '/verification/_lib.php';
+        $uid = (int)(currentUserId() ?? 0);
+        if ($uid > 0 && verifyDir() !== null) {
+            verifyWithStore(function (array $store) use ($uid, $job) {
+                $changed = false;
+                foreach ($store['records'] as &$r) {
+                    if (is_array($r) && (int)($r['user_id'] ?? 0) === $uid && ($r['kind'] ?? '') === 'job'
+                        && ($r['status'] ?? '') === 'approved' && trim((string)($r['job_text'] ?? '')) !== trim($job)) {
+                        $r['status'] = 'reverify';
+                        $r['reverify_at'] = verifyNow();
+                        $changed = true;
+                    }
+                }
+                unset($r);
+                if ($changed) verifyLog("job reverify needed user={$uid} (profile job changed)");
+                return $changed ? $store : null;
+            });
+        }
+    } catch (Throwable $e) {
+        error_log('[profile verification] ' . $e->getMessage());
+    }
+
     // ── 프로필 필수 항목 전수 검증 → 예약 자동 상태 전환 (paid → pending) ─────────
     //  필수: 이름·성별·연락처·생년월일·혼인여부·직업·MBTI·관심사 가 모두 채워졌는지 확인.
     //  (DB에 nickname 컬럼은 없음 — 프로필 카드 완성 필드 전체를 기준으로 검사)

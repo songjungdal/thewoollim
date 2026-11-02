@@ -4,7 +4,7 @@
  *
  * GET ?partyId=<id> → {
  *   ok: true,
- *   male:   [{id, maskedName, ageBand, mbti, job}, ...],
+ *   male:   [{id, maskedName, ageBand, mbti, job, jobVerified?}, ...],
  *   female: [...]
  * }
  *
@@ -17,6 +17,8 @@
  *    원본 이름은 응답에 넣지 않는다 (docs/specs/party-detail-relayout.md D-4). 생년월일은 ageBand() 으로 변환
  *  - 직업·MBTI 는 그대로 노출 (관리자 폼에서 입력한 공개 의도). 단 솔로파티는 프로필 카드를 받지 않으므로
  *    mbti·job 을 빈 값으로 내려준다 (docs/specs/party-solo-guide.md 4-2)
+ *  - 직업 인증 회원(매칭파티만): jobVerified=true, job 은 관리자가 승인 때 정한 표시 직업. 프로필 직업 글자가 승인 때와
+ *    달라지면 배지를 빼고 회원이 입력한 직업 그대로 (docs/specs/photo-job-verification.md 2-4)
  *  - 탈퇴 회원: 진행 예정/진행 중 파티(행사일 미경과)는 기존과 동일하게 제외.
  *    단, 행사일이 이미 지난(완료된) 파티는 탈퇴 회원도 명단에 포함 — 탈퇴 시 익명화되는
  *    항목은 name/phone/nickname/SNS 뿐이고 gender/mbti/job/birth_date 는 유지되므로
@@ -33,6 +35,7 @@
 declare(strict_types=1);
 require_once __DIR__ . '/lib.php';
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/verification/_lib.php';
 jsonHeaders();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
@@ -81,6 +84,12 @@ try {
     jsonOut(['ok' => true, 'male' => [], 'female' => []]);
 }
 
+// 직업 인증 배지 — 매칭파티만 (솔로파티는 직업을 공개하지 않으므로 배지도 없음). 저장소를 못 읽으면 배지 없이 명단은 그대로
+$verifyStore = null;
+if (!$partyIsSolo) {
+    try { $verifyStore = verifyReadStore(); } catch (Throwable $e) { error_log('[party-participants] verification: ' . $e->getMessage()); }
+}
+
 foreach ($users as $u) {
     $email = (string)$u['email'];
     $hash  = md5(normalizeEmail($email));
@@ -115,6 +124,14 @@ foreach ($users as $u) {
             'status'     => (string)($b['status'] ?? ''),  // 'confirmed' | 'pending_approval'
             'createdAt'  => (string)($b['createdAt'] ?? ''), // 정렬 전용 — 응답 직전에 제거
         ];
+        // 직업 인증 — 승인 때의 직업 글자와 지금 프로필 직업이 같을 때만 배지 + 관리자가 정한 표시 직업
+        if ($verifyStore !== null) {
+            $jobRec = verifyLatestWithStatus(verifyUserRecords($verifyStore, (int)$u['id'], 'job'), ['approved', 'reverify']);
+            if (verifyJobBadge($jobRec, (string)($u['job'] ?? ''))) {
+                $entry['jobVerified'] = true;
+                if (trim((string)($jobRec['job_label'] ?? '')) !== '') $entry['job'] = (string)$jobRec['job_label'];
+            }
+        }
         // 참가 구성 예약 — 항목 이름 (예: "1부+2부")
         if (!empty($b['optionName'])) $entry['optionName'] = (string)$b['optionName'];
 

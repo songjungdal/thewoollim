@@ -272,6 +272,9 @@ try {
         } catch (PDOException $e) {
             $pdo->prepare($anonymizeSql)->execute(['withdrawn-' . $userId, $anonEmail, $userId]);
         }
+        // 사진 심사·직업 인증 파일과 기록 삭제 (탈퇴와 같음, docs/specs/photo-job-verification.md 3-5)
+        require_once __DIR__ . '/../verification/_lib.php';
+        verifyDeleteUser($userId);
 
         // 2) 취소되지 않은 예약 → 기존 [취소] 규칙으로 인원·쿠폰 정리
         $active = _activeBookings($email);

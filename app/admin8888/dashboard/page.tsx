@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef, useMemo, Fragment } from "rea
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Users, Ticket, Tag, Building2, LogOut, ShieldCheck, CheckCircle2, Clock, AlertTriangle, Calendar, Plus, Pencil, Trash2, ImageIcon, X, FileText, Search, StickyNote, Save, ChevronDown, CreditCard, RotateCcw, Star, GalleryHorizontal, Menu } from "lucide-react";
+import { Users, Ticket, Tag, Building2, LogOut, ShieldCheck, CheckCircle2, Clock, AlertTriangle, Calendar, Plus, Pencil, Trash2, ImageIcon, X, FileText, Search, StickyNote, Save, ChevronDown, CreditCard, RotateCcw, Star, GalleryHorizontal, Menu, BadgeCheck } from "lucide-react";
 import { useParties, broadcastPartiesUpdated } from "../../lib/useParties";
 import { formatPhoneKR } from "../../lib/phone";
 import { calculateRefund, refundRateLabel } from "../../lib/refund";
@@ -15,6 +15,8 @@ import PartyDetailEditor, { validateDetail, type DetailSourceParty } from "./Par
 import PartyHeroCropModal from "./PartyHeroCropModal";
 import TestUsersTools from "./TestUsersTools";
 import HeroEditor from "./HeroEditor";
+import VerificationReview from "./VerificationReview";
+import VerificationPhotoButton from "./VerificationPhotoButton";
 import PartyOptionsEditor from "./PartyOptionsEditor";
 import DiscountArrow from "../../components/DiscountArrow";
 import DiscountBadge from "../../components/DiscountBadge";
@@ -46,10 +48,20 @@ type BookingRow = {
   refundRequestAmount?: number; // 취소요청한 날 기준 환불 금액
   refundAmount?: number;        // 실제 환불액 (환불 완료 건)
 };
-type TabKey = "members" | "bookings" | "parties" | "coupons" | "company" | "hero" | "gallery" | "reviews" | "logs" | "cancel_requests" | "memos";
+type TabKey = "members" | "bookings" | "parties" | "coupons" | "company" | "hero" | "gallery" | "reviews" | "logs" | "cancel_requests" | "memos" | "verifications";
+/** 인증 심사 요약 — api/admin/verifications.php?summary=1 (회원 관리 표·확인할 업무) */
+type VerifySummary = {
+  pendingCount: number;
+  users: Record<string, { photo: string; photoApproved: boolean; job: string; jobVerified: boolean; jobLabel: string | null }>;
+};
+const PHOTO_COL: Record<string, { label: string; tone: string }> = {
+  pending: { label: "심사 중", tone: "bg-amber-100 text-amber-800" },
+  approved: { label: "승인", tone: "bg-emerald-100 text-emerald-800" },
+  rejected: { label: "반려", tone: "bg-red-100 text-red-700" },
+};
 /** 모바일 메뉴 시트의 묶음 — 탭 key 만 나열 (라벨·아이콘은 TABS 그대로) */
 const MOBILE_MENU_GROUPS: { label: string; keys: TabKey[] }[] = [
-  { label: "운영",   keys: ["bookings", "parties", "cancel_requests", "members", "coupons", "memos"] },
+  { label: "운영",   keys: ["bookings", "parties", "cancel_requests", "verifications", "members", "coupons", "memos"] },
   { label: "콘텐츠", keys: ["hero", "gallery", "reviews"] },
   { label: "설정",   keys: ["company", "logs"] },
 ];
@@ -293,7 +305,11 @@ function BookingTable({ label, toneClass, rows, party, remarks, onApprove, onCan
                     ? "bg-gray-50 text-gray-500"
                     : "hover:bg-gray-50 md:even:bg-gray-50/50 md:hover:bg-brand-point/5"
                   }`}>
-                  <td className={`px-3 py-2.5 md:py-3 first:pl-5 md:first:pl-7 font-bold md:sticky md:left-0 md:z-[1] ${isCancelled ? "line-through md:bg-gray-50" : "md:text-brand-black md:bg-white"}`}>{b.userName}</td>
+                  <td className={`px-3 py-2.5 md:py-3 first:pl-5 md:first:pl-7 font-bold md:sticky md:left-0 md:z-[1] ${isCancelled ? "line-through md:bg-gray-50" : "md:text-brand-black md:bg-white"}`}>
+                    {b.userName}
+                    {/* 현장 본인 확인용 승인 사진 (docs/specs/photo-job-verification.md 4-2) */}
+                    {!isCancelled && b.userEmail && <VerificationPhotoButton email={b.userEmail} name={b.userName} />}
+                  </td>
                   {showOption && <td className={`px-3 py-2.5 md:py-3 font-bold ${isCancelled ? "line-through" : ""}`}>{b.optionName || "-"}</td>}
                   <td className="px-3 py-2.5 md:py-3 tabular-nums">{formatPhoneKR(b.userPhone)}</td>
                   <td className="px-3 py-2.5 md:py-3 text-gray-600 tabular-nums" title="프로필 카드 기반 (수정 불가)">{birth}</td>
@@ -483,6 +499,7 @@ export default function AdminDashboard() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false); // UI 전용 — 모바일 메뉴 시트 열림
   // 운영 현황 팝업 (v7.0) — 진입 시 1회 노출, '오늘 하루 열지 않기' 시 당일 숨김
   const [showOpsPopup, setShowOpsPopup] = useState(false);
+  const [verifySummary, setVerifySummary] = useState<VerifySummary>({ pendingCount: 0, users: {} });
   const [opsHideToday, setOpsHideToday] = useState(false);
   const [opsNow, setOpsNow] = useState("");
   const [opsErrorCount, setOpsErrorCount] = useState(0);
@@ -979,7 +996,7 @@ export default function AdminDashboard() {
   }, [router]);
 
   const loadAll = useCallback(async () => {
-    const [u, b, c, co, g, m, p] = await Promise.all([
+    const [u, b, c, co, g, m, p, v] = await Promise.all([
       fetch("/api/admin/users.php", { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
       fetch("/api/admin/bookings.php", { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
       fetch("/api/admin/coupons.php", { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
@@ -987,8 +1004,10 @@ export default function AdminDashboard() {
       fetch("/api/admin/gallery.php", { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
       fetch("/api/admin/memos.php", { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
       fetch("/api/admin/parties.php", { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
+      fetch("/api/admin/verifications.php?summary=1", { cache: "no-store", credentials: "include" }).then(r => r.json()).catch(() => ({})),
     ]);
     if (u?.users) setUsers(u.users);
+    if (v?.ok) setVerifySummary({ pendingCount: Number(v.pendingCount) || 0, users: v.users ?? {} });
     if (b?.rows) setBookings(b.rows);
     // 미저장 쿠폰 편집 중(dirty)이면 자동 새로고침이 draft를 덮어쓰지 않도록 스킵
     if (c?.coupons && !couponsDirtyRef.current) setCoupons(Array.isArray(c.coupons) ? c.coupons : []);
@@ -1556,6 +1575,7 @@ export default function AdminDashboard() {
     { key: "reviews", label: "후기게시판", icon: Star },
     { key: "logs", label: "로그 관리", icon: FileText },
     { key: "cancel_requests", label: "취소요청", icon: RotateCcw },
+    { key: "verifications", label: "인증 심사", icon: BadgeCheck },
     { key: "memos", label: "업무 메모", icon: StickyNote },
   ];
 
@@ -1700,6 +1720,9 @@ export default function AdminDashboard() {
       <main className="max-w-7xl lg:max-w-[1440px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
         <motion.div key={tab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
 
+          {/* === 인증 심사 (사진 심사 · 직업 인증) === */}
+          {tab === "verifications" && <VerificationReview onChanged={loadAll} />}
+
           {/* === 회원 관리 === */}
           {tab === "members" && (() => {
             // 1) 혼인여부 필터 + 이름/연락처/이메일 통합 검색
@@ -1782,7 +1805,7 @@ export default function AdminDashboard() {
                     <thead className="bg-gray-50 text-gray-600 font-bold sticky top-0 z-10">
                       <tr>
                         {/* '#' 컬럼 제거, 가입일 최신순 정렬. 이름 칸은 맨 앞 + 가로 스크롤 때 고정 */}
-                        {["이름", "성별", "혼인여부", "연락처", "이메일", "가입일", "지역", "직업", "MBTI", "생년월일", "SNS", "관리"].map(h => (
+                        {["이름", "성별", "혼인여부", "연락처", "이메일", "가입일", "지역", "직업", "사진", "직업 인증", "MBTI", "생년월일", "SNS", "관리"].map(h => (
                           <th key={h} className={`text-left px-3 py-3 ${h === "이름" ? "sticky left-0 z-20 bg-gray-50" : ""}`}>{h}</th>
                         ))}
                       </tr>
@@ -1827,6 +1850,16 @@ export default function AdminDashboard() {
                             <td className="px-3 py-3 text-gray-500 tabular-nums">{created}</td>
                             <td className="px-3 py-3">{u.location || "-"}</td>
                             <td className="px-3 py-3">{u.job || "-"}</td>
+                            {(() => {
+                              const vs = verifySummary.users[String(u.id)];
+                              const pc = vs ? PHOTO_COL[vs.photo] : undefined;
+                              return (
+                                <>
+                                  <td className="px-3 py-3">{pc ? <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-black ${pc.tone}`}>{pc.label}</span> : <span className="text-gray-500 text-xs">미제출</span>}</td>
+                                  <td className="px-3 py-3">{vs?.jobVerified ? <span className="inline-flex items-center gap-0.5 text-xs font-black text-brand-point-ink"><BadgeCheck size={12} /> {vs.jobLabel || "인증"}</span> : vs?.job === "pending" ? <span className="text-xs font-bold text-amber-700">심사 중</span> : vs?.job === "reverify" ? <span className="text-xs font-bold text-orange-700">재인증 필요</span> : <span className="text-gray-500 text-xs">-</span>}</td>
+                                </>
+                              );
+                            })()}
                             <td className="px-3 py-3">{u.mbti || "-"}</td>
                             <td className="px-3 py-3">{u.birth_date || <span className="text-gray-500 text-xs">미입력</span>}</td>
                             <td className="px-3 py-3">{u.sns_provider || "일반"}</td>
@@ -1842,7 +1875,7 @@ export default function AdminDashboard() {
                           </tr>
                         );
                       })}
-                      {sorted.length === 0 && <tr><td colSpan={12} className="text-center text-gray-500 py-8">{q ? `'${memberSearch}' 검색 결과 없음` : "데이터 없음"}</td></tr>}
+                      {sorted.length === 0 && <tr><td colSpan={14} className="text-center text-gray-500 py-8">{q ? `'${memberSearch}' 검색 결과 없음` : "데이터 없음"}</td></tr>}
                     </tbody>
                   </table>
                 </div>
@@ -1888,6 +1921,16 @@ export default function AdminDashboard() {
                         <p className="mt-1.5 text-[13px] text-gray-600 break-keep">
                           {[u.location, u.job, u.mbti].filter(Boolean).join(" · ") || <span className="text-gray-500">지역·직업·MBTI 미입력</span>}
                         </p>
+                        {(() => {
+                          const vs = verifySummary.users[String(u.id)];
+                          const pc = vs ? PHOTO_COL[vs.photo] : undefined;
+                          return (
+                            <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[13px] text-gray-600">
+                              사진 {pc ? <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-black ${pc.tone}`}>{pc.label}</span> : <span className="text-gray-500">미제출</span>}
+                              {vs?.jobVerified && <span className="inline-flex items-center gap-0.5 text-xs font-black text-brand-point-ink"><BadgeCheck size={12} /> 직업 인증 {vs.jobLabel}</span>}
+                            </p>
+                          );
+                        })()}
                         <details className="group mt-1">
                           <summary className="min-h-11 inline-flex items-center gap-1 text-[13px] font-bold text-gray-600 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
                             더보기 <ChevronDown size={14} className="transition-transform group-open:rotate-180" />
@@ -3976,6 +4019,7 @@ export default function AdminDashboard() {
                     <p className="font-black text-brand-black mb-1.5">[업무 확인 필요]</p>
                     <ul className="space-y-1 pl-1">
                       <li>• 취소 요청 : <Num v={cancelReq} />건</li>
+                      <li>• 인증 심사 대기 : <Num v={verifySummary.pendingCount} />건</li>
                       <li>• 신규 업무 메모 : <Num v={newMemos} />건</li>
                       <li>• 시스템 에러 : <Num v={opsErrorCount} />건 {opsErrorCount === 0 ? <span className="text-emerald-600 font-bold">(정상)</span> : (
                         <button type="button" onClick={ackOpsErrors} disabled={opsErrorAcking}

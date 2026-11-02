@@ -61,9 +61,9 @@ function LoginContent() {
   const searchParams = useSearchParams();
   // 사용자 정책: 로그인 성공 시 메인 페이지로 이동.
   // (이전엔 ?redirect= 쿼리에 따라 마이페이지/결제로 다시 보냈으나, 단순 일관성 우선)
-  // 예외: 멤버십 가입 화면(/membership/…)에서 온 경우만 그 화면으로 돌려보낸다 — 사이트 안 경로만 허용.
+  // 예외: 멤버십 가입 화면(/membership/…)·사진 심사 화면(/verification/)에서 온 경우만 그 화면으로 돌려보낸다 — 사이트 안 경로만 허용.
   const redirectParam = searchParams.get("redirect") ?? "";
-  const redirectTo = /^\/membership\/[a-z/-]*$/.test(redirectParam) ? redirectParam : "/";
+  const redirectTo = /^\/membership\/[a-z/-]*$/.test(redirectParam) || redirectParam === "/verification/" ? redirectParam : "/";
   const { login } = useAuth();
 
   const handleFindId = async (e: React.FormEvent) => {

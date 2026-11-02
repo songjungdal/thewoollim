@@ -10,6 +10,8 @@ import Footer from "../components/Footer";
 import { useAuth, calcCouponDiscount } from "../context/AuthContext";
 import { useParties, PARTIES_NOT_LOADED } from "../lib/useParties";
 import { linePriceFor, partyHasOptions, partyOptionById, VBANK_ACCOUNT_LINE } from "../lib/data";
+import PhotoGateModal from "../components/PhotoGateModal";
+import { fetchVerificationState, isPhotoGateCode, photoGateCode, type PhotoGateCode } from "../lib/verification";
 
 // ── Toss Payments v2 SDK 타입 선언 ────────────────────────────────────────
 declare global {
@@ -73,6 +75,14 @@ function CheckoutContent() {
   const [payMethod, setPayMethod] = useState<"toss" | "vbank">("toss");
   // 무통장 입금 접수 완료 안내 모달
   const [vbankModal, setVbankModal] = useState<{ amount: number } | null>(null);
+  // 사진 심사 안내창 — 결제 화면 진입 때·결제 요청이 사진 심사로 거절됐을 때 (docs/specs/photo-job-verification.md 2-1)
+  const [photoGate, setPhotoGate] = useState<{ code: PhotoGateCode; reason: string | null } | null>(null);
+  const checkoutPath = multiIds ? `/checkout/?ids=${multiIds}` : `/checkout/?id=${singleId}`;
+  const showPhotoGate = async (serverCode?: PhotoGateCode) => {
+    const vs = await fetchVerificationState();
+    const code = serverCode ?? photoGateCode(vs);
+    if (code) setPhotoGate({ code, reason: vs?.photo.rejectReason ?? null });
+  };
 
   // 결제 대상 파티 안에 적용된 쿠폰만 유효 — 쿠폰 적용 불가 파티에 걸린 쿠폰은 보내지 않고 정가로 계산 (서버도 거절)
   const couponApplicable = !!appliedCoupon && uniquePartyIds.includes(appliedCoupon.partyId)
@@ -105,6 +115,17 @@ function CheckoutContent() {
       router.push(`/login?redirect=${encodeURIComponent(currentUrl)}`);
     }
   }, [mounted, isLoggedIn, router, singleId, multiIds]);
+
+  // 결제 화면 진입 — 사진 승인 전이면 안내창 (서버도 결제 요청 때 다시 검사)
+  useEffect(() => {
+    if (!mounted || !isLoggedIn) return;
+    let cancelled = false;
+    fetchVerificationState().then(vs => {
+      const code = photoGateCode(vs);
+      if (!cancelled && code) setPhotoGate({ code, reason: vs?.photo.rejectReason ?? null });
+    });
+    return () => { cancelled = true; };
+  }, [mounted, isLoggedIn]);
 
   // ── Toss v2 위젯 초기화 — #payment-method 패널이 DOM 에 존재할 때만 실행 ──
   useEffect(() => {
@@ -242,8 +263,9 @@ function CheckoutContent() {
           return;
         }
         if (!data?.ok) {
-          alert(data?.error || "무통장 입금 신청에 실패했습니다.");
           setPaying(false);
+          if (isPhotoGateCode(data?.code)) { await showPhotoGate(data.code); return; }
+          alert(data?.error || "무통장 입금 신청에 실패했습니다.");
           return;
         }
         await refreshBookings();           // 마이페이지에 '입금 확인 중' 즉시 반영
@@ -284,8 +306,9 @@ function CheckoutContent() {
           router.push(`/login?redirect=${encodeURIComponent(back)}`);
           return;
         }
-        alert(pending?.error || "주문 정보 등록에 실패했습니다.");
         setPaying(false);
+        if (isPhotoGateCode(pending?.code)) { await showPhotoGate(pending.code); return; }
+        alert(pending?.error || "주문 정보 등록에 실패했습니다.");
         return;
       }
 
@@ -587,6 +610,9 @@ function CheckoutContent() {
         </div>
       </main>
       <Footer />
+
+      {/* 사진 승인 전에는 결제할 수 없으므로 닫으면 마이페이지로 */}
+      <PhotoGateModal code={photoGate?.code ?? null} rejectReason={photoGate?.reason} from={checkoutPath} onClose={() => { setPhotoGate(null); router.push("/mypage/"); }} />
 
       {/* ── 무통장 입금 접수 완료 안내 모달 (v7.0) ─────────────────────────── */}
       <AnimatePresence>

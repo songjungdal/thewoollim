@@ -23,6 +23,8 @@ import ParticipantsRoster, { type Participant, type GenderSeats, type RosterStat
 import PartyCtaButtons, { type PartyCtaState } from "./PartyCtaButtons";
 import PartyBottomBar, { type BarFee } from "./PartyBottomBar";
 import DetailPhotos from "./DetailPhotos";
+import PhotoGateModal from "../../components/PhotoGateModal";
+import { fetchVerificationState, photoGateCode, type PhotoGateCode } from "../../lib/verification";
 import { canGoBackInSite } from "../../lib/navHistory";
 
 /** 오늘 날짜(한국 시간) "YYYY-MM-DD" — useSyncExternalStore 용 (날짜가 바뀌어도 다시 구독할 필요는 없음) */
@@ -73,6 +75,8 @@ export default function PartyClientView({ id, initialParties }: { id: string; in
   //   정적 HTML(빌드)과 첫 화면이 같도록 서버·하이드레이션 단계에선 "" (종료 아님), 그 뒤 브라우저 날짜로 다시 그린다
   const todayKST = useSyncExternalStore(noSubscribe, todayKSTString, () => "");
   const [showCartModal, setShowCartModal] = useState(false);
+  // 사진 심사 안내창 — [참가하기]에서 사진 승인 전이면 띄운다 (장바구니 담기는 막지 않음, docs/specs/photo-job-verification.md 2-1)
+  const [photoGate, setPhotoGate] = useState<{ code: PhotoGateCode; reason: string | null } | null>(null);
   // 솔로파티 참가 구성 — 고른 참가 항목 id (명세 8-1)
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
   const [participants, setParticipants] = useState<{ male: Participant[]; female: Participant[] }>({ male: [], female: [] });
@@ -361,6 +365,10 @@ export default function PartyClientView({ id, initialParties }: { id: string; in
     const blocked = checkBlockedReason();
     if (blocked) { alert(blocked); return; }
     if (stock.hasOptions && !selectedOption) { alert("참가 항목을 선택해주세요"); return; }
+    // 사진 심사 — 승인 전이면 안내창 (상태를 못 불러오면 그대로 진행, 결제 단계에서 서버가 다시 검사)
+    const vs = await fetchVerificationState();
+    const gate = photoGateCode(vs);
+    if (gate) { setPhotoGate({ code: gate, reason: vs?.photo.rejectReason ?? null }); return; }
 
     const inCart = cart.find(c => c.partyId === id);
     if (inCart && !(selectedOption && inCart.optionId !== selectedOption.id)) {
@@ -1030,6 +1038,8 @@ export default function PartyClientView({ id, initialParties }: { id: string; in
       <PartyBottomBar title={detailItem.title} when={barWhen} place={barPlace} fee={barFee}>
         <PartyCtaButtons state={ctaState} onCheckout={handleCheckout} onAddToCart={handleAddToCart} />
       </PartyBottomBar>
+
+      <PhotoGateModal code={photoGate?.code ?? null} rejectReason={photoGate?.reason} from={`/party/${id}/`} onClose={() => setPhotoGate(null)} />
 
       {/* Cart confirmation modal */}
       <AnimatePresence>

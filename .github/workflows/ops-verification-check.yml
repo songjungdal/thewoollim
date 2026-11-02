@@ -1,0 +1,70 @@
+# [1회용] 사진 심사·직업 인증 운영 서버 준비 상태 점검 — 읽기만 (2026-11-02, docs/specs/photo-job-verification.md 8장)
+#
+# 실행: Actions → "Ops - verification readiness check (one-time)" → Run workflow (main 에서만)
+#   웹 서버 PHP 의 GD·Imagick·EXIF·업로드 크기 제한, 웹 루트 밖 데이터 폴더 상태를 확인한다 — scripts/ops/verification-check-remote.sh
+# 서버 접속은 deploy.yml 과 같은 방식·같은 production 환경 Secret. 서버에 아무것도 바꾸지 않는다.
+# 작업이 끝나면 이 파일은 삭제한다(1회용).
+
+name: Ops - verification readiness check (one-time)
+
+on:
+  workflow_dispatch: {}
+
+permissions: {}
+
+concurrency:
+  group: thewoollim-production
+  cancel-in-progress: false
+
+env:
+  WEB_ROOT: ${{ vars.DEPLOY_WEB_ROOT || '/var/www/thewoollim' }}
+  DEPLOY_SSH_USER: ${{ vars.DEPLOY_SSH_USER || 'admin' }}
+  DEPLOY_SSH_PORT: ${{ vars.DEPLOY_SSH_PORT || '22' }}
+  DEPLOY_ACCESS_MODE: ${{ vars.DEPLOY_ACCESS_MODE || 'direct' }}
+
+jobs:
+  check:
+    name: 인증 기능 준비 상태 점검 (읽기만)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment:
+      name: production
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: 실행 조건 확인
+        run: '[ "$GITHUB_REF" = "refs/heads/main" ] || { echo "::error::main 브랜치에서만 실행합니다."; exit 1; }'
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: AWS 자격증명 (보안그룹 임시 허용 모드)
+        if: env.DEPLOY_ACCESS_MODE == 'aws-sg-temporary'
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: 보안그룹 임시 허용
+        if: env.DEPLOY_ACCESS_MODE == 'aws-sg-temporary'
+        env:
+          AWS_SECURITY_GROUP_ID: ${{ vars.AWS_SECURITY_GROUP_ID }}
+        run: bash scripts/deploy/aws-sg.sh open
+
+      - name: SSH 설정
+        env:
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}
+          DEPLOY_SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+        run: bash scripts/deploy/ssh-setup.sh
+
+      - name: 서버 점검 (읽기만)
+        run: ssh thewoollim-prod "bash -s -- '$WEB_ROOT'" < scripts/ops/verification-check-remote.sh
+
+      - name: 보안그룹 임시 허용 제거
+        if: always() && env.DEPLOY_ACCESS_MODE == 'aws-sg-temporary'
+        env:
+          AWS_SECURITY_GROUP_ID: ${{ vars.AWS_SECURITY_GROUP_ID }}
+        run: bash scripts/deploy/aws-sg.sh close
