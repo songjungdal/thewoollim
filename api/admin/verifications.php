@@ -254,7 +254,7 @@ try {
         $rec['reviewed_at'] = $now;
         if ($kind === 'job') verifyDeleteRecordFiles($rec);   // 직업 서류: 승인·반려 즉시 삭제
         $store['records'][$idx] = $rec;
-        $result = ['kind' => $kind, 'userId' => $uid];
+        $result = ['kind' => $kind, 'userId' => $uid, 'createdAt' => (string)($rec['created_at'] ?? '')];
         verifyLog("record {$id} {$kind} " . ($approve ? 'approved' : 'rejected') . " by admin {$adminId}");
         return $store;
     });
@@ -285,4 +285,6 @@ logAdminActivity('update', 'verification', $email !== '' ? $email : (string)$res
 require_once __DIR__ . '/_verification_sms.php';
 notifyVerificationSms($result['userId'], $result['kind'], $approve, $reason);
 
-jsonOut(['ok' => true]);
+// 운영자 텔레그램 처리 완료 알림(무음) — 응답을 보낸 뒤 (docs/specs/verification-telegram.md 4-2)
+require_once __DIR__ . '/../verification/_notify.php';
+respondJsonThen(['ok' => true], fn() => verifyNotifyDecision($result['userId'], $result['kind'], $approve, $reason, $adminId, $result['createdAt']));

@@ -21,7 +21,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 | 서비스 | thewoollim.com. 오프라인 파티 신청·결제·운영 사이트. 파티 종류는 매칭파티(1:1 로테이션 소개팅)와 솔로파티 두 가지다. 솔로파티 규칙은 `docs/specs/party-*.md` 명세서에 있다 |
 | 화면 | Next.js 16 App Router + React 19 + Tailwind CSS 4 + TypeScript. `next.config.ts`의 `output: "export"`로 **정적 HTML(`out/`)** 을 만든다 |
 | 서버 | `api/` 아래 PHP 파일. 브라우저가 `/api/*.php`를 직접 호출한다 |
-| 데이터 | 회원·후기·현장스케치·관리자 메모·매칭 투표는 MySQL/MariaDB(PDO, `api/db.php`). 파티·예약·장바구니·쿠폰·메인이미지 설정·관리자 활동 기록·멤버십·사진 심사/직업 인증 기록은 서버의 JSON 파일(멤버십·인증 기록과 인증 사진은 웹 루트 밖 폴더에만). 위치는 `api/lib.php` `dataDir()`가 정한다(웹 루트 밖 `<웹 루트>-data/`, 옮기기 전에는 `api/data/`. `docs/DEPLOYMENT.md` 6-1) |
+| 데이터 | 회원·후기·현장스케치·관리자 메모·매칭 투표는 MySQL/MariaDB(PDO, `api/db.php`). 파티·예약·장바구니·쿠폰·메인이미지 설정·관리자 활동 기록·멤버십·사진 심사/직업 인증 기록·텔레그램 알림 설정은 서버의 JSON 파일(멤버십·인증 기록·인증 사진·텔레그램 설정은 웹 루트 밖 폴더에만). 위치는 `api/lib.php` `dataDir()`가 정한다(웹 루트 밖 `<웹 루트>-data/`, 옮기기 전에는 `api/data/`. `docs/DEPLOYMENT.md` 6-1) |
 | 외부 연동 | 토스페이먼츠(결제), 포트원 V2 + 다날(본인인증), 알리고(SMS), 카카오·네이버·구글 로그인(현재 화면에서 숨김) |
 | 운영 | AWS EC2. 배포는 GitHub Actions 수동 워크플로로만 한다(13장) |
 

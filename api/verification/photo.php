@@ -54,9 +54,14 @@ foreach (['photo1', 'photo2'] as $field) {
 }
 
 $summary = null;
+$recordId = 0;
+$photoKind = '첫 제출';   // 텔레그램 알림 구분 (docs/specs/verification-telegram.md 4-1)
 try {
-    verifyWithStore(function (array $store) use ($userId, $files, &$summary) {
+    verifyWithStore(function (array $store) use ($userId, $files, &$summary, &$recordId, &$photoKind) {
         $now = verifyNow();
+        $prev = verifyUserRecords($store, $userId, 'photo');
+        $has = fn(string $st) => (bool)array_filter($prev, fn($r) => ($r['status'] ?? '') === $st);
+        $photoKind = $has('approved') ? '사진 교체(승인 회원)' : ($has('rejected') ? '재제출(반려 후)' : ($has('pending') ? '다시 제출(심사 중 교체)' : '첫 제출'));
         foreach ($store['records'] as &$r) {
             if (is_array($r) && (int)($r['user_id'] ?? 0) === $userId && ($r['kind'] ?? '') === 'photo' && ($r['status'] ?? '') === 'pending') {
                 $r['status'] = 'superseded';
@@ -74,6 +79,7 @@ try {
             'consent_at' => $now,
             'created_at' => $now,
         ];
+        $recordId = $store['seq'];
         $summary = verifyPhotoSummary($store, $userId);
         verifyLog("photo submitted record={$store['seq']} user={$userId}");
         return $store;
@@ -84,4 +90,6 @@ try {
     jsonFail('잠시 후 다시 시도해주세요.', 500);
 }
 
-jsonOut(['ok' => true, 'photo' => $summary]);
+// 운영자 텔레그램 알림 — 응답을 보낸 뒤 (실패해도 접수 결과에 영향 없음)
+require_once __DIR__ . '/_notify.php';
+respondJsonThen(['ok' => true, 'photo' => $summary], fn() => verifyNotifySubmit($userId, $recordId, $photoKind));

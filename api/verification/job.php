@@ -68,8 +68,9 @@ if ($name === null) {
 $bizCheck = $type === 'business' ? verifyNtsCheck($bizNo, $openDate, (string)($u['name'] ?? '')) : null;
 
 $summary = null;
+$recordId = 0;
 try {
-    verifyWithStore(function (array $store) use ($userId, $type, $docKind, $name, $bizCheck, &$summary) {
+    verifyWithStore(function (array $store) use ($userId, $type, $docKind, $name, $bizCheck, &$summary, &$recordId) {
         $now = verifyNow();
         foreach ($store['records'] as &$r) {
             if (is_array($r) && (int)($r['user_id'] ?? 0) === $userId && ($r['kind'] ?? '') === 'job' && ($r['status'] ?? '') === 'pending') {
@@ -93,6 +94,7 @@ try {
         ];
         if ($bizCheck !== null) $rec['biz_check'] = $bizCheck;
         $store['records'][] = $rec;
+        $recordId = $store['seq'];
         $summary = verifyJobSummary($store, $userId, null);
         verifyLog("job submitted record={$store['seq']} user={$userId} type={$type}" . ($bizCheck ? " nts={$bizCheck['result']}" : ''));
         return $store;
@@ -103,4 +105,6 @@ try {
     jsonFail('잠시 후 다시 시도해주세요.', 500);
 }
 
-jsonOut(['ok' => true, 'job' => $summary]);
+// 운영자 텔레그램 알림 — 응답을 보낸 뒤 (실패해도 접수 결과에 영향 없음)
+require_once __DIR__ . '/_notify.php';
+respondJsonThen(['ok' => true, 'job' => $summary], fn() => verifyNotifySubmit($userId, $recordId));

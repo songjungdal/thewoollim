@@ -34,6 +34,15 @@ require_once __DIR__ . '/../lib.php';
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../_profile_notify_sms.php'; // _profileNotifyIsTestAccount() 재사용
 
+// 운영자 텔레그램 — 매일 KST 10시 심사 대기 요약 (매시 정각 도는 이 배치에 붙임. 하루 한 번만, 실패해도 문자 배치는 계속.
+// 문자 설정이 없어 아래에서 멈추는 경우에도 보내도록 맨 앞에 둔다. docs/specs/verification-telegram.md 4-3)
+try {
+    require_once __DIR__ . '/../verification/_notify.php';
+    verifyNotifyDailySummary();
+} catch (Throwable $e) {
+    error_log('[profile_24h_reminder] telegram summary: ' . $e->getMessage());
+}
+
 $dataDir = dataDir();
 
 function _p24Log(string $status, string $detail): void {
