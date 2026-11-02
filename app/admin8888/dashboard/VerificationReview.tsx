@@ -7,11 +7,13 @@
  *  - 목록: 심사 중 먼저, 오래된 순. 필터: 사진/직업, 상태
  *  - 상세: 사진 2장(이전 승인 사진이 있으면 나란히) · 직업 서류와 국세청 확인 결과 → [승인] / [반려]
  *    사진·서류는 api/admin/verification-file.php 로만 불러온다(열람은 활동 로그에 남는다).
+ *  - 스위치 아래 텔레그램 알림 설정 카드(TelegramSettings.tsx)
  */
 
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { BadgeCheck, Camera, CheckCircle2, Loader2, RefreshCw, ShieldAlert, X, XCircle } from "lucide-react";
+import TelegramSettings from "./TelegramSettings";
 
 const API = "/api/admin/verifications.php";
 export const verificationFileUrl = (id: number, slot: 1 | 2) => `/api/admin/verification-file.php?id=${id}&slot=${slot}`;
@@ -335,6 +337,9 @@ export default function VerificationReview({ onChanged }: { onChanged?: () => vo
           </button>
         </div>
       )}
+
+      {/* 텔레그램 알림 설정 (docs/specs/verification-telegram.md 3장) */}
+      <TelegramSettings />
 
       {error && <p className="mb-3 rounded-xl bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{error}</p>}
       {loading ? (
