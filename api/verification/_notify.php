@@ -1,6 +1,6 @@
 <?php
 /**
- * 사진 심사·직업 인증 → 운영자 텔레그램 그룹 알림 문구 (docs/specs/verification-telegram.md 4장).
+ * 사진 심사·직업 인증 → 운영자 텔레그램 알림 문구 (docs/specs/verification-telegram.md 4장 — 받는 곳은 운영자 개인 대화·그룹, 10장).
  *
  * ★ 개인정보 원칙(api/notify/_telegram.php 머리말과 같음): 이름·연락처·이메일·생년월일·사진·서류·사업자번호는 넣지 않는다.
  *   성별·나이대(ageBand)·구분·건수·시각·처리한 관리자 아이디만 쓴다.
