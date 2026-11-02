@@ -10,6 +10,8 @@
 #      /membership/join/ 은 로그인해야 열리므로(비로그인은 로그인 화면으로 이동), 같은 안내 부품(MembershipNotice)과
 #      같은 state.php 의 ready 값을 쓰는 소개 페이지 /membership/ 을 실제 브라우저로 연다.
 #   4. 모두 통과하면 이 워크플로를 스스로 비활성화한다. 다시 쓰려면 Actions 화면에서 Enable workflow.
+#      2026-11-02: 파일 이름을 ops-membership-key.yml → ops-membership-key-install.yml 로 바꿨다. 예전 이름은 비활성화된 채로 남아
+#      새 이름으로 다시 등록해, production 환경 Secret 으로 옮긴 키를 다시 넣었다.
 # 서버 접속은 deploy.yml 과 같은 방식·같은 production 환경 Secret.
 
 name: Ops - membership billing key (one-time)
@@ -137,10 +139,13 @@ jobs:
       - name: 이 워크플로 비활성화
         env:
           GH_TOKEN: ${{ github.token }}
+          WF_REF: ${{ github.workflow_ref }}
         run: |
           set -euo pipefail
+          # 지금 실행 중인 워크플로 파일 이름 (owner/repo/.github/workflows/<파일>@refs/heads/main → <파일>)
+          WF_FILE="${WF_REF%@*}"; WF_FILE="${WF_FILE##*/}"
           curl -fsS -X PUT -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/ops-membership-key.yml/disable"
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/$WF_FILE/disable"
           echo "워크플로를 비활성화했습니다 (다시 쓰려면 Actions 화면에서 Enable workflow)"
 
       - name: 보안그룹 임시 허용 제거
