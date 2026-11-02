@@ -1,13 +1,15 @@
 <?php
 /**
- * 운영자 텔레그램 그룹 알림 공통 (docs/specs/verification-telegram.md).
+ * 운영자 텔레그램 알림 공통 (docs/specs/verification-telegram.md — 10장: 그룹방 대신 운영자 개인 대화로도 받음).
  *
  * ★ 개인정보 원칙 — 텔레그램은 회사 밖 서비스다. 이름·연락처·이메일·생년월일·사진·서류·사업자번호 등
  *   개인을 알아볼 수 있는 정보는 메시지에 절대 넣지 않는다(성별·나이대·구분·건수·시각·관리자 아이디만).
  *   이 원칙 덕분에 개인정보처리방침을 바꾸지 않았다. 메시지에 항목을 더할 때 반드시 지킨다.
  *
  * 설정: privateDataDir()/notify/telegram.json (웹 루트 밖, 0600, withFileLock)
- *   { enabled, token, chat_id, chat_title, admin_url, last_summary_date, updated_by, updated_at }
+ *   { enabled, token, recipients:[{id,title,type}], admin_url, last_summary_date, updated_by, updated_at }
+ *   recipients: 알림 받을 대화 — 운영자 개인 대화(private, 그 사람이 봇에게 /start 를 보낸 대화) 또는 그룹. 최대 TELEGRAM_MAX_RECIPIENTS.
+ *   예전 형식(chat_id·chat_title 하나)도 읽는다(telegramRecipients).
  *   토큰 원문은 화면·API 응답·로그 어디에도 내보내지 않는다(telegramMaskToken 으로 가린 값만).
  * 발송: 연결 3초·전체 5초 제한, 실패해도 예외를 던지지 않고 false. 재시도하지 않는다.
  *   22:00~08:00(KST)에는 무음. 실패 기록은 dataDir()/_telegram.log 에 시각·HTTP 코드·텔레그램 오류 설명만(토큰·주소 없음).
@@ -19,9 +21,24 @@ require_once __DIR__ . '/../lib.php';
 
 const TELEGRAM_TEST_TEXT = '[어울림] 텔레그램 알림 연결 테스트입니다.';
 const TELEGRAM_DEFAULT_ADMIN_LINE = '관리자 > 인증 심사에서 확인';
+const TELEGRAM_MAX_RECIPIENTS = 5;
 
 function telegramDefaults(): array {
-    return ['enabled' => false, 'token' => '', 'chat_id' => '', 'chat_title' => '', 'admin_url' => '', 'last_summary_date' => ''];
+    return ['enabled' => false, 'token' => '', 'recipients' => [], 'chat_id' => '', 'chat_title' => '', 'admin_url' => '', 'last_summary_date' => ''];
+}
+
+/** 알림 받을 대화 목록 [{id,title,type}] — 예전 형식(chat_id 하나)도 받아 준다 */
+function telegramRecipients(array $cfg): array {
+    $out = [];
+    foreach ((array)($cfg['recipients'] ?? []) as $r) {
+        if (is_array($r) && preg_match('/^-?\d{1,20}$/', (string)($r['id'] ?? ''))) {
+            $out[] = ['id' => (string)$r['id'], 'title' => (string)($r['title'] ?? ''), 'type' => (string)($r['type'] ?? 'private')];
+        }
+    }
+    if (!$out && (string)($cfg['chat_id'] ?? '') !== '') {
+        $out[] = ['id' => (string)$cfg['chat_id'], 'title' => (string)($cfg['chat_title'] ?? ''), 'type' => 'group'];
+    }
+    return array_slice($out, 0, TELEGRAM_MAX_RECIPIENTS);
 }
 
 /** 설정 파일 경로 — 웹 루트 밖 폴더가 없으면 null (설정 저장 거절) */
@@ -68,9 +85,9 @@ function telegramTokenValid(string $token): bool {
     return (bool)preg_match('/^\d{5,15}:[A-Za-z0-9_-]{30,60}$/', $token);
 }
 
-/** 알림을 보낼 수 있는 상태 (스위치 켜짐 + 토큰 + 그룹) */
+/** 알림을 보낼 수 있는 상태 (스위치 켜짐 + 토큰 + 받는 사람 1명 이상) */
 function telegramReady(array $cfg): bool {
-    return !empty($cfg['enabled']) && (string)$cfg['token'] !== '' && (string)$cfg['chat_id'] !== '';
+    return !empty($cfg['enabled']) && (string)$cfg['token'] !== '' && telegramRecipients($cfg) !== [];
 }
 
 /** 22:00~08:00(KST) — 무음 */
@@ -123,28 +140,30 @@ function telegramApi(string $token, string $method, array $params): array {
 }
 
 /**
- * 그룹에 메시지 보내기 — 성공 여부. 일반 텍스트, 링크 미리보기 끔. 22:00~08:00 은 무음으로 강제.
- *  $requireEnabled=false 는 [테스트 알림 보내기] 전용 (스위치가 꺼져 있어도 토큰·그룹이 있으면 보냄)
- *  $cfg 를 주지 않으면 저장된 설정을 읽는다. $errorOut 에 텔레그램 오류 설명(토큰 없음)
+ * 받는 사람 모두에게 메시지 보내기 — 한 명이라도 받았으면 true. 일반 텍스트, 링크 미리보기 끔. 22:00~08:00 은 무음으로 강제.
+ *  $requireEnabled=false 는 [테스트 알림 보내기] 전용 (스위치가 꺼져 있어도 토큰·받는 사람이 있으면 보냄)
+ *  $cfg 를 주지 않으면 저장된 설정을 읽는다. $results 에 받는 사람별 [id,title,ok,error](토큰 없음)
  */
-function telegramSend(string $text, bool $silent = false, ?array $cfg = null, bool $requireEnabled = true, ?string &$errorOut = null): bool {
+function telegramSend(string $text, bool $silent = false, ?array $cfg = null, bool $requireEnabled = true, ?array &$results = null): bool {
+    $results = [];
     try {
         $cfg ??= telegramConfig();
-        if ($requireEnabled ? !telegramReady($cfg) : ((string)$cfg['token'] === '' || (string)$cfg['chat_id'] === '')) {
-            $errorOut = '토큰·그룹이 설정되지 않았습니다.';
-            return false;
-        }
+        $to = telegramRecipients($cfg);
+        if ($requireEnabled ? !telegramReady($cfg) : ((string)$cfg['token'] === '' || $to === [])) return false;
         if (telegramQuietHours()) $silent = true;
-        $r = telegramApi((string)$cfg['token'], 'sendMessage', [
-            'chat_id'              => (string)$cfg['chat_id'],
-            'text'                 => $text,
-            'disable_notification' => $silent,
-            'link_preview_options' => ['is_disabled' => true],
-        ]);
-        $errorOut = $r['ok'] ? null : $r['error'];
-        return $r['ok'];
+        $any = false;
+        foreach ($to as $r) {
+            $res = telegramApi((string)$cfg['token'], 'sendMessage', [
+                'chat_id'              => $r['id'],
+                'text'                 => $text,
+                'disable_notification' => $silent,
+                'link_preview_options' => ['is_disabled' => true],
+            ]);
+            $results[] = ['id' => $r['id'], 'title' => $r['title'], 'ok' => $res['ok'], 'error' => $res['error']];
+            $any = $any || $res['ok'];
+        }
+        return $any;
     } catch (Throwable $e) {
-        $errorOut = '통신 실패';
         return false;
     }
 }
