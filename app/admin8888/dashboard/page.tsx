@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef, useMemo, Fragment } from "rea
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Users, Ticket, Tag, Building2, LogOut, ShieldCheck, CheckCircle2, Clock, AlertTriangle, Calendar, Plus, Pencil, Trash2, ImageIcon, X, FileText, Search, StickyNote, Save, ChevronDown, CreditCard, RotateCcw, Star, GalleryHorizontal, Menu, BadgeCheck } from "lucide-react";
+import { Users, Ticket, Tag, Building2, LogOut, ShieldCheck, CheckCircle2, Clock, AlertTriangle, Calendar, Plus, Pencil, Trash2, ImageIcon, X, FileText, Search, StickyNote, Save, ChevronDown, CreditCard, RotateCcw, Star, GalleryHorizontal, Menu, BadgeCheck, Link2 } from "lucide-react";
 import { useParties, broadcastPartiesUpdated } from "../../lib/useParties";
 import { formatPhoneKR } from "../../lib/phone";
 import { calculateRefund, refundRateLabel } from "../../lib/refund";
@@ -16,6 +16,7 @@ import PartyHeroCropModal from "./PartyHeroCropModal";
 import TestUsersTools from "./TestUsersTools";
 import HeroEditor from "./HeroEditor";
 import VerificationReview from "./VerificationReview";
+import PaylinkAdmin from "./PaylinkAdmin";
 import VerificationPhotoButton from "./VerificationPhotoButton";
 import PartyOptionsEditor from "./PartyOptionsEditor";
 import DiscountArrow from "../../components/DiscountArrow";
@@ -48,7 +49,7 @@ type BookingRow = {
   refundRequestAmount?: number; // 취소요청한 날 기준 환불 금액
   refundAmount?: number;        // 실제 환불액 (환불 완료 건)
 };
-type TabKey = "members" | "bookings" | "parties" | "coupons" | "company" | "hero" | "gallery" | "reviews" | "logs" | "cancel_requests" | "memos" | "verifications";
+type TabKey = "members" | "bookings" | "parties" | "coupons" | "company" | "hero" | "gallery" | "reviews" | "logs" | "cancel_requests" | "memos" | "verifications" | "paylinks";
 /** 인증 심사 요약 — api/admin/verifications.php?summary=1 (회원 관리 표·확인할 업무) */
 type VerifySummary = {
   pendingCount: number;
@@ -61,7 +62,7 @@ const PHOTO_COL: Record<string, { label: string; tone: string }> = {
 };
 /** 모바일 메뉴 시트의 묶음 — 탭 key 만 나열 (라벨·아이콘은 TABS 그대로) */
 const MOBILE_MENU_GROUPS: { label: string; keys: TabKey[] }[] = [
-  { label: "운영",   keys: ["bookings", "parties", "cancel_requests", "verifications", "members", "coupons", "memos"] },
+  { label: "운영",   keys: ["bookings", "parties", "cancel_requests", "paylinks", "verifications", "members", "coupons", "memos"] },
   { label: "콘텐츠", keys: ["hero", "gallery", "reviews"] },
   { label: "설정",   keys: ["company", "logs"] },
 ];
@@ -1576,6 +1577,7 @@ export default function AdminDashboard() {
     { key: "logs", label: "로그 관리", icon: FileText },
     { key: "cancel_requests", label: "취소요청", icon: RotateCcw },
     { key: "verifications", label: "인증 심사", icon: BadgeCheck },
+    { key: "paylinks", label: "결제 링크", icon: Link2 },
     { key: "memos", label: "업무 메모", icon: StickyNote },
   ];
 
@@ -1722,6 +1724,7 @@ export default function AdminDashboard() {
 
           {/* === 인증 심사 (사진 심사 · 직업 인증) === */}
           {tab === "verifications" && <VerificationReview onChanged={loadAll} />}
+          {tab === "paylinks" && <PaylinkAdmin />}
 
           {/* === 회원 관리 === */}
           {tab === "members" && (() => {

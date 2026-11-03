@@ -13,6 +13,7 @@ import { isOnboardingSnoozed, clearOnboardingSnooze } from "../lib/onboardingSno
  *  - /onboarding 자체
  *  - /login (로그인 흐름)
  *  - /admin8888 계열 (관리자 영역)
+ *  - /pay 대관료 결제 링크 — 로그인한 회원이 열어도 온보딩으로 보내지 않는다 (docs/specs/paylink.md 3장)
  *  - /api 직접 호출 (있을 수 없지만 안전장치)
  *
  * 스누즈: 사용자가 /onboarding의 [나중에 입력하기]를 누르면 sessionStorage
@@ -26,6 +27,7 @@ const ALLOW = (path: string): boolean =>
   || path.startsWith("/login/")
   || path.startsWith("/admin8888")
   || path.startsWith("/matching")   // 독립 매칭 투표/결과 흐름 — 세션 격리, 메인으로 튕기지 않음
+  || path === "/pay" || path.startsWith("/pay/")   // 대관료 결제 링크 (로그인 없이 결제)
   || path.startsWith("/api/");
 
 export default function OnboardingGuard() {

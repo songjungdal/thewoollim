@@ -1,6 +1,6 @@
 # =============================================
 # 어울림(THEWOOLLIM) robots.txt — 정식 오픈
-# 일반 페이지는 색인 허용, 관리자/투표 보안 경로는 차단
+# 일반 페이지는 색인 허용, 관리자/투표 보안 경로·결제 링크(/pay/)는 차단
 # =============================================
 
 User-agent: *
@@ -11,5 +11,7 @@ Disallow: /matching/results
 Disallow: /matching/results/
 Disallow: /matching/results/admin8888
 Disallow: /matching/results/admin8888/
+Disallow: /pay
+Disallow: /pay/
 
 Sitemap: https://thewoollim.com/sitemap.xml
