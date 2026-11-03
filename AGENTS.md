@@ -21,7 +21,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 | 서비스 | thewoollim.com. 오프라인 파티 신청·결제·운영 사이트. 파티 종류는 매칭파티(1:1 로테이션 소개팅)와 솔로파티 두 가지다. 솔로파티 규칙은 `docs/specs/party-*.md` 명세서에 있다 |
 | 화면 | Next.js 16 App Router + React 19 + Tailwind CSS 4 + TypeScript. `next.config.ts`의 `output: "export"`로 **정적 HTML(`out/`)** 을 만든다 |
 | 서버 | `api/` 아래 PHP 파일. 브라우저가 `/api/*.php`를 직접 호출한다 |
-| 데이터 | 회원·후기·현장스케치·관리자 메모·매칭 투표는 MySQL/MariaDB(PDO, `api/db.php`). 파티·예약·장바구니·쿠폰·메인이미지 설정·관리자 활동 기록·멤버십·사진 심사/직업 인증 기록·텔레그램 알림 설정은 서버의 JSON 파일(멤버십·인증 기록·인증 사진·텔레그램 설정은 웹 루트 밖 폴더에만). 위치는 `api/lib.php` `dataDir()`가 정한다(웹 루트 밖 `<웹 루트>-data/`, 옮기기 전에는 `api/data/`. `docs/DEPLOYMENT.md` 6-1) |
+| 데이터 | 회원·후기·현장스케치·관리자 메모·매칭 투표는 MySQL/MariaDB(PDO, `api/db.php`). 파티·예약·장바구니·쿠폰·메인이미지 설정·관리자 활동 기록·멤버십·사진 심사/직업 인증 기록·텔레그램 알림 설정·대관료 결제 링크는 서버의 JSON 파일(멤버십·인증 기록·인증 사진·텔레그램 설정·결제 링크는 웹 루트 밖 폴더에만). 위치는 `api/lib.php` `dataDir()`가 정한다(웹 루트 밖 `<웹 루트>-data/`, 옮기기 전에는 `api/data/`. `docs/DEPLOYMENT.md` 6-1) |
 | 외부 연동 | 토스페이먼츠(결제), 포트원 V2 + 다날(본인인증), 알리고(SMS), 카카오·네이버·구글 로그인(현재 화면에서 숨김) |
 | 운영 | AWS EC2. 배포는 GitHub Actions 수동 워크플로로만 한다(13장) |
 
@@ -36,6 +36,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 | `app/admin****/` | 관리자 로그인·대시보드 (실제 폴더 이름은 문서에 적지 않는다, 12장) |
 | `api/lib.php` | PHP 공통 헬퍼(JSON 응답, 파일 잠금, 가격·정원·쿠폰 계산 등) |
 | `api/auth/`, `api/payments/`, `api/admin/`, `api/matching/` | 로그인·본인인증 / 결제 / 관리자 전용 / 매칭 투표 API |
+| `api/paylink/`, `app/pay/` | 대관료 결제 링크(로그인 없이 링크로 결제, `docs/specs/paylink.md`). 파티 결제 파일과 섞지 않는다 |
 | `api/cron/` | 서버 타이머로 실행되는 문자 발송 배치(CLI 전용) |
 | `api/**/*.example.php` | 비밀 설정 파일의 템플릿. 실제 설정 파일은 서버에만 있다 |
 | `db/migrations/` | `users` 테이블 SQL만 있다. 다른 DB 테이블의 생성 SQL은 저장소에 없다 |
@@ -93,7 +94,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 | 솔로파티 참가 구성(회차·항목) 제한 | `app/lib/partyOptions.ts` | `api/lib.php`(`sanitizePartyOptions`) |
 | 파티 상세 안내 입력 제한 | `app/lib/partyDetailTemplates.ts`(`DETAIL_LIMITS`) | `api/lib.php`(`sanitizePartyDetail`) |
 | 메인 이미지 슬라이드 계산 | `app/lib/hero.ts`(`buildHeroSlides`) | `api/_hero.php`(`heroBuildSlides`) |
-| 환불 비율 | `app/lib/refund.ts` | `api/lib.php`(`refundQuote`) — `api/payments/cancel-request.php`(취소 요청한 날 기준 금액 저장), `api/admin/bookings.php`(관리자 승인) |
+| 환불 비율 | `app/lib/refund.ts` — 결제 링크 화면 `/pay/`(`app/lib/paylink.ts`가 `REFUND_TABLE`을 그대로 씀) | `api/lib.php`(`refundQuote`) — `api/payments/cancel-request.php`(취소 요청한 날 기준 금액 저장), `api/admin/bookings.php`(관리자 승인), `api/admin/paylinks.php`·`api/paylink/_lib.php`(결제 링크 취소 규정 금액·결제 시점 규정 보존) |
 | 테스트 회원 범위 | `app/lib/testUsers.ts`(`TEST_USER_MAX`, `isTestUser`) | `api/lib.php`(`TEST_USER_MAX`, `isTestUser`) |
 | 문자 발송 제외 대상 | — | `api/lib.php`(`isSmsExcludedAccount`) 한 곳. 신청 접수·참가 확정·취소·프로필 안내 문자와 `api/cron/*.php`가 이 함수를 쓴다. 임시 비밀번호 문자(`api/auth/reset-password.php`)는 이 함수를 쓰지 않고 테스트 회원(`isTestUser`)과 관리자 계정 도메인을 따로 검사한다 |
 

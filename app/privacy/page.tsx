@@ -41,6 +41,7 @@ export default function PrivacyPage() {
                   <ul className="list-disc pl-5 md:pl-6 space-y-2">
                     <li><span className="font-bold">파티 신청 시:</span> 얼굴 사진 2장</li>
                     <li><span className="font-bold">직업 인증 신청 시(선택):</span> 직업 증빙 서류 이미지, 사업자등록번호·개업일자</li>
+                    <li><span className="font-bold">대관료 등 결제 링크 결제 시:</span> 이름, 휴대폰 번호, 결제 기록</li>
                   </ul>
                 </div>
               </section>
@@ -109,7 +110,7 @@ export default function PrivacyPage() {
 
               <section className="bg-gray-50 p-5 md:p-8 rounded-xl md:rounded-2xl border border-gray-100">
                 <h2 className="text-lg md:text-xl font-bold text-black mb-3 md:mb-4">부칙</h2>
-                <p className="text-gray-700">본 방침은 2026년 11월 2일부터 시행합니다. (이전 방침: 2026년 10월 9일부터 시행)</p>
+                <p className="text-gray-700">본 방침은 2026년 11월 3일부터 시행합니다. (이전 방침: 2026년 11월 2일부터 시행)</p>
               </section>
             </div>
           </div>
