@@ -107,19 +107,21 @@ function GenderColumn({ gender, list, seats, hideProfile }: {
       {list.map(p => {
         const meta = (hideProfile ? [p.ageBand] : [p.ageBand, p.mbti, p.job]).filter(Boolean).join(" · ");
         return (
-          <div key={p.id} className={`min-h-[58px] rounded-lg border px-2.5 py-2 max-[359px]:px-1.5 ${t.card}`} data-testid="participant-card">
-            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-              <span className={`whitespace-nowrap text-[14px] font-black max-[359px]:text-[13px] ${t.text}`}>{maskParticipantName(p.maskedName)}</span>
+          // 모바일은 2줄(이름·배지 / 연령대·MBTI·직업), 태블릿·PC(md~)는 한 줄 — 칸이 모자라면 맨 뒤 직업부터 … 으로 줄인다
+          <div key={p.id} className={`min-h-[58px] rounded-lg border px-2.5 py-2 max-[359px]:px-1.5 md:flex md:min-h-[60px] md:items-center md:gap-x-2 md:px-3 md:py-3 lg:px-4 ${t.card}`} data-testid="participant-card">
+            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 md:contents">
+              <span className={`whitespace-nowrap text-[14px] font-black max-[359px]:text-[13px] md:flex-shrink-0 md:text-[15px] ${t.text}`}>{maskParticipantName(p.maskedName)}</span>
               <StatusMiniBadge status={p.status} />
               {/* 솔로파티 참가 구성 — 신청한 항목 이름 */}
               {p.optionName && (
-                <span className="inline-block max-w-full truncate rounded-full border border-gray-200 bg-white px-1.5 py-0.5 align-middle text-xs font-bold text-gray-600">
+                <span className="inline-block max-w-full truncate rounded-full border border-gray-200 bg-white px-1.5 py-0.5 align-middle text-xs font-bold text-gray-600 md:min-w-0">
                   {p.optionName}
                 </span>
               )}
             </div>
             {meta && (
-              <p className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5 text-[12px] text-gray-500">
+              // 직업이 없으면(솔로파티·프로필 대기) 짧은 글자라 줄이지 않는다 — 칸이 모자라면 신청 항목 이름이 대신 줄어든다
+              <p className={`mt-1 flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5 text-[12px] text-gray-500 md:mt-0 md:flex-nowrap md:text-[13px] ${hideProfile || !p.job ? "md:flex-shrink-0" : ""}`}>
                 <span className="min-w-0 truncate">{meta}</span>
                 {/* 직업 인증 배지 — 직업 옆. 솔로파티(hideProfile)는 직업을 보여 주지 않으므로 배지도 없다 */}
                 {!hideProfile && p.jobVerified && p.job && (
@@ -139,6 +141,7 @@ function GenderColumn({ gender, list, seats, hideProfile }: {
 /**
  * 실시간 참가자 명단 (docs/specs/party-detail-relayout.md D-4) — 남/여 2열(모든 화면 폭), 열 높이는 따로.
  * 남은 자리는 성별 머리 카드(진행바·잔여석)로만 보여 준다. 명단 아래 범례·안내 문구는 두지 않는다.
+ * 참가자 카드는 모바일 2줄, 태블릿·PC 한 줄(2026-11-05).
  */
 export default function ParticipantsRoster({ male, female, maleSeats, femaleSeats, status, updatedAt, hideProfile, titleClassName }: {
   male: Participant[];
