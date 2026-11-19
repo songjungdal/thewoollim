@@ -254,7 +254,7 @@ export default function VerificationClient() {
   const job = state?.job;
   const ready = !!state?.ready;
   const showPhotoForm = !!photo && (photo.status === "none" || photo.status === "rejected" || photoReplace);
-  const showJobForm = !!job && (job.status === "none" || job.status === "rejected" || job.status === "reverify" || jobReplace);
+  const showJobForm = !!job && (job.status === "none" || job.status === "rejected" || jobReplace);
   const previewWhich = photo?.status === "pending" ? "pending" : "approved";
   const canGoBack = !!from && (!!photo?.approved || !!state?.testUser || !state?.photoRequired);
 
@@ -381,17 +381,16 @@ export default function VerificationClient() {
                   <BadgeCheck size={20} className="text-brand-point-ink" aria-hidden /> 직업 인증 <span className="text-base font-bold text-gray-500">(선택)</span>
                 </h2>
                 {job && (
-                  <StatusChip tone={job.status === "approved" ? "green" : job.status === "pending" ? "amber" : job.status === "rejected" || job.status === "reverify" ? "red" : "gray"}>
+                  <StatusChip tone={job.status === "approved" ? "green" : job.status === "pending" ? "amber" : job.status === "rejected" ? "red" : "gray"}>
                     <span data-testid="job-status">{JOB_STATUS_LABEL[job.status]}</span>
                   </StatusChip>
                 )}
               </div>
               <p className="mt-1 text-sm text-gray-500 break-keep">인증하면 파티 참여자 명단에 &apos;직업 인증&apos; 배지가 표시돼요. 제출 서류는 확인 후 바로 삭제합니다.</p>
 
-              {job && (job.status === "approved" || job.status === "reverify") && job.label && (
+              {job?.status === "approved" && job.label && (
                 <p className="mt-3 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800 break-keep">
                   인증된 직업: {job.label}
-                  {job.status === "reverify" && <span className="mt-1 block font-medium text-red-700">프로필의 직업이 바뀌어 배지를 숨겼어요. 다시 인증해주세요.</span>}
                 </p>
               )}
               {job?.status === "rejected" && job.rejectReason && (

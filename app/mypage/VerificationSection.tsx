@@ -18,13 +18,12 @@ const JOB_TONE: Record<JobStatus, string> = {
   none: "bg-gray-100 text-gray-700",
   pending: "bg-amber-100 text-amber-800",
   approved: "bg-emerald-100 text-emerald-800",
-  reverify: "bg-red-100 text-red-700",
   rejected: "bg-red-100 text-red-700",
 };
 
 /**
  * 마이페이지 > 인증 관리 (docs/specs/photo-job-verification.md 2-3).
- * 사진 심사 상태(미제출/심사 중/승인/반려+사유)와 직업 인증 상태(미인증/심사 중/인증 완료+표시 직업/재인증 필요/반려+사유).
+ * 사진 심사 상태(미제출/심사 중/승인/반려+사유)와 직업 인증 상태(미인증/심사 중/인증 완료+표시 직업/반려+사유).
  * 사진 교체·서류 제출은 /verification/ 에서 한다. 상태를 불러오지 못하면 그리지 않는다.
  */
 export default function VerificationSection() {
@@ -64,11 +63,8 @@ export default function VerificationSection() {
             <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-black ${JOB_TONE[job.status]}`} data-testid="mypage-job-status">
               {JOB_STATUS_LABEL[job.status]}
             </span>
-            {(job.status === "approved" || job.status === "reverify") && job.label && (
+            {job.status === "approved" && job.label && (
               <span className="ml-1.5 font-bold text-brand-black break-keep">{job.label}</span>
-            )}
-            {job.status === "reverify" && (
-              <p className="mt-1 text-[13px] font-bold text-red-700 break-keep">프로필 직업이 바뀌어 배지를 숨겼어요. 다시 인증해주세요.</p>
             )}
             {job.status === "rejected" && job.rejectReason && (
               <p className="mt-1 text-[13px] font-bold text-red-700 break-keep">사유: {job.rejectReason}</p>

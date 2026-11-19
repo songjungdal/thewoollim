@@ -31,7 +31,6 @@ type Settings = { photoRequired: boolean; switchOn: boolean; ready: boolean; rea
 const STATUS_META: Record<string, { label: string; tone: string }> = {
   pending: { label: "심사 중", tone: "bg-amber-100 text-amber-800" },
   approved: { label: "승인", tone: "bg-emerald-100 text-emerald-800" },
-  reverify: { label: "재인증 필요", tone: "bg-orange-100 text-orange-800" },
   rejected: { label: "반려", tone: "bg-red-100 text-red-700" },
   superseded: { label: "대체됨", tone: "bg-gray-100 text-gray-600" },
 };

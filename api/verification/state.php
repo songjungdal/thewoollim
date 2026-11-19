@@ -5,7 +5,7 @@
  * GET → {
  *   ok, ready(업로드 가능), photoRequired(결제 전 사진 승인 필요 — 관리자 스위치), testUser(검사 통과 회원),
  *   photo: { status:'none'|'pending'|'approved'|'rejected', approved, rejectReason, submittedAt, reviewedAt, approvedAt },
- *   job:   { status:'none'|'pending'|'approved'|'reverify'|'rejected', verified, label, jobType, rejectReason, submittedAt, reviewedAt }
+ *   job:   { status:'none'|'pending'|'approved'|'rejected', verified, label, jobType, rejectReason, submittedAt, reviewedAt }
  * }
  *  - 파일 경로·파일 이름은 내려주지 않는다. 사진은 my-photo.php 로만 본다.
  */
@@ -21,7 +21,7 @@ requireUser();
 
 $userId = (int)currentUserId();
 try {
-    $stmt = getDB()->prepare("SELECT email, job FROM users WHERE id = ? AND status = 'active' LIMIT 1");
+    $stmt = getDB()->prepare("SELECT email FROM users WHERE id = ? AND status = 'active' LIMIT 1");
     $stmt->execute([$userId]);
     $u = $stmt->fetch();
     if (!$u) jsonFail('unauthorized', 401);
@@ -37,5 +37,5 @@ jsonOut([
     'photoRequired' => verifyPhotoRequired($store),
     'testUser'      => isTestUser((string)$u['email']),
     'photo'         => verifyPhotoSummary($store, $userId),
-    'job'           => verifyJobSummary($store, $userId, (string)($u['job'] ?? '')),
+    'job'           => verifyJobSummary($store, $userId),
 ]);

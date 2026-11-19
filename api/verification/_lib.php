@@ -8,7 +8,8 @@
  *      record = { id, user_id, kind:'photo'|'job', status:'pending'|'approved'|'rejected'|'superseded'|'reverify',
  *                 job_type, doc_kind, job_label, job_text, files[], biz_check, reject_reason,
  *                 reviewed_by, reviewed_at, superseded_at, files_deleted_at, consent_at, created_at }
- *      job_text: 직업 승인 때 회원 프로필의 직업 글자. 프로필 직업이 이와 달라지면 배지를 숨기고 'reverify'(재인증 필요)
+ *      job_text: 직업 승인 때 회원 프로필의 직업 글자 — 기록용. 판정에 쓰지 않는다(docs/specs/verification-job-no-reverify.md)
+ *      'reverify': 예전(2026-11-19 이전) 프로필 직업 변경으로 바뀐 기록. 지금은 만들지 않고, 읽을 때 'approved'와 똑같이 본다
  *  - files/<무작위 32자>.jpg — 서버에서 다시 저장(재인코딩)해 EXIF(촬영 위치 등)를 지우고 긴 변 1600px 로 줄인 JPEG
  *
  * 보관: 승인 사진은 탈퇴 때까지, 반려·대체된 사진은 30일 뒤 삭제(verifyCleanup — cron), 직업 서류는 처리 즉시 삭제.
@@ -197,26 +198,32 @@ function verifyPhotoSummary(array $store, int $userId): array {
     ];
 }
 
-/** 승인된 직업 기록이 지금 프로필 직업과 맞는지 (배지 표시 조건) */
-function verifyJobBadge(?array $approved, ?string $currentJob): bool {
-    if ($approved === null || ($approved['status'] ?? '') !== 'approved') return false;
-    return $currentJob !== null && trim($currentJob) === trim((string)($approved['job_text'] ?? ''));
-}
+/** 직업 승인 기록으로 보는 상태 — 예전 'reverify' 기록도 승인과 똑같이 본다 */
+const VERIFY_JOB_APPROVED_STATUSES = ['approved', 'reverify'];
 
 /**
- * 직업 인증 상태 — status: 'none'|'pending'|'approved'|'reverify'|'rejected'
- *  $currentJob: 회원 프로필의 지금 직업 (null 이면 비교하지 않음)
+ * 직업 인증 배지 — 승인 기록이 있으면 표시 (docs/specs/verification-job-no-reverify.md).
+ * 운영진이 서류를 보고 승인했으면 그대로 유지한다. 프로필 직업 글자와 비교하지 않는다(명단에는 관리자가 정한 표시 직업이 나감).
  */
-function verifyJobSummary(array $store, int $userId, ?string $currentJob): array {
+function verifyJobBadge(?array $approved): bool {
+    return $approved !== null && in_array((string)($approved['status'] ?? ''), VERIFY_JOB_APPROVED_STATUSES, true);
+}
+
+/** 화면·관리자에게 내려줄 기록 상태 — 예전 'reverify'는 'approved'로 */
+function verifyPublicStatus(string $status): string {
+    return $status === 'reverify' ? 'approved' : $status;
+}
+
+/** 직업 인증 상태 — status: 'none'|'pending'|'approved'|'rejected' */
+function verifyJobSummary(array $store, int $userId): array {
     $recs     = verifyUserRecords($store, $userId, 'job');
-    $approved = verifyLatestWithStatus($recs, ['approved', 'reverify']);
+    $approved = verifyLatestWithStatus($recs, VERIFY_JOB_APPROVED_STATUSES);
     $pending  = verifyLatestWithStatus($recs, ['pending']);
     $last     = verifyLatestDecision($recs);
-    $badge    = verifyJobBadge($approved, $currentJob);
+    $badge    = verifyJobBadge($approved);
     if ($pending) $status = 'pending';
     elseif ($last && ($last['status'] ?? '') === 'rejected') $status = 'rejected';
-    elseif ($approved && $currentJob === null) $status = (string)$approved['status'];   // 'approved' | 'reverify'
-    elseif ($approved) $status = $badge ? 'approved' : 'reverify';
+    elseif ($approved) $status = 'approved';
     else $status = 'none';
     return [
         'status'       => $status,

@@ -1859,7 +1859,7 @@ export default function AdminDashboard() {
                               return (
                                 <>
                                   <td className="px-3 py-3">{pc ? <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-black ${pc.tone}`}>{pc.label}</span> : <span className="text-gray-500 text-xs">미제출</span>}</td>
-                                  <td className="px-3 py-3">{vs?.jobVerified ? <span className="inline-flex items-center gap-0.5 text-xs font-black text-brand-point-ink"><BadgeCheck size={12} /> {vs.jobLabel || "인증"}</span> : vs?.job === "pending" ? <span className="text-xs font-bold text-amber-700">심사 중</span> : vs?.job === "reverify" ? <span className="text-xs font-bold text-orange-700">재인증 필요</span> : <span className="text-gray-500 text-xs">-</span>}</td>
+                                  <td className="px-3 py-3">{vs?.jobVerified ? <span className="inline-flex items-center gap-0.5 text-xs font-black text-brand-point-ink"><BadgeCheck size={12} /> {vs.jobLabel || "인증"}</span> : vs?.job === "pending" ? <span className="text-xs font-bold text-amber-700">심사 중</span> : <span className="text-gray-500 text-xs">-</span>}</td>
                                 </>
                               );
                             })()}

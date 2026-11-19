@@ -124,10 +124,10 @@ foreach ($users as $u) {
             'status'     => (string)($b['status'] ?? ''),  // 'confirmed' | 'pending_approval'
             'createdAt'  => (string)($b['createdAt'] ?? ''), // 정렬 전용 — 응답 직전에 제거
         ];
-        // 직업 인증 — 승인 때의 직업 글자와 지금 프로필 직업이 같을 때만 배지 + 관리자가 정한 표시 직업
+        // 직업 인증 — 승인 기록이 있으면 배지 + 관리자가 정한 표시 직업 (프로필 직업과 비교하지 않음, verification-job-no-reverify.md)
         if ($verifyStore !== null) {
-            $jobRec = verifyLatestWithStatus(verifyUserRecords($verifyStore, (int)$u['id'], 'job'), ['approved', 'reverify']);
-            if (verifyJobBadge($jobRec, (string)($u['job'] ?? ''))) {
+            $jobRec = verifyLatestWithStatus(verifyUserRecords($verifyStore, (int)$u['id'], 'job'), VERIFY_JOB_APPROVED_STATUSES);
+            if (verifyJobBadge($jobRec)) {
                 $entry['jobVerified'] = true;
                 if (trim((string)($jobRec['job_label'] ?? '')) !== '') $entry['job'] = (string)$jobRec['job_label'];
             }
