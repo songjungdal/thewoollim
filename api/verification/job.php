@@ -95,7 +95,7 @@ try {
         if ($bizCheck !== null) $rec['biz_check'] = $bizCheck;
         $store['records'][] = $rec;
         $recordId = $store['seq'];
-        $summary = verifyJobSummary($store, $userId, null);
+        $summary = verifyJobSummary($store, $userId);
         verifyLog("job submitted record={$store['seq']} user={$userId} type={$type}" . ($bizCheck ? " nts={$bizCheck['result']}" : ''));
         return $store;
     });

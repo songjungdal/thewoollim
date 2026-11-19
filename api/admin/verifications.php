@@ -88,7 +88,7 @@ if ($method === 'GET') {
             foreach ($userIds as $uid) {
                 if (!isset($users[$uid])) continue;
                 $p = verifyPhotoSummary($store, $uid);
-                $j = verifyJobSummary($store, $uid, (string)($users[$uid]['job'] ?? ''));
+                $j = verifyJobSummary($store, $uid);
                 $map[(string)$uid] = ['photo' => $p['status'], 'photoApproved' => $p['approved'], 'job' => $j['status'], 'jobVerified' => $j['verified'], 'jobLabel' => $j['label']];
             }
             jsonOut(['ok' => true, 'pendingCount' => _verifyPendingCount($store), 'settings' => _verifySettingsView($store), 'users' => (object)$map]);
@@ -102,7 +102,7 @@ if ($method === 'GET') {
             $st = (string)($r['status'] ?? '');
             if ($st === 'superseded') return $status === 'all';
             if ($status === 'all') return true;
-            if ($status === 'approved') return $st === 'approved' || $st === 'reverify';
+            if ($status === 'approved') return in_array($st, VERIFY_JOB_APPROVED_STATUSES, true);
             return $st === $status;
         }));
         // 심사 중 먼저, 같은 묶음은 오래된 순 (처리된 것은 최근 처리 순)
@@ -132,7 +132,7 @@ if ($method === 'GET') {
             $rows[] = [
                 'id'            => (int)$r['id'],
                 'kind'          => (string)$r['kind'],
-                'status'        => (string)$r['status'],
+                'status'        => verifyPublicStatus((string)$r['status']),   // 예전 'reverify' → 'approved'
                 'userId'        => $uid,
                 'email'         => $email,
                 'name'          => (string)($u['name'] ?? '(알 수 없음)'),
@@ -235,7 +235,7 @@ try {
             // 같은 회원의 이전 승인 기록 → 대체됨 (사진은 30일 뒤 삭제, 직업 서류는 이미 지워져 있음)
             foreach ($store['records'] as $i => &$r) {
                 if ($i !== $idx && is_array($r) && (int)($r['user_id'] ?? 0) === $uid && ($r['kind'] ?? '') === $kind
-                    && in_array($r['status'] ?? '', ['approved', 'reverify'], true)) {
+                    && in_array($r['status'] ?? '', VERIFY_JOB_APPROVED_STATUSES, true)) {
                     $r['status'] = 'superseded';
                     $r['superseded_at'] = $now;
                 }
@@ -244,7 +244,7 @@ try {
             $rec['status'] = 'approved';
             if ($kind === 'job') {
                 $rec['job_label'] = $jobLabel;
-                $rec['job_text']  = (string)$profileJob;
+                $rec['job_text']  = (string)$profileJob;   // 기록용 — 판정에 쓰지 않음 (verification-job-no-reverify.md)
             }
         } else {
             $rec['status'] = 'rejected';

@@ -5,7 +5,8 @@
  */
 
 export type PhotoStatus = "none" | "pending" | "approved" | "rejected";
-export type JobStatus = "none" | "pending" | "approved" | "reverify" | "rejected";
+/** 직업 인증 상태 — 승인 뒤 프로필 직업을 바꿔도 "승인" 유지 (docs/specs/verification-job-no-reverify.md) */
+export type JobStatus = "none" | "pending" | "approved" | "rejected";
 export type JobType = "employee" | "business" | "other";
 
 export type PhotoSummary = {
@@ -83,7 +84,6 @@ export const JOB_STATUS_LABEL: Record<JobStatus, string> = {
   none: "미인증",
   pending: "심사 중",
   approved: "인증 완료",
-  reverify: "재인증 필요",
   rejected: "반려",
 };
 
