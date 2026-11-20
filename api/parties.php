@@ -9,11 +9,11 @@
  *        targetGroup?,theme?,locationTag?,locationShort?,partyType,couponDisabled,discountRate,
  *        sessions?:[{id,name,startTime,maleStock,femaleStock,maleBooked,femaleBooked}],
  *        options?:[{id,name,sessionIds,priceMale,priceFemale}]}]
- *   sessions·options: 참가 구성이 있는 솔로파티만 (docs/specs/party-options-solo.md). 회차별 신청 인원은 party_counts 의 sessions.
+ *   sessions·options: 참가 구성이 있는 솔로파티만 (docs/specs/party-options-solo.md). 회차별 인원은 참가확정 인원의 sessions.
  *
  * 데이터 소스: /api/data/parties.json (관리자 폼이 편집)
  * - 파일이 비어있거나 손상 시 빈 배열 반환 (UI 측 fallback 처리)
- * - maleBooked/femaleBooked 는 party_counts.json 의 실시간 값으로 합성
+ * - maleBooked/femaleBooked 는 참가확정 인원(lib.php readConfirmedCounts)의 실시간 값으로 합성 — 결제만 끝난 예약은 세지 않는다
  *   → 관리자 단일 진실 소스(parties.json)를 변경하지 않고 표시 값만 결합
  */
 
@@ -27,7 +27,6 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 
 $dir = dataDir();
 $partiesFile = $dir . '/parties.json';
-$countsFile  = $dir . '/party_counts.json';
 
 $parties = [];
 if (file_exists($partiesFile)) {
@@ -36,13 +35,8 @@ if (file_exists($partiesFile)) {
     if (is_array($d)) $parties = $d;
 }
 
-// 인원 카운트 합성
-$counts = [];
-if (file_exists($countsFile)) {
-    $raw = file_get_contents($countsFile);
-    $c = json_decode((string)$raw, true);
-    if (is_array($c)) $counts = $c;
-}
+// 인원 카운트 합성 — 참가확정 인원
+$counts = readConfirmedCounts();
 
 $result = [];
 foreach ($parties as $p) {

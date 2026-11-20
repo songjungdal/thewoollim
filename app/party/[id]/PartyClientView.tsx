@@ -142,7 +142,7 @@ export default function PartyClientView({ id, initialParties }: { id: string; in
   }, [id]);
   const detailReady = !!detailRes && detailRes.id === id;
 
-  // 실시간 결제완료 인원만 노출 — DB 카운트가 없으면 0/12로 표시 (시드/테스트 데이터 무시)
+  // 실시간 참가확정 인원만 노출(관리자가 [참가확정]을 누른 예약) — 카운트가 없으면 0 으로 표시 (시드/테스트 데이터 무시)
   // 참가 구성 파티는 회차별 인원도 함께 (withLiveCounts)
   const detailItem = baseItem ? withLiveCounts(baseItem, partyCounts[id]) : undefined;
   const hasItem = !!detailItem;
@@ -475,12 +475,14 @@ export default function PartyClientView({ id, initialParties }: { id: string; in
   };
   const maleSeats = seatsOf("male");
   const femaleSeats = seatsOf("female");
-  const totalApplied = detailItem.maleBooked + detailItem.femaleBooked;
+  // 참가확정 인원 합계 — 결제만 끝난(확정 전) 신청자는 명단 카드로만 보이고 이 숫자에는 들어가지 않는다
+  const totalConfirmed = detailItem.maleBooked + detailItem.femaleBooked;
+  const rosterCards = participants.male.length + participants.female.length;
   const rosterStatus: RosterStatus = stock.allFull || isExpired
     ? { kind: "full" }
-    : totalApplied === 0
+    : totalConfirmed === 0 && rosterCards === 0
       ? { kind: "empty" }
-      : { kind: "open", total: totalApplied, cap: maleSeats.cap + femaleSeats.cap, remaining: maleSeats.remaining + femaleSeats.remaining };
+      : { kind: "open", total: totalConfirmed, cap: maleSeats.cap + femaleSeats.cap, remaining: maleSeats.remaining + femaleSeats.remaining };
 
   // 대상별 안내 (싱글/돌싱) — 필수 확인 사항 맨 끝 항목으로. 미지정·all 이면 없음.
   //   싱글 전용 경고는 신청 제한(checkEligibility)과 같게 혼인여부 "싱글"일 때만 — 대상별 "싱글"만으로는 띄우지 않는다 (2026-10-25)

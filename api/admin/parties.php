@@ -23,6 +23,7 @@
  * update: 요청에 없는 host_name·partyType·detail·voting_status·status·couponDisabled·discountRate·imageUrl·heroImageUrl·locationShort·sessions·options 는
  *         기존 값을 그대로 둔다. imageUrl·heroImageUrl·locationShort 는 키가 있고 비어 있으면 null 로 저장한다(이미지 제거·장소명 지우기).
  * GET: 참가 구성이 있는 파티에는 applicants(취소되지 않은 예약 기준 항목별·회차별 신청자 수)를 덧붙인다.
+ *      applicants.seats 는 회차별 참가확정 인원 — 회차 정원은 이 값보다 적게 줄일 수 없다 (lib.php sanitizePartyOptions).
  *
  * 보안:
  *   - host_name 은 본 엔드포인트(GET / update_host) 에서만 노출/수정
@@ -45,13 +46,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         if (is_array($d)) {
             $withOptions = array_values(array_map(fn($p) => (string)$p['id'], array_filter($d, fn($p) => is_array($p) && partyHasOptions($p))));
             $stats = $withOptions ? partyApplicantStats($withOptions) : [];
+            $seatCounts = $withOptions ? readConfirmedCounts() : [];
             foreach ($d as $p) {
                 if (!is_array($p)) continue;
                 // host_name 항상 노출 (없으면 빈 문자열)
                 $p['host_name'] = (string)($p['host_name'] ?? '');
                 if (partyHasOptions($p)) {
                     $st = $stats[(string)$p['id']] ?? ['options' => [], 'sessions' => []];
-                    $p['applicants'] = ['options' => (object)$st['options'], 'sessions' => (object)$st['sessions']];
+                    $seatRow = $seatCounts[(string)$p['id']] ?? null;
+                    $seats = is_array($seatRow) && is_array($seatRow['sessions'] ?? null) ? $seatRow['sessions'] : [];
+                    $p['applicants'] = ['options' => (object)$st['options'], 'sessions' => (object)$st['sessions'], 'seats' => (object)$seats];
                 }
                 $items[] = $p;
             }

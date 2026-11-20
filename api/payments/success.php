@@ -9,10 +9,11 @@
  *  2) Toss로 받은 amount === pending.expectedAmount 검증 (위변조 방어)
  *  3) Toss confirm API 호출 (시크릿 키 Basic auth)
  *  4) 결제 승인 성공 시:
- *     - 파티별 정원(maleStock/femaleStock) 검사 — 초과면 토스 결제 전액 자동 취소 후 실패 redirect
+ *     - 파티별 정원(maleStock/femaleStock) 검사 — 참가확정 인원(lib.php readConfirmedCounts)이 정원을 채웠으면
+ *       토스 결제 전액 자동 취소 후 실패 redirect. 확정 전 결제자 수는 보지 않는다 (관리자 [참가확정] 때 자리를 센다)
  *       (참가 구성이 있는 솔로파티는 고른 항목에 포함된 회차마다 정원 검사·증가. 항목이 사라졌거나 바뀌었으면 자동 취소)
  *       (파티 없음·쿠폰 검증 실패 등 승인 뒤 실패도 같은 autoCancelAndFail() 로 자동 취소)
- *     - party_counts atomic +1
+ *     - party_counts(결제 인원 기록) atomic +1
  *     - 쿠폰 atomic consume
  *     - booking 생성 (status: 솔로파티는 pending_approval, 매칭파티는 프로필 완성도에 따라 paid_pending_profile / pending_approval — 예약마다)
  *  5) /payment/success/?ids=...&total=... 로 redirect
@@ -237,7 +238,7 @@ foreach (array_unique($partyIds) as $pid) {
     $resolvedOptions[$pid] = $opt;
 }
 
-// 정원 검증 + 차감 (flock atomic)
+// 정원 검증(참가확정 인원 기준) + 결제 인원 기록 (party_counts flock atomic)
 // 회복력 강화: counts 파일 fopen 실패 시 결제는 이미 Toss 가 확정한 상태이므로,
 // 결제 취소 대신 booking 만 생성하고 admin 수동 확인 큐에 기록 (사용자 중복 결제 방어).
 $countsFile = "$dataDir/party_counts.json";
@@ -262,6 +263,8 @@ if (!$fp) {
 
     $reqCounts = [];
     foreach ($partyIds as $pid) $reqCounts[$pid] = ($reqCounts[$pid] ?? 0) + 1;
+    // 정원 검사는 참가확정 인원 기준 — 결제만 끝난(확정 전) 인원은 세지 않는다. 결제 인원(party_counts)은 아래에서 +1 기록만
+    $seatCounts = readConfirmedCounts();
 
     $soldOut = [];
     foreach ($reqCounts as $pid => $reqQty) {
@@ -276,11 +279,12 @@ if (!$fp) {
         }
         $cur = $counts[$pid] ?? $DEFAULT_COUNTS[$pid] ?? ['male' => 0, 'female' => 0];
         $effective[$pid] = $cur;
+        $seat = is_array($seatCounts[$pid] ?? null) ? $seatCounts[$pid] : ['male' => 0, 'female' => 0];
         if (isset($resolvedOptions[$pid])) {
-            // 항목에 포함된 회차 중 하나라도 차 있으면 마감 (회차별 정원)
-            $over = optionSessionsOverStock($partyMap[$pid], $resolvedOptions[$pid], (array)$cur, $genderKey, $reqQty);
+            // 항목에 포함된 회차 중 하나라도 참가확정 인원으로 차 있으면 마감 (회차별 정원)
+            $over = optionSessionsOverStock($partyMap[$pid], $resolvedOptions[$pid], $seat, $genderKey, $reqQty);
             if ($over) $soldOut[] = "$pid(" . implode('/', $over) . ')';
-        } elseif ((int)($cur[$genderKey] ?? 0) + $reqQty > partyStockLimit($partyMap[$pid], $genderKey)) {
+        } elseif ((int)($seat[$genderKey] ?? 0) + $reqQty > partyStockLimit($partyMap[$pid], $genderKey)) {
             $soldOut[] = $pid;
         }
     }
@@ -366,7 +370,7 @@ if ($couponCode !== '') {
     fflush($cfp); flock($cfp, LOCK_UN); fclose($cfp);
 }
 
-// 정원 증가 + 저장 — counts 파일 정상 열린 경우만 (skipCounts 시 booking 만 생성)
+// 결제 인원(party_counts) 증가 + 저장 — counts 파일 정상 열린 경우만 (skipCounts 시 booking 만 생성). 참가확정 인원은 관리자 [참가확정] 때 +1
 if (!$skipCounts && $fp) {
     // 파티 신청 인원 +1, 항목이 있으면 포함 회차마다 +1 (1부+2부 신청자는 s1·s2 각각 +1)
     $merged = $counts;

@@ -333,7 +333,7 @@ function BookingTable({ label, toneClass, rows, party, remarks, onApprove, onCan
                       // 취소요청/환불완료 — [취소요청] 탭에서 처리. 여기선 참가확정 버튼 숨김(좌측 [취소]는 유지).
                       <span className="text-xs text-gray-500 font-bold">—</span>
                     ) : b.status === "vbank_pending" ? (
-                      // 무통장 입금 신청자 — [결제확인] 시 pending_approval 전환 + 인원 +1 (v7.0)
+                      // 무통장 입금 신청자 — [결제확인] 시 pending_approval 전환 (파티 인원은 [참가확정] 때 +1)
                       <button type="button" onClick={() => onConfirmVBank(b.userEmail, b.id, b.total ?? party?.price ?? 0)}
                         className="inline-flex items-center gap-1 bg-[#fce5cd] text-danger px-2.5 md:px-3 py-1.5 rounded-lg text-xs font-black hover:brightness-95 transition-all min-h-11 md:min-h-0">
                         <CreditCard size={11} /> 결제확인
@@ -472,10 +472,10 @@ function buildAdminPartyRows(items: unknown[]): Record<string, AdminPartyRow> {
     const type = partyTypeOf(r);
     const options = type === "solo" ? normalizeOptions(r.options) : [];
     const sessions = options.length ? normalizeSessions(r.sessions) : [];
-    const ap = (r.applicants && typeof r.applicants === "object") ? r.applicants as { options?: Record<string, number>; sessions?: Record<string, { male: number; female: number }> } : null;
+    const ap = (r.applicants && typeof r.applicants === "object") ? r.applicants as { options?: Record<string, number>; sessions?: Record<string, { male: number; female: number }>; seats?: Record<string, { male: number; female: number }> } : null;
     out[String(r.id)] = {
       partyType: type, detail: normalizeDetail(r.detail), sessions, options,
-      applicants: ap ? { options: ap.options ?? {}, sessions: ap.sessions ?? {} } : null,
+      applicants: ap ? { options: ap.options ?? {}, sessions: ap.sessions ?? {}, seats: ap.seats ?? {} } : null,
       couponDisabled: r.couponDisabled === true,
       discountRate: typeof r.discountRate === "number" ? formDiscountRate(String(r.discountRate)) : 0,
     };
@@ -1332,14 +1332,19 @@ export default function AdminDashboard() {
   };
 
   const approveBooking = async (email: string, bookingId: string) => {
-    if (!confirm("이 예약을 '참가 확정 완료'로 처리하시겠습니까?")) return;
+    if (!confirm("이 예약을 '참가 확정 완료'로 처리하시겠습니까?\n\n파티의 성별 인원수가 +1 반영됩니다.\n(참가확정 인원이 정원을 모두 채우면 확정되지 않습니다)")) return;
     const res = await fetch("/api/admin/bookings.php", {
       method: "POST", credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "approve", email, bookingId }),
     });
     const d = await res.json();
-    if (d?.ok) { alert("확정 처리 완료"); await loadAll(); }
+    if (d?.ok) {
+      // 파티 인원은 참가확정 인원 기준 — 다른 탭(메인/상세)의 partyCounts 즉시 갱신
+      try { new BroadcastChannel("woollim_party_counts").postMessage({ at: Date.now() }); } catch { }
+      alert("확정 처리 완료 (파티 인원 +1 반영)");
+      await loadAll();
+    }
     else alert(d?.error || "처리 실패");
   };
 
@@ -1370,7 +1375,7 @@ export default function AdminDashboard() {
         // 카드결제와 동일 분기 — 프로필 미완성=결제완료(프로필 대기) / 완성=확정 대기 중 (v5.9)
         const label = d.status === "pending_approval" ? "확정 대기 중" : "결제완료(프로필 작성 대기)";
         setVbankModal(null);
-        alert(`입금 확인 완료 — '${label}'으로 전환되었습니다. (인원 +1 반영)`);
+        alert(`입금 확인 완료 — '${label}'으로 전환되었습니다. (파티 인원은 [참가확정] 때 반영됩니다)`);
         await loadAll();
       } else {
         setVbankError(d?.error || "입금 확인 처리 실패");
@@ -1381,7 +1386,7 @@ export default function AdminDashboard() {
   };
 
   const cancelBooking = async (email: string, bookingId: string) => {
-    if (!confirm("이 예약을 취소 처리하시겠습니까?\n\n해당 회원은 명단에서 [취소 완료]로 표시되며,\n파티의 성별 인원수가 즉시 -1 차감됩니다.")) return;
+    if (!confirm("이 예약을 취소 처리하시겠습니까?\n\n해당 회원은 명단에서 [취소 완료]로 표시되며,\n참가확정된 예약이면 파티의 성별 인원수가 즉시 -1 차감됩니다.")) return;
     const res = await fetch("/api/admin/bookings.php", {
       method: "POST", credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -1401,7 +1406,7 @@ export default function AdminDashboard() {
   // 카드결제 100% 환불 취소 (신규) — 취소 시기별 환불 규정 무시하고 결제금액 전액 즉시 Toss 취소.
   // 무통장 건은 백엔드에서 차단되므로 버튼 자체를 노출하지 않음(BookingTable 분기).
   const cancelBookingFullRefund = async (email: string, bookingId: string) => {
-    if (!confirm("이 예약을 100% 환불 처리하시겠습니까?\n\n카드 결제 금액 전액이 취소 시기와 무관하게 토스페이먼츠로 즉시 환불되며,\n해당 회원은 명단에서 [취소 완료]로 표시되고 파티의 성별 인원수가 즉시 -1 차감됩니다.")) return;
+    if (!confirm("이 예약을 100% 환불 처리하시겠습니까?\n\n카드 결제 금액 전액이 취소 시기와 무관하게 토스페이먼츠로 즉시 환불되며,\n해당 회원은 명단에서 [취소 완료]로 표시되고 참가확정된 예약이면 파티의 성별 인원수가 즉시 -1 차감됩니다.")) return;
     const res = await fetch("/api/admin/bookings.php", {
       method: "POST", credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -3926,7 +3931,7 @@ export default function AdminDashboard() {
               onKeyDown={e => { if (e.key === "Enter") submitVBankBooking(); }}
               className="w-full px-4 py-3 rounded-lg border border-gray-200 text-base font-bold tabular-nums focus:ring-2 focus:ring-brand-point outline-none min-h-11 md:min-h-0"
             />
-            <p className="text-[13px] md:text-sm text-gray-500 mt-2">입력한 금액으로 결제금액이 변경되며, 해당 회원은 ‘확정 대기 중’(또는 프로필 대기)으로 전환되고 파티 인원 +1 반영됩니다.</p>
+            <p className="text-[13px] md:text-sm text-gray-500 mt-2">입력한 금액으로 결제금액이 변경되며, 해당 회원은 ‘확정 대기 중’(또는 프로필 대기)으로 전환됩니다. 파티 인원은 [참가확정] 때 +1 반영됩니다.</p>
             {vbankError && <p className="text-[13px] md:text-sm font-bold text-red-600 mt-2">{vbankError}</p>}
             <div className="flex gap-2 mt-auto pt-5 md:mt-5 md:pt-0">
               <button type="button" onClick={() => setVbankModal(null)} disabled={vbankSubmitting} className="flex-1 py-2.5 rounded-lg border border-gray-200 text-base md:text-sm font-bold text-gray-600 hover:bg-gray-50 disabled:opacity-40 min-h-12 md:min-h-0">취소</button>

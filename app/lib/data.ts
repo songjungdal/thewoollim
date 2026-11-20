@@ -58,8 +58,8 @@ export type Party = {
   tag: string;
   maleStock: number;     // 남성 모집 정원 (기본 12)
   femaleStock: number;   // 여성 모집 정원 (기본 12)
-  maleBooked: number;    // 현재 남성 신청 인원
-  femaleBooked: number;  // 현재 여성 신청 인원
+  maleBooked: number;    // 현재 남성 참가확정 인원 (관리자가 [참가확정]을 누른 예약만 — 정원·마감 판정 기준)
+  femaleBooked: number;  // 현재 여성 참가확정 인원
   // 참가 자격 제한 (선택) — 누락 시 모든 회원 신청 가능
   minAge?: number;                            // 최소 나이 (만 나이)
   maxAge?: number;                            // 최대 나이 (만 나이)
@@ -144,11 +144,11 @@ export function linePriceFor(party: Party, gender: string | null | undefined, op
   return gender === "여성" ? o.priceFemale : o.priceMale;
 }
 
-/** 실시간 신청 인원 (api/party-counts.php 한 파티 값) */
+/** 실시간 참가확정 인원 (api/party-counts.php 한 파티 값) — 결제만 끝난(확정 전) 예약은 세지 않는다 */
 export type LivePartyCount = { male: number; female: number; sessions?: Record<string, { male: number; female: number }> };
 
 /**
- * 실시간 신청 인원을 파티에 입힌다 — 카운트가 없으면 0 (시드/테스트 데이터 무시, 기존 규칙과 같음).
+ * 실시간 참가확정 인원을 파티에 입힌다 — 카운트가 없으면 0 (시드/테스트 데이터 무시, 기존 규칙과 같음).
  * 참가 구성 파티는 회차별 인원도 함께 입힌다. 메인 카드·일정 섹션·상세가 같은 방식으로 쓴다.
  */
 export function withLiveCounts(party: Party, live?: LivePartyCount | null): Party {

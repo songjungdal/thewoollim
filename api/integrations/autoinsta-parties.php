@@ -11,8 +11,9 @@
  *      couponDisabled,status,url,imageUrl,sessions[],options[]} ] }
  *
  * - 남은 자리는 서버 마감 판단과 같은 함수(partyRemainingSeats · partyStockLimit · sessionStockLimit)를 그대로 쓴다.
+ * - maleBooked/femaleBooked 는 참가확정 인원 — 관리자가 [참가확정]을 누른 예약만 센다 (결제만 끝난 예약은 들어가지 않음).
  * - vbankPending 은 무통장 "입금 확인 중"(vbank_pending) 예약 수. 인원(maleBooked)에는 들어가지 않은 수다.
- * - api/data/*.json 은 읽기만 한다. 개인정보(이름·연락처·생년월일·예약 상세)는 내보내지 않는다.
+ * - api/data/*.json 은 읽기만 한다 (참가확정 인원 파일이 아직 없을 때만 예약 파일로 다시 세어 만든다). 개인정보(이름·연락처·생년월일·예약 상세)는 내보내지 않는다.
  */
 
 declare(strict_types=1);
@@ -45,8 +46,7 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from)) {
 $dir = dataDir();
 $parties = json_decode((string)@file_get_contents($dir . '/parties.json'), true);
 if (!is_array($parties)) $parties = [];
-$counts = json_decode((string)@file_get_contents($dir . '/party_counts.json'), true);
-if (!is_array($counts)) $counts = [];
+$counts = readConfirmedCounts(); // 참가확정 인원 — 사이트의 인원 표시·마감 판단과 같은 값 (파일이 없을 때만 다시 세어 저장)
 
 /** 무통장 입금 확인 중 예약 수 — 파티·성별별 (partyApplicantStats 와 같은 방식으로 예약 파일을 훑는다) */
 function autoinstaVbankPending(): array {

@@ -7,7 +7,8 @@
  * 기존 refund.php(즉시 Toss 취소 + 인원 -1)와 달리, 여기서는 **결제 취소를 하지 않고**
  * 예약 상태만 'cancel_requested'(취소 요청 중)로 전환한다.
  *  - Toss 결제 취소 API 미호출
- *  - party_counts 미변경 (인원 차감은 관리자가 별도 [취소]로 처리하는 기존 흐름 유지)
+ *  - party_counts·참가확정 인원 미변경 (인원 차감은 관리자가 별도 [취소]로 처리하는 기존 흐름 유지)
+ *    요청 직전에 참가확정이었는지 seatHeld 로 남긴다 — 관리자 [취소] 때 참가확정 인원을 줄일지 판단 (lib.php bookingHoldsSeat)
  * 실제 환불/취소는 관리자 [취소요청] 탭의 [취소승인처리]에서 수행.
  *
  * 환불 금액은 **요청한 날 기준으로 고정**한다 — 관리자 승인이 늦어져도 줄지 않게.
@@ -54,6 +55,8 @@ foreach ($bookings as &$b) {
         if ($quote !== null && $quote['rate'] <= 0) {
             jsonFail('파티 시작 2일 전부터는 환불 및 취소가 불가능합니다. 자세한 사항은 고객센터로 문의 바랍니다.', 409);
         }
+        // 취소요청 직전에 자리를 차지하던 예약인지 (참가확정 여부) — 관리자 [취소] 때 참가확정 인원을 줄일지 정한다 (lib.php bookingHoldsSeat)
+        $b['seatHeld']          = bookingHoldsSeat($b);
         $b['status']            = 'cancel_requested';
         $b['updatedAt']         = date('c');
         $b['cancelRequestedAt'] = date('c');

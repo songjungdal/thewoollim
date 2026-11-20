@@ -86,7 +86,7 @@ Header: X-Api-Key: <연동 키>
 | 기본 필드(`id`~`targetGroup`, `couponDisabled`, `imageUrl`) | `api/parties.php`와 같은 값. `imageUrl`은 `/`로 시작하면 `https://thewoollim.com`을 붙여 절대 주소로 |
 | `priceMale/priceFemale` | 일반 파티: `priceForGender($party, '남성'|'여성')` — 성별 가격이 없으면 기본가. 참가 구성 파티: `null`(가격은 `options[].priceMale/priceFemale`) |
 | `maleStock/femaleStock` | `partyStockLimit($party, 'male'|'female')` — 서버 마감 판단과 같은 값(0 이하면 12) |
-| `maleBooked/femaleBooked` | `party_counts.json` 값(카드 결제 완료 + 무통장 입금 확인 인원) |
+| `maleBooked/femaleBooked` | 참가확정 인원 — 관리자가 [참가확정]을 누른 예약만(`api/lib.php` `readConfirmedCounts`, 2026-11-20부터. 예전에는 `party_counts.json`의 카드 결제 완료 + 무통장 입금 확인 인원). 결제만 끝난 확정 전 예약은 들어가지 않는다 |
 | `remaining` | `partyRemainingSeats($party, $countsRow)` 그대로 |
 | `vbankPending` | `bookings_*.json`에서 `status === 'vbank_pending'`인 예약을 이 파티·성별로 센 수(`partyApplicantStats`와 같은 방식으로 파일을 읽음). 인원(`maleBooked`)에는 들어가지 않은 수다 |
 | `startsAt` | `calendarDate` + `dateString` 안의 첫 `HH:MM`(없으면 첫 회차 `startTime`, 그것도 없으면 `00:00`), `+09:00` |
