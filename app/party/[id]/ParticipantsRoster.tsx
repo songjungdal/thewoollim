@@ -13,10 +13,10 @@ export type Participant = {
   jobVerified?: boolean; // 직업 인증 회원 (매칭파티만, docs/specs/photo-job-verification.md 2-4)
 };
 
-/** 성별 자리 현황 — 머리 카드(n/정원·진행바·잔여석)에만 쓴다 */
+/** 성별 자리 현황 — 머리 카드(n/정원·진행바·잔여석)에만 쓴다. booked 는 참가확정 인원(관리자가 [참가확정]을 누른 예약만) */
 export type GenderSeats = { booked: number; cap: number; remaining: number; full: boolean };
 
-/** 명단 제목 아래 한 줄 — 진행 중 / 0명 / 마감 */
+/** 명단 제목 아래 한 줄 — 진행 중(참가확정 인원 기준) / 신청자 없음 / 마감 */
 export type RosterStatus =
   | { kind: "open"; total: number; cap: number; remaining: number }
   | { kind: "empty" }
@@ -93,7 +93,7 @@ function GenderColumn({ gender, list, seats, hideProfile }: {
         <div
           className="mt-2 h-1.5 overflow-hidden rounded-full bg-white md:mt-0 md:min-w-0 md:flex-1"
           role="progressbar"
-          aria-label={`${t.label} 신청 현황`}
+          aria-label={`${t.label} 참가확정 현황`}
           aria-valuemin={0}
           aria-valuemax={seats.cap}
           aria-valuenow={Math.min(seats.booked, seats.cap)}
@@ -141,6 +141,7 @@ function GenderColumn({ gender, list, seats, hideProfile }: {
 /**
  * 실시간 참가자 명단 (docs/specs/party-detail-relayout.md D-4) — 남/여 2열(모든 화면 폭), 열 높이는 따로.
  * 남은 자리는 성별 머리 카드(진행바·잔여석)로만 보여 준다. 명단 아래 범례·안내 문구는 두지 않는다.
+ * 인원 숫자(머리 카드 n/정원·제목 아래 "총 N명 참가확정")는 참가확정 인원만 센다 — 카드는 결제완료·확정 대기 중도 함께 보인다.
  * 참가자 카드는 모바일 2줄, 태블릿·PC 한 줄(2026-11-05).
  */
 export default function ParticipantsRoster({ male, female, maleSeats, femaleSeats, status, updatedAt, hideProfile, titleClassName }: {
@@ -169,7 +170,7 @@ export default function ParticipantsRoster({ male, female, maleSeats, femaleSeat
           <span className="font-bold text-brand-point-ink">모집을 시작했어요 · 첫 번째 참가자가 되어 보세요</span>
         ) : (
           <>
-            총 <strong className="font-black text-brand-black">{status.total}</strong>명 신청 ·{" "}
+            총 <strong className="font-black text-brand-black">{status.total}</strong>명 참가확정 ·{" "}
             <strong className="font-black text-brand-black">{status.cap}</strong>자리 중{" "}
             <strong className="font-black text-brand-point-ink">{status.remaining}</strong>자리 남았어요
           </>

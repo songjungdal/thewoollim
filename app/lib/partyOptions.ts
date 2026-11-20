@@ -13,7 +13,7 @@ export type PartySession = {
   startTime: string;      // "19:00"
   maleStock: number;
   femaleStock: number;
-  maleBooked?: number;    // 공개 목록(api/parties.php)의 회차별 신청 인원
+  maleBooked?: number;    // 공개 목록(api/parties.php)의 회차별 참가확정 인원
   femaleBooked?: number;
 };
 
@@ -29,6 +29,8 @@ export type PartyOption = {
 export type OptionApplicants = {
   options: Record<string, number>;
   sessions: Record<string, { male: number; female: number }>;
+  /** 회차별 참가확정 인원 — 회차 정원은 이 값보다 적게 줄일 수 없다 (확정 전 결제자는 정원을 넘을 수 있음) */
+  seats?: Record<string, { male: number; female: number }>;
 };
 
 export const OPTION_LIMITS = { sessions: 5, options: 6, name: 20, stockMax: 100, priceMax: 10_000_000 } as const;
@@ -83,7 +85,7 @@ const intIn = (v: string, min: number, max: number) => /^\d+$/.test(v.trim()) &&
 
 /**
  * 저장 전 화면 검사 (6-1) — 문제 목록(누락 알림에 그대로 붙인다). 비어 있으면 저장 가능.
- * 신청자가 있을 때의 제한(삭제·포함 회차 변경)은 편집기에서 버튼을 막고, 정원은 여기서 확인한다. 서버가 최종 판정.
+ * 신청자가 있을 때의 제한(삭제·포함 회차 변경)은 편집기에서 버튼을 막고, 정원은 여기서 확인한다(참가확정 인원 기준). 서버가 최종 판정.
  */
 export function validateOptionsDraft(d: OptionsDraft, applicants?: OptionApplicants | null): string[] {
   const errs: string[] = [];
@@ -99,9 +101,10 @@ export function validateOptionsDraft(d: OptionsDraft, applicants?: OptionApplica
     if (!SESSION_TIME_RE.test(s.startTime.trim())) errs.push(`${label} 시작 시각(예: 19:00)`);
     if (!intIn(s.maleStock, 1, OPTION_LIMITS.stockMax)) errs.push(`${label} 남 정원(1~${OPTION_LIMITS.stockMax})`);
     if (!intIn(s.femaleStock, 1, OPTION_LIMITS.stockMax)) errs.push(`${label} 여 정원(1~${OPTION_LIMITS.stockMax})`);
-    const a = applicants?.sessions?.[s.key];
-    if (a && intIn(s.maleStock, 1, OPTION_LIMITS.stockMax) && Number(s.maleStock) < a.male) errs.push(`${label} 남 정원(신청 ${a.male}명보다 적게 불가)`);
-    if (a && intIn(s.femaleStock, 1, OPTION_LIMITS.stockMax) && Number(s.femaleStock) < a.female) errs.push(`${label} 여 정원(신청 ${a.female}명보다 적게 불가)`);
+    // 정원은 참가확정 인원보다 적게만 못 줄인다 — 서버 api/lib.php sanitizePartyOptions 와 같은 규칙
+    const a = applicants?.seats?.[s.key];
+    if (a && intIn(s.maleStock, 1, OPTION_LIMITS.stockMax) && Number(s.maleStock) < a.male) errs.push(`${label} 남 정원(참가확정 ${a.male}명보다 적게 불가)`);
+    if (a && intIn(s.femaleStock, 1, OPTION_LIMITS.stockMax) && Number(s.femaleStock) < a.female) errs.push(`${label} 여 정원(참가확정 ${a.female}명보다 적게 불가)`);
   });
   const keys = new Set(d.sessions.map(s => s.key));
   const oNames = new Set<string>();

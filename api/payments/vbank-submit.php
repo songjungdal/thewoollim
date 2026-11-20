@@ -8,8 +8,9 @@
  *
  * 카드결제(Toss success.php)와의 차이:
  *   - booking status = 'vbank_pending' ('입금 확인 중'). 관리자 [결제확인] 전까지 미확정.
- *   - party_counts(정원/인원 카운트)를 **증가시키지 않는다.** 입금 확인(관리자 승인) 시점에
- *     admin/bookings.php(action=confirm_vbank)가 +1 반영 → 그 전까지 재고/명단에서 제외.
+ *   - party_counts(결제 인원 기록)를 **증가시키지 않는다.** 입금 확인(관리자 승인) 시점에
+ *     admin/bookings.php(action=confirm_vbank)가 +1 반영 → 그 전까지 명단에서 제외.
+ *     정원·공개 인원은 참가확정 인원(lib.php readConfirmedCounts) 기준 — 관리자 [참가확정] 때 +1.
  *   - 쿠폰은 신청 시점에 atomic consume (success.php 와 동일 규칙 — 발급수량/중복 enforce).
  *   - 결제된 partyId 만 장바구니에서 정밀 제거 (success.php 와 동일).
  *
@@ -91,8 +92,7 @@ if (!empty($dupTitles)) {
 // ── 3) 성별 단가 합산 (항목이 있는 파티는 고른 항목의 성별 가격) ─────────────────
 $total = 0; $orderTitles = [];
 $lines = []; $resolvedOptions = []; $plainIds = [];
-$counts = json_decode((string)@file_get_contents($dataDir . '/party_counts.json'), true);
-if (!is_array($counts)) $counts = [];
+$counts = readConfirmedCounts(); // 정원 사전 검사 — 참가확정 인원 기준 (확정 전 결제자는 세지 않음)
 foreach ($partyIds as $pid) {
     if (!isset($partyMap[$pid])) jsonFail("파티를 찾을 수 없습니다: $pid", 404);
     $oidIn = $optionIdsIn[$pid] ?? '';

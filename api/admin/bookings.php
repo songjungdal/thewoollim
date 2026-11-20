@@ -2,11 +2,12 @@
 /**
  * 관리자 예약 관리.
  *  GET  : 모든 회원의 예약 + 회원 정보 조인 (status/gender 필터링용 데이터 포함)
- *  POST { action: "approve", email, bookingId } → status='paid_pending_profile'|'pending_approval' → 'confirmed'
+ *  POST { action: "approve", email, bookingId } → status='paid_pending_profile'|'pending_approval' → 'confirmed' + 참가확정 인원 +1
  *    (이미 확정·취소·취소요청·환불완료·모임종료·무통장 입금 전 예약은 거절 — 상태·문자 변경 없음)
- *  POST { action: "cancel",  email, bookingId } → status='cancelled' + party_counts -1 (atomic)
+ *    (참가확정 인원이 그 성별 정원을 이미 채웠으면 거절 — 참가 구성 예약은 회차마다. 정원·공개 인원은 참가확정 인원 기준, lib.php bookingHoldsSeat)
+ *  POST { action: "cancel",  email, bookingId } → status='cancelled' + party_counts -1 (atomic) + 참가확정이었으면 참가확정 인원 -1
  *    (참가 구성 예약은 예약에 저장된 sessionIds 회차 인원도 함께 -1 / confirm_vbank 는 그 회차마다 정원 검사 후 +1)
- *  POST { action: "cancel_full_refund", email, bookingId } → 카드결제 전액 Toss 즉시취소 + status='cancelled' + party_counts -1
+ *  POST { action: "cancel_full_refund", email, bookingId } → 카드결제 전액 Toss 즉시취소 + status='cancelled' + party_counts -1 (+ 참가확정 인원 -1, cancel 과 같음)
  *
  *  'cancel' / 'cancel_full_refund' 공통: DB 상태 업데이트 성공 직후 _cancel_sms.php 의 notifyCancelSms() 로
  *  취소완료 알리고 문자 발송 (테스트/관리자 계정 제외, 실패해도 취소 처리 자체는 무중단).
@@ -40,6 +41,28 @@ function saveBookings(string $email, array $bookings): void {
         $dataDir . '/bookings_' . md5(strtolower(trim($email))) . '.json',
         json_encode($bookings, JSON_UNESCAPED_UNICODE)
     );
+}
+
+/**
+ * 취소한 예약이 차지하던 참가확정 자리를 돌려준다 — 참가확정 인원 -1 (참가 구성 예약은 저장된 회차마다).
+ * 예약을 'cancelled' 로 저장한 뒤 부른다. 인원 파일을 다시 센 경우엔 이 예약이 이미 빠져 있으므로 증감하지 않는다.
+ * 반환: 자리를 차지하던 예약이었는지 (활동 로그용). 기록 실패는 취소 처리를 막지 않는다.
+ */
+function releaseConfirmedSeat(array $before): bool {
+    $partyId = (string)($before['partyId'] ?? '');
+    if ($partyId === '' || !bookingHoldsSeat($before)) return false;
+    $genderKey = (string)($before['gender'] ?? '') === '남성' ? 'male' : 'female';
+    $sids = array_map('strval', (array)($before['sessionIds'] ?? []));
+    try {
+        withConfirmedCounts(function (array &$c, bool $rebuilt) use ($partyId, $genderKey, $sids): bool {
+            if ($rebuilt) return false;
+            countsAdjust($c, $partyId, $genderKey, $sids, -1);
+            return true;
+        });
+    } catch (Throwable $e) {
+        error_log('[admin/bookings confirmed seat release] ' . $e->getMessage());
+    }
+    return true;
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
@@ -96,10 +119,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $bookings = loadBookings($email);
 
     // ─── action === 'confirm_vbank' — 무통장 입금 확인 (v7.0 / v5.9) ──────────────
-    //  vbank_pending → (프로필 완성 여부에 따라) paid_pending_profile/pending_approval 전환 + party_counts +1.
+    //  vbank_pending → (프로필 완성 여부에 따라) paid_pending_profile/pending_approval 전환 + party_counts(결제 인원 기록) +1.
     //  솔로파티는 프로필 완성 여부와 상관없이 pending_approval.
     //  카드결제 success.php 와 동일 분기 — 결제완료 후 프로필 작성/자동전환 흐름을 그대로 탄다.
-    //  (카드는 결제 즉시 +1, 무통장은 입금 확인된 지금 +1)
+    //  (카드는 결제 즉시 +1, 무통장은 입금 확인된 지금 +1. 정원·공개 인원은 참가확정 인원으로 따로 센다 — approve 에서 +1)
     if ($action === 'confirm_vbank') {
         $paidAmount = $body['paidAmount'] ?? null;
         if (!is_int($paidAmount) || $paidAmount < 0) {
@@ -122,7 +145,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $gender    = (string)($target['gender']  ?? '');
         $genderKey = $gender === '남성' ? 'male' : 'female';
 
-        // party_counts +1 (atomic) + 파티별 정원 초과 검증 — 카드결제 success.php 와 동일 상한(partyStockLimit).
+        // 파티별 정원 검증(참가확정 인원 기준) + party_counts +1 (atomic) — 카드결제 success.php 와 동일 상한(partyStockLimit).
         $partiesJson = json_decode((string)@file_get_contents("$dataDir/parties.json"), true);
         $vbankParty  = [];
         foreach ((array)$partiesJson as $p) {
@@ -130,6 +153,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $stockLimit = partyStockLimit($vbankParty, $genderKey);
         $vbankSids  = array_map('strval', (array)($target['sessionIds'] ?? [])); // 참가 구성 예약 — 신청 시점 사본의 회차
+        // 정원 검사 — 참가확정 인원 기준. 확정 인원이 이미 정원을 채웠으면 입금 확인을 막는다 (확정 전 결제자 수는 보지 않음)
+        $seatRow = readConfirmedCounts()[$partyId] ?? [];
+        if (!is_array($seatRow)) $seatRow = [];
+        if ($vbankSids) {
+            // 회차마다 정원 검사 — 회차가 파티에서 사라졌으면 마감으로 본다
+            $over = optionSessionsOverStock($vbankParty, ['sessionIds' => $vbankSids], $seatRow, $genderKey);
+            if ($over) {
+                $names = array_map(fn($sid) => (string)(partySessionById($vbankParty, $sid)['name'] ?? $sid), $over);
+                echo json_encode(['ok' => false, 'error' => '참가확정 인원이 정원을 채워 입금 확인을 진행할 수 없습니다. (' . implode(', ', $names) . ')'], JSON_UNESCAPED_UNICODE); exit;
+            }
+        } elseif ((int)($seatRow[$genderKey] ?? 0) + 1 > $stockLimit) {
+            echo json_encode(['ok' => false, 'error' => '참가확정 인원이 정원을 채워 입금 확인을 진행할 수 없습니다.'], JSON_UNESCAPED_UNICODE); exit;
+        }
+        // 결제·입금 확인 인원(party_counts) +1 — 기록용. 정원 판단에는 쓰지 않는다
         $countsFile = "$dataDir/party_counts.json";
         $fp = fopen($countsFile, 'c+');
         if ($fp) {
@@ -137,21 +174,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $raw = stream_get_contents($fp);
             $counts = $raw ? json_decode($raw, true) : [];
             if (!is_array($counts)) $counts = [];
-            if (!isset($counts[$partyId]) || !is_array($counts[$partyId])) {
-                $counts[$partyId] = ['male' => 0, 'female' => 0];
-            }
-            if ($vbankSids) {
-                // 회차마다 정원 검사 — 회차가 파티에서 사라졌으면 마감으로 본다
-                $over = optionSessionsOverStock($vbankParty, ['sessionIds' => $vbankSids], $counts[$partyId], $genderKey);
-                if ($over) {
-                    flock($fp, LOCK_UN); fclose($fp);
-                    $names = array_map(fn($sid) => (string)(partySessionById($vbankParty, $sid)['name'] ?? $sid), $over);
-                    echo json_encode(['ok' => false, 'error' => '잔여 정원을 초과하여 입금 확인을 진행할 수 없습니다. (' . implode(', ', $names) . ')'], JSON_UNESCAPED_UNICODE); exit;
-                }
-            } elseif ((int)($counts[$partyId][$genderKey] ?? 0) + 1 > $stockLimit) {
-                flock($fp, LOCK_UN); fclose($fp);
-                echo json_encode(['ok' => false, 'error' => '잔여 정원을 초과하여 입금 확인을 진행할 수 없습니다.']); exit;
-            }
             countsAdjust($counts, $partyId, $genderKey, $vbankSids, 1);
             ftruncate($fp, 0); rewind($fp); fwrite($fp, json_encode($counts));
             fflush($fp); flock($fp, LOCK_UN); fclose($fp);
@@ -222,7 +244,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         logAdminActivity(
             'update', 'booking', $bid,
-            "무통장 입금 확인 — 회원 {$email}, 파티 #{$partyId}, 성별 {$gender} (+1 인원 반영, → {$newStatus}, 입금액 {$paidAmount}원)",
+            "무통장 입금 확인 — 회원 {$email}, 파티 #{$partyId}, 성별 {$gender} (결제 인원 +1, 참가확정 인원은 참가확정 때 반영, → {$newStatus}, 입금액 {$paidAmount}원)",
             ['status' => 'vbank_pending', 'total' => (int)($target['total'] ?? 0)],
             ['status' => $newStatus, 'total' => $paidAmount]
         );
@@ -352,23 +374,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'completed'        => '모임이 종료된 예약입니다.',
             'vbank_pending'    => '무통장 입금 확인 전인 예약입니다. [결제확인]을 먼저 해주세요.',
         ];
-        $found = false;
+        // 참가확정 인원 +1 — 정원 검사·예약 상태 변경과 같은 잠금 안에서 한다.
+        //   두 관리자가 동시에 눌러도 정원을 넘겨 확정되거나 같은 예약이 두 번 세지지 않도록, 잠금 안에서 예약을 다시 읽는다.
+        //   참가확정 인원이 이미 정원을 채웠으면 확정을 막는다 (상태·문자 변경 없음).
+        $approveError = null;
         $approvedBooking = null;
-        foreach ($bookings as &$b) {
-            if (($b['id'] ?? '') === $bid) {
-                $curStatus = (string)($b['status'] ?? '');
-                if (isset($approveBlocked[$curStatus])) {
-                    echo json_encode(['ok' => false, 'error' => $approveBlocked[$curStatus]]); exit;
+        try {
+            withConfirmedCounts(function (array &$counts) use ($email, $bid, $approveBlocked, $dataDir, &$approveError, &$approvedBooking): bool {
+                $list = loadBookings($email);
+                $idx = null;
+                foreach ($list as $i => $b) {
+                    if (is_array($b) && (string)($b['id'] ?? '') === $bid) { $idx = $i; break; }
                 }
-                $b['status']    = 'confirmed';
-                $b['updatedAt'] = date('c');
-                $approvedBooking = $b;
-                $found = true; break;
-            }
+                if ($idx === null) { $approveError = 'booking not found'; return false; }
+                $cur = $list[$idx];
+                $curStatus = (string)($cur['status'] ?? '');
+                if (isset($approveBlocked[$curStatus])) { $approveError = $approveBlocked[$curStatus]; return false; }
+
+                $partyId   = (string)($cur['partyId'] ?? '');
+                $genderKey = (string)($cur['gender'] ?? '') === '남성' ? 'male' : 'female';
+                $sids      = array_map('strval', (array)($cur['sessionIds'] ?? [])); // 참가 구성 예약 — 신청 시점 사본의 회차
+                $party = null;
+                foreach ((array)json_decode((string)@file_get_contents("$dataDir/parties.json"), true) as $p) {
+                    if (is_array($p) && (string)($p['id'] ?? '') === $partyId) { $party = $p; break; }
+                }
+                // 파티가 지워졌으면 정원 검사 없이 확정한다 (예전 동작 그대로)
+                if ($party !== null) {
+                    $row = is_array($counts[$partyId] ?? null) ? $counts[$partyId] : [];
+                    $label = $genderKey === 'male' ? '남성' : '여성';
+                    if ($sids) {
+                        $over = optionSessionsOverStock($party, ['sessionIds' => $sids], $row, $genderKey);
+                        if ($over) {
+                            $names = array_map(fn($sid) => (string)(partySessionById($party, $sid)['name'] ?? $sid), $over);
+                            $approveError = "참가확정 인원이 {$label} 정원을 모두 채운 회차가 있어 확정할 수 없습니다. (" . implode(', ', $names) . ")\n"
+                                . '더 확정하려면 회차 정원을 늘리거나 다른 참가확정 예약을 취소해주세요.';
+                            return false;
+                        }
+                    } else {
+                        $limit = partyStockLimit($party, $genderKey);
+                        if ((int)($row[$genderKey] ?? 0) + 1 > $limit) {
+                            $approveError = "참가확정 인원이 {$label} 정원({$limit}명)을 모두 채워 확정할 수 없습니다.\n"
+                                . '더 확정하려면 파티 정원을 늘리거나 다른 참가확정 예약을 취소해주세요.';
+                            return false;
+                        }
+                    }
+                }
+
+                $list[$idx]['status']    = 'confirmed';
+                $list[$idx]['updatedAt'] = date('c');
+                saveBookings($email, $list);
+                $approvedBooking = $list[$idx];
+                if ($partyId !== '') countsAdjust($counts, $partyId, $genderKey, $sids, 1);
+                return true;
+            });
+        } catch (Throwable $e) {
+            error_log('[admin/bookings approve confirmed counts] ' . $e->getMessage());
+            echo json_encode(['ok' => false, 'error' => '참가확정 인원을 기록하지 못해 확정하지 않았습니다. 잠시 후 다시 시도해주세요.'], JSON_UNESCAPED_UNICODE); exit;
         }
-        unset($b);
-        if (!$found) { echo json_encode(['ok' => false, 'error' => 'booking not found']); exit; }
-        saveBookings($email, $bookings);
+        if ($approveError !== null) { echo json_encode(['ok' => false, 'error' => $approveError], JSON_UNESCAPED_UNICODE); exit; }
         @file_put_contents($dataDir . '/_admin_approvals.log', sprintf(
             "[%s] APPROVED email=%s bid=%s\n", date('c'), $email, $bid
         ), FILE_APPEND);
@@ -482,6 +545,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 fflush($fp); flock($fp, LOCK_UN); fclose($fp);
             }
         }
+        // 참가확정 인원 -1 — 참가확정 자리를 차지하던 예약만
+        $heldSeat = releaseConfirmedSeat($beforeBooking);
 
         // 사용했던 쿠폰이 있으면 사용 이력 해제 — 재사용 가능하도록 복원
         releaseCouponUsage((string)($beforeBooking['couponCode'] ?? ''), $email);
@@ -505,6 +570,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             '환불 금액' => number_format($paidAmount) . '원 (결제 금액 100%)',
             '환불 방식' => $paidAmount > 0 ? '카드 결제 취소(토스)' : '결제 금액 0원 — 카드 결제 취소 없음',
             '신청 인원' => adminLogCountResult($beforeBooking, $partyId !== '' && $wasCounted),
+            '참가확정 인원' => adminLogSeatResult($beforeBooking, $heldSeat),
             '쿠폰 복원' => adminLogCouponResult($beforeBooking),
         ]);
         logAdminActivity(
@@ -563,6 +629,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             fflush($fp); flock($fp, LOCK_UN); fclose($fp);
         }
     }
+    // 참가확정 인원 -1 — 참가확정 자리를 차지하던 예약만
+    $heldSeat = releaseConfirmedSeat(is_array($beforeBooking) ? $beforeBooking : []);
 
     // 사용했던 쿠폰이 있으면 사용 이력 해제 — 재사용 가능하도록 복원
     releaseCouponUsage((string)($beforeBooking['couponCode'] ?? ''), $email);
@@ -588,6 +656,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ? '이미 환불 완료된 예약 — 추가 환불 없음'
             : '자동 환불 없음 (카드 결제 취소·무통장 송금은 따로 처리)',
         '신청 인원' => adminLogCountResult($logBooking, $partyId !== '' && $wasCounted),
+        '참가확정 인원' => adminLogSeatResult($logBooking, $heldSeat),
         '쿠폰 복원' => adminLogCouponResult($logBooking),
     ]);
     logAdminActivity(

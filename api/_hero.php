@@ -116,13 +116,12 @@ function heroPartyEventTs(array $p): int {
     return (int)strtotime($cd . ' 23:59:59');
 }
 
-/** 파티별 모집 상태 — parties.json + party_counts.json (공개 api/parties.php 와 같은 합성) */
+/** 파티별 모집 상태 — parties.json + 참가확정 인원 (공개 api/parties.php 와 같은 합성) */
 function heroPartyInfos(): array {
     $dir = dataDir();
     $parties = json_decode((string)@file_get_contents($dir . '/parties.json'), true);
-    $counts  = json_decode((string)@file_get_contents($dir . '/party_counts.json'), true);
+    $counts  = readConfirmedCounts();
     if (!is_array($parties)) $parties = [];
-    if (!is_array($counts))  $counts  = [];
     $now = time();
     $out = [];
     foreach ($parties as $p) {

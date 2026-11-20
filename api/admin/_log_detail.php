@@ -138,6 +138,8 @@ if (!function_exists('adminLogPartyDetail')) {
             if (!empty($party['couponDisabled'])) $d['쿠폰'] = '사용 불가 파티';
             $counts = json_decode((string)@file_get_contents(dataDir() . '/party_counts.json'), true);
             $row = is_array($counts[$pid] ?? null) ? $counts[$pid] : [];
+            $seatAll = readConfirmedCounts();
+            $seat = is_array($seatAll[$pid] ?? null) ? $seatAll[$pid] : [];   // 참가확정 인원 — 정원·공개 인원 기준
             if (partyHasOptions($party)) {
                 // 참가 구성 솔로파티 — 정원·신청 인원은 회차마다
                 $stock = []; $booked = [];
@@ -150,9 +152,18 @@ if (!function_exists('adminLogPartyDetail')) {
                 }
                 $d['정원']      = implode(', ', $stock);
                 $d['신청 인원'] = implode(', ', $booked) . ' (결제·입금 확인 기준)';
+                $seats = [];
+                foreach ((array)$party['sessions'] as $s) {
+                    if (!is_array($s)) continue;
+                    $sid  = (string)($s['id'] ?? '');
+                    $name = trim((string)($s['name'] ?? '') . ' ' . (string)($s['startTime'] ?? ''));
+                    $seats[] = "{$name} 남 " . (int)($seat['sessions'][$sid]['male'] ?? 0) . '명 / 여 ' . (int)($seat['sessions'][$sid]['female'] ?? 0) . '명';
+                }
+                $d['참가확정 인원'] = implode(', ', $seats);
             } else {
                 $d['정원']      = '남 ' . partyStockLimit($party, 'male') . '명 / 여 ' . partyStockLimit($party, 'female') . '명';
                 $d['신청 인원'] = '남 ' . (int)($row['male'] ?? 0) . '명 / 여 ' . (int)($row['female'] ?? 0) . '명 (결제·입금 확인 기준)';
+                $d['참가확정 인원'] = '남 ' . (int)($seat['male'] ?? 0) . '명 / 여 ' . (int)($seat['female'] ?? 0) . '명';
             }
             $d['예약 현황'] = _adminLogPartyBookingSummary($pid) . ' — 파티를 지워도 예약은 그대로 남습니다';
 
@@ -252,6 +263,13 @@ if (!function_exists('adminLogPartyDetail')) {
             return (string)($booking['paymentMethod'] ?? '') === 'vbank' && empty($booking['vbankPaidAt'])
                 ? '변동 없음 (무통장 입금 확인 전 예약)' : '변동 없음';
         }
+        $g = (string)($booking['gender'] ?? '') === '남성' ? '남성' : '여성';
+        return "{$g} 1명 차감" . (!empty($booking['sessionIds']) ? ' (참가 회차 인원 포함)' : '');
+    }
+
+    /** 처리 결과 "참가확정 인원" 문구 — 취소한 예약이 참가확정 자리를 차지하고 있었는지($held, lib.php bookingHoldsSeat) */
+    function adminLogSeatResult(array $booking, bool $held): string {
+        if (!$held) return '변동 없음 (참가확정 전 예약)';
         $g = (string)($booking['gender'] ?? '') === '남성' ? '남성' : '여성';
         return "{$g} 1명 차감" . (!empty($booking['sessionIds']) ? ' (참가 회차 인원 포함)' : '');
     }

@@ -105,7 +105,7 @@ async function fetchSessionEmail(): Promise<string | null> {
   return info?.email ?? null;
 }
 
-export type PartyCount = LivePartyCount;   // { male, female, sessions?: 회차별 인원 }
+export type PartyCount = LivePartyCount;   // { male, female, sessions?: 회차별 인원 } — 참가확정 인원
 export type PartyCounts = Record<string, PartyCount>;
 
 async function fetchPartyCounts(): Promise<PartyCounts | null> {

@@ -246,7 +246,7 @@ function partyStockLimit(array $party, string $genderKey): int {
 }
 
 // ─── 파티 남은 자리 (남/여) — 메인 파티 카드의 마감 판정(app/lib/data.ts partyStockStatus)과 같은 규칙 ───
-//   $countsRow = party_counts.json 의 그 파티 값 { male, female, sessions?: { <sid>: { male, female } } }
+//   $countsRow = 참가확정 인원(readConfirmedCounts)의 그 파티 값 { male, female, sessions?: { <sid>: { male, female } } }
 //   - 일반 파티: 정원 - 신청 인원
 //   - 참가 구성 솔로파티: 항목마다 포함 회차 중 가장 적은 남은 자리, 그중 가장 큰 값(마감되지 않은 항목 기준)
 //   사용처: api/_hero.php (메인 히어로 모집중·마감임박 판정)
@@ -279,10 +279,9 @@ function partyRemainingSeats(array $party, array $countsRow): array {
     ];
 }
 
-// 결제 전 사전 검사 — 현재 인원 + 1 이 상한을 넘는 partyId 목록. (잠금 없는 읽기: 최종 판정은 success.php / confirm_vbank)
+// 결제 전 사전 검사 — 참가확정 인원 + 1 이 상한을 넘는 partyId 목록. (잠금 없는 읽기: 최종 판정은 success.php / confirm_vbank)
 function partiesOverStock(array $partyIds, array $partyMap, string $genderKey): array {
-    $counts = json_decode((string)@file_get_contents(dataDir() . '/party_counts.json'), true);
-    if (!is_array($counts)) $counts = [];
+    $counts = readConfirmedCounts();
     $over = [];
     foreach ($partyIds as $pid) {
         $cur = (int)($counts[$pid][$genderKey] ?? 0);
@@ -408,6 +407,96 @@ function countsAdjust(array &$counts, string $partyId, string $genderKey, array 
     unset($row);
 }
 
+// ─── 참가확정 인원 — 정원·마감·남은 자리·화면 인원 표시의 기준 ─────────────────
+// 관리자가 [참가확정]을 누른 예약만 자리를 차지한다. 결제만 끝난 예약(결제완료(프로필 대기)·확정 대기 중)과
+// 무통장 입금 확인 중 예약은 세지 않으므로, 확정 전 결제자가 많아도 확정 인원이 정원 미만이면 추가 결제를 받는다.
+//   파일: party_confirmed_counts.json — 형식은 party_counts.json 과 같다 { <partyId>: { male, female, sessions?: { <sid>: { male, female } } } }
+//   party_counts.json(결제·입금 확인 인원)은 예전처럼 기록만 하고 정원 판단·공개 인원 표시에는 쓰지 않는다.
+//   +1: admin/bookings.php approve (정원 검사 후) / -1: admin/bookings.php cancel·cancel_full_refund, admin/test-users.php 삭제
+//   파일이 없거나 깨졌으면(처음 배포 뒤 등) 예약 파일로 다시 센다 — rebuildConfirmedCounts().
+
+function confirmedCountsPath(): string {
+    return dataDir() . '/party_confirmed_counts.json';
+}
+
+/**
+ * 자리를 차지하는 예약인지.
+ *  - 참가확정(confirmed)·모임종료(completed): 차지
+ *  - 취소요청(cancel_requested)·환불완료(refund_completed): 관리자 [취소] 전까지 취소요청 직전 상태를 따른다
+ *    (인원은 관리자 [취소] 때만 줄어드는 기존 운영 규칙). 직전 상태는 cancel-request.php 가 seatHeld 로 남긴다.
+ *    seatHeld 가 없는 예전 취소요청은 예전 결제 인원 규칙(무통장 입금 확인 전만 제외)으로 본다.
+ *  - 그 밖(결제완료·확정 대기 중·입금 확인 중·취소): 차지하지 않음
+ */
+function bookingHoldsSeat(array $b): bool {
+    $st = (string)($b['status'] ?? '');
+    if ($st === 'confirmed' || $st === 'completed') return true;
+    if ($st === 'cancel_requested' || $st === 'refund_completed') {
+        if (array_key_exists('seatHeld', $b)) return (bool)$b['seatHeld'];
+        return !(($b['paymentMethod'] ?? '') === 'vbank' && empty($b['vbankPaidAt']));
+    }
+    return false;
+}
+
+/** 예약 파일 전체로 참가확정 인원을 다시 센다 — bookingHoldsSeat 인 예약만, 참가 구성 예약은 저장된 회차마다 */
+function rebuildConfirmedCounts(): array {
+    $counts = [];
+    foreach (glob(dataDir() . '/bookings_*.json') ?: [] as $f) {
+        $list = json_decode((string)@file_get_contents($f), true);
+        if (!is_array($list)) continue;
+        foreach ($list as $b) {
+            if (!is_array($b) || !bookingHoldsSeat($b)) continue;
+            $pid = (string)($b['partyId'] ?? '');
+            if ($pid === '') continue;
+            $g = (string)($b['gender'] ?? '') === '남성' ? 'male' : 'female';
+            countsAdjust($counts, $pid, $g, array_map('strval', (array)($b['sessionIds'] ?? [])), 1);
+        }
+    }
+    return $counts;
+}
+
+/**
+ * 참가확정 인원 파일을 잠근 채 $fn(array &$counts, bool $rebuilt): bool 을 실행한다. true 를 돌려주면 저장한다.
+ * 파일이 없거나 비어 있거나 깨졌으면 예약 파일로 다시 센 값을 넘긴다($rebuilt = true, 이때는 항상 저장).
+ *   $rebuilt 이면 지금 예약 파일 상태가 이미 반영돼 있다 — 예약을 먼저 바꾼 뒤 부르는 쪽(취소)은 증감하지 않는다.
+ * 반환: $fn 실행 뒤의 인원. 파일을 열 수 없으면 RuntimeException.
+ */
+function withConfirmedCounts(callable $fn): array {
+    $fp = @fopen(confirmedCountsPath(), 'c+');
+    if (!$fp) throw new RuntimeException('cannot open party_confirmed_counts.json');
+    flock($fp, LOCK_EX);
+    try {
+        $raw = (string)stream_get_contents($fp);
+        $counts = trim($raw) !== '' ? json_decode($raw, true) : null;
+        $rebuilt = !is_array($counts);
+        if ($rebuilt) $counts = rebuildConfirmedCounts();
+        $changed = (bool)$fn($counts, $rebuilt);
+        if ($rebuilt || $changed) {
+            ftruncate($fp, 0); rewind($fp);
+            fwrite($fp, json_encode($counts, JSON_FORCE_OBJECT));
+            fflush($fp);
+        }
+        return $counts;
+    } finally {
+        flock($fp, LOCK_UN);
+        fclose($fp);
+    }
+}
+
+/** 참가확정 인원 읽기 — 잠그지 않고 읽고, 파일이 없거나 깨졌을 때만 잠가서 다시 센다. 그래도 못 읽으면 빈 배열 */
+function readConfirmedCounts(): array {
+    $raw = @file_get_contents(confirmedCountsPath());
+    if (is_string($raw) && trim($raw) !== '') {
+        $c = json_decode($raw, true);
+        if (is_array($c)) return $c;
+    }
+    try {
+        return withConfirmedCounts(fn(array &$c, bool $rebuilt): bool => false);
+    } catch (Throwable $e) {
+        error_log('[confirmed counts] ' . $e->getMessage());
+        return [];
+    }
+}
+
 /**
  * 결제 전 항목 확인 — 성공 시 ['option'=>..., 'price'=>int], 실패 시 회원에게 보여줄 문구(string).
  * 항목이 없는 파티는 ['option'=>null, 'price'=>기존 성별 가격].
@@ -466,7 +555,7 @@ function dateStringWithTime(string $dateString, string $time): string {
  *  - $clean: sanitizeParty 결과 — 여기에 sessions/options/대표 가격·정원/일시를 반영해 돌려준다
  * 요청에 sessions·options 키가 모두 없으면 기존 값을 그대로 둔다. 매칭파티면 회차·항목을 지운다.
  * 신청자가 있는 회차·항목을 지우거나(단일 가격·매칭파티 전환 포함), 항목의 포함 회차를 바꾸거나,
- * 회차 정원을 신청 인원보다 적게 바꾸면 거절한다.
+ * 회차 정원을 참가확정 인원보다 적게 바꾸면 거절한다.
  */
 function sanitizePartyOptions(array $in, ?array $prev, array $clean): array {
     $prevSessions = is_array($prev['sessions'] ?? null) ? $prev['sessions'] : [];
@@ -487,8 +576,11 @@ function sanitizePartyOptions(array $in, ?array $prev, array $clean): array {
     }
 
     $stats = null;
+    $seatSessions = [];   // 회차별 참가확정 인원 — 정원 축소 검사용
     if ($prev !== null && $prevOptions) {
         $stats = partyApplicantStats([(string)$prev['id']])[(string)$prev['id']] ?? ['total' => 0, 'options' => [], 'sessions' => []];
+        $seatRow = readConfirmedCounts()[(string)$prev['id']] ?? null;
+        if (is_array($seatRow) && is_array($seatRow['sessions'] ?? null)) $seatSessions = $seatRow['sessions'];
     }
 
     if (!$wantOptions) {
@@ -600,8 +692,11 @@ function sanitizePartyOptions(array $in, ?array $prev, array $clean): array {
             foreach ($sessions as $s) if ($s['id'] === $sid) { $now = $s; break; }
             $pname = (string)($ps['name'] ?? $sid);
             if ($now === null) throw new RuntimeException("신청자가 있는 회차는 삭제할 수 없습니다: {$pname} (신청자 " . ($sc['male'] + $sc['female']) . "명)");
-            if ($now['maleStock'] < $sc['male'])     throw new RuntimeException("{$now['name']}의 남 정원을 현재 신청 인원({$sc['male']}명)보다 적게 바꿀 수 없습니다.");
-            if ($now['femaleStock'] < $sc['female']) throw new RuntimeException("{$now['name']}의 여 정원을 현재 신청 인원({$sc['female']}명)보다 적게 바꿀 수 없습니다.");
+            // 정원은 참가확정 인원보다 적게만 못 줄인다 — 확정 전 결제자는 정원을 넘을 수 있다 (화면 app/lib/partyOptions.ts validateOptionsDraft 와 같은 규칙)
+            $seat = $seatSessions[$sid] ?? [];
+            $sm = (int)($seat['male'] ?? 0); $sf = (int)($seat['female'] ?? 0);
+            if ($now['maleStock'] < $sm)   throw new RuntimeException("{$now['name']}의 남 정원을 현재 참가확정 인원({$sm}명)보다 적게 바꿀 수 없습니다.");
+            if ($now['femaleStock'] < $sf) throw new RuntimeException("{$now['name']}의 여 정원을 현재 참가확정 인원({$sf}명)보다 적게 바꿀 수 없습니다.");
         }
     }
 

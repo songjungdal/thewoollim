@@ -297,6 +297,22 @@ try {
                 ftruncate($fp, 0); rewind($fp); fwrite($fp, json_encode($counts));
                 fflush($fp); flock($fp, LOCK_UN); fclose($fp);
             }
+            // 참가확정 인원 — 자리를 차지하던 예약만 -1 (예약 파일을 지우기 전이라 다시 세는 경우에도 이 예약이 들어가 있다)
+            try {
+                withConfirmedCounts(function (array &$c) use ($active): bool {
+                    $changed = false;
+                    foreach ($active as $b) {
+                        $partyId = (string)($b['partyId'] ?? '');
+                        if ($partyId === '' || !bookingHoldsSeat($b)) continue;
+                        $genderKey = (string)($b['gender'] ?? '') === '남성' ? 'male' : 'female';
+                        countsAdjust($c, $partyId, $genderKey, array_map('strval', (array)($b['sessionIds'] ?? [])), -1);
+                        $changed = true;
+                    }
+                    return $changed;
+                });
+            } catch (Throwable $e) {
+                error_log('[admin/test-users delete confirmed counts] ' . $e->getMessage());
+            }
             foreach ($active as $b) {
                 releaseCouponUsage((string)($b['couponCode'] ?? ''), $email);
                 @file_put_contents("$dir/_admin_cancellations.log", sprintf(

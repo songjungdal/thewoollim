@@ -88,8 +88,7 @@ $total = 0; $orderTitles = [];
 $lines = [];      // partyId => 줄 가격 (결제 시점 가격 — success.php 가 예약 금액에 그대로 씀)
 $optionIds = [];  // partyId => optionId (항목이 있는 파티만)
 $plainIds = [];   // 항목이 없는 파티 — 기존 파티 단위 정원 검사
-$counts = json_decode((string)@file_get_contents($dir . '/party_counts.json'), true);
-if (!is_array($counts)) $counts = [];
+$counts = readConfirmedCounts(); // 정원 사전 검사 — 참가확정 인원 기준 (확정 전 결제자는 세지 않음)
 foreach ($partyIds as $pid) {
     if (!isset($partyMap[$pid])) jsonFail("파티를 찾을 수 없습니다: $pid", 404);
     $oidIn = $optionIdsIn[$pid] ?? '';

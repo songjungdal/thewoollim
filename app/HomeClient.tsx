@@ -390,7 +390,7 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
   const showApplyMore = !applyMoreOpen && sortedParties.length > applyLimit;
 
   // #schedule 전용 — 파티별 일정 상태(지난 일정 > 마감 > 마감임박 > 모집중)와 남은 자리.
-  // 남은 자리는 신청 카드와 같은 실시간 결제 인원(partyCounts, 없으면 0)으로 계산.
+  // 남은 자리는 신청 카드와 같은 실시간 참가확정 인원(partyCounts, 없으면 0)으로 계산.
   // 마감·마감임박·남은 자리는 partyStockStatus 결과 그대로 (참가 구성 파티는 회차 기준, 명세 8-3).
   // now 가 없으면(마운트 전) 상태 계산을 건너뜀 → 하이드레이션 안전 (기존 방식과 동일).
   const scheduleStatus = useMemo(() => {
