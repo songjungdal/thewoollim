@@ -2,7 +2,7 @@
 
 import { Fragment, useState, useEffect, useRef, useCallback, useSyncExternalStore, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, ShoppingBag, X, Users as UsersIcon, CalendarDays, MapPin, UserRound, ChevronDown, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ShoppingBag, X, Users as UsersIcon, CalendarDays, MapPin, UserRound, ChevronDown, ShieldCheck, Clock, Ban } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Header from "../../components/Header";
@@ -10,7 +10,7 @@ import Footer from "../../components/Footer";
 import DiscountArrow from "../../components/DiscountArrow";
 import DiscountBadge from "../../components/DiscountBadge";
 import FitWidth from "../../components/FitWidth";
-import { partyStockStatus, withLiveCounts, dateOnly, partyHasOptions, partyHasDiscount, discountedPrice, partyTypeOf, PARTY_TYPE_LABELS, type Party, type PartyType } from "../../lib/data";
+import { partyStockStatus, partyRecruitState, stockWithRecruit, partyEventDate, kstHHMM, RECRUIT_CLOSE_BEFORE_MIN, withLiveCounts, dateOnly, partyHasOptions, partyHasDiscount, discountedPrice, partyTypeOf, PARTY_TYPE_LABELS, type Party, type PartyType } from "../../lib/data";
 import PartyOptionPicker, { optionClosedFor } from "./PartyOptionPicker";
 import { PARTY_GUIDES, visibleNotices, markupToGuideText } from "../../lib/partyGuides";
 import { templateFor, normalizeDetail, timelineTitleOf, DEFAULT_ABOUT_TITLE, DEFAULT_APPLY_TITLE, DEFAULT_NOTICE_TITLE, DEFAULT_BEFORE_APPLY_TITLE, type PartyDetail, type DetailImageSlot } from "../../lib/partyDetailTemplates";
@@ -26,6 +26,7 @@ import DetailPhotos from "./DetailPhotos";
 import PhotoGateModal from "../../components/PhotoGateModal";
 import { fetchVerificationState, photoGateCode, type PhotoGateCode } from "../../lib/verification";
 import { canGoBackInSite } from "../../lib/navHistory";
+import { useMinuteNow } from "../../lib/useMinuteNow";
 
 /** 오늘 날짜(한국 시간) "YYYY-MM-DD" — useSyncExternalStore 용 (날짜가 바뀌어도 다시 구독할 필요는 없음) */
 const todayKSTString = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date());
@@ -74,6 +75,9 @@ export default function PartyClientView({ id, initialParties }: { id: string; in
   // 행사 일시 경과 여부 — KST 기준 오늘 날짜 > calendarDate (YYYY-MM-DD) 면 종료
   //   정적 HTML(빌드)과 첫 화면이 같도록 서버·하이드레이션 단계에선 "" (종료 아님), 그 뒤 브라우저 날짜로 다시 그린다
   const todayKST = useSyncExternalStore(noSubscribe, todayKSTString, () => "");
+  // 모집 마감 판정 시각 — 마운트 뒤 1분마다 다시 읽어, 페이지를 열어 둔 채 마감 시각이 지나도 1분 안에 버튼이 바뀐다
+  //   (docs/specs/party-recruit-close-cancel.md 3장). 마운트 전(정적 HTML)은 null
+  const now = useMinuteNow();
   const [showCartModal, setShowCartModal] = useState(false);
   // 사진 심사 안내창 — [참가하기]에서 사진 승인 전이면 띄운다 (장바구니 담기는 막지 않음, docs/specs/photo-job-verification.md 2-1)
   const [photoGate, setPhotoGate] = useState<{ code: PhotoGateCode; reason: string | null } | null>(null);
@@ -269,7 +273,10 @@ export default function PartyClientView({ id, initialParties }: { id: string; in
   }
 
   // 남은 자리·마감 — 메인 카드·일정 섹션과 같은 계산 (참가 구성 파티는 회차 기준, 명세 8-3)
-  const stock = partyStockStatus(detailItem);
+  //   모집 마감(취소·시작·관리자 마감·시작 30분 전 자동 마감)은 정원 마감과 같은 "마감" 모양으로 겹친다 (partyRecruitState, 명세 2-3·3장)
+  const recruit = now ? partyRecruitState(detailItem, now) : null;
+  const isCancelled = !!detailItem.cancelledAt;
+  const stock = recruit ? stockWithRecruit(partyStockStatus(detailItem), recruit) : partyStockStatus(detailItem);
   // 고른 참가 항목 — 그사이 내 성별 기준으로 마감됐으면 고르지 않은 것으로 본다
   const selectedOption = stock.hasOptions
     ? stock.options.find(o => o.id === selectedOptionId && !optionClosedFor(o, profile?.gender)) ?? null
@@ -302,8 +309,19 @@ export default function PartyClientView({ id, initialParties }: { id: string; in
   // 진행 안내 형식 — numbered 가 없으면 번호 형식(지금 모양)
   const timelineNumbered = shownDetail?.timeline.numbered !== false;
   const slotImages = (slot: DetailImageSlot) => shownDetail?.images[slot] ?? [];
-  // 행사 일시 경과 — todayKST > calendarDate 일 때 모집 종료. SSR 단계에선 false (window 없음)
-  const isExpired = !!detailItem.calendarDate && todayKST !== "" && todayKST > detailItem.calendarDate;
+  // 행사 일시 경과(모집종료) — 시작 시각이 지남 (참가 구성 파티는 모든 항목의 시작이 지남, partyRecruitState).
+  //   마운트 전(정적 HTML)은 예전처럼 날짜로만 본다(SSR 단계에선 false). 취소된 파티도 신청을 막는다
+  const isExpired = isCancelled || (recruit
+    ? recruit.state === "ended"
+    : !!detailItem.calendarDate && todayKST !== "" && todayKST > detailItem.calendarDate);
+  // 자동 마감 안내 — "온라인 신청은 파티 시작 30분 전(18:30)에 자동 마감됩니다." / 참가 구성 파티는 회차별 (명세 3장)
+  const autoCloseNotice = (() => {
+    if (partyHasOptions(detailItem)) return `온라인 신청은 각 회차 시작 ${RECRUIT_CLOSE_BEFORE_MIN}분 전에 자동 마감됩니다.`;
+    const hasTime = /\d{1,2}:\d{2}/.test(detailItem.dateString || "");
+    if (!hasTime || !detailItem.calendarDate) return `온라인 신청은 파티 시작 ${RECRUIT_CLOSE_BEFORE_MIN}분 전에 자동 마감됩니다.`;
+    const closeAt = new Date(partyEventDate(detailItem).getTime() - RECRUIT_CLOSE_BEFORE_MIN * 60_000);
+    return `온라인 신청은 파티 시작 ${RECRUIT_CLOSE_BEFORE_MIN}분 전(${kstHHMM(closeAt)})에 자동 마감됩니다.`;
+  })();
 
   // 자격 검증 (로그인한 회원에 한해 평가) — 참가 대상 문구는 정보 패널의 "대상"으로 흡수, 자격이 맞지 않을 때 사유만 아래에 보여 준다
   const eligibility = isLoggedIn && profile
@@ -424,7 +442,9 @@ export default function PartyClientView({ id, initialParties }: { id: string; in
     const hardDisabled = stock.allFull || userSideFull || eligibilityBlocked;
     // 회색 스타일 적용 조건 — 시각적으로 비활성처럼 보이지만 alreadyBooked 는 클릭 가능
     const grayedOut = alreadyBooked || hardDisabled;
-    const label = alreadyBooked
+    const label = isCancelled
+      ? "취소된 파티"
+      : alreadyBooked
       ? "이미 신청된 파티"
       : stock.allFull
         ? "모집 마감"
@@ -435,7 +455,7 @@ export default function PartyClientView({ id, initialParties }: { id: string; in
             : eligibilityBlocked
               ? "참가 대상 아님"
               : "참가하기";
-    return { ended: isExpired, hardDisabled, grayedOut, clickableGray: alreadyBooked && !hardDisabled, label };
+    return { ended: isExpired, endedLabel: isCancelled ? "취소된 파티" : undefined, hardDisabled, grayedOut, clickableGray: alreadyBooked && !hardDisabled, label };
   })();
 
   // 참가비 — 성별별 분리 표시 (남성 / 여성). 미설정 시 price 폴백 단일 표시
@@ -810,9 +830,10 @@ export default function PartyClientView({ id, initialParties }: { id: string; in
               {/* 상태 배지 — 우선순위: 행사일 경과(모집종료) > 정원 만석(모집마감) > 모집중 (기존 로직 그대로).
                    파티 종류 배지(매칭파티/솔로파티)는 2026-10-25 사용자 요청으로 뺐다 */}
               {(() => {
-                const status: "ended" | "full" | "open" =
-                  isExpired ? "ended" : stock.allFull ? "full" : "open";
+                const status: "cancelled" | "ended" | "full" | "open" =
+                  isCancelled ? "cancelled" : isExpired ? "ended" : stock.allFull ? "full" : "open";
                 const badge = {
+                  cancelled: { label: "취소됨", cls: "bg-gray-900 text-white" },
                   ended: { label: "모집종료", cls: "bg-danger text-white" },
                   full:  { label: "모집마감", cls: "bg-gray-300 text-black" },
                   open:  { label: "모집중",   cls: "bg-brand-point text-black" },
@@ -928,6 +949,21 @@ export default function PartyClientView({ id, initialParties }: { id: string; in
               <p className="mt-2 px-1 text-[13px] font-bold text-red-600" data-testid="eligibility-message">
                 {eligibility.message}
                 {userAge !== null && eligibility.reason === "ageOutOfRange" && ` (현재 만 ${userAge}세)`}
+              </p>
+            )}
+
+            {/* 취소된 파티 — 신청 불가 안내 (docs/specs/party-recruit-close-cancel.md 3장) */}
+            {isCancelled && (
+              <p role="status" className="mt-3 flex items-center gap-2 rounded-xl border border-gray-300 bg-gray-100 px-4 py-3 text-[13px] font-bold text-gray-800 break-keep md:text-[15px]" data-testid="party-cancelled-notice">
+                <Ban className="size-4 flex-shrink-0" aria-hidden />
+                주최측 사정으로 취소된 파티입니다.
+              </p>
+            )}
+            {/* 자동 마감 안내 — 신청을 받을 수 있는 파티에만 (명세 3장) */}
+            {!isExpired && (
+              <p className="mt-3 flex items-center gap-2 px-1 text-[13px] font-bold text-gray-600 break-keep md:text-sm" data-testid="auto-close-notice">
+                <Clock className="size-4 flex-shrink-0 text-brand-point-ink" aria-hidden />
+                {autoCloseNotice}
               </p>
             )}
 

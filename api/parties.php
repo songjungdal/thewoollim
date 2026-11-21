@@ -6,7 +6,7 @@
  *        maleStock,femaleStock,maleBooked,femaleBooked,
  *        minAge?,maxAge?,allowedMaritalStatus?,
  *        imageUrl?,heroImageUrl?,description?,
- *        targetGroup?,theme?,locationTag?,locationShort?,partyType,couponDisabled,discountRate,
+ *        targetGroup?,theme?,locationTag?,locationShort?,partyType,couponDisabled,discountRate,recruitMode,cancelledAt,
  *        sessions?:[{id,name,startTime,maleStock,femaleStock,maleBooked,femaleBooked}],
  *        options?:[{id,name,sessionIds,priceMale,priceFemale}]}]
  *   sessions·options: 참가 구성이 있는 솔로파티만 (docs/specs/party-options-solo.md). 회차별 인원은 참가확정 인원의 sessions.
@@ -75,6 +75,9 @@ foreach ($parties as $p) {
         'couponDisabled'       => partyCouponDisabled($p),
         // 할인율 (0 = 할인 없음) — 화면이 정가·할인가를 함께 보여 준다. 결제 금액은 서버 priceForGender 가 따로 계산
         'discountRate'         => partyDiscountRate($p),
+        // 모집 마감·파티 취소 (docs/specs/party-recruit-close-cancel.md) — 화면이 partyRecruitState 로 판정. 취소 사유·처리 관리자는 내보내지 않는다
+        'recruitMode'          => normalizeRecruitMode($p['recruitMode'] ?? null),
+        'cancelledAt'          => partyIsCancelled($p) ? (string)$p['cancelledAt'] : null,
     ];
     // 참가 구성 (솔로파티) — 회차(이름·시작 시각·정원·신청 인원)와 항목(이름·포함 회차·남/여 가격)
     if (partyHasOptions($p)) {

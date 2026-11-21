@@ -42,7 +42,8 @@ async function fetchActivePartyIds(): Promise<string[]> {
     return data
       .filter((p): p is Party =>
         !!p && typeof p === "object" &&
-        partyVisibility(p as Pick<Party, "calendarDate" | "dateString">) === "active"
+        partyVisibility(p as Pick<Party, "calendarDate" | "dateString">) === "active" &&
+        !(p as { cancelledAt?: unknown }).cancelledAt   // 취소된 파티 제외
       )
       .map((p) => String((p as { id: unknown }).id ?? ""))
       .filter((id) => id !== "");

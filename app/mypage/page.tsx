@@ -9,11 +9,12 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import DiscountArrow from "../components/DiscountArrow";
 import DiscountBadge from "../components/DiscountBadge";
-import { useAuth, calcCouponDiscount, type BookingStatus } from "../context/AuthContext";
+import { useAuth, calcCouponDiscount, type BookingStatus, type Booking } from "../context/AuthContext";
 import MembershipSection from "./MembershipSection";
 import VerificationSection from "./VerificationSection";
 import { useParties, PARTIES_NOT_LOADED } from "../lib/useParties";
-import { partyStockStatus, linePriceFor, basePriceForGender, partyHasDiscount, partyHasOptions, partyOptionById, dateOnly, partyVisibility, VBANK_INFO, COUPON_DISABLED_MESSAGE } from "../lib/data";
+import { useMinuteNow } from "../lib/useMinuteNow";
+import { partyStockStatus, recruitClosedForLine, withLiveCounts, linePriceFor, basePriceForGender, partyHasDiscount, partyHasOptions, partyOptionById, dateOnly, partyVisibility, VBANK_INFO, COUPON_DISABLED_MESSAGE, type Party } from "../lib/data";
 
 // 관리자 페이지의 신청자 상태 배지 규격과 동일한 색상 조합 사용 (admin8888/dashboard STATUS_LABEL)
 const STATUS_DISPLAY: Record<BookingStatus, { label: string; tone: string; stripe: string; icon: typeof Clock; sub?: string }> = {
@@ -80,6 +81,17 @@ const STATUS_DISPLAY: Record<BookingStatus, { label: string; tone: string; strip
     icon:   X,
   },
 };
+
+// 파티 취소로 취소된 예약의 표시 이름 (docs/specs/party-recruit-close-cancel.md 3장) — 상태값은 그대로 cancelled
+function partyCancelLabel(b: Booking): string | null {
+  if (b.cancelReason !== "party_cancelled") return null;
+  if (b.paymentMethod === "vbank") {
+    if (b.manualRefundStatus === "done") return "파티 취소 · 송금 완료";
+    if (b.manualRefundStatus === "pending") return "파티 취소 · 환불 송금 예정";
+    return "파티 취소";   // 입금 전이라 환불할 금액 없음
+  }
+  return "파티 취소 · 전액 환불";
+}
 
 // 참가확정 예약의 행사 일시가 지났을 때 카드 안내 문구 (표시만 — 상태값은 그대로 confirmed)
 const PARTY_ENDED_SUB = "어울림과 함께한 시간은 즐거우셨나요? 소중한 후기를 남겨주시면 다음 참여 시 혜택을 드립니다.";
@@ -194,6 +206,12 @@ export default function MyPage() {
   const cartParties = cart
     .map(item => PARTIES.find(p => p.id === item.partyId))
     .filter(Boolean) as typeof PARTIES;
+
+  // 모집 마감(시작 30분 전·관리자 마감·정원)·취소된 파티 — 1분마다 다시 판정 (docs/specs/party-recruit-close-cancel.md 3장)
+  const now = useMinuteNow();
+  const lineClosed = (p: Party) => now
+    ? recruitClosedForLine(withLiveCounts(p, partyCounts[p.id]), cart.find(c => c.partyId === p.id)?.optionId, now)
+    : { closed: false, cancelled: false };
 
   /** 수량 개념 제거 — 한 사용자는 같은 파티에 1회만 신청 → 항상 1 반환 (legacy 호출부 호환) */
   const qtyOf = (_partyId: string) => 1;
@@ -547,7 +565,7 @@ export default function MyPage() {
                               const cd = party?.calendarDate ?? "";
                               return (
                                 <li key={b.id} className="flex items-center gap-3 min-h-[48px] px-4 lg:px-6 py-2.5">
-                                  <span className={`flex-shrink-0 text-[11px] font-black px-2 py-0.5 rounded-full whitespace-nowrap ${meta.tone}`}>{meta.label}</span>
+                                  <span className={`flex-shrink-0 text-[11px] font-black px-2 py-0.5 rounded-full whitespace-nowrap ${meta.tone}`} data-testid="past-booking-status">{partyCancelLabel(b) ?? meta.label}</span>
                                   {party ? (
                                     <Link href={`/party/${b.partyId}`} className="flex-1 min-w-0 truncate text-sm font-bold text-gray-800 hover:text-brand-point-ink transition-colors">
                                       {party.title}
@@ -624,7 +642,13 @@ export default function MyPage() {
                           </button>
                           <Link href={`/party/${party.id}`} className="block group flex-1 min-w-0">
                             <div className="flex flex-wrap items-center gap-1.5">
-                              <span className="inline-flex items-center text-[11px] font-black text-brand-point-ink bg-brand-point/10 px-2 py-0.5 rounded-full">모집중</span>
+                              {lineClosed(party).closed ? (
+                                <span className="inline-flex items-center text-[11px] font-black text-white bg-gray-900 px-2 py-0.5 rounded-full" data-testid="cart-closed">
+                                  {lineClosed(party).cancelled ? "취소된 파티" : "모집 마감"}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center text-[11px] font-black text-brand-point-ink bg-brand-point/10 px-2 py-0.5 rounded-full">모집중</span>
+                              )}
                               {/* 솔로파티 참가 구성 — 담은 항목 이름 */}
                               {partyHasOptions(party) && partyOptionById(party, cartOptionOf(party.id)) && (
                                 <span className="inline-flex text-[11px] font-black text-brand-point-ink bg-brand-point/10 px-2 py-0.5 rounded-full" data-testid="cart-option">
@@ -817,26 +841,48 @@ export default function MyPage() {
                         parties.flatMap(p => Array(qtyOf(p.id)).fill(p.id)).join(",");
                       const allIds      = expandIds(cartParties);
                       const selectedIdsStr = expandIds(selectedParties);
+                      // 마감된 파티가 담겨 있으면 결제 버튼을 막고 빼도록 안내 (docs/specs/party-recruit-close-cancel.md 3장)
+                      const anyClosed      = cartParties.some(p => lineClosed(p).closed);
+                      const selectedClosed = selectedParties.some(p => lineClosed(p).closed);
+                      const disabledCls = "flex items-center justify-center gap-2 w-full bg-gray-200 text-gray-500 rounded-xl font-black text-center cursor-not-allowed";
                       return (
                         <>
+                          {anyClosed && (
+                            <p role="alert" className="mb-3 flex items-start gap-2 rounded-xl bg-red-50 px-4 py-3 text-sm font-bold text-danger break-keep" data-testid="cart-closed-notice">
+                              <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
+                              마감된 파티를 장바구니에서 빼주세요.
+                            </p>
+                          )}
                           {/* Primary: Pay all */}
+                          {anyClosed ? (
+                            <span aria-disabled="true" className={`${disabledCls} py-4 text-base md:text-lg mb-3`} data-testid="cart-pay-all">
+                              <CreditCard size={20} />
+                              전체 결제하기 ({cartTotalQty}건) · ₩{cartTotal.toLocaleString()}
+                            </span>
+                          ) : (
                           <Link
                             href={`/checkout/?ids=${allIds}`}
                             className="flex items-center justify-center gap-2 w-full bg-brand-black text-white py-4 rounded-xl font-black text-base md:text-lg hover:bg-brand-point hover:text-black transition-all text-center mb-3"
+                            data-testid="cart-pay-all"
                           >
                             <CreditCard size={20} />
                             전체 결제하기 ({cartTotalQty}건) · ₩{cartTotal.toLocaleString()}
                           </Link>
+                          )}
 
                           {/* Secondary: Pay selected (only if partial selection) */}
-                          {!allSelected && selectedParties.length > 0 && (
+                          {!allSelected && selectedParties.length > 0 && (selectedClosed ? (
+                            <span aria-disabled="true" className={`${disabledCls} py-3.5 text-sm md:text-base`}>
+                              선택 항목만 결제하기 ({selectedParties.reduce((s, p) => s + qtyOf(p.id), 0)}건)
+                            </span>
+                          ) : (
                             <Link
                               href={`/checkout/?ids=${selectedIdsStr}`}
                               className="flex items-center justify-center gap-2 w-full bg-white border-2 border-brand-black text-brand-black py-3.5 rounded-xl font-black text-sm md:text-base hover:bg-brand-point hover:text-black hover:border-brand-point transition-all text-center"
                             >
                               선택 항목만 결제하기 ({selectedParties.reduce((s, p) => s + qtyOf(p.id), 0)}건)
                             </Link>
-                          )}
+                          ))}
                         </>
                       );
                     })()}

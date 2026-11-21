@@ -76,6 +76,7 @@ if (!is_array($parties)) $parties = [];
 $targetParties = []; // partyId => party
 foreach ($parties as $p) {
     if (!is_array($p)) continue;
+    if (partyIsCancelled($p)) continue; // 취소된 파티는 안내하지 않는다 (docs/specs/party-recruit-close-cancel.md)
     if ((string)($p['calendarDate'] ?? '') === $tomorrow) {
         $targetParties[(string)($p['id'] ?? '')] = $p;
     }

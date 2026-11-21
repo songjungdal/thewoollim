@@ -53,6 +53,9 @@ export type Booking = {
   optionName?: string;
   sessionIds?: string[];
   sessionTimes?: string[];
+  // 파티 취소로 취소된 예약 (docs/specs/party-recruit-close-cancel.md) — 무통장 입금 완료 예약은 환불 송금 상태
+  cancelReason?: "party_cancelled";
+  manualRefundStatus?: "pending" | "done";
   createdAt: string;
   updatedAt: string;
 };

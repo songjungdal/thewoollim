@@ -71,6 +71,12 @@ $users = $stmt->fetchAll();
 
 $sentCount = 0; $failCount = 0; $skipCount = 0;
 
+// 취소된 파티의 예약은 안내하지 않는다 (docs/specs/party-recruit-close-cancel.md)
+$cancelledParties = [];
+foreach ((array)json_decode((string)@file_get_contents($dataDir . '/parties.json'), true) as $p) {
+    if (is_array($p) && partyIsCancelled($p)) $cancelledParties[(string)($p['id'] ?? '')] = true;
+}
+
 foreach ($users as $u) {
     $email = (string)($u['email'] ?? '');
     if ($email === '') continue;
@@ -85,6 +91,7 @@ foreach ($users as $u) {
     foreach ($bookings as &$b) {
         if (!is_array($b)) continue;
         if ((string)($b['status'] ?? '') !== 'paid_pending_profile') continue;
+        if (isset($cancelledParties[(string)($b['partyId'] ?? '')])) continue;
         if (!empty($b['profile24hReminderAt'])) continue; // 이미 발송됨 — 중복 발송 차단
 
         $updatedAtTs = strtotime((string)($b['updatedAt'] ?? ''));

@@ -6,6 +6,12 @@
  *
  * POST { action: 'create'|'update'|'delete', party?: {...}, id?: '...' } → { ok: true }
  * POST { action: 'update_host', id, host_name } → { ok: true, host_name }
+ * POST { action: 'recruit', partyId, mode: 'auto'|'closed'|'open' } → 모집 마감·마감 해제·다시 자동 마감 (취소·시작된 파티는 거절)
+ * POST { action: 'cancel_preview', partyId } → 파티 취소 미리보기(결제 수단별 건수·금액) / 취소된 파티는 남은 처리·무통장 송금 목록
+ * POST { action: 'cancel_party', partyId, reason, sendSms, confirmTitle } → 파티 취소 + 신청자 전원 전액 환불 (_party_cancel.php)
+ * POST { action: 'cancel_retry', partyId } → 취소된 파티의 남은 환불 다시 시도 (이미 처리된 예약은 건너뜀)
+ * POST { action: 'manual_refund_done', partyId, email, bookingId } → 무통장 환불 [송금 완료]
+ *   (docs/specs/party-recruit-close-cancel.md 5·6장. 모집 상태·취소 정보는 수정(update) 저장으로 바뀌지 않는다)
  *
  * 데이터 저장: /api/data/parties.json (단일 진실 소스)
  *
@@ -109,6 +115,105 @@ if ($action === 'update_host') {
     jsonOut(['ok' => true, 'host_name' => $applied]);
 }
 
+// ─── 모집 마감·마감 해제·파티 취소 (docs/specs/party-recruit-close-cancel.md 5·6장) ─────────────
+if (in_array($action, ['recruit', 'cancel_preview', 'cancel_party', 'cancel_retry', 'manual_refund_done'], true)) {
+    require_once __DIR__ . '/_party_cancel.php';
+    $adminId = (string)($_SESSION['adminId'] ?? '?');
+    $partyId = (string)($body['partyId'] ?? '');
+    if ($partyId === '') jsonFail('partyId 가 필요합니다.');
+
+    // [모집 마감] / [마감 해제] / [다시 자동 마감으로] — recruitMode 만 바꾼다
+    if ($action === 'recruit') {
+        $mode = (string)($body['mode'] ?? '');
+        if (!in_array($mode, ['auto', 'closed', 'open'], true)) jsonFail('mode 가 올바르지 않습니다.');
+        $before = null; $after = null;
+        try {
+            withFileLock($file, function (array $parties) use ($partyId, $mode, $adminId, &$before, &$after): array {
+                foreach ($parties as &$row) {
+                    if (!is_array($row) || (string)($row['id'] ?? '') !== $partyId) continue;
+                    if (partyIsCancelled($row)) throw new RuntimeException('취소된 파티는 모집 상태를 바꿀 수 없습니다.');
+                    if (partyRecruitState($row, time())['state'] === 'ended') throw new RuntimeException('이미 시작된 파티는 모집 상태를 바꿀 수 없습니다.');
+                    $before = normalizeRecruitMode($row['recruitMode'] ?? null);
+                    $row['recruitMode']   = $mode;
+                    $row['recruitModeBy'] = $adminId;
+                    $row['recruitModeAt'] = date('c');
+                    $after = $row;
+                    return $parties;
+                }
+                unset($row);
+                throw new RuntimeException('party not found');
+            });
+        } catch (Throwable $e) {
+            jsonFail($e->getMessage(), 400);
+        }
+        $label = ['auto' => '자동 마감', 'closed' => '모집 마감(관리자)', 'open' => '마감 해제'];
+        logAdminActivity('update', 'party', $partyId,
+            "모집 상태 변경 — [" . partyTypeLabel($after) . "] #{$partyId} " . (string)($after['title'] ?? '') . " · {$label[$before]} → {$label[$mode]}",
+            ['recruitMode' => $before], ['recruitMode' => $mode]);
+        jsonOut(['ok' => true, 'recruitMode' => $mode, 'recruitModeAt' => $after['recruitModeAt']]);
+    }
+
+    $party = partyCancelFindParty($partyId);
+    if ($party === null) jsonFail('파티를 찾을 수 없습니다.', 404);
+
+    // 미리보기 — 결제 수단별 건수·금액 (취소된 파티는 남은 처리 건수와 무통장 송금 목록)
+    if ($action === 'cancel_preview') {
+        jsonOut(['ok' => true] + partyCancelPreview($party));
+    }
+
+    // [송금 완료] — 파티 취소로 생긴 무통장 환불 송금 기록만
+    if ($action === 'manual_refund_done') {
+        $email = normalizeEmail((string)($body['email'] ?? ''));
+        $bid   = (string)($body['bookingId'] ?? '');
+        $done = partyCancelMarkManualRefundDone($partyId, $email, $bid, $adminId);
+        if (is_string($done)) jsonFail($done);
+        require_once __DIR__ . '/_log_detail.php';
+        logAdminActivity('update', 'booking', $bid,
+            "파티 취소 무통장 환불 송금 완료 — 파티 #{$partyId} " . (string)($party['title'] ?? '') . ', ' . number_format((int)$done['amount']) . '원',
+            ['manualRefund' => 'pending'], ['manualRefund' => 'done'],
+            adminLogBookingDetail($email, $done['booking'], ['송금 금액' => number_format((int)$done['amount']) . '원']));
+        jsonOut(['ok' => true, 'manualRefund' => $done['booking']['manualRefund']]);
+    }
+
+    // [파티 취소 실행] / [남은 환불 다시 시도]
+    if ($action === 'cancel_party') {
+        if (partyIsCancelled($party)) jsonFail('이미 취소된 파티입니다. [남은 환불 다시 시도]를 이용해주세요.');
+        $reason = trim((string)preg_replace('/[\x00-\x1F\x7F<>]/u', '', (string)($body['reason'] ?? '')));
+        if ($reason === '') jsonFail('취소 사유를 입력해주세요.');
+        if (mb_strlen($reason) > PARTY_CANCEL_REASON_MAX) jsonFail('취소 사유는 ' . PARTY_CANCEL_REASON_MAX . '자 이하로 입력해주세요.');
+        if (trim((string)($body['confirmTitle'] ?? '')) !== trim((string)($party['title'] ?? ''))) {
+            jsonFail('파티 제목이 일치하지 않습니다. 제목을 그대로 입력해주세요.');
+        }
+        $sendSms = filter_var($body['sendSms'] ?? true, FILTER_VALIDATE_BOOLEAN);
+        // 1) 파티에 취소 기록 먼저 — 이 순간부터 신청·결제 불가 (명세 6-2 1번)
+        try {
+            $party = partyCancelMark($partyId, $reason, $sendSms, $adminId);
+        } catch (Throwable $e) {
+            jsonFail($e->getMessage(), 400);
+        }
+    } else { // cancel_retry
+        if (!partyIsCancelled($party)) jsonFail('취소된 파티가 아닙니다.');
+    }
+
+    // 2) 예약 처리 — 하나가 실패해도 나머지는 계속 (브라우저가 끊겨도 끝까지)
+    ignore_user_abort(true);
+    @set_time_limit(0);
+    $result = partyCancelProcess($party);
+
+    // 3) 텔레그램 (설정 켜져 있을 때만) — 회원 이름·연락처 없이 건수만
+    partyCancelNotifyTelegram($party, $result, $adminId, $action === 'cancel_retry');
+
+    // 4) 활동 로그
+    logAdminActivity('update', 'party', $partyId,
+        ($action === 'cancel_retry' ? '파티 취소 — 남은 환불 다시 시도' : '파티 취소') . " — [" . partyTypeLabel($party) . "] #{$partyId} " . (string)($party['title'] ?? '')
+            . ' · 카드 환불 ' . $result['summary']['card'] . '건 / 무통장 송금 필요 ' . $result['summary']['vbankPaid'] . '건 / 입금 대기 취소 ' . $result['summary']['vbankPending'] . '건 / 실패 ' . $result['summary']['failed'] . '건',
+        $action === 'cancel_party' ? ['cancelledAt' => null] : null,
+        ['cancelledAt' => $party['cancelledAt'] ?? null, 'cancelReason' => $party['cancelReason'] ?? null, 'sendSms' => !empty($party['cancelSms'])],
+        partyCancelLogDetail($result));
+
+    jsonOut(['ok' => true, 'party' => ['id' => $partyId, 'cancelledAt' => $party['cancelledAt'] ?? null]] + $result);
+}
+
 // ─── 기존 CRUD (create / update / delete) ────────────────────────
 $logInfo = ['id' => '', 'row' => null, 'detailChanged' => false];
 try {
@@ -144,6 +249,10 @@ try {
                         $before = $row;
                         // 참가 구성(sessions·options)은 요청에 없으면 sanitizePartyOptions 가 기존 값을 유지한다
                         $row = sanitizePartyOptions($p, $before, sanitizeParty($p, true));
+                        // 모집 상태·파티 취소 정보는 전용 동작(recruit·cancel_party)으로만 바뀐다 — 수정 저장은 요청 값과 상관없이 기존 값 유지
+                        foreach (PARTY_RECRUIT_CANCEL_FIELDS as $keep) {
+                            if (array_key_exists($keep, $before)) $row[$keep] = $before[$keep];
+                        }
                         $logInfo = [
                             'id'            => $row['id'],
                             'row'           => $row,

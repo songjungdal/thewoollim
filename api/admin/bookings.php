@@ -28,42 +28,8 @@ if (!adminIsLoggedIn()) {
 
 $dataDir = dataDir();
 
-function loadBookings(string $email): array {
-    global $dataDir;
-    $f = $dataDir . '/bookings_' . md5(strtolower(trim($email))) . '.json';
-    if (!file_exists($f)) return [];
-    $d = json_decode((string)file_get_contents($f), true);
-    return is_array($d) ? $d : [];
-}
-function saveBookings(string $email, array $bookings): void {
-    global $dataDir;
-    file_put_contents(
-        $dataDir . '/bookings_' . md5(strtolower(trim($email))) . '.json',
-        json_encode($bookings, JSON_UNESCAPED_UNICODE)
-    );
-}
-
-/**
- * 취소한 예약이 차지하던 참가확정 자리를 돌려준다 — 참가확정 인원 -1 (참가 구성 예약은 저장된 회차마다).
- * 예약을 'cancelled' 로 저장한 뒤 부른다. 인원 파일을 다시 센 경우엔 이 예약이 이미 빠져 있으므로 증감하지 않는다.
- * 반환: 자리를 차지하던 예약이었는지 (활동 로그용). 기록 실패는 취소 처리를 막지 않는다.
- */
-function releaseConfirmedSeat(array $before): bool {
-    $partyId = (string)($before['partyId'] ?? '');
-    if ($partyId === '' || !bookingHoldsSeat($before)) return false;
-    $genderKey = (string)($before['gender'] ?? '') === '남성' ? 'male' : 'female';
-    $sids = array_map('strval', (array)($before['sessionIds'] ?? []));
-    try {
-        withConfirmedCounts(function (array &$c, bool $rebuilt) use ($partyId, $genderKey, $sids): bool {
-            if ($rebuilt) return false;
-            countsAdjust($c, $partyId, $genderKey, $sids, -1);
-            return true;
-        });
-    } catch (Throwable $e) {
-        error_log('[admin/bookings confirmed seat release] ' . $e->getMessage());
-    }
-    return true;
-}
+// 예약 파일 읽기·쓰기, 참가확정 자리 반환, 토스 취소, 취소 뒤 정리 — 파티 취소(parties.php)와 같은 코드 (_booking_cancel.php)
+require_once __DIR__ . '/_booking_cancel.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     try {
@@ -291,36 +257,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 echo json_encode(['ok' => false, 'error' => '결제 키(paymentId)가 없어 카드 취소를 진행할 수 없습니다.']); exit;
             }
             if ($refundAmount > 0) {
-                try {
-                    $cfg = require __DIR__ . '/../payments/toss-config.php';
-                    $ch  = curl_init('https://api.tosspayments.com/v1/payments/' . urlencode($paymentKey) . '/cancel');
-                    curl_setopt_array($ch, [
-                        CURLOPT_POST           => true,
-                        CURLOPT_POSTFIELDS     => json_encode(['cancelReason' => '취소요청 승인(관리자)', 'cancelAmount' => $refundAmount]),
-                        CURLOPT_HTTPHEADER     => [
-                            'Authorization: Basic ' . base64_encode($cfg['secret_key'] . ':'),
-                            'Content-Type: application/json',
-                        ],
-                        CURLOPT_RETURNTRANSFER => true,
-                        CURLOPT_TIMEOUT        => 20,
-                    ]);
-                    $tossBody = curl_exec($ch);
-                    $tossHttp = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                    $tossJson = is_string($tossBody) ? (json_decode($tossBody, true) ?: []) : [];
-                    curl_close($ch);
-                    @file_put_contents("$dataDir/_toss_refund.log", sprintf(
-                        "[%s] APPROVE_REFUND paymentKey=%s amount=%d http=%d body=%s\n",
-                        date('c'), $paymentKey, $refundAmount, $tossHttp, substr((string)$tossBody, 0, 400)
-                    ), FILE_APPEND);
-                    // 이미 취소된 결제(ALREADY_CANCELED)는 성공으로 간주
-                    $alreadyCanceled = ($tossHttp === 400 && (string)($tossJson['code'] ?? '') === 'ALREADY_CANCELED_PAYMENT');
-                    if ($tossHttp !== 200 && !$alreadyCanceled) {
-                        echo json_encode(['ok' => false, 'error' => 'Toss 결제 취소 실패: ' . (string)($tossJson['message'] ?? "HTTP $tossHttp")]); exit;
-                    }
-                } catch (Throwable $e) {
-                    error_log('[approve_refund toss] ' . $e->getMessage());
-                    echo json_encode(['ok' => false, 'error' => '결제 취소 처리 중 오류가 발생했습니다.']); exit;
-                }
+                $toss = bookingTossCancel($paymentKey, $refundAmount, '취소요청 승인(관리자)', 'APPROVE_REFUND');
+                if (!$toss['ok']) { echo json_encode(['ok' => false, 'error' => $toss['error']]); exit; }
             }
         }
 
@@ -486,36 +424,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($paymentKey === '') {
                 echo json_encode(['ok' => false, 'error' => '결제 키(paymentId)가 없어 카드 취소를 진행할 수 없습니다.']); exit;
             }
-            try {
-                $cfg = require __DIR__ . '/../payments/toss-config.php';
-                $ch  = curl_init('https://api.tosspayments.com/v1/payments/' . urlencode($paymentKey) . '/cancel');
-                curl_setopt_array($ch, [
-                    CURLOPT_POST           => true,
-                    CURLOPT_POSTFIELDS     => json_encode(['cancelReason' => '관리자 100% 환불 처리', 'cancelAmount' => $paidAmount]),
-                    CURLOPT_HTTPHEADER     => [
-                        'Authorization: Basic ' . base64_encode($cfg['secret_key'] . ':'),
-                        'Content-Type: application/json',
-                    ],
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_TIMEOUT        => 20,
-                ]);
-                $tossBody = curl_exec($ch);
-                $tossHttp = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                $tossJson = is_string($tossBody) ? (json_decode($tossBody, true) ?: []) : [];
-                curl_close($ch);
-                @file_put_contents("$dataDir/_toss_refund.log", sprintf(
-                    "[%s] CANCEL_FULL_REFUND paymentKey=%s amount=%d http=%d body=%s\n",
-                    date('c'), $paymentKey, $paidAmount, $tossHttp, substr((string)$tossBody, 0, 400)
-                ), FILE_APPEND);
-                // 이미 취소된 결제(ALREADY_CANCELED)는 성공으로 간주
-                $alreadyCanceled = ($tossHttp === 400 && (string)($tossJson['code'] ?? '') === 'ALREADY_CANCELED_PAYMENT');
-                if ($tossHttp !== 200 && !$alreadyCanceled) {
-                    echo json_encode(['ok' => false, 'error' => 'Toss 결제 취소 실패: ' . (string)($tossJson['message'] ?? "HTTP $tossHttp")]); exit;
-                }
-            } catch (Throwable $e) {
-                error_log('[cancel_full_refund toss] ' . $e->getMessage());
-                echo json_encode(['ok' => false, 'error' => '결제 취소 처리 중 오류가 발생했습니다.']); exit;
-            }
+            $toss = bookingTossCancel($paymentKey, $paidAmount, '관리자 100% 환불 처리', 'CANCEL_FULL_REFUND');
+            if (!$toss['ok']) { echo json_encode(['ok' => false, 'error' => $toss['error']]); exit; }
         }
 
         $beforeBooking = $target;
@@ -526,30 +436,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $bookings[$idx]['refundAmount'] = $paidAmount;
         saveBookings($email, $bookings);
 
-        // party_counts 해당 성별 -1 (atomic) — 기존 'cancel' 액션과 완전히 동일한 규칙 재사용
-        $partyId   = (string)($beforeBooking['partyId'] ?? '');
-        $gender    = (string)($beforeBooking['gender']  ?? '');
-        $genderKey = $gender === '남성' ? 'male' : 'female';
-        $wasCounted = !(($beforeBooking['paymentMethod'] ?? '') === 'vbank' && empty($beforeBooking['vbankPaidAt']));
-        if ($partyId !== '' && $wasCounted) {
-            $countsFile = "$dataDir/party_counts.json";
-            $fp = fopen($countsFile, 'c+');
-            if ($fp) {
-                flock($fp, LOCK_EX);
-                $raw = stream_get_contents($fp);
-                $counts = $raw ? json_decode($raw, true) : [];
-                if (!is_array($counts)) $counts = [];
-                // 파티 신청 인원 -1, 참가 구성 예약이면 예약에 저장된 회차 인원도 각각 -1
-                countsAdjust($counts, $partyId, $genderKey, array_map('strval', (array)($beforeBooking['sessionIds'] ?? [])), -1);
-                ftruncate($fp, 0); rewind($fp); fwrite($fp, json_encode($counts));
-                fflush($fp); flock($fp, LOCK_UN); fclose($fp);
-            }
-        }
-        // 참가확정 인원 -1 — 참가확정 자리를 차지하던 예약만
-        $heldSeat = releaseConfirmedSeat($beforeBooking);
-
-        // 사용했던 쿠폰이 있으면 사용 이력 해제 — 재사용 가능하도록 복원
-        releaseCouponUsage((string)($beforeBooking['couponCode'] ?? ''), $email);
+        // 결제 인원 -1 · 참가확정 인원 -1 · 쿠폰 사용 이력 해제 — 기존 'cancel' 액션과 같은 공통 처리 (_booking_cancel.php)
+        $rel = bookingReleaseAfterCancel($email, $beforeBooking);
+        ['partyId' => $partyId, 'gender' => $gender, 'wasCounted' => $wasCounted, 'heldSeat' => $heldSeat] = $rel;
 
         @file_put_contents($dataDir . '/_admin_cancellations.log', sprintf(
             "[%s] CANCELLED_FULL_REFUND email=%s bid=%s partyId=%s gender=%s amount=%d\n",
@@ -606,34 +495,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$found) { echo json_encode(['ok' => false, 'error' => 'booking not found']); exit; }
     saveBookings($email, $bookings);
 
-    // party_counts 해당 성별 -1 (atomic)
-    $partyId   = (string)($beforeBooking['partyId'] ?? '');
-    $gender    = (string)($beforeBooking['gender']  ?? '');
-    $genderKey = $gender === '남성' ? 'male' : 'female';
-
-    // ⚠ 무통장 미입금 건은 애초에 인원 카운트(+1)가 안 된 상태이므로 -1 차감에서 제외 (v7.0).
-    //   카운트 시점: 카드=success.php 즉시 / 무통장=관리자 [결제확인](confirm_vbank, vbankPaidAt 기록).
-    //   따라서 'vbank 인데 vbankPaidAt 이 없으면' 한 번도 카운트 안 된 건 → 차감 스킵.
-    $wasCounted = !(($beforeBooking['paymentMethod'] ?? '') === 'vbank' && empty($beforeBooking['vbankPaidAt']));
-    if ($partyId !== '' && $wasCounted) {
-        $countsFile = "$dataDir/party_counts.json";
-        $fp = fopen($countsFile, 'c+');
-        if ($fp) {
-            flock($fp, LOCK_EX);
-            $raw = stream_get_contents($fp);
-            $counts = $raw ? json_decode($raw, true) : [];
-            if (!is_array($counts)) $counts = [];
-            // 파티 신청 인원 -1, 참가 구성 예약이면 예약에 저장된 회차 인원도 각각 -1
-            countsAdjust($counts, $partyId, $genderKey, array_map('strval', (array)($beforeBooking['sessionIds'] ?? [])), -1);
-            ftruncate($fp, 0); rewind($fp); fwrite($fp, json_encode($counts));
-            fflush($fp); flock($fp, LOCK_UN); fclose($fp);
-        }
-    }
-    // 참가확정 인원 -1 — 참가확정 자리를 차지하던 예약만
-    $heldSeat = releaseConfirmedSeat(is_array($beforeBooking) ? $beforeBooking : []);
-
-    // 사용했던 쿠폰이 있으면 사용 이력 해제 — 재사용 가능하도록 복원
-    releaseCouponUsage((string)($beforeBooking['couponCode'] ?? ''), $email);
+    // 결제 인원 -1(무통장 미입금 제외) · 참가확정 인원 -1 · 쿠폰 사용 이력 해제 — 공통 처리 (_booking_cancel.php)
+    $rel = bookingReleaseAfterCancel($email, is_array($beforeBooking) ? $beforeBooking : []);
+    ['partyId' => $partyId, 'gender' => $gender, 'wasCounted' => $wasCounted, 'heldSeat' => $heldSeat] = $rel;
 
     @file_put_contents($dataDir . '/_admin_cancellations.log', sprintf(
         "[%s] CANCELLED email=%s bid=%s partyId=%s gender=%s\n",

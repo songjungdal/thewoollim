@@ -290,6 +290,149 @@ function partiesOverStock(array $partyIds, array $partyMap, string $genderKey): 
     return $over;
 }
 
+// ─── 모집 마감 판정 (docs/specs/party-recruit-close-cancel.md 2장) ─────────────
+// 화면 app/lib/data.ts partyRecruitState 와 같은 규칙 (AGENTS.md 6장). 모든 시각은 한국 시간.
+//   parties.json 파티 항목: recruitMode "auto"(없으면)|"closed"|"open", recruitModeBy·recruitModeAt,
+//   cancelledAt·cancelledBy·cancelReason (cancelledAt 이 있으면 취소된 파티)
+const RECRUIT_CLOSE_BEFORE_MIN = 30;   // 자동 마감 — 시작 몇 분 전 (화면 RECRUIT_CLOSE_BEFORE_MIN 과 같은 값)
+// 모집 상태·파티 취소 정보 — 전용 동작(admin/parties.php recruit·cancel_party)으로만 바뀌고, 파티 수정 저장으로는 바뀌지 않는다
+const PARTY_RECRUIT_CANCEL_FIELDS = ['recruitMode', 'recruitModeBy', 'recruitModeAt', 'cancelledAt', 'cancelledBy', 'cancelReason', 'cancelSms'];
+
+/** "YYYY-MM-DD" + "HH:MM" → 그 한국 시각의 타임스탬프. 형식이 맞지 않으면 null */
+function kstTimestamp(string $date, string $hhmm): ?int {
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) return null;
+    if (!preg_match('/^(\d{1,2}):(\d{2})$/', trim($hhmm), $m)) return null;
+    $dt = DateTimeImmutable::createFromFormat('!Y-m-d H:i', sprintf('%s %02d:%s', $date, (int)$m[1], $m[2]), new DateTimeZone('Asia/Seoul'));
+    return $dt ? $dt->getTimestamp() : null;
+}
+
+/** 파티 시작 = calendarDate + dateString 의 HH:MM (없으면 그날 23:59:59). 날짜가 없으면 0 */
+function partyStartTs(array $party): int {
+    $cd = (string)($party['calendarDate'] ?? '');
+    if (preg_match('/(\d{1,2}):(\d{2})/', (string)($party['dateString'] ?? ''), $m)) {
+        $ts = kstTimestamp($cd, $m[1] . ':' . $m[2]);
+        if ($ts !== null) return $ts;
+    }
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $cd)) return 0;
+    $dt = DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', $cd . ' 23:59:59', new DateTimeZone('Asia/Seoul'));
+    return $dt ? $dt->getTimestamp() : 0;
+}
+
+function normalizeRecruitMode($v): string {
+    return $v === 'closed' || $v === 'open' ? $v : 'auto';
+}
+
+function partyIsCancelled(array $party): bool {
+    return !empty($party['cancelledAt']);
+}
+
+/** 항목 하나의 판정 — 2(시작 지남)·3(관리자 마감)·4(마감 해제)·5(30분 전) */
+function recruitJudgeItem(int $startTs, string $mode, int $now): array {
+    $closeTs = $startTs - RECRUIT_CLOSE_BEFORE_MIN * 60;
+    $state = $now >= $startTs ? 'ended'
+        : ($mode === 'closed' ? 'closed_admin'
+        : ($mode === 'open' ? 'open_forced'
+        : ($now >= $closeTs ? 'closed_auto' : 'open')));
+    return ['state' => $state, 'closed' => !in_array($state, ['open', 'open_forced'], true), 'startTs' => $startTs, 'closeTs' => $closeTs];
+}
+
+/**
+ * 파티 모집 상태 (명세 2-3, 위에서부터 먼저 맞는 것)
+ *   cancelled → ended → closed_admin → open_forced → closed_auto → full → open
+ *  - 참가 구성 솔로파티: 항목마다 "포함 회차 중 가장 이른 회차 시작"으로 판정, 모든 항목이 마감이면 파티 전체가 마감
+ *  - $countsRow(참가확정 인원의 그 파티 값)를 주면 정원 마감(full)도 본다 — 마감 해제를 해도 자리가 없으면 마감.
+ *    결제 서버는 정원을 기존 검사(partiesOverStock 등)로 따로 보므로 $countsRow 없이 부른다.
+ * 반환: ['state','closed','startTs','closeTs','options' => [optionId => 같은 모양], 'sessions' => [[id,name,startTs,closeTs]...]]
+ */
+function partyRecruitState(array $party, int $now, ?array $countsRow = null): array {
+    $mode = normalizeRecruitMode($party['recruitMode'] ?? null);
+    $partyStart = partyStartTs($party);
+    $hasOptions = partyHasOptions($party);
+    $sessions = [];
+    if ($hasOptions) {
+        foreach ((array)$party['sessions'] as $s) {
+            if (!is_array($s)) continue;
+            $ts = kstTimestamp((string)($party['calendarDate'] ?? ''), (string)($s['startTime'] ?? ''));
+            if ($ts === null) continue;
+            $sessions[] = ['id' => (string)($s['id'] ?? ''), 'name' => (string)($s['name'] ?? ''), 'startTs' => $ts, 'closeTs' => $ts - RECRUIT_CLOSE_BEFORE_MIN * 60];
+        }
+    }
+    if (partyIsCancelled($party)) {
+        $base = ['state' => 'cancelled', 'closed' => true, 'startTs' => $partyStart, 'closeTs' => $partyStart - RECRUIT_CLOSE_BEFORE_MIN * 60];
+        $opts = [];
+        if ($hasOptions) foreach ((array)$party['options'] as $o) if (is_array($o)) $opts[(string)($o['id'] ?? '')] = $base;
+        return $base + ['options' => $opts, 'sessions' => $sessions];
+    }
+    $full = false;
+    if ($countsRow !== null) {
+        $left = partyRemainingSeats($party, $countsRow);
+        $full = $left['male'] <= 0 && $left['female'] <= 0;
+    }
+    if (!$hasOptions) {
+        $r = recruitJudgeItem($partyStart, $mode, $now);
+        if (!$r['closed'] && $full) $r = ['state' => 'full', 'closed' => true] + $r;
+        return $r + ['options' => [], 'sessions' => $sessions];
+    }
+    $startById = [];
+    foreach ($sessions as $s) $startById[$s['id']] = $s['startTs'];
+    $opts = [];
+    foreach ((array)$party['options'] as $o) {
+        if (!is_array($o)) continue;
+        $starts = [];
+        foreach ((array)($o['sessionIds'] ?? []) as $sid) {
+            if (isset($startById[(string)$sid])) $starts[] = $startById[(string)$sid];
+        }
+        $opts[(string)($o['id'] ?? '')] = recruitJudgeItem($starts ? min($starts) : $partyStart, $mode, $now);
+    }
+    if (!$opts) return recruitJudgeItem($partyStart, $mode, $now) + ['options' => [], 'sessions' => $sessions];
+    // 파티 대표 시각 — 아직 신청할 수 있는 항목 중 가장 늦게 마감되는 것(없으면 전체 중 가장 늦은 것)
+    $pick = function (array $list): array {
+        $best = null;
+        foreach ($list as $i) if ($best === null || $i['closeTs'] > $best['closeTs']) $best = $i;
+        return $best;
+    };
+    $openItems = array_filter($opts, fn($i) => !$i['closed']);
+    if ($openItems) {
+        $rep = $pick($openItems);
+        $state = $full ? 'full' : ($mode === 'open' ? 'open_forced' : 'open');
+        return ['state' => $state, 'closed' => $full] + $rep + ['options' => $opts, 'sessions' => $sessions];
+    }
+    $allEnded = !array_filter($opts, fn($i) => $i['state'] !== 'ended');
+    $state = $allEnded ? 'ended' : ($mode === 'closed' ? 'closed_admin' : 'closed_auto');
+    return ['state' => $state, 'closed' => true] + $pick($opts) + ['options' => $opts, 'sessions' => $sessions];
+}
+
+/**
+ * 결제 서버 검사 (명세 4장) — 이 파티(참가 구성은 고른 항목)가 지금 신청을 받지 않으면 true.
+ * 취소·모집종료·관리자 마감·30분 전 자동 마감. 정원은 결제 서버의 기존 검사가 따로 본다.
+ */
+function partyRecruitClosedFor(array $party, string $optionId, int $now): bool {
+    $r = partyRecruitState($party, $now);
+    if ($optionId !== '' && isset($r['options'][$optionId])) return (bool)$r['options'][$optionId]['closed'];
+    return (bool)$r['closed'];
+}
+
+/**
+ * 결제 요청(pending.php · vbank-submit.php)의 파티 중 신청을 받지 않는 파티 제목 목록 — 비어 있지 않으면 409 RECRUIT_CLOSED.
+ *   $optionIdsIn: 요청의 optionIds (partyId => optionId). 없는 파티는 건너뛴다(결제 서버의 기존 404 처리).
+ */
+function recruitClosedTitles(array $partyIds, array $partyMap, array $optionIdsIn, int $now): array {
+    $titles = [];
+    foreach ($partyIds as $pid) {
+        if (!isset($partyMap[$pid]) || !is_array($partyMap[$pid])) continue;
+        $oid = $optionIdsIn[$pid] ?? '';
+        if (partyRecruitClosedFor($partyMap[$pid], is_scalar($oid) ? (string)$oid : '', $now)) {
+            $titles[] = (string)($partyMap[$pid]['title'] ?? "파티 #$pid");
+        }
+    }
+    return $titles;
+}
+
+/** 모집 마감 거절 응답 (명세 4장) — 409 { ok:false, code:"RECRUIT_CLOSED", error } */
+function failRecruitClosed(array $titles): void {
+    jsonFail('모집이 마감된 파티가 있습니다: ' . implode(', ', array_unique($titles)), 409, ['code' => 'RECRUIT_CLOSED']);
+}
+
 // ─── 참가 구성 (회차 sessions · 참가 항목 options) — 솔로파티 전용 ─────────────
 // 명세: docs/specs/party-options-solo.md. options 가 없는 파티는 지금과 똑같이 동작한다.
 //   회차   : { id:"s1", name, startTime:"HH:MM", maleStock, femaleStock }  1~5개, 시작 시각 순서

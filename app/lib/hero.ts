@@ -128,9 +128,10 @@ export type HeroPartyInfo = {
   imageUrl: string | null;
   maleLeft: number;
   femaleLeft: number;
-  open: boolean;        // 모집중 = 행사 전 && (남 잔여 > 0 || 여 잔여 > 0)
+  open: boolean;        // 모집중 = 행사 전 && 모집 마감 아님(관리자 마감·30분 전 자동 마감·취소 제외) && (남 잔여 > 0 || 여 잔여 > 0)
   almostFull: boolean;  // 모집중이면서 남·여 잔여 합계 3 이하
-  ended: boolean;       // 행사 일시 지남
+  ended: boolean;       // 행사 일시 지남 (취소된 파티 포함)
+  cancelled?: boolean;  // 취소된 파티
 };
 
 export const DEFAULT_HERO_CONFIG: HeroConfig = {

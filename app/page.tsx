@@ -42,7 +42,8 @@ export default async function Page() {
   const parties = await getBuildTimeParties();
   // 종료 후 오래 지나 메인에서 빠지는 파티는 정적 HTML 에도 넣지 않는다 (화면이 열린 뒤 규칙과 같음)
   const now = new Date();
-  const initialParties = parties ? parties.filter(p => partyVisibility(p, now) !== "expired") : undefined;
+  // 취소된 파티도 넣지 않는다 (docs/specs/party-recruit-close-cancel.md 3장)
+  const initialParties = parties ? parties.filter(p => partyVisibility(p, now) !== "expired" && !p.cancelledAt) : undefined;
   // 빌드 시점에 이미 시작한(지난) 파티 — 정적 HTML 의 카드를 '신청하기' 대신 종료로 그린다.
   // 한국 시간 기준으로 서버에서 정해 넘기므로, 하이드레이션 때 브라우저도 같은 값을 써서 첫 화면이 어긋나지 않는다.
   const endedAtBuild = initialParties?.filter(p => partyStartedBy(p, now)).map(p => p.id);

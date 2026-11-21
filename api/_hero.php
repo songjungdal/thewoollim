@@ -127,10 +127,13 @@ function heroPartyInfos(): array {
     foreach ($parties as $p) {
         if (!is_array($p) || empty($p['id'])) continue;
         $pid  = (string)$p['id'];
-        $left = partyRemainingSeats($p, is_array($counts[$pid] ?? null) ? $counts[$pid] : []);
+        $row  = is_array($counts[$pid] ?? null) ? $counts[$pid] : [];
+        $left = partyRemainingSeats($p, $row);
         $ts   = heroPartyEventTs($p);
-        $ended = $ts <= $now || (($p['status'] ?? '') === 'completed');
-        $open  = !$ended && ($left['male'] > 0 || $left['female'] > 0);
+        // 모집 상태 — 취소·시작·관리자 마감·30분 전 자동 마감·정원 마감이면 슬라이드에서 뺀다 (docs/specs/party-recruit-close-cancel.md)
+        $recruit = partyRecruitState($p, $now, $row);
+        $ended = $ts <= $now || (($p['status'] ?? '') === 'completed') || in_array($recruit['state'], ['ended', 'cancelled'], true);
+        $open  = !$ended && !$recruit['closed'] && ($left['male'] > 0 || $left['female'] > 0);
         $img   = (string)($p['imageUrl'] ?? '');
         $out[] = [
             'partyId'      => $pid,
@@ -144,6 +147,7 @@ function heroPartyInfos(): array {
             'open'         => $open,
             'almostFull'   => $open && ($left['male'] + $left['female']) <= 3,
             'ended'        => $ended,
+            'cancelled'    => partyIsCancelled($p),
             'eventTs'      => $ts,
         ];
     }

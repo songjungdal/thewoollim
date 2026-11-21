@@ -387,7 +387,7 @@ function PartyCard({ cfg, info, index, total, onMove, onRemove, onChange, analys
     ? { text: "삭제된 파티", cls: "bg-gray-200 text-gray-600", excluded: true }
     : info.open
       ? info.almostFull ? { text: "마감임박", cls: "bg-red-600 text-white", excluded: false } : { text: "모집중", cls: "bg-brand-point text-black", excluded: false }
-      : { text: info.ended ? "종료" : "마감", cls: "bg-gray-200 text-gray-600", excluded: true };
+      : { text: info.cancelled ? "취소됨" : info.ended ? "종료" : "마감", cls: "bg-gray-200 text-gray-600", excluded: true };
   const own = !!(cfg.imagePc || cfg.imageMo);
   return (
     <div className="rounded-xl border border-gray-200 p-4">

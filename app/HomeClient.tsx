@@ -16,7 +16,7 @@ import GalleryGrid from "./components/gallery/GalleryGrid";
 import GalleryAllSheet from "./components/gallery/GalleryAllSheet";
 import GalleryLightbox from "./components/gallery/GalleryLightbox";
 import type { GalleryItem } from "./components/gallery/types";
-import { PARTICIPANTS, FAQS, partyStockStatus, withLiveCounts, partyVisibility, categoryLabel, partyTypeOf, PARTY_TYPES, type Party, type PartyType, type AllowedMaritalStatus } from "./lib/data";
+import { PARTICIPANTS, FAQS, partyStockStatus, withLiveCounts, partyVisibility, partyRecruitState, stockWithRecruit, categoryLabel, partyTypeOf, PARTY_TYPES, type Party, type PartyType, type AllowedMaritalStatus } from "./lib/data";
 import { useAuth } from "./context/AuthContext";
 import { useParties, PARTIES_NOT_LOADED } from "./lib/useParties";
 import { daysUntil } from "./lib/refund";
@@ -129,8 +129,10 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
   const galleryShown = galleryItems.length > 0 ? galleryItems : GALLERY_FALLBACK;
   const [liveMembers, setLiveMembers] = useState<typeof PARTICIPANTS>([]);
   const { partyCounts } = useAuth();
-  const PARTIES = useParties(initialParties);
-  const partiesLoaded = PARTIES !== PARTIES_NOT_LOADED;
+  const LIVE_PARTIES = useParties(initialParties);
+  const partiesLoaded = LIVE_PARTIES !== PARTIES_NOT_LOADED;
+  // 취소된 파티는 메인(파티 신청·일정·캘린더)에서 숨긴다 — 상세 주소로 들어오면 취소 안내 (docs/specs/party-recruit-close-cancel.md 3장)
+  const PARTIES = useMemo(() => partiesLoaded ? LIVE_PARTIES.filter(p => !p.cancelledAt) : LIVE_PARTIES, [LIVE_PARTIES, partiesLoaded]);
   const router = useRouter();
 
   // 후기 갤러리 fetch — 관리자 변경 시 BroadcastChannel('woollim_gallery') 으로 즉시 동기화
@@ -373,11 +375,13 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
       return a.calendarDate.localeCompare(b.calendarDate);
     });
 
+    // 모집종료 = 시작 시각이 지남 (참가 구성 파티는 모든 항목의 시작이 지남 — partyRecruitState)
+    const endedNow = (p: Party) => partyRecruitState(p, now).state === "ended";
     return filtered
       .filter(p => partyVisibility(p, now) !== "expired")        // 종료 21일 초과 → 노출 제외
       .sort((a, b) => {
-        const ra = partyVisibility(a, now) === "active" ? 0 : 1; // active 우선, ended 후순위
-        const rb = partyVisibility(b, now) === "active" ? 0 : 1;
+        const ra = endedNow(a) ? 1 : 0; // 모집종료 전 우선, 종료 후순위
+        const rb = endedNow(b) ? 1 : 0;
         if (ra !== rb) return ra - rb;
         return a.calendarDate.localeCompare(b.calendarDate);     // 그룹 내부는 기존 날짜 오름차순 유지
       });
@@ -396,10 +400,13 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
   const scheduleStatus = useMemo(() => {
     const map: Record<string, { status: ScheduleStatus | null; maleRemaining: number; femaleRemaining: number; hasOptions: boolean; remainingLabel: string }> = {};
     PARTIES.forEach(p => {
-      const stock = partyStockStatus(withLiveCounts(p, partyCounts[p.id]));
+      const live = withLiveCounts(p, partyCounts[p.id]);
+      // 모집 마감(관리자·30분 전 자동)은 정원 마감과 같은 "마감"으로 (docs/specs/party-recruit-close-cancel.md 3장)
+      const recruit = now ? partyRecruitState(live, now) : null;
+      const stock = recruit ? stockWithRecruit(partyStockStatus(live), recruit) : partyStockStatus(live);
       let status: ScheduleStatus | null = null;
-      if (now) {
-        if (partyVisibility(p, now) !== "active") status = "past";
+      if (now && recruit) {
+        if (recruit.state === "ended") status = "past";
         else if (stock.allFull) status = "full";
         else if (stock.nearlyFull) status = "soon";
         else status = "open";
@@ -412,7 +419,7 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
   // 일정 섹션(모바일 리스트 + 데스크탑 캘린더) — 행사 일시 경과한 이벤트에 'fc-event-ended' 클래스 부여.
   // 칩 색은 eventContent 가 상태(extendedProps.status)로 정한다. 다른 카테고리 탭/필터·데이터 쿼리에는 무영향.
   const CALENDAR_EVENTS = useMemo(() => PARTIES.map(p => {
-    const past = now ? partyVisibility(p, now) !== "active" : false;
+    const past = now ? partyRecruitState(p, now).state === "ended" : false;
     const m = (p.dateString ?? "").match(/(\d{1,2}):(\d{2})/);
     const start = m
       ? `${p.calendarDate}T${m[1].padStart(2, "0")}:${m[2]}:00`
@@ -623,10 +630,13 @@ export default function HomeClient({ initialParties, endedAtBuild }: { initialPa
                 {visibleParties.map(card => {
                   // 실시간 결제완료 인원만 노출 — 카운트 없으면 0으로 강제 (시드/테스트 데이터 무시)
                   // 모집 마감은 partyStockStatus 결과 (참가 구성 파티는 모든 항목이 마감일 때, 명세 8-3)
-                  const stock = partyStockStatus(withLiveCounts(card, partyCounts[card.id]));
+                  // 관리자 마감·시작 30분 전 자동 마감도 정원 마감과 같은 "모집 마감" 모양 (partyRecruitState, docs/specs/party-recruit-close-cancel.md 3장)
+                  const live = withLiveCounts(card, partyCounts[card.id]);
+                  const recruit = now ? partyRecruitState(live, now) : null;
+                  const stock = recruit ? stockWithRecruit(partyStockStatus(live), recruit) : partyStockStatus(live);
                   // 행사 일시 경과 → 모집 종료 카드 UI (배너 흐리게, [모집 종료된 파티] 표시). 카드는 다른 카드처럼 상세페이지로 이동
                   // 마운트 뒤: 브라우저 시각으로 실시간 판단 / 마운트 전(정적 HTML): 빌드 시점 판단
-                  const isEnded = now ? partyVisibility(card, now) === "ended" : endedAtBuildSet.has(card.id);
+                  const isEnded = recruit ? recruit.state === "ended" : endedAtBuildSet.has(card.id);
                   // 모집 중 = 종료 전이고 마감 아님 — D-day 배지·솔로파티 사이키 테두리는 이때만
                   const recruiting = !isEnded && !stock.allFull;
                   const days = now && recruiting ? daysUntil(card.calendarDate, now) : null;

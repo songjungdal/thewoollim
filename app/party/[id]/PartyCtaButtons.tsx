@@ -7,7 +7,8 @@ import { ShoppingBag } from "lucide-react";
  * 버튼 쪽에서는 조건을 다시 만들지 않는다 (하단 고정 바의 모바일형·PC형이 같은 상태·핸들러를 쓴다).
  */
 export type PartyCtaState = {
-  ended: boolean;          // 행사일 경과(모집종료) — 두 버튼 모두 비활성, "모집 마감"
+  ended: boolean;          // 행사일 경과(모집종료)·취소된 파티 — 두 버튼 모두 비활성, "모집 마감"(취소는 endedLabel)
+  endedLabel?: string;     // ended 일 때 버튼 글자 — 없으면 "모집 마감" (취소된 파티: "취소된 파티")
   hardDisabled: boolean;   // 정원·자격 사유 — 누를 수 없음
   grayedOut: boolean;      // 회색 표시 (이미 신청한 파티는 회색이지만 누를 수 있음 — 마이페이지 안내)
   clickableGray: boolean;  // 회색이지만 누를 수 있음 (이미 신청한 파티)
@@ -50,7 +51,7 @@ export default function PartyCtaButtons({ state, onCheckout, onAddToCart }: {
           gray ? grayCls : "bg-brand-black text-white hover:bg-brand-point hover:text-black"
         }`}
       >
-        {state.ended ? "모집 마감" : state.label}
+        {state.ended ? (state.endedLabel ?? "모집 마감") : state.label}
       </button>
     </div>
   );
