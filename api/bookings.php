@@ -51,6 +51,16 @@ foreach ($d as $b) {
         'createdAt' => (string)($b['createdAt']  ?? ''),
         'updatedAt' => (string)($b['updatedAt']  ?? ''),
     ];
+    // 파티 취소로 취소된 예약 — 마이페이지 "파티 취소 · 전액 환불" / 무통장 "환불 송금 예정·송금 완료" 표시용 (docs/specs/party-recruit-close-cancel.md 3장)
+    if ((string)($b['cancelReason'] ?? '') === 'party_cancelled') {
+        $row = &$out[count($out) - 1];
+        $row['cancelReason']  = 'party_cancelled';
+        $row['paymentMethod'] = (string)($b['paymentMethod'] ?? '') === 'vbank' ? 'vbank' : 'card';
+        if (is_array($b['manualRefund'] ?? null)) {
+            $row['manualRefundStatus'] = (string)($b['manualRefund']['status'] ?? '') === 'done' ? 'done' : 'pending';
+        }
+        unset($row);
+    }
     // 참가 구성 예약 — 결제 시점 사본 (항목 이름·포함 회차·회차 시작 시각)
     if (!empty($b['optionId'])) {
         $row = &$out[count($out) - 1];

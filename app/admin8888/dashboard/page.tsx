@@ -19,6 +19,7 @@ import VerificationReview from "./VerificationReview";
 import PaylinkAdmin from "./PaylinkAdmin";
 import VerificationPhotoButton from "./VerificationPhotoButton";
 import PartyOptionsEditor from "./PartyOptionsEditor";
+import { RecruitChip, RecruitButtons, RecruitBar, PartyCancelPanel } from "./PartyRecruitControls";
 import DiscountArrow from "../../components/DiscountArrow";
 import DiscountBadge from "../../components/DiscountBadge";
 import {
@@ -754,6 +755,8 @@ export default function AdminDashboard() {
       ? { ...prev, notice: defaultNotice(t, m === "options") } : prev);
   };
 
+  // 수정 중인 파티의 공개 데이터 (모집 상태·취소 정보) — 모집 마감·파티 취소 컨트롤용
+  const editingParty = partyEditMode === "edit" && partyForm.id ? PARTIES.find(p => p.id === partyForm.id) ?? null : null;
   const openPartyCreate = () => { setPartyForm(EMPTY_PARTY); resetPartyModal(); setPartyEditMode("create"); setPartyFormDirty(false); };
   const openPartyEdit = async (id: string) => {
     const p = PARTIES.find(x => x.id === id);
@@ -2324,6 +2327,11 @@ export default function AdminDashboard() {
                           {(adminPartyRows[p.id]?.couponDisabled ?? p.couponDisabled) && (
                             <span className="ml-1.5 inline-block align-middle px-1.5 py-0.5 rounded bg-gray-100 border border-gray-200 text-gray-600 text-xs font-bold">쿠폰불가</span>
                           )}
+                          {/* 모집 상태 칩 + [모집 마감]/[마감 해제]/[다시 자동 마감으로] (docs/specs/party-recruit-close-cancel.md 5장) */}
+                          <div className="mt-1 flex flex-wrap items-start gap-1.5 font-normal">
+                            <RecruitChip party={p} />
+                            <RecruitButtons party={p} compact onChanged={loadAll} />
+                          </div>
                         </td>
                         <td className="px-3 py-3 text-gray-600">{p.dateString}</td>
                         <td className="px-3 py-3 text-gray-600 max-w-[200px] truncate" title={p.location}>{p.location}</td>
@@ -2402,6 +2410,10 @@ export default function AdminDashboard() {
                           <p className="mt-1 text-[15px] font-black leading-snug break-keep">{p.title}</p>
                           <p className="mt-0.5 text-[13px] text-gray-600 break-keep">{p.dateString}</p>
                           <p className="text-[13px] text-gray-600 break-keep">{p.location}</p>
+                          <div className="mt-1.5 flex flex-wrap items-start gap-1.5">
+                            <RecruitChip party={p} />
+                            <RecruitButtons party={p} compact onChanged={loadAll} />
+                          </div>
                         </div>
                       </div>
                       <dl className="mt-3 bg-gray-50 rounded-xl p-3 grid grid-cols-[52px_minmax(0,1fr)] gap-x-2 gap-y-1.5 text-[13px]">
@@ -2482,6 +2494,8 @@ export default function AdminDashboard() {
                     </div>
                     {/* 스크롤 가능한 본문 */}
                     <div className="flex-1 overflow-y-auto overscroll-contain p-4 md:p-7 space-y-4">
+                      {/* 수정 화면 상단 — 모집 상태와 [모집 마감]/[마감 해제] (docs/specs/party-recruit-close-cancel.md 5장) */}
+                      {partyEditMode === "edit" && editingParty && <RecruitBar party={editingParty} onChanged={loadAll} />}
                       {partyModalTab === "detail" ? (
                         partyDetail && partyForm.partyType ? (
                           <PartyDetailEditor
@@ -2873,6 +2887,12 @@ export default function AdminDashboard() {
 
                         </div>
                       </div>
+                      )}
+                      {/* 수정 화면 하단 — [파티 취소] (기존 [삭제]와 떨어진 곳, 명세 6-1). 취소된 파티는 남은 환불·무통장 송금 목록 */}
+                      {partyEditMode === "edit" && editingParty && partyModalTab === "basic" && (
+                        <div className="pt-6 mt-2 border-t border-dashed border-gray-200">
+                          <PartyCancelPanel party={editingParty} onChanged={loadAll} />
+                        </div>
                       )}
                     </div>
                     {/* 고정 푸터 */}

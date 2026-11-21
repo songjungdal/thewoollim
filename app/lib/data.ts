@@ -79,6 +79,9 @@ export type Party = {
   // 솔로파티 참가 구성 (docs/specs/party-options-solo.md) — 있으면 남은 자리·마감은 회차 기준(partyStockStatus)
   sessions?: PartySession[];   // 회차 (maleBooked/femaleBooked = 회차별 신청 인원)
   options?: PartyOption[];     // 참가 항목 (항목 가격·포함 회차)
+  // 모집 마감·파티 취소 (docs/specs/party-recruit-close-cancel.md) — 판정은 partyRecruitState
+  recruitMode?: RecruitMode;   // "auto"(없으면 이것) | "closed"(관리자 마감) | "open"(관리자 마감 해제)
+  cancelledAt?: string;        // 파티 취소 일시 — 있으면 취소된 파티 (신청 불가, 메인·일정·히어로에서 숨김)
 };
 
 // 예시 파티 목록(PARTIES)은 정적 HTML·화면에 가짜 파티가 비치지 않도록 삭제했다.
@@ -266,17 +269,166 @@ export function dateOnly(dateString: string): string {
 export const PARTY_HIDE_AFTER_DAYS = 21;
 
 /**
- * 파티 행사 일시 → Date 객체.
- *   - calendarDate (YYYY-MM-DD) + dateString 내부 "HH:MM" 부분을 결합 (로컬 시간대)
+ * 파티 행사 일시 → Date 객체 (한국 시간, 기기 시간대와 무관 — app/lib/partySeo.ts 와 같은 +09:00 계산).
+ *   - calendarDate (YYYY-MM-DD) + dateString 내부 "HH:MM" 부분을 결합
  *   - dateString 에서 시간 추출 실패 시 해당 날짜의 23:59:59 로 폴백 → 당일 자정 직전까지는 "진행 중"
  */
 export function partyEventDate(party: Pick<Party, "calendarDate" | "dateString">): Date {
   const m = (party.dateString || "").match(/(\d{1,2}):(\d{2})/);
-  if (party.calendarDate && m) {
-    return new Date(`${party.calendarDate}T${m[1].padStart(2, "0")}:${m[2]}:00`);
-  }
-  if (party.calendarDate) return new Date(`${party.calendarDate}T23:59:59`);
+  const at = kstDateTime(party.calendarDate, m ? `${m[1]}:${m[2]}` : "");
+  if (at) return at;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(party.calendarDate || "")) return new Date(`${party.calendarDate}T23:59:59+09:00`);
   return new Date(0);
+}
+
+/** "YYYY-MM-DD" + "HH:MM" → 그 한국 시각의 Date. 형식이 맞지 않으면 null */
+export function kstDateTime(date: string | undefined, hhmm: string | undefined): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date || "")) return null;
+  const m = /^(\d{1,2}):(\d{2})$/.exec((hhmm || "").trim());
+  if (!m) return null;
+  return new Date(`${date}T${m[1].padStart(2, "0")}:${m[2]}:00+09:00`);
+}
+
+/** Date → 한국 시각 "HH:MM" */
+export function kstHHMM(d: Date): string {
+  return new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(d);
+}
+
+/** Date → 한국 날짜 "MM/DD" */
+export function kstMMDD(d: Date): string {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Seoul", month: "2-digit", day: "2-digit" }).formatToParts(d);
+  const get = (t: string) => parts.find(p => p.type === t)?.value ?? "";
+  return `${get("month")}/${get("day")}`;
+}
+
+// ─── 모집 마감 판정 (docs/specs/party-recruit-close-cancel.md 2장) ─────────────
+// 서버 api/lib.php partyRecruitState 와 같은 규칙 (AGENTS.md 6장).
+
+/** 자동 마감 — 시작 몇 분 전 (이 값 한 곳만 고친다. 서버 api/lib.php RECRUIT_CLOSE_BEFORE_MIN 과 같은 값) */
+export const RECRUIT_CLOSE_BEFORE_MIN = 30;
+
+export type RecruitMode = "auto" | "closed" | "open";
+
+/**
+ * 모집 상태 — 위에서부터 먼저 맞는 것 (명세 2-3)
+ *  cancelled    : 취소된 파티
+ *  ended        : 시작 시각이 지남 (모집종료)
+ *  closed_admin : 관리자 [모집 마감]
+ *  open_forced  : 관리자 [마감 해제] — 30분 전 규칙 무시 (정원 규칙은 그대로)
+ *  closed_auto  : 시작 30분 전이 지남 (자동 마감)
+ *  full         : 정원 마감 (partyStockStatus.allFull)
+ *  open         : 모집 중
+ */
+export type RecruitStateKind = "cancelled" | "ended" | "closed_admin" | "open_forced" | "closed_auto" | "full" | "open";
+
+export type ItemRecruit = {
+  state: RecruitStateKind;
+  closed: boolean;        // 신청 불가 (open·open_forced 만 false)
+  startAt: Date;          // 시작 시각 (참가 항목은 포함 회차 중 가장 이른 회차)
+  closeAt: Date;          // 자동 마감 시각 = 시작 − RECRUIT_CLOSE_BEFORE_MIN
+};
+
+export type PartyRecruit = ItemRecruit & {
+  /** 참가 구성 파티 — 항목별 판정 (정원은 항목·성별마다 partyStockStatus 가 따로 본다). 그 밖의 파티는 {} */
+  options: Record<string, ItemRecruit>;
+  /** 참가 구성 파티 — 회차별 시작·자동 마감 시각 (회차 순서) */
+  sessions: { id: string; name: string; startAt: Date; closeAt: Date }[];
+};
+
+export function normalizeRecruitMode(v: unknown): RecruitMode {
+  return v === "closed" || v === "open" ? v : "auto";
+}
+
+const isClosedKind = (k: RecruitStateKind) => k !== "open" && k !== "open_forced";
+
+function judgeItem(startAt: Date, mode: RecruitMode, now: Date): ItemRecruit {
+  const closeAt = new Date(startAt.getTime() - RECRUIT_CLOSE_BEFORE_MIN * 60_000);
+  const t = now.getTime();
+  const state: RecruitStateKind =
+    t >= startAt.getTime() ? "ended"
+    : mode === "closed" ? "closed_admin"
+    : mode === "open" ? "open_forced"
+    : t >= closeAt.getTime() ? "closed_auto"
+    : "open";
+  return { state, closed: isClosedKind(state), startAt, closeAt };
+}
+
+/**
+ * 파티 모집 상태 (명세 2-3). 신청 인원은 호출 전에 withLiveCounts 로 입혀 둔다 (정원 마감 판정용).
+ *  - 참가 구성 솔로파티: 항목마다 "포함 회차 중 가장 이른 회차 시작"으로 시작·30분 전·관리자 설정을 판정.
+ *    모든 항목이 마감이면 파티 전체가 마감 (모두 시작이 지났으면 모집종료).
+ *  - 정원 마감(6)은 시간·관리자 판정에서 모집 중일 때만 본다 — 마감 해제를 해도 자리가 없으면 마감.
+ */
+export function partyRecruitState(party: Party, now: Date): PartyRecruit {
+  const mode = normalizeRecruitMode(party.recruitMode);
+  const partyStart = partyEventDate(party);
+  const sessions = partyHasOptions(party)
+    ? (party.sessions ?? []).flatMap(s => {
+        const at = kstDateTime(party.calendarDate, s.startTime);
+        return at ? [{ id: s.id, name: s.name, startAt: at, closeAt: new Date(at.getTime() - RECRUIT_CLOSE_BEFORE_MIN * 60_000) }] : [];
+      })
+    : [];
+  if (party.cancelledAt) {
+    const base: ItemRecruit = { state: "cancelled", closed: true, startAt: partyStart, closeAt: new Date(partyStart.getTime() - RECRUIT_CLOSE_BEFORE_MIN * 60_000) };
+    const options: Record<string, ItemRecruit> = {};
+    for (const o of party.options ?? []) options[o.id] = { ...base };
+    return { ...base, options, sessions };
+  }
+  const stock = partyStockStatus(party);
+  if (!partyHasOptions(party)) {
+    const r = judgeItem(partyStart, mode, now);
+    if (!r.closed && stock.allFull) return { ...r, state: "full", closed: true, options: {}, sessions };
+    return { ...r, options: {}, sessions };
+  }
+  const byId = new Map(sessions.map(s => [s.id, s]));
+  const options: Record<string, ItemRecruit> = {};
+  for (const o of party.options ?? []) {
+    const starts = o.sessionIds.map(id => byId.get(id)?.startAt).filter((d): d is Date => !!d);
+    const start = starts.length ? new Date(Math.min(...starts.map(d => d.getTime()))) : partyStart;
+    options[o.id] = judgeItem(start, mode, now);
+  }
+  const items = Object.values(options);
+  const openItems = items.filter(i => !i.closed);
+  // 파티 대표 시각 — 아직 신청할 수 있는 항목 중 가장 늦게 마감되는 것(없으면 가장 늦게 시작하는 항목)
+  const pick = (list: ItemRecruit[]) => list.reduce((a, b) => (b.closeAt.getTime() > a.closeAt.getTime() ? b : a));
+  if (items.length === 0) {
+    const r = judgeItem(partyStart, mode, now);
+    return { ...r, options, sessions };
+  }
+  if (openItems.length > 0) {
+    const rep = pick(openItems);
+    if (stock.allFull) return { ...rep, state: "full", closed: true, options, sessions };
+    return { ...rep, state: mode === "open" ? "open_forced" : "open", closed: false, options, sessions };
+  }
+  const rep = pick(items);
+  const state: RecruitStateKind = items.every(i => i.state === "ended") ? "ended"
+    : mode === "closed" ? "closed_admin" : "closed_auto";
+  return { ...rep, state, closed: true, options, sessions };
+}
+
+/**
+ * 장바구니·결제 화면 한 줄 — 담긴 파티(참가 구성은 담은 항목)가 지금 신청을 받지 않는지 (명세 3장 "장바구니·결제 화면").
+ * 결제 서버(api/lib.php partyRecruitClosedFor)와 같은 판정 + 정원 마감(남녀 모두 마감). 신청 인원은 withLiveCounts 로 입혀 둔다.
+ */
+export function recruitClosedForLine(party: Party, optionId: string | null | undefined, now: Date): { closed: boolean; cancelled: boolean } {
+  const r = partyRecruitState(party, now);
+  if (r.state === "cancelled") return { closed: true, cancelled: true };
+  const item = optionId ? r.options[optionId] : undefined;
+  return { closed: item ? item.closed || r.state === "full" : r.closed, cancelled: false };
+}
+
+/**
+ * 모집 상태를 남은 자리 계산에 겹친다 — 시간·관리자 마감이면 allFull, 마감된 참가 항목은 남녀 모두 마감.
+ * 메인 카드·상세 버튼·항목 선택이 기존 "정원 마감"과 같은 모양으로 마감을 보여 주도록 (명세 3장).
+ * 마감 임박은 모집 중일 때만.
+ */
+export function stockWithRecruit(stock: PartyStock, recruit: PartyRecruit): PartyStock {
+  return {
+    ...stock,
+    allFull: stock.allFull || recruit.closed,
+    nearlyFull: stock.nearlyFull && !recruit.closed,
+    options: stock.options.map(o => recruit.options[o.id]?.closed ? { ...o, maleClosed: true, femaleClosed: true } : o),
+  };
 }
 
 export type PartyVisibility = "active" | "ended" | "expired";

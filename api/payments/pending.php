@@ -61,6 +61,10 @@ foreach ((array)$parties as $p) {
     if (isset($p['id'])) $partyMap[(string)$p['id']] = $p;
 }
 
+// ── 모집 마감 검사 — 취소·모집종료·관리자 마감·시작 30분 전 자동 마감이면 거절 (참가 구성은 고른 항목 기준, docs/specs/party-recruit-close-cancel.md 4장)
+$closedTitles = recruitClosedTitles($partyIds, $partyMap, $optionIdsIn, time());
+if ($closedTitles) failRecruitClosed($closedTitles);
+
 // ── 중복 신청 차단 (서버 방어선) — 동일 partyId 에 cancelled 가 아닌 booking 이 있으면 거절
 $bookingsFile = $dir . '/bookings_' . md5(strtolower(trim((string)$u['email']))) . '.json';
 if (file_exists($bookingsFile)) {

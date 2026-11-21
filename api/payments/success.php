@@ -13,6 +13,7 @@
  *       토스 결제 전액 자동 취소 후 실패 redirect. 확정 전 결제자 수는 보지 않는다 (관리자 [참가확정] 때 자리를 센다)
  *       (참가 구성이 있는 솔로파티는 고른 항목에 포함된 회차마다 정원 검사·증가. 항목이 사라졌거나 바뀌었으면 자동 취소)
  *       (파티 없음·쿠폰 검증 실패 등 승인 뒤 실패도 같은 autoCancelAndFail() 로 자동 취소)
+ *       (관리자가 취소한 파티도 같은 방식으로 자동 취소. 모집 마감(30분 전·관리자 마감)은 검사하지 않는다)
  *     - party_counts(결제 인원 기록) atomic +1
  *     - 쿠폰 atomic consume
  *     - booking 생성 (status: 솔로파티는 pending_approval, 매칭파티는 프로필 완성도에 따라 paid_pending_profile / pending_approval — 예약마다)
@@ -222,6 +223,14 @@ foreach ((array)$partiesJson as $p) {
 }
 
 $DEFAULT_COUNTS = [];
+
+// ── 취소된 파티 — 결제창을 연 뒤 관리자가 파티를 취소했으면 승인된 결제를 전액 자동 취소한다.
+//   모집 마감(30분 전·관리자 마감)은 검사하지 않는다 — 마감 전에 발급된 주문은 그대로 접수 (docs/specs/party-recruit-close-cancel.md 4장)
+foreach (array_unique($partyIds) as $pid) {
+    if (isset($partyMap[$pid]) && partyIsCancelled($partyMap[$pid])) {
+        autoCancelAndFail('주최측 사정으로 취소된 파티입니다', '파티 취소로 자동 취소', 'PARTY_CANCELLED', "partyId=$pid");
+    }
+}
 
 // ── 참가 항목 확인 (참가 구성이 있는 솔로파티) — 결제 준비 때 고른 항목이 지금도 그 파티에 있는지
 $pendingOptionIds = is_array($pending['optionIds'] ?? null) ? $pending['optionIds'] : [];

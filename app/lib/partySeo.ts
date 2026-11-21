@@ -78,7 +78,7 @@ export function partyStartedBy(p: Party, now: Date): boolean {
 export function partyEventJsonLd(p: Party, now: Date = new Date()) {
   const url = absoluteUrl(`/party/${p.id}/`);
   const start = partyStartIso(p);
-  const ended = partyStartedBy(p, now);
+  const ended = partyStartedBy(p, now) || !!p.cancelledAt;   // 취소된 파티는 신청 불가로
   const stock = partyStockStatus(p);
   const availability = (closed: boolean) => (ended ? AVAIL.ended : closed ? AVAIL.full : AVAIL.open);
 
@@ -103,7 +103,7 @@ export function partyEventJsonLd(p: Party, now: Date = new Date()) {
     name: p.title,
     description: partyDescription(p),
     ...(start ? { startDate: start } : {}),
-    eventStatus: "https://schema.org/EventScheduled",
+    eventStatus: p.cancelledAt ? "https://schema.org/EventCancelled" : "https://schema.org/EventScheduled",
     eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
     location: { "@type": "Place", name: p.location, address: p.location },
     image: [image],

@@ -81,6 +81,7 @@ if (!is_array($parties)) $parties = [];
 $targets = []; // partyId => ['party' => array]
 foreach ($parties as $p) {
     if (!is_array($p)) continue;
+    if (partyIsCancelled($p)) continue; // 취소된 파티는 안내하지 않는다 (docs/specs/party-recruit-close-cancel.md)
     $hit = _s2hInWindow(_s2hPartyStart($p), $now);
     if (!$hit && partyHasOptions($p)) {
         foreach ($p['sessions'] as $sess) {

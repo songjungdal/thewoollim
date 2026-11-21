@@ -9,7 +9,8 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useAuth, calcCouponDiscount } from "../context/AuthContext";
 import { useParties, PARTIES_NOT_LOADED } from "../lib/useParties";
-import { linePriceFor, partyHasOptions, partyOptionById, VBANK_ACCOUNT_LINE } from "../lib/data";
+import { linePriceFor, partyHasOptions, partyOptionById, recruitClosedForLine, withLiveCounts, VBANK_ACCOUNT_LINE } from "../lib/data";
+import { useMinuteNow } from "../lib/useMinuteNow";
 import PhotoGateModal from "../components/PhotoGateModal";
 import { fetchVerificationState, isPhotoGateCode, photoGateCode, type PhotoGateCode } from "../lib/verification";
 
@@ -48,8 +49,9 @@ function emailToCustomerKey(email: string): string {
 function CheckoutContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { mounted, isLoggedIn, userEmail, profile, appliedCoupon, bookings, refreshBookings, cart } = useAuth();
+  const { mounted, isLoggedIn, userEmail, profile, appliedCoupon, bookings, refreshBookings, cart, refreshCart, partyCounts } = useAuth();
   const PARTIES = useParties();
+  const now = useMinuteNow();
 
   // Toss redirect 실패 시 ?error=... 로 돌아옴 — 사용자에게 안내
   const errorMsg = searchParams.get("error") || "";
@@ -102,6 +104,16 @@ function CheckoutContent() {
   });
   // 참가 구성 파티인데 항목이 없거나 바뀐 경우 — 결제 불가 (상세에서 다시 고르도록 안내)
   const missingOptionParties = parties.filter(p => partyHasOptions(p) && !optionIds[p.id]);
+  // 모집 마감(시작 30분 전·관리자 마감·정원)·취소된 파티 — 결제 불가, 1분마다 다시 판정 (docs/specs/party-recruit-close-cancel.md 3장)
+  const lineClosed = (p: typeof PARTIES[number]) => now
+    ? recruitClosedForLine(withLiveCounts(p, partyCounts[p.id]), optionIds[p.id] ?? cart.find(c => c.partyId === p.id)?.optionId, now)
+    : { closed: false, cancelled: false };
+  const closedParties = parties.filter(p => lineClosed(p).closed);
+  // 결제 서버가 409 RECRUIT_CLOSED 로 거절 — 안내창을 띄우고 장바구니를 다시 읽는다 (명세 4장)
+  const handleRecruitClosed = async (message?: string) => {
+    alert(`${message || "모집이 마감된 파티가 있습니다."}\n마감된 파티를 장바구니에서 빼주세요.`);
+    await refreshCart();
+  };
 
   // 회원 성별 기반 단가 — priceMale/priceFemale 우선, 미설정 시 price 폴백. 참가 구성 파티는 고른 항목의 내 성별 가격
   const unitPrice = (p: typeof PARTIES[number]) => linePriceFor(p, profile?.gender, optionIds[p.id]) ?? 0;
@@ -220,6 +232,7 @@ function CheckoutContent() {
     if (paying)           { console.warn("[checkout] paying=true 이미 진행 중 — 중단"); return; }
     if (!userEmail)       { console.warn("[checkout] userEmail 없음 — 중단"); alert("로그인이 필요합니다."); router.push("/login"); return; }
     if (!profile?.gender) { console.warn("[checkout] 프로필 성별 미설정 — 중단"); alert("프로필 카드에서 성별을 먼저 등록해주세요."); router.push("/profile-setup/"); return; }
+    if (closedParties.length > 0) { alert(`모집이 마감된 파티가 있습니다: ${closedParties.map(p => p.title).join(", ")}\n마감된 파티를 장바구니에서 빼주세요.`); return; }
     if (missingOptionParties.length > 0) { alert(`참가 항목을 선택해주세요.\n파티 상세에서 항목을 다시 골라 장바구니에 담아주세요.\n\n· ${missingOptionParties.map(p => p.title).join(", ")}`); return; }
     if (totalAmount <= 0) { console.error("[checkout] totalAmount=0 — 결제 금액 비정상", { partyIds, totalAmount }); alert("결제 금액이 비정상입니다. 장바구니를 다시 확인해주세요."); return; }
 
@@ -265,6 +278,7 @@ function CheckoutContent() {
         if (!data?.ok) {
           setPaying(false);
           if (isPhotoGateCode(data?.code)) { await showPhotoGate(data.code); return; }
+          if (data?.code === "RECRUIT_CLOSED") { await handleRecruitClosed(data.error); return; }
           alert(data?.error || "무통장 입금 신청에 실패했습니다.");
           return;
         }
@@ -308,6 +322,7 @@ function CheckoutContent() {
         }
         setPaying(false);
         if (isPhotoGateCode(pending?.code)) { await showPhotoGate(pending.code); return; }
+        if (pending?.code === "RECRUIT_CLOSED") { await handleRecruitClosed(pending.error); return; }
         alert(pending?.error || "주문 정보 등록에 실패했습니다.");
         return;
       }
@@ -395,6 +410,11 @@ function CheckoutContent() {
                   <div key={party.id} className="bg-gray-50/70 rounded-xl md:rounded-2xl p-4 md:p-5 border border-gray-100">
                     <div className="flex items-start justify-between gap-3 mb-3 md:mb-4">
                       <h3 className="font-black text-base md:text-lg leading-snug min-w-0">
+                        {lineClosed(party).closed && (
+                          <span className="mr-1.5 align-middle inline-flex text-xs font-black text-white bg-gray-900 px-2 py-0.5 rounded-full whitespace-nowrap" data-testid="checkout-closed">
+                            {lineClosed(party).cancelled ? "취소된 파티" : "모집 마감"}
+                          </span>
+                        )}
                         {party.title}
                         {/* 솔로파티 참가 구성 — 고른 항목 이름 */}
                         {optionIds[party.id] && (
@@ -573,8 +593,10 @@ function CheckoutContent() {
             const amountValid   = totalAmount > 0;
             const partyIdsValid = partyIds.length > 0;
             const optionsValid  = missingOptionParties.length === 0;   // 참가 구성 파티는 항목이 있어야 결제
-            const canPay        = amountValid && partyIdsValid && optionsValid && !paying;
+            const recruitValid  = closedParties.length === 0;          // 모집 마감·취소된 파티가 있으면 결제 불가
+            const canPay        = amountValid && partyIdsValid && optionsValid && recruitValid && !paying;
             const reason        =
+              !recruitValid  ? `모집이 마감된 파티가 있습니다 (${closedParties.map(p => p.title).join(", ")}). 마감된 파티를 장바구니에서 빼주세요.` :
               !optionsValid  ? `참가 항목을 선택해주세요 (${missingOptionParties.map(p => p.title).join(", ")}). 파티 상세에서 항목을 골라 다시 담아주세요.` :
               !amountValid   ? "결제 금액이 비정상입니다." :
               !partyIdsValid ? "주문 항목이 비어있습니다." :

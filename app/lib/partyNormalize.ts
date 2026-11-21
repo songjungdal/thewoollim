@@ -1,5 +1,5 @@
 import { normalizeSessions, normalizeOptions } from "./partyOptions";
-import { TARGET_GROUPS, THEMES, LEGACY_THEMES, LOCATION_TAGS, partyTypeOf, type Party, type TargetGroup, type Theme, type LocationTag } from "./data";
+import { TARGET_GROUPS, THEMES, LEGACY_THEMES, LOCATION_TAGS, partyTypeOf, normalizeRecruitMode, type Party, type TargetGroup, type Theme, type LocationTag } from "./data";
 
 /**
  * /api/parties.php 응답 한 건 → Party.
@@ -42,6 +42,9 @@ export function normalizeParty(p: Record<string, unknown>): Party {
     couponDisabled: p.couponDisabled === true,
     // 할인율 — 0~90 정수(또는 숫자 1~2자리 문자열)만, 그 밖의 값은 0 = 할인 없음 (서버 api/lib.php partyDiscountRate 와 같은 규칙)
     discountRate: normalizeDiscountRate(p.discountRate),
+    // 모집 마감·파티 취소 (docs/specs/party-recruit-close-cancel.md) — 없으면 자동 마감(auto)·취소 안 됨
+    recruitMode: normalizeRecruitMode(p.recruitMode),
+    ...(typeof p.cancelledAt === "string" && p.cancelledAt !== "" ? { cancelledAt: p.cancelledAt } : {}),
     // 솔로파티 참가 구성 — 회차·항목이 모두 있을 때만 (없으면 기존 파티와 똑같이 동작)
     ...(sessions.length > 0 && options.length > 0 ? { sessions, options } : {}),
   };
